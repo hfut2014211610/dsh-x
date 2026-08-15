@@ -1,0 +1,27 @@
+{
+  "name": "@deepseek-ai/dsh-desktop-shell",
+  "description": "dsh desktop shell: the Electron sidecar window over the official dsh web runtime",
+  "version": "0.1.0-rc.5",
+  "publishConfig": {
+    "access": "public"
+  },
+  "repository": {
+    "type": "git",
+    "url": "git+https://github.com/deepseek-ai/deepseek-harness.git",
+    "directory": "apps/desktop"
+  },
+  "type": "module",
+  "main": "lib/main.js",
+  "files": [
+    "lib/*.js",
+    "preload.cjs",
+    "loading.html",
+    "loading.js"
+  ],
+  "license": "MIT",
+  "devDependencies": {
+    "electron": "^43.1.1",
+    "electron-builder": "^26.15.3",
+    "playwright": "^1.49.0"
+  }
+}

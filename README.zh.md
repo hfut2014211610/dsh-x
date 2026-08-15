@@ -6,6 +6,16 @@ DeepSeek Harness（`dsh`）是由 [DeepSeek AI](https://deepseek.com) 开发的�
 
 它采用**一切皆插件**的架构，并由 [Cordis](https://github.com/cordiverse/cordis) 驱动，其设计参见论文 [_A Programming Paradigm for Spatiotemporal Composability_](https://github.com/cordiverse/paper)。
 
+## DSH-X
+
+本仓库是 **DSH-X**——DeepSeek Harness 的个人分支，在上游 `master` 之上承载三项扩展：
+
+- **桌面壳**——官方 `dsh --profile web` 运行时之上的 Electron 窗口，带运行时发现、托盘驻留与可安装产物（[apps/desktop](apps/desktop/README.md)；[设计笔记](.agents/notes/proposed/architecture/2026-08-15-desktop-runtime-surface.md)）；
+- **用量面板**——逐请求的模型 token 用量作为会话投影、`/usage` 报告命令，以及 Web UI 中的“模型用量”设置分区；
+- **个人层**——[personal/](personal/README.md) 下的本地 model-hub 预设与插件，以及本部署默认 web 端口 13080（经用户级 webserver 补丁）。
+
+其余内容随上游演进：从 `upstream` 远程合并即可吸收上游变更。
+
 ## 开发者预览
 
 DeepSeek Harness 目前处于 _开发者预览_ 阶段，正在快速迭代。**未来将出现破坏兼容性的变更。**

@@ -1,0 +1,54 @@
+<!doctype html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
+<title>DeepSeek Harness</title>
+<style>
+  :root { color-scheme: dark; }
+  * { margin: 0; padding: 0; box-sizing: border-box; }
+  body {
+    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
+    background: #101319; color: #e6e9ef; height: 100vh;
+    display: flex; align-items: center; justify-content: center;
+  }
+  .panel { width: min(640px, 88vw); }
+  .title { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
+  .mark { width: 34px; height: 34px; border-radius: 9px; background: #4d6bfe; }
+  .title h1 { font-size: 20px; font-weight: 600; }
+  .stage { font-size: 15px; margin-bottom: 8px; }
+  .detail { font-size: 13px; color: #9aa3b2; margin-bottom: 20px; min-height: 18px; }
+  .runtime { font-size: 13px; color: #9aa3b2; margin-bottom: 20px; }
+  .runtime code { color: #c6cdd9; }
+  .bar { height: 3px; background: #232833; border-radius: 2px; overflow: hidden; margin-bottom: 20px; }
+  .bar-fill { height: 100%; width: 40%; background: #4d6bfe; border-radius: 2px; animation: slide 1.4s ease-in-out infinite; }
+  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
+  .logs {
+    background: #0a0d12; border: 1px solid #232833; border-radius: 8px;
+    padding: 12px 14px; height: 180px; overflow-y: auto;
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 12px;
+    color: #8b94a5; white-space: pre-wrap; word-break: break-all;
+  }
+  .retry {
+    margin-top: 20px; padding: 9px 22px; border: none; border-radius: 7px;
+    background: #4d6bfe; color: #fff; font-size: 14px; cursor: pointer; display: none;
+  }
+  .retry:hover { background: #3d59d8; }
+  body.failed .bar-fill { display: none; }
+  body.failed .retry { display: inline-block; }
+  body.ready .bar-fill { display: none; }
+</style>
+</head>
+<body>
+<div class="panel">
+  <div class="title"><div class="mark"></div><h1>DeepSeek Harness</h1></div>
+  <div class="stage" id="stage">Discovering the dsh runtime…</div>
+  <div class="detail" id="detail"></div>
+  <div class="runtime" id="runtime"></div>
+  <div class="bar"><div class="bar-fill"></div></div>
+  <div class="logs" id="logs"></div>
+  <button class="retry" id="retry">Retry</button>
+</div>
+<script src="loading.js"></script>
+</body>
+</html>

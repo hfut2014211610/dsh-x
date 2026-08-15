@@ -313,6 +313,40 @@ jobs:
       - name: Run complete keyless Python suite
         run: uv run --python 3.10 --group test --project python/sdk pytest
 
+  # The desktop shell's keyless signal: the Electron sidecar launches the built
+  # dsh web runtime, reaches the official web UI, and leaves no orphan process
+  # behind on quit. The automations gate skips the Electron binary download, so
+  # this lane opts in through desktop:prepare before the packaged smoke.
+  desktop:
+    if: github.event_name == 'pull_request'
+    runs-on: ubuntu-latest
+    name: desktop / electron smoke
+    timeout-minutes: 30
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: ${{ env.PRIMARY_NODE_VERSION }}
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Install Electron binary and system dependencies
+        run: |
+          pnpm run desktop:prepare
+          sudo apt-get update
+          sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0t64 libnss3 libasound2t64
+
+      - name: Run the Electron smoke keyless
+        run: xvfb-run --auto-servernum --server-args='-screen 0 1280x1024x24' pnpm run test:desktop
+
   # One native target makes the complete release-shaped Python path required
   # without duplicating platform-independent behavior across the release matrix.
   # The reusable builder owns the executable, snapshot, wheel, clean-install,
@@ -925,7 +959,7 @@ jobs:
           && github.event.pull_request.user.login != 'dependabot[bot]'
           && fromJSON('["self-hosted", "linux", "x64", "vm-backup"]')
           || 'ubuntu-latest' }}
-    needs: [node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime, windows]
+    needs: [node-24, node-24-coverage, node-24-consumers, node-compat, python-sdk, python-runtime, windows, desktop]
     if: always() && github.event_name == 'pull_request'
     steps:
       - name: Fail if any needed job did not succeed

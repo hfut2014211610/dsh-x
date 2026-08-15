@@ -1,0 +1,42 @@
+# electron-builder packaging for the desktop shell (Stage A sidecar shape).
+# The bundled dsh runtime under resources/dsh-runtime is assembled by the
+# release workflow (npm install @deepseek-ai/dsh@<version> --prefix); a local
+# packaging attempt without it fails loud on the missing extraResources path.
+appId: com.deepseek.harness
+productName: DeepSeek Harness
+directories:
+  output: release
+  buildResources: build
+files:
+  - lib/*.js
+  - preload.cjs
+  - loading.html
+  - loading.js
+extraResources:
+  - from: resources/dsh-runtime
+    to: dsh-runtime
+    filter:
+      - '**/*'
+      - '!**/*.md'
+      - '!**/tsconfig*.json'
+win:
+  target:
+    - nsis
+    - portable
+  # Signing rides the CSC_LINK / CSC_KEY_PASSWORD environment variables when
+  # the release workflow provides them; unsigned builds stay valid fallbacks.
+nsis:
+  oneClick: true
+  perMachine: false
+mac:
+  target:
+    - target: dmg
+      arch:
+        - arm64
+        - x64
+  category: public.app-category.developer-tools
+linux:
+  target:
+    - AppImage
+    - deb
+  category: Development

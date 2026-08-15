@@ -1,0 +1,157 @@
+name: Desktop release
+
+# Pack and publish the desktop shell installers (Stage A sidecar shape). Every
+# artifact embeds the bundled dsh runtime from the npm release of the same
+# version, so this workflow runs after the dsh family publish and never builds
+# a runtime from source. Windows ships first; macOS and Linux follow on the
+# same workflow. Code signing rides CSC_LINK/CSC_KEY_PASSWORD when the secrets
+# exist and stays a valid unsigned fallback when they do not.
+
+on:
+  workflow_dispatch:
+    inputs:
+      version:
+        description: 'Published @deepseek-ai/dsh version to bundle (defaults to latest)'
+        required: false
+        default: ''
+  push:
+    tags:
+      - 'desktop-v*'
+
+permissions:
+  contents: write
+
+env:
+  DSH_TELEMETRY_DISABLED: '1'
+
+jobs:
+  windows:
+    runs-on: windows-latest
+    name: windows x64 / nsis + portable
+    timeout-minutes: 40
+    env:
+      BUNDLED_VERSION: ${{ github.event.inputs.version || github.ref_name }}
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install (immutable)
+        shell: pwsh
+        run: pnpm install --frozen-lockfile
+
+      - name: Build the shell and its runtime inputs
+        shell: pwsh
+        run: |
+          pnpm run desktop:prepare
+          pnpm run build:lib
+          pnpm run build:web
+          npx tsc -b apps/desktop/tsconfig.json
+
+      - name: Assemble the bundled dsh runtime
+        shell: pwsh
+        run: |
+          $version = if ($env:BUNDLED_VERSION -match '^desktop-v(.+)$') { $Matches[1] } else { $env:BUNDLED_VERSION }
+          $spec = if ($version -eq '') { '@deepseek-ai/dsh@latest' } else { "@deepseek-ai/dsh@$version" }
+          npm install --prefix apps/desktop/resources/dsh-runtime --omit=dev $spec
+
+      - name: Package installers
+        shell: pwsh
+        env:
+          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
+          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
+        run: pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --win nsis portable --publish never
+
+      - name: Smoke the packaged app
+        shell: pwsh
+        env:
+          DSH_DESKTOP_PACKAGED_EXE: ${{ github.workspace }}\apps\desktop\release\win-unpacked\DeepSeek Harness.exe
+        run: npx vitest run --config vitest.desktop.config.ts apps/desktop/tests/packaged.e2e.ts
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-windows-x64
+          path: apps/desktop/release/*.exe
+          if-no-files-found: error
+
+  macos:
+    if: false # macOS and Linux artifacts follow the Windows-first gate; enable with the signing budget.
+    runs-on: macos-latest
+    name: macos arm64 + x64 / dmg
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and package
+        run: |
+          pnpm run desktop:prepare
+          pnpm run build:lib
+          pnpm run build:web
+          npx tsc -b apps/desktop/tsconfig.json
+          npm install --prefix apps/desktop/resources/dsh-runtime --omit=dev "@deepseek-ai/dsh@${GITHUB_REF_NAME#desktop-v}"
+          pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --mac dmg --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos
+          path: apps/desktop/release/*.dmg
+          if-no-files-found: error
+
+  linux:
+    if: false # macOS and Linux artifacts follow the Windows-first gate; enable with the signing budget.
+    runs-on: ubuntu-latest
+    name: linux x64 / AppImage + deb
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Build and package
+        run: |
+          pnpm run desktop:prepare
+          pnpm run build:lib
+          pnpm run build:web
+          npx tsc -b apps/desktop/tsconfig.json
+          npm install --prefix apps/desktop/resources/dsh-runtime --omit=dev "@deepseek-ai/dsh@${GITHUB_REF_NAME#desktop-v}"
+          sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0t64 libnss3 libasound2t64
+          pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --linux AppImage deb --publish never
+
+      - uses: actions/upload-artifact@v4
+        with:
+          name: desktop-linux-x64
+          path: |
+            apps/desktop/release/*.AppImage
+            apps/desktop/release/*.deb
+          if-no-files-found: error

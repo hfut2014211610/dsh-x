@@ -6,6 +6,16 @@ DeepSeek Harness (`dsh`) is an open-source agent harness developed by [DeepSeek 
 
 It uses an architecture where **everything is a plugin**, and is powered by [Cordis](https://github.com/cordiverse/cordis), whose design is described in [_A Programming Paradigm for Spatiotemporal Composability_](https://github.com/cordiverse/paper).
 
+## DSH-X
+
+This repository is **DSH-X**, a personal fork of DeepSeek Harness that carries three additions over upstream `master`:
+
+- the **desktop shell** — an Electron window over the official `dsh --profile web` runtime, with runtime discovery, tray persistence, and installable artifacts ([apps/desktop](apps/desktop/README.md); [design note](.agents/notes/proposed/architecture/2026-08-15-desktop-runtime-surface.md));
+- the **usage surface** — per-request model token usage as a session projection, a `/usage` report command, and the Model-usage settings panel in the web UI;
+- the **personal layer** — local model-hub presets and plugins under [personal/](personal/README.md), and this deployment's default web port 13080 (through the home-level webserver patch).
+
+Everything else tracks upstream: merge from the `upstream` remote to absorb its changes.
+
 ## Developer preview
 
 DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
