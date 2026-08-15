@@ -1,0 +1,194 @@
+/* Usage settings section, in the settings-panel design language: 14/22 body,
+ * 12/18 caption, `border-l2` hairlines. Every color resolves through a
+ * `--dsw-alias-*` token so the dark theme overrides apply. The heatmap's dot
+ * intensity rides the static blue scale; the grades are fixed design tokens,
+ * not runtime-computed colors. */
+
+.section {
+  display: flex;
+  flex-direction: column;
+  gap: 12px;
+  max-width: 720px;
+  color: var(--dsw-alias-label-primary);
+}
+
+.header {
+  display: flex;
+  align-items: flex-start;
+  justify-content: space-between;
+  gap: 12px;
+}
+
+.title {
+  margin: 0;
+  font-size: 16px;
+  line-height: 24px;
+  font-weight: 500;
+  color: var(--dsw-alias-label-primary);
+}
+
+.intro {
+  margin: 4px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.error {
+  margin: 0;
+  padding: 8px 12px;
+  border-radius: 8px;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-state-error-primary);
+  background: var(--dsw-alias-interactive-bg-hover-danger);
+}
+
+.empty {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  color: var(--dsw-alias-label-secondary);
+}
+
+.summary {
+  display: grid;
+  grid-template-columns: repeat(4, minmax(0, 1fr));
+  gap: 1px;
+  margin: 0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  overflow: hidden;
+  background: var(--dsw-alias-border-l2);
+}
+
+.summary > div {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  padding: 8px 12px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+.summary dt {
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.summary dd {
+  margin: 0;
+  font-size: 14px;
+  line-height: 22px;
+  font-variant-numeric: tabular-nums;
+  color: var(--dsw-alias-label-primary);
+}
+
+.ranges {
+  display: flex;
+  gap: 4px;
+}
+
+.rangeButton {
+  padding: 4px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 14px;
+  background: var(--dsw-alias-bg-layer-1);
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+.rangeButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover);
+}
+
+.rangeSelected {
+  border-color: var(--dsw-alias-brand-primary);
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+.heatmap {
+  display: grid;
+  grid-template-columns: repeat(28, minmax(0, 1fr));
+  gap: 4px;
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-1);
+}
+
+/* Every day paints a visible dot, empty or not — the grid reads as a month
+ * at a glance, not as one lit cell on a blank card. The border keeps empty
+ * cells legible in both themes. */
+.dayCell {
+  display: block;
+  box-sizing: border-box;
+  aspect-ratio: 1;
+  min-height: 14px;
+  border-radius: 3px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-mask-1);
+}
+
+/* Consumption intensity, in quadrants of the window's busiest day. The
+ * static blue scale keeps one hue across light and dark themes. */
+.dayCell[data-level='1'] {
+  background: var(--dsw-static-blue-100, var(--dsw-alias-brand-primary));
+}
+
+.dayCell[data-level='2'] {
+  background: var(--dsw-static-blue-300, var(--dsw-alias-brand-primary));
+}
+
+.dayCell[data-level='3'] {
+  background: var(--dsw-static-blue-500, var(--dsw-alias-brand-primary));
+}
+
+.dayCell[data-level='4'] {
+  background: var(--dsw-static-blue-800, var(--dsw-alias-brand-primary));
+}
+
+.heatmapCaption {
+  margin: -4px 0 0;
+  font-size: 12px;
+  line-height: 18px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.models {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12px;
+  line-height: 18px;
+  font-variant-numeric: tabular-nums;
+}
+
+.models th {
+  padding: 4px 8px;
+  text-align: right;
+  font-weight: 500;
+  color: var(--dsw-alias-label-tertiary);
+  background: var(--dsw-alias-bg-layer-1);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  white-space: nowrap;
+}
+
+.models th:first-of-type,
+.models td:first-of-type {
+  text-align: left;
+}
+
+.models td {
+  padding: 4px 8px;
+  text-align: right;
+  color: var(--dsw-alias-label-secondary);
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  white-space: nowrap;
+}
+
+.models td:first-of-type {
+  color: var(--dsw-alias-label-primary);
+}

@@ -701,13 +701,29 @@ export function fixtureUserPrompts(fixtureText: string): string[] {
  * @returns the realized fixture text.
  */
 export function realizeSeedFixture(scaffold: WebScaffold, fixtureText: string, id: string): string {
+  // JSON-stringified so a Windows workspace path's backslashes stay escaped
+  // inside the fixture's JSON strings (a bare join would corrupt them).
+  const jsonSafeCwd = JSON.stringify(scaffold.workspaceCwd).slice(1, -1)
+  // Hand-written seeds may stamp event times relative to the run instant
+  // ({{now}} / {{now-<ms>}) so day-windowed views and their goldens never age
+  // out of a fixed recorded timestamp.
+  const now = Date.now()
   const realized = fixtureText
     .split('{{sessionId}}').join(id)
-    .split('{{cwd}}').join(scaffold.workspaceCwd)
+    .split('{{cwd}}').join(jsonSafeCwd)
+    .replace(/\{\{now-(\d+)\}\}/g, (_, offset: string) => String(now - Number(offset)))
+    .split('{{now}}').join(String(now))
   const fixtureCwd = (JSON.parse(realized.split('\n', 1)[0]!) as { cwd?: string }).cwd
-  return fixtureCwd === undefined
-    ? realized
-    : realized.split(fixtureCwd).join(scaffold.workspaceCwd)
+  if (fixtureCwd === undefined) return realized
+  // Rewrite the recorded cwd (unescaped by the parse) back onto the scaffold
+  // workspace, in both spellings the realization above can leave in the text:
+  // the raw path outside JSON strings and its JSON-escaped form inside them.
+  // On a separator-mismatched host one spelling simply misses, leaving that
+  // text intact.
+  const fixtureCwdSafe = JSON.stringify(fixtureCwd).slice(1, -1)
+  return realized
+    .split(fixtureCwd).join(scaffold.workspaceCwd)
+    .split(fixtureCwdSafe).join(jsonSafeCwd)
 }
 
 export async function seedSession(
@@ -731,6 +747,24 @@ export async function seedSession(
     ...agentPreset === undefined ? {} : { agentPreset },
   }
   await persistSeedSession(scaffold, meta, events)
+  // Seed the booted tree's projection cache: a store-detached session folds
+  // the seed once through the host's registry, and the host's own cache
+  // service persists the checkpoint into its live storage — exactly the row a
+  // normally detached session would have left, so the COLD list row carries
+  // its projections (title, usageStats) with zero log loads on the host side.
+  try {
+    const prepared = scaffold.ctx.sessions.prepare(meta.id, {
+      seed: events,
+      meta,
+      seedSource: 'persistence',
+    })
+    await scaffold.ctx.sessionProjectionCache.write(prepared)
+  } catch {
+    // Older recorded fixtures predate the identified-message envelope, so the
+    // runtime refuses to construct them; nothing but this seeding step can
+    // throw here (the durable log write already succeeded), and the seed then
+    // keeps the pre-cache behavior — cold rows without projection values.
+  }
   return meta.id
 }
 
@@ -788,10 +822,15 @@ async function persistSeedSession(
  */
 function normalizeAria(snapshot: string, workspaceCwd: string): string {
   // The session heading renders the workspace's basename, not the full
-  // path, so both spellings must collapse to the token.
-  const base = workspaceCwd.split('/').pop()!
+  // path, so both spellings must collapse to the token. Both separators,
+  // because a Windows workspace arrives backslash-delimited.
+  const base = workspaceCwd.split(/[\\/]/).pop()!
+  // Seeded tool-result text carries the JSON-stringified spelling of the
+  // workspace path (realizeSeedFixture escapes it), so both collapse here.
+  const jsonSafeCwd = JSON.stringify(workspaceCwd).slice(1, -1)
   return snapshot
     .split(workspaceCwd).join('{{cwd}}')
+    .split(jsonSafeCwd).join('{{cwd}}')
     .split(base).join('{{workspace}}')
     .replace(/[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}/gi, '{{uuid}}')
     // The optional space in `\d+m ?\d+s` covers both minute spellings: the
@@ -869,7 +908,10 @@ export async function assertFixtureInventory(dir: string, expected: string[]): P
   expect(entries).toEqual([...expected].sort())
   for (const entry of entries.filter(name => name.endsWith('.jsonl'))) {
     const content = await readFile(join(dir, entry), 'utf8')
-    expect(scrubRequestHeaders(content), `${dir}/${entry} carries request-header bulk`).toBe(content)
+    // Now-relative stamps are not valid JSON until realization; stand them in
+    // for the parse-based header scrub, which they cannot affect.
+    const parseable = content.replace(/\{\{now(?:-\d+)?\}\}/g, '0')
+    expect(scrubRequestHeaders(parseable), `${dir}/${entry} carries request-header bulk`).toBe(parseable)
     expect(content, `${dir}/${entry} carries a run-local rpcId`)
       .not.toMatch(/"rpcId":"(?!\{\{rpcId\}\})[^"]+"/)
   }

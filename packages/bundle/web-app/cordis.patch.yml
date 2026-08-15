@@ -84,6 +84,11 @@
     - id: session-stats
       name: '@deepseek-ai/dsh-session-stats'
 
+    # Per-request model token usage for the settings usage panel (the
+    # usageStats projection key); rides the same projection carriers.
+    - id: usage-stats
+      name: '@deepseek-ai/dsh-usage-stats'
+
     # Resolve bind host, SSH launch, and display once at boot, then mount the
     # matching dual-face directory picker. Mount -native or -browse directly in
     # an overlay to pin the interaction.
@@ -191,6 +196,9 @@
 
     - id: ui-settings-models
       name: '@deepseek-ai/dsh-client-ui-settings-models'
+
+    - id: ui-settings-usage
+      name: '@deepseek-ai/dsh-client-ui-settings-usage'
 
     - id: ui-settings-plugin-inventory
       name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'

@@ -1,0 +1,81 @@
+- dialog "设置":
+  - navigation:
+    - text: 设置
+    - button "通用设置":
+      - img
+      - text: 通用设置
+    - button "模型":
+      - img
+      - text: 模型
+    - button "插件":
+      - img
+      - text: 插件
+    - button "Agent 预设":
+      - img
+      - text: Agent 预设
+    - button "用量":
+      - img
+      - text: 用量
+  - button "打开配置文件"
+  - button "关闭":
+    - img
+    - text: 关闭
+  - region "模型用量":
+    - heading "模型用量" [level=2]
+    - paragraph: 全部会话累计的模型 token 消耗。冷会话展示其最后一次持久化检查点的数据。
+    - button "刷新":
+      - img
+      - text: 刷新
+    - group "统计区间":
+      - button "7 天"
+      - button "28 天" [pressed]
+      - button "90 天"
+      - button "全部"
+    - term: 会话
+    - definition: "1"
+    - term: 请求
+    - definition: "3"
+    - term: 输入
+    - definition: "27"
+    - term: 缓存读
+    - definition: "2"
+    - term: 缓存写
+    - definition: —
+    - term: 输出
+    - definition: "17"
+    - term: 推理
+    - definition: "1"
+    - term: 模型时长
+    - definition: 1.7 s
+    - img "每日 token 用量点阵图，颜色越深当日消耗越大"
+    - paragraph: 每日消耗点阵（按窗口内最忙一日分档着色，悬浮查看当日明细）。
+    - table:
+      - rowgroup:
+        - row "模型 请求 输入 缓存读 缓存写 输出 推理 模型时长":
+          - columnheader "模型"
+          - columnheader "请求"
+          - columnheader "输入"
+          - columnheader "缓存读"
+          - columnheader "缓存写"
+          - columnheader "输出"
+          - columnheader "推理"
+          - columnheader "模型时长"
+      - rowgroup:
+        - row "deepseek-v4-flash 2 18 2 — 8 1 1.6 s":
+          - cell "deepseek-v4-flash"
+          - cell "2"
+          - cell "18"
+          - cell "2"
+          - cell "—"
+          - cell "8"
+          - cell "1"
+          - cell "1.6 s"
+        - row "deepseek-v4-pro 1 9 0 — 9 — 60 ms":
+          - cell "deepseek-v4-pro"
+          - cell "1"
+          - cell "9"
+          - cell "0"
+          - cell "—"
+          - cell "9"
+          - cell "—"
+          - cell "60 ms"
