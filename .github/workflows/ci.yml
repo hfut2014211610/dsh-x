@@ -606,7 +606,9 @@ jobs:
   # tool caches make them redundant (and saving here would poison the hosted
   # cache namespace with self-hosted paths).
   serial-linux-selfhosted:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # The in-house standby pool exists only in the upstream repository; on any
+    # other owner these labels would queue forever.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && github.repository_owner == 'deepseek-ai'
     name: serial / linux (self-hosted standby)
     runs-on: [self-hosted, linux, x64, vm-backup]
     steps:
@@ -690,7 +692,9 @@ jobs:
   # and tool caches make them redundant (and saving here would poison the
   # hosted cache namespace with self-hosted paths).
   serial-windows:
-    if: github.event_name == 'push' && github.ref == 'refs/heads/master'
+    # The in-house standby pool exists only in the upstream repository; on any
+    # other owner these labels would queue forever.
+    if: github.event_name == 'push' && github.ref == 'refs/heads/master' && github.repository_owner == 'deepseek-ai'
     name: serial / windows (self-hosted standby)
     runs-on: [self-hosted, dsh-win-ci, windows]
     timeout-minutes: 60

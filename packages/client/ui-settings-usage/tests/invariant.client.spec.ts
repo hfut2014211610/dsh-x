@@ -12,7 +12,9 @@ describe('invariant companion', () => {
   })
 
   it('node-half apply is a no-op host placeholder', async () => {
-    const { apply } = await import('@deepseek-ai/dsh-client-ui-settings-usage')
+    // Relative on purpose: the bare package name resolves only through built
+    // exports, which the unbuilt darwin-parity runner does not have.
+    const { apply } = await import('../src/index.ts')
     apply()
     expect(true).toBe(true) // reaching here without throw is the contract
   })
