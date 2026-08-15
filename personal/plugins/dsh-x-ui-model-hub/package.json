@@ -1,0 +1,33 @@
+{
+  "name": "@personal/dsh-x-ui-model-hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Settings page (client module) for dsh-x-model-hub: visual provider/model configuration with per-model protocol.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./client": {
+      "default": "./lib/client.js"
+    },
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "client": {
+      "inject": [
+        "@deepseek-ai/dsh-client-runtime",
+        "@deepseek-ai/dsh-client-ui-settings",
+        "@deepseek-ai/dsh-client-locale",
+        "@deepseek-ai/dsh-api-remotes"
+      ],
+      "platform": "web"
+    },
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "scripts": {
+    "bundle": "tsdown",
+    "test": "vitest run --config personal/plugins/dsh-x-ui-model-hub/vitest.config.ts"
+  }
+}

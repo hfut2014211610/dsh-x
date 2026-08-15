@@ -38,3 +38,10 @@ apps/web/dist/
 worktrees/
 .agents/worktrees/
 .typert-*/
+
+# Desktop shell: electron-builder output and the release-assembled bundled runtime.
+apps/desktop/release/
+apps/desktop/resources/
+
+# Local agent session state.
+.zcode/

@@ -1,0 +1,106 @@
+# 模型配置模板（settings.yaml 片段）
+
+# 复制需要的段落到你的 $DSH_HOME/settings.yaml（默认 ~/.dsh/settings.yaml），改 key 即用。
+# 字段全集见官方生成的 docs/config-catalog.md；这里只列常用项。
+
+# ─────────────────────────────────────────────────────────────
+# 一、多协议模型路由（官方 llm-pi-ai 段）
+# ─────────────────────────────────────────────────────────────
+llm-pi-ai:
+  providers:
+    # 1) 目录路由：endpoint、协议、模型清单全部来自内置目录，只配凭证
+    deepseek:
+      apiKeyEnv: DEEPSEEK_API_KEY
+
+    # 2) 目录路由 + 修正单个模型的能力（其余模型照常服务）
+    anthropic:
+      apiKeyEnv: ANTHROPIC_API_KEY
+      modelOverrides:
+        claude-sonnet-4-5:
+          contextWindow: 200000
+
+    # 3) 手写路由：公司网关 / 自建服务 / 目录外的新厂商
+    #    api 取值见 supportedProtocols()：openai-completions、openai-responses、
+    #    anthropic-messages、google-generative-ai、mistral-conversations 等
+    my-gateway:
+      displayName: 公司网关
+      apiKeyEnv: GATEWAY_API_KEY
+      api: openai-completions
+      baseURL: https://gateway.example.com/v1
+      # 私有网关的"思考"方言无法从 URL 推断时用 compat 指定
+      compat:
+        thinkingFormat: deepseek        # deepseek | openai | zai | qwen | ...
+      defaultContextWindow: 131072      # 目录未收录模型的上下文兜底
+      defaultMaxTokens: 8192            # 目录未收录模型的输出上限兜底
+      models:
+        - id: my-chat
+          contextWindow: 131072
+          maxTokens: 8192
+          input: [text, image]          # 支持图片输入才声明
+        - id: my-reasoner
+          contextWindow: 262144
+          maxTokens: 32768
+          # 可选思考等级：键 = 选择器里出现的等级，值 = 发送到线上的拼写
+          # 可选等级集合：off | minimal | low | medium | high | xhigh | max
+          reasoningEfforts:
+            off:                        # 空值 = 支持"关闭思考"，发送时不带参数
+            high: high
+            max: ultra                  # 网关词汇不同就改名映射
+      reasoning: high                   # 路由级默认思考强度（请求级选择优先）
+
+# ─────────────────────────────────────────────────────────────
+# 二、供应商/模型分离 + 按模型配协议（个人插件 dsh-x-model-hub 段）
+# 需先挂载插件，见 personal/plugins/dsh-x-model-hub/cordis.patch.yml
+# 适合：一个网关同时服务多种协议的模型。插件把本段编译成官方 llm-pi-ai
+# 路由（按协议分组：单协议 → 路由名=供应商键；多协议 → 供应商键~协议名）。
+# ─────────────────────────────────────────────────────────────
+dsh-x-model-hub:
+  providers:
+    hub-gateway:
+      displayName: 我的网关
+      baseURL: https://gateway.example.com/v1
+      # 按协议覆盖端点：Anthropic SDK 会在 baseURL 后自拼 /v1/messages，
+      # 所以开 anthropic-messages 协议的网关要去掉 /v1 后缀，否则双 /v1 吃 404
+      endpoints:
+        anthropic-messages: https://gateway.example.com
+      apiKeyEnv: GATEWAY_API_KEY
+      defaultInput: [text, image]
+  models:
+    my-chat:
+      provider: hub-gateway
+      api: openai-completions          # 按模型配协议
+      contextWindow: 131072
+      maxTokens: 8192
+    my-claude:
+      provider: hub-gateway            # 同一供应商、另一协议
+      api: anthropic-messages
+      contextWindow: 1000000
+      maxTokens: 128000
+# 编译结果（自动写入 llm-pi-ai 用户层，勿手改 ~ 路由）：
+#   hub-gateway~openai-completions   (models: my-chat)
+#   hub-gateway~anthropic-messages   (models: my-claude)
+
+# ─────────────────────────────────────────────────────────────
+# 三、每模型采样默认值（个人插件 dsh-x-model-tuning 段）
+# 需先挂载插件，见 personal/plugins/dsh-x-model-tuning/cordis.patch.yml
+# ─────────────────────────────────────────────────────────────
+dsh-x-model-tuning:
+  profiles:
+    # 键 = provider/model（第一个 / 分隔；模型 id 本身可含 /）。
+    # 若模型由 hub 生成，provider 用编译后的路由名：
+    hub-gateway~anthropic-messages/my-claude:
+      temperature: 0.7
+    deepseek/deepseek-chat:
+      temperature: 0.6                  # 0..2
+      maxTokens: 8192                   # 每请求输出上限（正整数）
+    my-gateway/my-reasoner:
+      reasoningEffort: high             # off|minimal|low|medium|high|xhigh|max
+      stop: ["<END>"]                   # 停止序列
+
+# 说明：
+# - 条目里声明的字段对每个请求生效；未声明的字段保持原样（例如 UI 里选的思考等级）。
+# - 模型不支持所配 reasoningEffort 时，适配器会以 UNSUPPORTED_REASONING_EFFORT 拒绝该请求（显式失败，便于发现配置错误）。
+# - 运行时也可以用斜杠命令调整（下一请求生效，无需重启）：
+#     /model-tuning                                    查看当前条目
+#     /model-tuning set deepseek/deepseek-chat temperature 0.8
+#     /model-tuning unset deepseek/deepseek-chat temperature

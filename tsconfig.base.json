@@ -225,6 +225,9 @@
       "@deepseek-ai/dsh-sdk-client": ["./packages/sdk/client/src"],
       "@deepseek-ai/dsh-sdk-protocol": ["./packages/sdk/protocol/src"],
       "@deepseek-ai/dsh-sdk-jsonrpc-server": ["./packages/sdk/server/src"],
+      // llm-pi-ai exposes its catalog only through the `./src/*` package
+      // export; the personal model-hub presets derive from it.
+      "@deepseek-ai/dsh-llm-pi-ai/src/*": ["./packages/llm/llm-pi-ai/src/*"],
       "@deepseek-ai/dsh-*": [
         "./packages/core/*/src",
         "./packages/prompt/*/src",
