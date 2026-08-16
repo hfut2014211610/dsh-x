@@ -9,7 +9,7 @@ function makeDeps(overrides: Partial<DiscoveryDeps> = {}): DiscoveryDeps {
     readJson: async () => undefined,
     listDirs: async () => [],
     npxCacheDirs: [],
-    resourcesDir: '',
+    bundledRoot: '',
     runtimeLauncher: { command: '/electron', args: [] },
     probeOrigin: DEFAULT_PROBE_ORIGIN,
     randomUuid: () => 'uuid-1',
@@ -74,10 +74,10 @@ describe('discoverRuntime', () => {
     ])
   })
 
-  it('falls to the bundled runtime under resourcesPath', async () => {
+  it('falls to the bundled runtime root', async () => {
     const outcome = await discoverRuntime(makeDeps({
-      resourcesDir: '/resources',
-      readJson: async path => path === '/resources/dsh-runtime/node_modules/@deepseek-ai/dsh/package.json'
+      bundledRoot: '/bundled',
+      readJson: async path => path === '/bundled/node_modules/@deepseek-ai/dsh/package.json'
         ? { name: '@deepseek-ai/dsh', version: '3.1.0' }
         : undefined,
       runtimeLauncher: { command: '/electron', args: [], env: { ELECTRON_RUN_AS_NODE: '1' } },
@@ -86,7 +86,7 @@ describe('discoverRuntime', () => {
       source: 'bundled',
       spawn: {
         command: '/electron',
-        args: ['/resources/dsh-runtime/node_modules/@deepseek-ai/dsh/lib/bin.js'],
+        args: ['/bundled/node_modules/@deepseek-ai/dsh/lib/bin.js'],
         env: { ELECTRON_RUN_AS_NODE: '1' },
       },
       version: '3.1.0',

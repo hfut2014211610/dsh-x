@@ -13,12 +13,14 @@ files:
   - loading.html
   - loading.js
 extraResources:
-  - from: resources/dsh-runtime
-    to: dsh-runtime
-    filter:
-      - '**/*'
-      - '!**/*.md'
-      - '!**/tsconfig*.json'
+  # The bundled runtime ships as ONE archive: this electron-builder build
+  # strips node_modules from resource copies entirely (a supply-chain rule),
+  # so the installed tree cannot ride extraResources directly. The shell
+  # extracts this archive into userData on first run (src/bundled-runtime.ts).
+  # The release workflow assembles it from `npm install --prefix
+  # <stage> @deepseek-ai/dsh@<version>` zipped at its root.
+  - from: resources/dsh-runtime.zip
+    to: dsh-runtime.zip
 win:
   target:
     - nsis

@@ -2,6 +2,7 @@
 // Runs sandboxed with no node integration; the preload bridge is the only IPC surface.
 (function () {
   const stages = {
+    preparing: 'Preparing the bundled dsh runtime…',
     discovering: 'Discovering the dsh runtime…',
     launching: 'Starting the dsh web runtime…',
     connecting: 'Connecting…',

@@ -14,7 +14,7 @@ Spawned runtimes always run `web --host 127.0.0.1 --port 0`; readiness is the `d
 
 The renderer runs with `nodeIntegration` off and `contextIsolation` plus the Chromium sandbox on; new windows and cross-origin navigation go to the system browser. Closing the window hides it to the tray while the runtime keeps serving agent work; quitting kills the spawned process tree (Windows `taskkill /T`, POSIX process-group signal) and leaves no orphans. An unexpected runtime exit restarts it once automatically; a second exit stops on the loading screen with the runtime's log tail and a retry button. One instance runs per user (single-instance lock).
 
-The bundled runtime runs under the Electron binary itself (`ELECTRON_RUN_AS_NODE`), so an installed app needs no system Node.js; the `PATH` and npx sources serve development machines that already have one.
+The bundled runtime ships as one archive (`resources/dsh-runtime.zip`) and the shell extracts it into its userData on first run (`src/bundled-runtime.ts`), because this electron-builder build strips `node_modules` from resource copies outright; the extracted tree runs under the Electron binary itself (`ELECTRON_RUN_AS_NODE` plus `--expose-internals` for the web profile's HMR row), so an installed app needs no system Node.js. The `PATH` and npx sources serve development machines that already have one.
 
 ## Data
 

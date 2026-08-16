@@ -14,7 +14,7 @@
 
 渲染进程关闭 `nodeIntegration`、开启 `contextIsolation` 与 Chromium 沙箱；新窗口与跨源导航交给系统浏览器。关窗隐藏到托盘、运行时继续服务 agent 工作；退出时杀死拉起的进程树（Windows `taskkill /T`，POSIX 进程组信号），不留孤儿。运行时意外退出会自动重启一次；第二次退出则停在加载页，显示运行时日志尾部与重试按钮。每用户单实例（单实例锁）。
 
-内置运行时直接跑在 Electron 二进制上（`ELECTRON_RUN_AS_NODE`），安装后的应用不需要系统 Node.js；`PATH` 与 npx 来源服务于本就装有 Node 的开发机。
+内置运行时以单一归档（`resources/dsh-runtime.zip`）随包分发，壳在首启时把它解压到自己的 userData（`src/bundled-runtime.ts`）——因为这个 electron-builder 构建会整体剥离资源拷贝中的 `node_modules`；解压出的树直接跑在 Electron 二进制上（`ELECTRON_RUN_AS_NODE` 加 `--expose-internals`，供 web profile 的 HMR 行使用），安装后的应用不需要系统 Node.js。`PATH` 与 npx 来源服务于本就装有 Node 的开发机。
 
 ## 数据
 

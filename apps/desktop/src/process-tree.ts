@@ -72,15 +72,36 @@ export function killProcessTree(pid: number, deps: ProcessTreeDeps): void {
 export function spawnRuntimeProcess(spec: RuntimeSpawn, args: readonly string[]): RuntimeProcess {
   const lineListeners = new Set<(line: string) => void>()
   const exitListeners = new Set<(code: number | null) => void>()
-  // Windows resolves a PATH `dsh` through its shim only under a shell; every
-  // other candidate is an executable path that needs none. POSIX spawns the
-  // shebang directly, detached so the runtime leads its own process group.
-  const child: ChildProcess = spawn(spec.command, [...spec.args, ...args], {
-    shell: process.platform === 'win32',
-    detached: process.platform !== 'win32',
+  const argv = [...spec.args, ...args]
+  if (process.platform === 'win32') {
+    // Windows resolves a PATH `dsh` through its shim only under a shell, and a
+    // shell form receives one RAW command line: quote every element ourselves,
+    // or a path with spaces (`DeepSeek Harness.exe`, an APPDATA username)
+    // splits mid-path. The quoted shim name still resolves through PATHEXT.
+    const quoted = [spec.command, ...argv].map(value => `"${value.replaceAll('"', '""')}"`).join(' ')
+    const child: ChildProcess = spawn(quoted, {
+      shell: true,
+      env: { ...process.env, ...spec.env },
+      stdio: ['ignore', 'pipe', 'pipe'],
+    })
+    return adaptProcess(child, lineListeners, exitListeners)
+  }
+  // POSIX spawns the shebang directly, detached so the runtime leads its own
+  // process group for the group signal teardown.
+  const child: ChildProcess = spawn(spec.command, argv, {
+    detached: true,
     env: { ...process.env, ...spec.env },
     stdio: ['ignore', 'pipe', 'pipe'],
   })
+  return adaptProcess(child, lineListeners, exitListeners)
+}
+
+/** Wire line splitting and exit forwarding onto one spawned child. */
+function adaptProcess(
+  child: ChildProcess,
+  lineListeners: Set<(line: string) => void>,
+  exitListeners: Set<(code: number | null) => void>,
+): RuntimeProcess {
   let buffer = ''
   const emitLine = (chunk: Buffer): void => {
     buffer += chunk.toString('utf8')

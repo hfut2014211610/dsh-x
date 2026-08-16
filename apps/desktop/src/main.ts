@@ -9,11 +9,13 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { readFile, readdir } from 'node:fs/promises'
+import { existsSync } from 'node:fs'
+import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
+import { ensureBundledRuntime } from './bundled-runtime.ts'
 import { DEFAULT_PROBE_ORIGIN, discoverRuntime } from './discovery.ts'
 import { spawnRuntimeProcess } from './process-tree.ts'
 import { startSidecar, type SidecarHandle } from './sidecar.ts'
@@ -77,6 +79,55 @@ async function connect(): Promise<void> {
   sidecar?.kill()
   sidecar = undefined
 
+  // Materialize the bundled runtime before discovery can select it. A
+  // shipping failure degrades loudly (trail + failed screen) rather than
+  // silently falling through to sources a clean machine does not have.
+  let bundledRoot = ''
+  if (app.isPackaged) {
+    state.phase('preparing')
+    log('preparing the bundled runtime')
+    try {
+      const runtime = await ensureBundledRuntime({
+        archivePath: join(process.resourcesPath, 'dsh-runtime.zip'),
+        targetDir: join(app.getPath('userData'), 'dsh-runtime'),
+        exists: async path => existsSync(path),
+        readFile: path => readFile(path),
+        removeDir: async (path) => { await rm(path, { recursive: true, force: true }) },
+        makeDir: async (path) => { await mkdir(path, { recursive: true }) },
+        writeFile: async (path, contents) => { await writeFile(path, contents, 'utf8') },
+        extract: async (archive, dir) => {
+          const run = (command: string, args: readonly string[]): void => {
+            const result = spawnSync(command, args, { encoding: 'utf8', timeout: 600_000 })
+            if (result.status !== 0) {
+              throw new Error(`${command} exited ${String(result.status)}: ${String(result.stderr).slice(0, 300)}`)
+            }
+          }
+          // bsdtar reads zip archives. On Windows, resolve the SYSTEM bsdtar by
+          // absolute path: a PATH `tar` may be GNU tar (MSYS), which neither
+          // reads zip nor accepts a `D:` drive letter.
+          const tarCommand = process.platform === 'win32'
+            ? join(process.env.SystemRoot ?? 'C:\\Windows', 'system32', 'tar.exe')
+            : 'tar'
+          try {
+            run(tarCommand, ['-xf', archive, '-C', dir])
+          } catch (tarError) {
+            log(`tar extraction unavailable (${tarError instanceof Error ? tarError.message : String(tarError)}); trying unzip`)
+            run('unzip', ['-q', archive, '-d', dir])
+          }
+        },
+      })
+      if (runtime !== undefined) {
+        bundledRoot = runtime.root
+        log(`bundled runtime ready (dsh ${runtime.version})`)
+      }
+    } catch (error) {
+      const detail = error instanceof Error ? error.message : String(error)
+      log(`bundled runtime preparation failed: ${detail}`)
+      state.phase('failed', `The bundled runtime could not be prepared: ${detail}`)
+      return
+    }
+  }
+
   state.phase('discovering')
   log('discovering a dsh runtime')
   const outcome = await discoverRuntime({
@@ -107,8 +158,11 @@ async function connect(): Promise<void> {
       join(homedir(), '.npm', '_npx'),
       process.env.LOCALAPPDATA === undefined ? '' : join(process.env.LOCALAPPDATA, 'npm-cache', '_npx'),
     ].filter(dir => dir !== ''),
-    resourcesDir: app.isPackaged ? process.resourcesPath : '',
-    runtimeLauncher: { command: process.execPath, args: [], env: { ELECTRON_RUN_AS_NODE: '1' } },
+    bundledRoot,
+    // `--expose-internals` precedes the entry script: the web profile's HMR
+    // row requires it, and the CLI's own respawn does not reach an
+    // electron-as-node child. PATH `dsh` manages its own flags.
+    runtimeLauncher: { command: process.execPath, args: ['--expose-internals'], env: { ELECTRON_RUN_AS_NODE: '1' } },
     probeOrigin: process.env.DSH_DESKTOP_PROBE_ORIGIN ?? DEFAULT_PROBE_ORIGIN,
     randomUuid: () => crypto.randomUUID(),
   })

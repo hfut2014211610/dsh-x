@@ -56,12 +56,18 @@ jobs:
           pnpm run build:web
           npx tsc -b apps/desktop/tsconfig.json
 
-      - name: Assemble the bundled dsh runtime
+      - name: Assemble the bundled dsh runtime archive
         shell: pwsh
         run: |
           $version = if ($env:BUNDLED_VERSION -match '^desktop-v(.+)$') { $Matches[1] } else { $env:BUNDLED_VERSION }
           $spec = if ($version -eq '') { '@deepseek-ai/dsh@latest' } else { "@deepseek-ai/dsh@$version" }
-          npm install --prefix apps/desktop/resources/dsh-runtime --omit=dev $spec
+          $stage = Join-Path $env:RUNNER_TEMP 'dsh-runtime-stage'
+          npm install --prefix $stage --omit=dev $spec
+          New-Item -ItemType Directory -Force apps/desktop/resources | Out-Null
+          # bsdtar writes forward-slash zip entries (Compress-Archive writes
+          # backslashes, which portable unzippers reject); the shell extracts
+          # this archive into userData on first run.
+          tar -a -cf apps/desktop/resources/dsh-runtime.zip -C $stage .
 
       - name: Package installers
         shell: pwsh

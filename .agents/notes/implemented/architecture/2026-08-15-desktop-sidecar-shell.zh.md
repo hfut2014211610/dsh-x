@@ -14,7 +14,7 @@ Status: implemented
 
 安全姿态：只绑回环地址、关闭 `nodeIntegration`、开启 `contextIsolation` 与 Chromium 沙箱、外部导航与新窗口交给系统浏览器、文件 URL 仅允许加载页自身。生命周期：关窗驻留托盘、单实例锁、运行时意外退出自动重启一次、退出时进程树拆除（Windows `taskkill /T`，POSIX 进程组信号，见 `src/process-tree.ts`）。子进程环境原样继承，`DSH_HOME` 原样透传，壳不拥有第二个数据根。
 
-内置运行时经 `ELECTRON_RUN_AS_NODE` 直接跑在 Electron 二进制上，安装后的应用不需要系统 Node.js——PATH 与 npx 来源服务于本就装有 Node 的开发机。Electron 二进制下载是可选项（`allowBuilds: electron: false` 加 `pnpm run desktop:prepare`），其余 CI lane 的 `pnpm install` 速度不受影响。
+内置运行时以单一归档随包分发，壳在首启时按归档校验和解压到 userData（`src/bundled-runtime.ts`）——这个 electron-builder 构建会整体剥离资源拷贝中的 `node_modules`，安装好的树无法直接经 `extraResources` 分发。解压出的运行时经 `ELECTRON_RUN_AS_NODE` 加 `--expose-internals`（web profile 的 HMR 行所需）跑在 Electron 二进制上，安装后的应用不需要系统 Node.js——PATH 与 npx 来源服务于本就装有 Node 的开发机。Windows 的 shell 拉起对每个参数加引号：应用装在 `DeepSeek Harness.exe` 下，不加引号的路径会在 cmd 中从空格处断开。Electron 二进制下载是可选项（`allowBuilds: electron: false` 加 `pnpm run desktop:prepare`），其余 CI lane 的 `pnpm install` 速度不受影响。
 
 ## 结果
 

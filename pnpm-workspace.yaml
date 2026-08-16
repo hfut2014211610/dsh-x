@@ -27,6 +27,10 @@ linkWorkspacePackages: true
 overrides:
   '@deepseek-ai/cosmokit': 'link:vendor/cosmokit'
   '@deepseek-ai/schemastery': 'link:vendor/schemastery'
+  # app-builder-lib resolves @electron/get 3.0.0, which predates the
+  # ElectronDownloadCacheMode enum its own code reads; 3.1.0 is the same
+  # range's fix. Scoped so no other consumer moves.
+  'app-builder-lib>@electron/get': '3.1.0'
 
 peerDependencyRules:
   allowedVersions:

@@ -9,7 +9,7 @@
 import type { RuntimeSource } from './discovery.ts'
 
 /** Where the connection pipeline currently is. */
-type ShellPhase = 'discovering' | 'launching' | 'connecting' | 'ready' | 'failed'
+type ShellPhase = 'preparing' | 'discovering' | 'launching' | 'connecting' | 'ready' | 'failed'
 
 /** The selected runtime, shown in the connection UI. */
 interface ShellRuntimeInfo {

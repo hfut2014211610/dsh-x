@@ -50,8 +50,8 @@ export interface DiscoveryDeps {
   listDirs: (path: string) => Promise<readonly string[]>
   /** npx cache roots to scan (`~/.npm/_npx`, `%LOCALAPPDATA%\npm-cache\_npx`). */
   npxCacheDirs: readonly string[]
-  /** Packaged `process.resourcesPath`; empty string disables the bundled source. */
-  resourcesDir: string
+  /** Extracted bundled runtime root; empty string disables the bundled source. */
+  bundledRoot: string
   /** Launcher that runs dsh entry scripts (system node, or Electron as node). */
   runtimeLauncher: RuntimeSpawn
   /** Origin the serving-instance source probes (the deployment's default port). */
@@ -153,14 +153,13 @@ export async function discoverRuntime(deps: DiscoveryDeps): Promise<DiscoveryOut
   }
   trail.push('npx-cache: no cached dsh installation')
 
-  if (deps.resourcesDir !== '') {
-    const bundledRoot = `${deps.resourcesDir}/dsh-runtime`
-    const runtime = await readRuntime(deps, bundledRoot)
+  if (deps.bundledRoot !== '') {
+    const runtime = await readRuntime(deps, deps.bundledRoot)
     if (runtime !== undefined) {
-      trail.push(`bundled: ${bundledRoot} (dsh ${runtime.version})`)
-      return { candidate: { source: 'bundled', spawn: runtimeSpawn(deps, bundledRoot), version: runtime.version }, trail }
+      trail.push(`bundled: ${deps.bundledRoot} (dsh ${runtime.version})`)
+      return { candidate: { source: 'bundled', spawn: runtimeSpawn(deps, deps.bundledRoot), version: runtime.version }, trail }
     }
-    trail.push(`bundled: no dsh runtime under ${bundledRoot}`)
+    trail.push(`bundled: no dsh runtime under ${deps.bundledRoot}`)
   }
 
   return { trail }
