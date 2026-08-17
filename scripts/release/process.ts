@@ -5,7 +5,26 @@
 
 import { spawnSync } from 'node:child_process'
 import { realpathSync } from 'node:fs'
+import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
+
+/**
+ * The tar the release steps drive. On Windows resolved by absolute path to the
+ * SYSTEM bsdtar: a PATH `tar` may be GNU tar (MSYS), which rejects `D:` drive-
+ * letter arguments as remote-host syntax — the same resolution the desktop
+ * shell's extractor applies.
+ */
+export const TAR = process.platform === 'win32'
+  ? join(process.env.SystemRoot ?? 'C:\\Windows', 'system32', 'tar.exe')
+  : 'tar'
+
+/**
+ * Whether spawned commands run through a shell. On Windows, `pnpm` and `npm`
+ * are `.cmd` shims a shell-less `spawnSync` cannot execute (ENOENT); the
+ * shell resolves them. Arguments carry no quoting metacharacters — the
+ * release steps pass plain paths and names.
+ */
+const WINDOWS_SHELL = process.platform === 'win32' ? { shell: true as const } : {}
 
 /** Where and with what environment a release step runs a command. */
 export interface RunOptions {
@@ -33,7 +52,12 @@ export interface CommandResult {
  * @returns The exit status and captured streams.
  */
 export function attempt(command: string, args: readonly string[], options: RunOptions = {}): CommandResult {
-  const result = spawnSync(command, [...args], { cwd: options.cwd, env: options.env, encoding: 'utf8' })
+  const result = spawnSync(command, [...args], {
+    cwd: options.cwd,
+    env: options.env,
+    encoding: 'utf8',
+    ...WINDOWS_SHELL,
+  })
   if (result.error !== undefined) throw result.error
   return { status: result.status, stdout: result.stdout, stderr: result.stderr }
 }
@@ -61,7 +85,12 @@ export function capture(command: string, args: readonly string[], options: RunOp
  * @param options - working directory and environment.
  */
 export function run(command: string, args: readonly string[], options: RunOptions = {}): void {
-  const result = spawnSync(command, [...args], { cwd: options.cwd, env: options.env, stdio: 'inherit' })
+  const result = spawnSync(command, [...args], {
+    cwd: options.cwd,
+    env: options.env,
+    stdio: 'inherit',
+    ...WINDOWS_SHELL,
+  })
   if (result.error !== undefined) throw result.error
   if (result.status !== 0) throw new Error(`${command} ${args.join(' ')} exited with ${String(result.status)}`)
 }
