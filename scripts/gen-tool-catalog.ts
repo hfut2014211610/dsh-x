@@ -60,6 +60,8 @@ import * as ToolTasks from '@deepseek-ai/dsh-tool-jobs'
 import * as ToolTodo from '@deepseek-ai/dsh-tool-todo'
 import * as ToolSubagent from '@deepseek-ai/dsh-tool-subagent'
 import * as ToolWeb from '@deepseek-ai/dsh-tool-web'
+import DocumentsLocal from '@deepseek-ai/dsh-documents-local'
+import * as ToolDocuments from '@deepseek-ai/dsh-tool-documents'
 import VmWorkflowEngine from '@deepseek-ai/dsh-workflow-worker-thread'
 import * as ToolRalph from '@deepseek-ai/dsh-tool-ralph'
 import * as ToolWorkflow from '@deepseek-ai/dsh-tool-workflow'
@@ -550,6 +552,22 @@ const TOOL_PACKAGES: ToolPackage[] = [
     },
     note:
       'web_search and web_fetch keep provider selection behind ctx.web so model-visible schemas stay stable across backend swaps.',
+  },
+  {
+    pkg: '@deepseek-ai/dsh-tool-documents',
+    dir: 'tool-documents',
+    source: 'packages/writing/tool-documents/src/index.ts',
+    requires: ['ctx.tools', 'ctx.documents', 'ctx.systemPrompt', 'an agent-scoped execution (the session id)'],
+    writes: ['tool/call', 'documents/changed through ctx.documents.apply on mutations', 'tool/result'],
+    async mount(ctx) {
+      // The real local provider satisfies `inject: ['documents']`; the schema
+      // harvest never executes a call, so its filesystem stays untouched.
+      await ctx.plugin(LocalFileSystem)
+      await ctx.plugin(DocumentsLocal, { root: 'tool-catalog-documents' })
+      await ctx.plugin(ToolDocuments)
+    },
+    note:
+      'The five document_* tools ride the documents seam so schemas stay stable across providers. The editing protocol is version-guarded: document_edit requires the version a prior document_read returned, and a document provider emits documents/changed when the mutation commits. document_create accepts plain-text formats only; search, read, and outline are concurrency-safe while create and edit are not.',
   },
 ]
 

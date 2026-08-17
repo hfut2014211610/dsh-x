@@ -65,12 +65,17 @@ export interface UsageOverview {
 /** Statistics windows the panel offers; 'all' aggregates the whole log. */
 export type UsageRange = 7 | 28 | 90 | 'all'
 
+/** Selectable statistics windows, in panel order. */
 export const USAGE_RANGES: readonly UsageRange[] = [7, 28, 90, 'all']
 
 /** Days the dot heatmap covers at most, ending at the aggregation instant's day. */
 export const HEATMAP_WINDOW_DAYS = 28
 
-/** Day cells a range draws: its own span, capped at the heatmap window. */
+/**
+ * Day cells a range draws: its own span, capped at the heatmap window.
+ * @param range - the selected statistics window.
+ * @returns the number of day cells the heatmap renders.
+ */
 export const heatmapDaysOf = (range: UsageRange): number =>
   range === 'all' ? HEATMAP_WINDOW_DAYS : Math.min(range, HEATMAP_WINDOW_DAYS)
 

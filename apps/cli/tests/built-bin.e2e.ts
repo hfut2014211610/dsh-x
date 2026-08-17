@@ -545,6 +545,23 @@ describe.skipIf(!existsSync(dshBin))('dsh BUILT bin (node lib/bin.js, no tsx)', 
     }
   }, 30_000)
 
+  it('disposes on SIGHUP — the only signal a closing Windows console delivers', async () => {
+    // A terminal closed mid-session sends SIGHUP, not SIGINT: the profile boot
+    // must tear the tree down the same way, or the runtime stays running.
+    const fixture = createProfileLifecycleFixture()
+    const child = startProfileLifecycle(fixture)
+    try {
+      await waitForFile(fixture.settled)
+      child.kill('SIGHUP')
+      const result = await child
+      expect(result.exitCode, `${result.stderr}\nstdout:\n${result.stdout}\nsignal: ${String(result.signal)}`).toBe(0)
+      expect(existsSync(fixture.disposed)).toBe(true)
+    } finally {
+      child.kill('SIGKILL')
+      rmSync(fixture.home, { recursive: true, force: true })
+    }
+  }, 30_000)
+
   it('hands the app arguments to the profile, which applies them before its rows start', async () => {
     const fixture = createStartupFixture()
     const child = startStartupProfile(fixture, ['--generation', 'flagged'])

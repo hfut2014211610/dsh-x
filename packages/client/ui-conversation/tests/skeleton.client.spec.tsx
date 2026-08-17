@@ -134,6 +134,7 @@ function mount(
     list: () => viewTabs,
     subscribe: () => () => {},
     version: () => 1,
+    preferred: () => null,
   }
   /** Owner share handed to the two composer tool-row seats, per render. */
   const seatOwners: { key: string; owner: unknown }[] = []

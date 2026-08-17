@@ -539,6 +539,43 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'documents',
+    summary: 'Document service (`ctx.documents`) shared by host providers and consumers.',
+    description: 'Document service (`ctx.documents`) shared by host providers and consumers.',
+    methods: [
+      {
+        signature: '@Remote(\'read\') async read(request: { sessionId: SessionId path: string locator?: DocumentLocator }): Promise<DocumentReadResult>',
+        description: 'Resolve and read a whole document or a located slice.',
+        parameters: [{ name: 'request', description: 'session, document path, and optional locator slice.' }],
+        returns: 'the resolved content with format, current version, and truncation flag.',
+      },
+      {
+        signature: '@Remote(\'outline\') async outline(request: { sessionId: SessionId path: string }): Promise<DocumentOutlineResult>',
+        description: 'Read the structural outline of a document.',
+        parameters: [{ name: 'request', description: 'session and document path.' }],
+        returns: 'the outline entries with format and current version.',
+      },
+      {
+        signature: '@Remote(\'search\') async search(request: { sessionId: SessionId query: string limit?: number }): Promise<DocumentSearchResult>',
+        description: 'Search workspace documents by content keywords.',
+        parameters: [{ name: 'request', description: 'session, query, and optional hit limit.' }],
+        returns: 'the search hits, with a warning when the scan stopped early.',
+      },
+      {
+        signature: '@Remote(\'create\') async create(request: { sessionId: SessionId path: string content: string }): Promise<{ path: string; version: string }>',
+        description: 'Create a new supported text document.',
+        parameters: [{ name: 'request', description: 'session, document path, and initial content.' }],
+        returns: 'the created path and its first version.',
+      },
+      {
+        signature: '@Remote(\'apply\') async apply(request: { sessionId: SessionId path: string baseVersion: string edit: DocumentEdit }): Promise<{ version: string }>',
+        description: 'Apply one version-guarded document mutation and emit documents/changed.',
+        parameters: [{ name: 'request', description: 'session, path, guarded base version, and the edit.' }],
+        returns: 'the document\'s new version.',
+      },
+    ],
+  },
+  {
     key: 'e2b',
     summary: 'Creates one lazily consumable E2B SDK handle and deletes the sandbox at timeout or disposal.',
     description: 'Creates one lazily consumable E2B SDK handle and deletes the sandbox at timeout or disposal. Creation begins at plugin construction; adapters await getSandbox before their first operation.',
@@ -2342,6 +2379,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     parameters: [{ name: 'ref', description: 'the reference whose stored value changed.' }],
   },
   {
+    name: 'documents/changed',
+    mode: 'emit',
+    signature: '\'documents/changed\'(change: DocumentChange): void',
+    summary: 'A document mutation committed through the documents service.',
+    description: 'A document mutation committed through the documents service.',
+    parameters: [{ name: 'change', description: 'path, versions, and optional text patches.' }],
+  },
+  {
     name: 'domain/changed',
     mode: 'emit',
     signature: '\'domain/changed\'(change: DomainChanged): void',
@@ -2948,6 +2993,46 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'DirectoryRegistrationHandle',
     declaration: 'export interface DirectoryRegistrationHandle {\n    (): void;\n    replace(entries: readonly LlmConfigurableProvider[]): void;\n}',
+  },
+  {
+    name: 'DocumentChange',
+    declaration: 'export interface DocumentChange {\n    readonly sessionId: SessionId;\n    readonly path: string;\n    readonly baseVersion: string;\n    readonly version: string;\n    readonly patches: DocumentPatch[] | null;\n}',
+  },
+  {
+    name: 'DocumentEdit',
+    declaration: 'export type DocumentEdit = {\n    kind: \'replace\';\n    locator: DocumentLocator;\n    text: string;\n} | {\n    kind: \'insert\';\n    at: DocumentLocator;\n    where: \'before\' | \'after\';\n    text: string;\n} | {\n    kind: \'delete\';\n    locator: DocumentLocator;\n};',
+  },
+  {
+    name: 'DocumentFormat',
+    declaration: 'export type DocumentFormat = \'text\' | \'markdown\' | \'code\' | \'docx\' | \'xlsx\';',
+  },
+  {
+    name: 'DocumentLocator',
+    declaration: 'export type DocumentLocator = {\n    unit: \'line\';\n    start: number;\n    end: number;\n} | {\n    unit: \'paragraph\';\n    start: number;\n    end: number;\n} | {\n    unit: \'heading\';\n    id: string;\n} | {\n    unit: \'block\';\n    id: string;\n} | {\n    unit: \'cell\';\n    sheet: string;\n    range: string;\n};',
+  },
+  {
+    name: 'DocumentOutlineEntry',
+    declaration: 'export interface DocumentOutlineEntry {\n    readonly id: string;\n    readonly kind: \'heading\' | \'block\' | \'sheet\';\n    readonly title: string;\n    readonly locator: DocumentLocator;\n}',
+  },
+  {
+    name: 'DocumentOutlineResult',
+    declaration: 'export interface DocumentOutlineResult {\n    readonly path: string;\n    readonly format: DocumentFormat;\n    readonly version: string;\n    readonly entries: readonly DocumentOutlineEntry[];\n}',
+  },
+  {
+    name: 'DocumentPatch',
+    declaration: 'export type DocumentPatch = {\n    op: \'splice\';\n    start: number;\n    deleteCount: number;\n    text: string;\n} | {\n    op: \'replace\';\n    locator: DocumentLocator;\n    text: string;\n};',
+  },
+  {
+    name: 'DocumentReadResult',
+    declaration: 'export interface DocumentReadResult {\n    readonly path: string;\n    readonly format: DocumentFormat;\n    readonly version: string;\n    readonly content: string;\n    readonly truncated: boolean;\n}',
+  },
+  {
+    name: 'DocumentSearchHit',
+    declaration: 'export interface DocumentSearchHit {\n    readonly path: string;\n    readonly title: string;\n    readonly snippet: string;\n    readonly score: number;\n    readonly truncated: boolean;\n}',
+  },
+  {
+    name: 'DocumentSearchResult',
+    declaration: 'export interface DocumentSearchResult {\n    readonly hits: readonly DocumentSearchHit[];\n    readonly warning?: string;\n}',
   },
   {
     name: 'Domain',

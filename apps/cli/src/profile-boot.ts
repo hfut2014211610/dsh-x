@@ -217,9 +217,13 @@ export async function runProfile(options: RunProfileOptions): Promise<{ ctx: Con
   // settles: an inserted provider can publish before sibling rows finish mounting.
   // SIGTERM is a supervisor's ordinary stop request and exits 0 on every
   // surface — the launcher does not know whether the app considered its work
-  // complete; SIGINT is a user interrupt and reports 130.
+  // complete; SIGINT is a user interrupt and reports 130; SIGHUP is the
+  // terminal closing (on Windows, the only signal a closing console sends), so
+  // report 0 — the session ended, not crashed. Without it the whole dispose
+  // chain is skipped and child runtimes are left running.
   process.on('SIGTERM', () => { interrupt(0) })
   process.on('SIGINT', () => { interrupt(130) })
+  process.on('SIGHUP', () => { interrupt(0) })
   installFailLoud(NAME, process, async () => {
     await app.current?.fiber.dispose()
   })

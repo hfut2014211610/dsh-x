@@ -56,6 +56,14 @@ export interface IConversation {
    * @returns completion of the page pull.
    */
   loadOlder(): Promise<void>
+  /**
+   * Declare a preferred conversation view for sessions that have no explicit
+   * user tab selection. Resolvers run in registration order; the first
+   * non-null result wins.
+   * @param resolver - returns a conversation.view entry id or null.
+   * @returns disposer that removes this resolver.
+   */
+  declarePreferredView(resolver: (sessionId: SessionId) => string | null): () => void
 }
 
 /** Create one browser-only draft descriptor; only its id enters input state. */
@@ -106,10 +114,17 @@ export class ConversationController extends Service implements IConversation {
    * constructed by the plugin apply (the same instances the slot inject
    * factories close over).
    */
-  constructor(ctx: Context, config: { input: SessionInputResolver; blocks: ComposerBlocks }) {
+  private readonly declarePreferredViewImpl: (resolver: (sessionId: SessionId) => string | null) => () => void
+
+  constructor(ctx: Context, config: {
+    input: SessionInputResolver
+    blocks: ComposerBlocks
+    preferredViews: { declare: (resolver: (sessionId: SessionId) => string | null) => () => void }
+  }) {
     super(ctx, 'conversation')
     this.input = config.input
     this.blocks = config.blocks
+    this.declarePreferredViewImpl = config.preferredViews.declare
     ctx.effect(() => () => {
       this.disposed = true
       for (const url of this.createdImageUrls) revokePreview(url)
@@ -118,6 +133,10 @@ export class ConversationController extends Service implements IConversation {
       this.imageUrls.clear()
       this.imageGenerations.clear()
     }, 'conversation attachment URL cache')
+  }
+
+  declarePreferredView(resolver: (sessionId: SessionId) => string | null): () => void {
+    return this.declarePreferredViewImpl(resolver)
   }
 
   /**

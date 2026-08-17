@@ -223,6 +223,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
     list: () => tabsOf(slots),
     subscribe: (fn: () => void) => slots.subscribe('conversation.view', fn),
     version: () => slots.getVersion('conversation.view'),
+    preferred: () => null,
   }
   const useInput = bindSnapshotSelector(createSnapshotStore({
     draft: '', imageIds: [], draftRev: 0, phase: 'plain', occurrences: [], queue: [],

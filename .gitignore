@@ -43,5 +43,11 @@ worktrees/
 apps/desktop/release/
 apps/desktop/resources/
 
+# Local release-packaging workspace (personal/scripts/build-windows.mjs).
+/dist/
+
 # Local agent session state.
 .zcode/
+
+# Personal design docs (local drafts, not committed).
+personal/docs/design/

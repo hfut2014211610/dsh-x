@@ -106,6 +106,15 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'The host commits accepted images before session events; provider adapters resolve authorized durable references into provider-native content.',
   },
   {
+    key: 'documents',
+    pkg: 'documents',
+    title: 'Versioned document access for writing mode',
+    mode: 'seam',
+    implementations: ['documents-local'],
+    consumers: ['tool-documents'],
+    note: 'read/outline/search/create plus version-guarded apply; the provider emits documents/changed so browser UIs follow committed mutations through the generated remote.',
+  },
+  {
     key: 'llm',
     pkg: 'llm',
     title: 'LLM adapter registry',

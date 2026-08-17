@@ -41,6 +41,7 @@
 | `@deepseek-ai/dsh-tool-todo` | `todo_write` | `ctx.tools`、`owning Agent session` | `tool/call`、`todo/write`、`tool/result` | - | todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为检查清单。`allowParallelInProgress` 是没有默认值的必填项，因此本目录明确选择 `true`，对应描述允许同时存在多个 `in_progress` 项。选择 `false` 的部署会获得同一工具，但描述会要求只能有 1 个活动任务。 |
 | `@deepseek-ai/dsh-tool-workflow` | `workflow` | `ctx.tools`、`ctx.workflowEngine`、`ctx.systemPrompt`、`a calling Agent (exec.agent parents the script children)` | `tool/call`、`tool/result` | - | - |
 | `@deepseek-ai/dsh-tool-web` | `web_fetch`、`web_search` | `ctx.tools`、`ctx.web`、`ctx.systemPrompt` | `tool/call`、`tool/result` | - | web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。 |
+| `@deepseek-ai/dsh-tool-documents` | `document_create`、`document_edit`、`document_outline`、`document_read`、`document_search` | `ctx.tools`、`ctx.documents`、`ctx.systemPrompt`、`an agent-scoped execution (the session id)` | `tool/call`、`documents/changed through ctx.documents.apply on mutations`、`tool/result` | - | 五个 document_* 工具运行在 documents 能力 seam 上，schema 在更换提供方时保持稳定。编辑协议带版本守卫：document_edit 必须使用此前 document_read 返回的版本，提供方在修改提交时发出 documents/changed。document_create 仅接受纯文本格式；search、read、outline 可并发安全调用，create 与 edit 不可以。 |
 
 <a id="deepseek-aidsh-tool-ask-user"></a>
 
@@ -1876,3 +1877,200 @@ todo_write 是会话所有的状态；UI 将最新的 todo/write 事件渲染为
 来源：[`packages/web/tool-web/src/index.ts`](../packages/web/tool-web/src/index.ts)
 
 web_search 和 web_fetch 将提供方选择置于 ctx.web 之后，使模型可见 schema 在更换后端时保持稳定。
+
+<a id="deepseek-aidsh-tool-documents"></a>
+
+## `@deepseek-ai/dsh-tool-documents`
+
+### `document_create`
+
+新建一个受支持的文本文档（仅限 .txt、.md 或代码文件）。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Workspace-relative document path."
+    },
+    "content": {
+      "type": "string",
+      "description": "Full document content."
+    }
+  },
+  "required": [
+    "path",
+    "content"
+  ]
+}
+```
+
+[`packages/writing/tool-documents/src/index.ts`](../packages/writing/tool-documents/src/index.ts)
+
+### `document_edit`
+
+对文档执行带版本守卫的替换、插入或删除操作。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Workspace-relative document path."
+    },
+    "base_version": {
+      "type": "string",
+      "description": "Version returned by a prior document_read."
+    },
+    "edit": {
+      "type": "object",
+      "additionalProperties": false,
+      "properties": {
+        "kind": {
+          "type": "string",
+          "enum": [
+            "replace",
+            "insert",
+            "delete"
+          ]
+        },
+        "locator": {
+          "type": "object",
+          "additionalProperties": true
+        },
+        "at": {
+          "type": "object",
+          "additionalProperties": false
+        },
+        "where": {
+          "type": "string",
+          "enum": [
+            "before",
+            "after"
+          ]
+        },
+        "text": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "kind",
+        "locator"
+      ]
+    }
+  },
+  "required": [
+    "path",
+    "base_version",
+    "edit"
+  ]
+}
+```
+
+[`packages/writing/tool-documents/src/index.ts`](../packages/writing/tool-documents/src/index.ts)
+
+### `document_outline`
+
+读取文档的标题、块或工作表结构。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Workspace-relative document path."
+    }
+  },
+  "required": [
+    "path"
+  ]
+}
+```
+
+[`packages/writing/tool-documents/src/index.ts`](../packages/writing/tool-documents/src/index.ts)
+
+### `document_read`
+
+读取整篇文档或定位切片，并返回其当前版本。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "path": {
+      "type": "string",
+      "description": "Workspace-relative document path."
+    },
+    "locator": {
+      "type": "object",
+      "description": "Optional 1-based located slice. Omit to read the whole document.",
+      "additionalProperties": true,
+      "properties": {
+        "unit": {
+          "type": "string",
+          "enum": [
+            "line",
+            "paragraph",
+            "heading",
+            "block",
+            "cell"
+          ]
+        },
+        "start": {
+          "type": "number"
+        },
+        "end": {
+          "type": "number"
+        },
+        "id": {
+          "type": "string"
+        },
+        "sheet": {
+          "type": "string"
+        },
+        "range": {
+          "type": "string"
+        }
+      },
+      "required": [
+        "unit"
+      ]
+    }
+  },
+  "required": [
+    "path"
+  ]
+}
+```
+
+[`packages/writing/tool-documents/src/index.ts`](../packages/writing/tool-documents/src/index.ts)
+
+### `document_search`
+
+按内容关键词搜索工作区文档，返回排序后的命中结果。
+
+```json
+{
+  "type": "object",
+  "properties": {
+    "query": {
+      "type": "string",
+      "description": "Keywords to search for."
+    },
+    "limit": {
+      "type": "number",
+      "description": "Maximum number of hits to return."
+    }
+  },
+  "required": [
+    "query"
+  ]
+}
+```
+
+[`packages/writing/tool-documents/src/index.ts`](../packages/writing/tool-documents/src/index.ts)
+
+五个 document_* 工具运行在 documents 能力 seam 上，schema 在更换提供方时保持稳定。编辑协议带版本守卫：document_edit 必须使用此前 document_read 返回的版本，提供方在修改提交时发出 documents/changed。document_create 仅接受纯文本格式；search、read、outline 可并发安全调用，create 与 edit 不可以。

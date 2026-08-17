@@ -23,8 +23,12 @@ interface Breadcrumb {
 const DEFAULT_VIEW_ID = 'chat'
 
 /** Resolve by id and keep stale persisted selections on the stable Chat fallback. */
-function resolveActiveView(tabs: readonly ViewTab[], selectedId: string | null): ViewTab | undefined {
-  const requestedId = selectedId ?? DEFAULT_VIEW_ID
+function resolveActiveView(
+  tabs: readonly ViewTab[],
+  selectedId: string | null,
+  preferredId: string | null,
+): ViewTab | undefined {
+  const requestedId = selectedId ?? preferredId ?? DEFAULT_VIEW_ID
   return tabs.find(view => view.id === requestedId)
     ?? tabs.find(view => view.id === DEFAULT_VIEW_ID)
 }
@@ -65,7 +69,7 @@ export function ConversationSessionHeader({
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
   const selectedId = useStore(s => s.view)
-  const active = resolveActiveView(tabs, selectedId)
+  const active = resolveActiveView(tabs, selectedId, views.preferred(sessionId))
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
@@ -142,7 +146,7 @@ export function ConversationSession({
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
   const selectedId = useStore(s => s.view)
-  const active = resolveActiveView(tabs, selectedId)
+  const active = resolveActiveView(tabs, selectedId, views.preferred(sessionId))
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
   const inputState = useInput(s => s)

@@ -22,7 +22,6 @@
     },
     {
       "path": "../../credentials/credentials"
-
     },
     {
       "path": "../../extensions/cordis-host-runner"
@@ -50,6 +49,9 @@
     },
     {
       "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../writing/documents"
     }
   ]
 }

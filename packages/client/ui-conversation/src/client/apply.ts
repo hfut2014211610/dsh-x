@@ -150,6 +150,13 @@ export function apply(ctx: Context): void {
   // persisted: a fresh page load keeps the open-jump-to-bottom default.
   const chatScrollPositions = new Map<SessionId, ChatScrollPosition>()
 
+  const preferredViewResolvers = new Set<(sessionId: SessionId) => string | null>()
+  const preferredViews = {
+    declare: (resolver: (sessionId: SessionId) => string | null): () => void => {
+      preferredViewResolvers.add(resolver)
+      return () => { preferredViewResolvers.delete(resolver) }
+    },
+  }
   const viewTabs = (): ViewTab[] => {
     const tabs: ViewTab[] = []
     for (const entry of slots.entries('conversation.view')) {
@@ -163,6 +170,13 @@ export function apply(ctx: Context): void {
     list: viewTabs,
     subscribe: (fn: () => void) => slots.subscribe('conversation.view', fn),
     version: () => slots.getVersion('conversation.view'),
+    preferred: (sessionId: SessionId): string | null => {
+      for (const resolver of preferredViewResolvers) {
+        const id = resolver(sessionId)
+        if (id !== null) return id
+      }
+      return null
+    },
   }
 
   // The per-session input machine registry (SessionInputResolver face; published as
@@ -432,7 +446,7 @@ export function apply(ctx: Context): void {
   // registers itself as `conversation` and lives on its own child fiber.
   // Presentation registrants depend directly on their slot declarations;
   // this service remains only where conversation actions are required.
-  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks })
+  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks, preferredViews })
 
   // The plan strip rides the input dock above the queue rows (same posture).
   ctx.plugin(todoDockEntry)

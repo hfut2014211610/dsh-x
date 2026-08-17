@@ -431,6 +431,7 @@ export interface ConversationSessionInjected {
     list: () => readonly ViewTab[]
     subscribe: (fn: () => void) => () => void
     version: () => number
+    preferred: (sessionId: SessionId) => string | null
   }
   /** Release historical image URLs when this rendered session scope unmounts. */
   releaseSessionImages: (sessionId: SessionId) => void
@@ -445,6 +446,7 @@ export interface ConversationSessionHeaderInjected {
     list: () => readonly ViewTab[]
     subscribe: (fn: () => void) => () => void
     version: () => number
+    preferred: (sessionId: SessionId) => string | null
   }
   /** Select a real Session through the runtime navigation owner. */
   open: (sessionId: SessionId) => void

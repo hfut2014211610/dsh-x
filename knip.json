@@ -209,6 +209,12 @@
         "tests/**/*.tsx"
       ]
     },
+    "packages/client/ui-writing": {
+      "project": [
+        "src/**/*.ts",
+        "src/**/*.tsx"
+      ]
+    },
     "packages/client/web-react": {
       "entry": [
         "tests/**/*.spec.tsx"
@@ -600,6 +606,19 @@
       ],
       "ignoreDependencies": [
         "zod"
+      ]
+    },
+    "packages/writing/documents": {
+      "project": [
+        "src/**/*.ts"
+      ],
+      "ignoreDependencies": [
+        "zod"
+      ]
+    },
+    "packages/writing/writing-mode": {
+      "project": [
+        "src/**/*.ts"
       ]
     },
     "packages/examples/jsonrpc-demo": {

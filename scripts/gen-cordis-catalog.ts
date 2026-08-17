@@ -66,6 +66,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   cordisInspect: 'extensions.md',
   credentials: 'credentials.md',
   directoryPicker: 'workspace.md',
+  documents: 'writing.md',
   dynamicCordisRunner: 'extensions.md',
   e2b: 'subprocess.md',
   fs: 'filesystem.md',
@@ -171,6 +172,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'cordis': 'extensions.md',
   'credentials': 'credentials.md',
   'domain': 'storage.md',
+  'documents': 'writing.md',
   'fs': 'filesystem.md',
   'goal': 'goal.md',
   'llm': 'llm-streaming.md',
@@ -486,6 +488,12 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   TypertPackageRecord: 'invariants.md',
   TypertSchemaFilter: 'invariants.md',
   TypertSchemaRecord: 'invariants.md',
+  DocumentChange: 'writing.md',
+  DocumentEdit: 'writing.md',
+  DocumentLocator: 'writing.md',
+  DocumentOutlineResult: 'writing.md',
+  DocumentReadResult: 'writing.md',
+  DocumentSearchResult: 'writing.md',
 }
 
 /** TypeScript lib and pinned framework types with no repository-owned data page. */

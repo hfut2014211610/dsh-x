@@ -34,8 +34,10 @@ export const zh = {
   errorTitle: '加载失败',
 } as const
 
+/** Locale keys of the usage panel, shared by both dictionaries. */
 export type UsageKey = keyof typeof zh
 
+/** English usage-panel dictionary, keyed by the shared locale keys. */
 export const en: Record<UsageKey, string> = {
   nav: 'Usage',
   title: 'Model usage',

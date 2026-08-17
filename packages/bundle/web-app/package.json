@@ -104,7 +104,10 @@
     "@deepseek-ai/dsh-storage-json": "workspace:^",
     "@deepseek-ai/dsh-workspace": "workspace:^",
     "@deepseek-ai/schemastery": "workspace:^",
-    "commander": "^15.0.0"
+    "commander": "^15.0.0",
+    "@deepseek-ai/dsh-documents": "workspace:^",
+    "@deepseek-ai/dsh-documents-local": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-writing": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis-plugin-loader": "workspace:^",

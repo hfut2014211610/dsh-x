@@ -65,6 +65,11 @@
       name: '@deepseek-ai/dsh-message-feedback'
       config:
         maxNoteBytes: 8192
+    - id: documents-local
+      name: '@deepseek-ai/dsh-documents-local'
+      config:
+        root: !!js process.env.DSH_CWD ?? process.cwd()
+
 
     # Browser Session export: `/export` command plus the shared download dialog.
     - id: session-log-download
@@ -280,6 +285,9 @@
 
     - id: ui-trajectory
       name: '@deepseek-ai/dsh-client-ui-trajectory'
+
+    - id: ui-writing
+      name: '@deepseek-ai/dsh-client-ui-writing'
 
 # ── the agent plane moves behind agent presets ─────────────────────────────
 #

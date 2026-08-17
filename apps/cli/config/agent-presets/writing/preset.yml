@@ -1,0 +1,3 @@
+name: 写作模式
+description: 面向文档编写与修订的写作 Agent，只提供 document_* 文档工具。
+order: 5
