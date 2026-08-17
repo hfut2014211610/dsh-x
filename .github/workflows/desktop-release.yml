@@ -81,8 +81,8 @@ jobs:
             # the stage from those tarballs. Optional platform prebuilts
             # (koffi, landlock) still come from the registry, matching the
             # npm path below.
-            pnpm run release:pack -- --family dsh --out dist/npm-dsh
-            pnpm run release:pack -- --family vendor --out dist/npm-vendor
+            pnpm run release:pack --family dsh --out dist/npm-dsh
+            pnpm run release:pack --family vendor --out dist/npm-vendor
             pnpm --dir native/landlock-run run build:ts
             pnpm --dir native/landlock-run/packages/entry pack --pack-destination "$PWD/dist/npm-landlock" | Out-Null
             pnpm exec tsx scripts/release/desktop-runtime.ts --from dist/npm-dsh --from dist/npm-vendor --from dist/npm-landlock --stage $stage
@@ -168,8 +168,8 @@ jobs:
             # the stage from those tarballs. Optional platform prebuilts
             # (koffi, landlock) still come from the registry, matching the
             # npm path below.
-            pnpm run release:pack -- --family dsh --out dist/npm-dsh
-            pnpm run release:pack -- --family vendor --out dist/npm-vendor
+            pnpm run release:pack --family dsh --out dist/npm-dsh
+            pnpm run release:pack --family vendor --out dist/npm-vendor
             pnpm --dir native/landlock-run run build:ts
             pnpm --dir native/landlock-run/packages/entry pack --pack-destination "$PWD/dist/npm-landlock" >/dev/null
             pnpm exec tsx scripts/release/desktop-runtime.ts --from dist/npm-dsh --from dist/npm-vendor --from dist/npm-landlock --stage "$stage"
