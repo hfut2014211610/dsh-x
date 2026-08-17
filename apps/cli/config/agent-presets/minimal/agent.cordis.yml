@@ -15,9 +15,14 @@
 # The PTY registry is an agent-owned service, so it lives in an entry-local
 # realm. The backend still consumes the host sandbox policy and subprocess
 # implementation, while the tool registers into this agent's scoped catalog.
+#
+# DISABLED ON WINDOWS: subprocess-local's process inspector covers linux/darwin
+# only, so the PTY seam throws on win32; the `custom-bash` row below registers
+# the same `bash` tool name there instead.
 - id: persistent-shell
   name: cordis:group
   group: true
+  disabled: !!js process.platform === 'win32'
   isolate:
     terminals: true
   config:
@@ -42,6 +47,14 @@
           * To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.
           * Please avoid commands that may produce a very large amount of output.
           * Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.
+
+# Windows-only `bash` (see custom-bash.mjs): the same tool name and a
+# Minimal-compatible description, executed through the ordinary cross-platform
+# subprocess seam (`bash -c`, resolved from PATH — point `bashPath` at Git Bash
+# explicitly when the WSL shim would otherwise be picked up).
+- id: custom-bash
+  name: ./custom-bash.mjs
+  disabled: !!js process.platform !== 'win32'
 
 # The bare local filesystem shadows the host's sandboxed provider only for this
 # preset. The editor shares that realm and requires absolute paths.

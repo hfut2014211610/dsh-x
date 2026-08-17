@@ -39,6 +39,16 @@ const MINIMAL_BASH_DESCRIPTION = `Run commands in a bash shell
 * To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.
 * Please avoid commands that may produce a very large amount of output.
 * Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.`
+/** The `bash` description win32 presets carry instead: custom-bash's (fresh-shell, unsandboxed). */
+const WIN_BASH_DESCRIPTION = `Run commands in a bash shell (Git Bash on Windows)
+* When invoking this tool, the contents of the "command" parameter does NOT need to be XML-escaped.
+* You don't have access to the internet via this tool.
+* You do have access to a mirror of common linux and python packages via apt and pip.
+* State does NOT persist across command calls: each call runs in a fresh shell.
+* To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.
+* Please avoid commands that may produce a very large amount of output.
+* NOTE: runs without OS sandbox confinement on Windows (no landlock); treat output as untrusted.`
+const platformBashDescription = (): string => process.platform === 'win32' ? WIN_BASH_DESCRIPTION : MINIMAL_BASH_DESCRIPTION
 
 /**
  * Boot the shipped Web composition, minus the rows that would bind a port,
@@ -219,7 +229,9 @@ describe('the shipped Web composition', () => {
 
   it('composes the exact RL prompt and two tools from `minimal`', async () => {
     const handle = await ctx.agents.create({
-      sessionId: SessionId('preset-minimal'),
+      // Unique per run: executing a tool durably writes the session log, and a
+      // fixed id would collide with a log an earlier run left there.
+      sessionId: SessionId(`preset-minimal-${randomUUID()}`),
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'minimal').then(() => undefined),
     })
     try {
@@ -228,11 +240,25 @@ describe('the shipped Web composition', () => {
         { name: 'deployment:persona', text: MINIMAL_PROMPT },
       ])
       expect(assembly.tools.map(tool => tool.name)).toEqual(['bash', 'str_replace_editor'])
-      expect(assembly.tools.find(tool => tool.name === 'bash')?.description).toBe(MINIMAL_BASH_DESCRIPTION)
+      // win32 carries custom-bash's description (the PTY seam throws there);
+      // every other platform carries the persistent shell's byte-identically.
+      expect(assembly.tools.find(tool => tool.name === 'bash')?.description).toBe(platformBashDescription())
       expect(JSON.stringify(assembly.tools.find(tool => tool.name === 'str_replace_editor')?.parameters))
         .toContain('Absolute path')
       expect(ctx.agentPresets.serviceFor(handle.agent, 'compaction')).toBeUndefined()
       expect(handle.agent.ctx.get('compaction')).toBeUndefined()
+
+      // The pair executes on every platform (persistent PTY shell on
+      // linux/darwin, custom-bash on win32), not just lists in a catalog.
+      const executed = await ctx.tools.execute({
+        callId: CallId('preset-minimal-bash'),
+        name: 'bash',
+        arguments: { command: 'printf dsh-bash-ok' },
+        signal: new AbortController().signal,
+        agent: handle.agent,
+      })
+      expect(executed.isError).toBe(false)
+      expect(JSON.stringify(executed.content)).toContain('dsh-bash-ok')
     } finally {
       await handle.dispose()
     }
@@ -246,18 +272,33 @@ describe('the shipped Web composition', () => {
       setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'anchored-standard').then(() => undefined),
     })
     try {
-      // Bootstrap phase: exactly the Minimal pair with the Minimal bash
-      // description, and no assembled runtime contexts — the anchor
-      // condition.
+      // Bootstrap phase: exactly the Minimal pair, and no assembled runtime
+      // contexts — the anchor condition. The bash description is the
+      // persistent shell's on linux/darwin and custom-bash's on win32 (where
+      // the PTY seam throws), so the schema anchor is platform-conditional.
       const boot = await ctx.systemPrompt.assemble({ agent: handle.agent, scope: handle.agent })
       expect(boot.tools.map(tool => tool.name)).toEqual(['bash', 'str_replace_editor'])
-      expect(boot.tools.find(tool => tool.name === 'bash')?.description).toBe(MINIMAL_BASH_DESCRIPTION)
+      expect(boot.tools.find(tool => tool.name === 'bash')?.description).toBe(platformBashDescription())
       expect(boot.sections).toEqual([{ name: 'deployment:persona', text: MINIMAL_PROMPT }])
       expect(boot.contexts).toEqual([])
 
       // The registry still carries the full catalog; only the assembly
       // narrows, so dev_tool_search has something to find.
       expect(toolNames(ctx, handle.agent).length).toBeGreaterThan(10)
+
+      // The bootstrap pair's bash EXECUTES on every platform: the persistent
+      // PTY shell on linux/darwin, custom-bash through the subprocess seam on
+      // win32 (where the PTY seam throws). A catalog-only assertion cannot
+      // tell a working pair from a broken one.
+      const booted = await ctx.tools.execute({
+        callId: CallId('preset-anchored-bash'),
+        name: 'bash',
+        arguments: { command: 'printf dsh-bash-ok' },
+        signal: new AbortController().signal,
+        agent: handle.agent,
+      })
+      expect(booted.isError).toBe(false)
+      expect(JSON.stringify(booted.content)).toContain('dsh-bash-ok')
 
       // A durable assistant reply promotes: the next assembly carries the
       // resident set — the bootstrap pair plus the three discovery tools.

@@ -161,11 +161,9 @@ function formatFileView(
         `Invalid \`view_range\`: [${viewRange.join(', ')}]. Its first element \`${initialLine}\` should be within the range of lines of the file: [1, ${allLines.length}]`,
       )
     }
-    if (finalLine > allLines.length) {
-      throw new Error(
-        `Invalid \`view_range\`: [${viewRange.join(', ')}]. Its second element \`${finalLine}\` should be smaller than the number of lines in the file: \`${allLines.length}\``,
-      )
-    }
+    // A final line past EOF clamps to the last line: a model asking for
+    // "the rest" with a padded bound reads the tail instead of retrying.
+    if (finalLine !== -1 && finalLine > allLines.length) finalLine = allLines.length
     if (finalLine !== -1 && finalLine < initialLine) {
       throw new Error(
         `Invalid \`view_range\`: [${viewRange.join(', ')}]. Its second element \`${finalLine}\` should be larger or equal than its first \`${initialLine}\``,

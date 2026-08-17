@@ -176,6 +176,19 @@ describe('tool-str-replace-editor', () => {
       '',
     ].join('\n'))
 
+    // A final line past EOF clamps to the last line instead of erroring: a
+    // padded "rest of the file" bound reads the tail on the first try.
+    expect(text(await call(ctx, owner, {
+      command: 'view',
+      path: sample,
+      view_range: [3, 99],
+    }))).toBe([
+      `Here's the content of ${sample} with line numbers (which has a total of 4 lines) with view_range=[3, 4]:`,
+      '     3  three',
+      '     4  ',
+      '',
+    ].join('\n'))
+
     expect(text(await call(ctx, owner, {
       command: 'str_replace',
       path: sample,
@@ -403,7 +416,6 @@ describe('tool-str-replace-editor', () => {
       { command: 'view', path: ambiguous, view_range: [1] },
       { command: 'view', path: ambiguous, view_range: [0, 1] },
       { command: 'view', path: ambiguous, view_range: [1.5, 2] },
-      { command: 'view', path: threeLines, view_range: [1, 99] },
       { command: 'view', path: threeLines, view_range: [2, 1] },
       { command: 'view', path: directory, view_range: [1, 1] },
       { command: 'create', path: join(root, 'new.txt') },

@@ -147,11 +147,11 @@
 # registry from here; their executors (`bash-sandbox`/`pwsh-sandbox`) are
 # host-plane too.
 #
-# Disabled on EVERY platform, not just non-Windows: the persistent shell below
-# registers the same `bash` tool name into this same preset layer, and the
-# tools registry rejects duplicates within one layer. The persistent shell is
-# this preset's bash — and the Minimal pair's exact `bash` schema — so the
-# bootstrap anchor holds on every platform.
+# Disabled on EVERY platform, not just non-Windows: the shell rows below
+# register the same `bash` tool name into this same preset layer, and the
+# tools registry rejects duplicates within one layer. On linux/darwin the
+# persistent shell owns the name; on win32 (where the PTY seam throws) the
+# `custom-bash` row does.
 - id: tool-bash
   name: '@deepseek-ai/dsh-tool-bash'
   disabled: true
@@ -160,16 +160,20 @@
   name: '@deepseek-ai/dsh-tool-pwsh'
   disabled: !!js process.platform !== 'win32'
 
-# The Minimal preset's shell, ungated: a PTY-backed persistent bash,
-# byte-identical in configuration to the official `minimal` preset's
-# `persistent-shell` group so the first request exposes exactly Minimal's
-# real `bash` schema. The PTY registry is an agent-owned service, so it lives
-# in an entry-local realm; the backend still consumes the host sandbox policy
-# and subprocess implementation, while the tool registers into this agent's
-# scoped catalog.
+# The Minimal preset's shell: a PTY-backed persistent bash, byte-identical in
+# configuration to the official `minimal` preset's `persistent-shell` group so
+# the first request exposes exactly Minimal's real `bash` schema. The PTY
+# registry is an agent-owned service, so it lives in an entry-local realm; the
+# backend still consumes the host sandbox policy and subprocess implementation,
+# while the tool registers into this agent's scoped catalog.
+#
+# DISABLED ON WINDOWS: subprocess-local's process inspector covers linux/darwin
+# only, so the PTY seam throws on win32. The `custom-bash` row below registers
+# the same `bash` tool name there instead (platform-exclusive).
 - id: persistent-shell
   name: cordis:group
   group: true
+  disabled: !!js process.platform === 'win32'
   isolate:
     terminals: true
   config:
@@ -194,6 +198,16 @@
           * To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.
           * Please avoid commands that may produce a very large amount of output.
           * Please run long lived commands in the background, e.g. 'sleep 10 &' or start a server in the background.
+
+# Windows-only `bash` tool (see custom-bash.mjs): registers the SAME tool name
+# as the persistent shell with a Minimal-compatible description, but executes
+# through the ordinary cross-platform subprocess seam (`bash -c`, resolved from
+# PATH — point `bashPath` at Git Bash explicitly when the WSL shim would
+# otherwise be picked up). No OS sandbox confinement on Windows; the tool
+# description says so.
+- id: custom-bash
+  name: ./custom-bash.mjs
+  disabled: !!js process.platform !== 'win32'
 
 # ── filesystem ──────────────────────────────────────────────────────────────
 

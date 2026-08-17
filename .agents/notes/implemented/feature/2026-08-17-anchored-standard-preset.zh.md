@@ -22,13 +22,15 @@ DeepSeek V4 级模型的首条思维链轨迹强烈依赖首次模型请求在 A
 
 ## Adaptations from the upstream preset
 
-上游组合面向 harness `0.1.0-rc.5`，在 Windows 上通过 `custom-bash` 行补位（其 PTY 后端仅支持 linux/darwin）。本 harness 的 `spawnTerminal` 直接运行 node-pty 且无 win32 守卫，内置 `minimal` 预设也已无门控挂载持久 shell——因此移植去掉 `custom-bash`，全平台挂载持久 shell，使引导双工具对在各平台都与 Minimal 字节一致。上游 `dev-tool-search` 的 schema 编译器还会丢弃 `toolNames` 的 `items` 字段；移植版将其透传。技能可见性遵循本 harness 的调用策略（上游早于该机制）。
+上游组合面向 harness `0.1.0-rc.5`，在 Windows 上通过 `custom-bash` 行补位（其 PTY 后端仅支持 linux/darwin）。本 harness 的 `spawnTerminal` 直接运行 node-pty，看起来跨平台——但 `subprocess-local` 的进程检查器在 spawn 时仍拒绝 win32（"terminal inspection is unsupported on platform win32"），PTY 接缝实际仍是 linux/darwin。因此移植保留上游的平台切分：linux/darwin 由持久 shell 持有 `bash`，win32 由移植的 `custom-bash`（适配本 harness 必填 `cwd` 的 spawn 规格）持有同名工具，经普通 subprocess 接缝执行 Git Bash。内置 `minimal` 预设带着同样的 win32 缺陷（无门控的持久 shell 能挂载但无法执行）；本次一并为其加门控并挂载同一个 `custom-bash`。
+
+上游 `dev-tool-search` 的 schema 编译器还会丢弃 `toolNames` 的 `items` 字段；移植版将其透传。技能可见性遵循本 harness 的调用策略（上游早于该机制）。
 
 ## Alternatives considered
 
 **同时移植上游的变体家族（zero-anchored、whoami、prefab、eternal-minimal、wire-think、combo）。** 否决：它们是上游评测循环的对照模式——每个变体以持续代价换取各自杠杆（每会话或每轮多一次模型调用、兄弟 provider 路由、前缀缓存抖动），且其 Project2 级分数无法与基础模式分离。基础两段式组合以零持续代价承载实测收益；变体可日后按需移植。
 
-**保留 `custom-bash` 以与上游对齐 Windows。** 否决：本 harness 的 PTY 原语跨平台，内置 `minimal` 预设已依赖这一点；第二个 `bash` 实现会按平台分叉锚定 schema 的字节一致性，而非保全它。
+**保留 `custom-bash` 以与上游对齐 Windows。** 保留：本 harness 的 PTY 原语看似跨平台（node-pty 无 win32 守卫），但本地 subprocess 提供方的进程检查器只覆盖 linux/darwin、在 win32 spawn 时抛错，持久 shell 在 Windows 上无法执行。第二个 `bash` 实现是全平台可用双工具对的代价；其描述不同（全新 shell、无沙箱），e2e 以真实执行断言双工具对，而非目录在场。
 
 **把 `anchored-standard` 提升为默认预设。** 否决：轨迹收益是上游项目在其评测上的测量，未在本 fork 的行为上复验；以可选方式内置让它按部署逐步证明自身，`standard` 仍是无所倾向的默认。
 

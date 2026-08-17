@@ -22,13 +22,15 @@ All phase state derives from durable session events through one epoch-aware trac
 
 ## Adaptations from the upstream preset
 
-The upstream composition targeted harness `0.1.0-rc.5` and Windows via a `custom-bash` row (its PTY backend was linux/darwin-only). This harness's `spawnTerminal` runs node-pty with no win32 guard, and the shipped `minimal` preset mounts the persistent shell ungated — so this port drops `custom-bash` and mounts the persistent shell on every platform, keeping the bootstrap pair byte-identical to Minimal everywhere. The upstream `dev-tool-search` schema compiler also dropped the `toolNames` `items` field; the port passes it through. Skill visibility follows this harness's invocation policies, which upstream predates.
+The upstream composition targeted harness `0.1.0-rc.5` and Windows via a `custom-bash` row because its PTY backend was linux/darwin-only. This harness's `spawnTerminal` runs node-pty directly, which read as cross-platform — but `subprocess-local`'s process inspector still rejects win32 at spawn time ("terminal inspection is unsupported on platform win32"), so the PTY seam is linux/darwin in practice. The port therefore keeps the upstream platform split: the persistent shell owns `bash` on linux/darwin, and a ported `custom-bash` (adapted to this harness's required-`cwd` spawn spec) owns the same name on win32, executing Git Bash through the ordinary subprocess seam. The shipped `minimal` preset carried the same win32 defect (its ungated persistent shell mounted but could not execute); this change gates it and mounts the same `custom-bash` there too.
+
+The upstream `dev-tool-search` schema compiler also dropped the `toolNames` `items` field; the port passes it through. Skill visibility follows this harness's invocation policies, which upstream predates.
 
 ## Alternatives considered
 
 **Ship the upstream variant family too (zero-anchored, whoami, prefab, eternal-minimal, wire-think, combo).** Rejected: they are comparison modes for the upstream evaluation loop — each buys its lever at a standing cost (an extra model call per session or per turn, sibling provider routes, prefix-cache churn) and their Project2-class scores are not separable from the base mode's. The base two-phase composition carries the measured win at zero standing cost; a variant can be ported later on demand.
 
-**Keep `custom-bash` for Windows parity with upstream.** Rejected: this harness's PTY primitive is cross-platform and the shipped `minimal` preset already relies on that; a second `bash` implementation would fork the anchor schema's byte-identity across platforms instead of preserving it.
+**Keep `custom-bash` for Windows parity with upstream.** Kept: this harness's PTY primitive looked cross-platform (node-pty with no win32 guard), but the local subprocess provider's process inspector covers linux/darwin only and throws on win32 at spawn time, so the persistent shell cannot execute on Windows. A second `bash` implementation is the price of a working pair on every platform; its description differs (fresh shell, unsandboxed) and the e2e asserts the pair by EXECUTING it, not by catalog presence.
 
 **Promote `anchored-standard` to the default preset.** Rejected: the trajectory claim is the upstream project's measurement on its evaluation, not re-verified against this fork's behavior; shipping it as opt-in lets it prove out per deployment while `standard` remains the unopinionated default.
 

@@ -97,7 +97,11 @@ async function connect(): Promise<void> {
         writeFile: async (path, contents) => { await writeFile(path, contents, 'utf8') },
         extract: async (archive, dir) => {
           const run = (command: string, args: readonly string[]): void => {
-            const result = spawnSync(command, args, { encoding: 'utf8', timeout: 600_000 })
+            // A cold Windows machine extracts the bundled runtime's tens of
+            // thousands of small files under real-time antivirus scanning;
+            // the bound covers that first run without keeping a stuck tar
+            // alive indefinitely.
+            const result = spawnSync(command, args, { encoding: 'utf8', timeout: 900_000 })
             if (result.status !== 0) {
               throw new Error(`${command} exited ${String(result.status)}: ${String(result.stderr).slice(0, 300)}`)
             }

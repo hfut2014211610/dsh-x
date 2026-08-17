@@ -34,7 +34,7 @@ describe.skipIf(packagedExe === '' || !existsSync(packagedExe))('packaged app sm
     const electron = await _electron.launch({ executablePath: packagedExe, env: childEnv })
     try {
       const window = await electron.firstWindow()
-      await window.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 360_000 })
+      await window.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 900_000 })
       expect(window.url()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\//)
       await expect.poll(() => window.title(), { timeout: 60_000 }).toBe('DeepSeek Harness')
       const url = window.url()
@@ -50,5 +50,5 @@ describe.skipIf(packagedExe === '' || !existsSync(packagedExe))('packaged app sm
     } finally {
       await electron.close().catch(() => undefined)
     }
-  }, 420_000)
+  }, 960_000)
 })
