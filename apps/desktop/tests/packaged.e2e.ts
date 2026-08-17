@@ -20,9 +20,10 @@ afterAll(() => {
 })
 
 describe.skipIf(packagedExe === '' || !existsSync(packagedExe))('packaged app smoke', () => {
-  // A cold CI runner pays the whole first boot at once: archive extraction
-  // (530 files), profile auto-init, and the Cordis tree — well over the lane's
-  // 180s default, so this test carries its own generous bound.
+  // A cold CI runner pays the whole first boot at once: extracting the
+  // bundled runtime's ~33k small files under real-time antivirus scanning,
+  // profile auto-init, and the Cordis tree — minutes, not seconds, so this
+  // test carries its own bound well past the extraction's own.
   test('the packaged app boots from its bundled runtime', async () => {
     isolatedHome = mkdtempSync(join(tmpdir(), 'dsh-desktop-packaged-home-'))
     const childEnv: Record<string, string> = {}
@@ -31,10 +32,31 @@ describe.skipIf(packagedExe === '' || !existsSync(packagedExe))('packaged app sm
     }
     childEnv.DSH_DESKTOP_PROBE_ORIGIN = 'http://127.0.0.1:1'
     childEnv.DSH_HOME = isolatedHome
+    // The GUI process detaches from the runner's console; Electron's logging
+    // switch is the only way its own output reaches a captured pipe.
+    childEnv.ELECTRON_ENABLE_LOGGING = '1'
     const electron = await _electron.launch({ executablePath: packagedExe, env: childEnv })
+    /** Everything the app printed, so a CI failure names its cause. */
+    const processOutput: string[] = []
+    for (const stream of [electron.process().stdout, electron.process().stderr]) {
+      stream?.on('data', (chunk: Buffer) => {
+        const text = chunk.toString().trim()
+        if (text !== '') processOutput.push(text)
+      })
+    }
     try {
       const window = await electron.firstWindow()
-      await window.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 900_000 })
+      await window.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 900_000 }).catch(async (error: unknown) => {
+        // The loading screen renders the shell's phase and log tail; both it
+        // and the process output turn a remote timeout into a diagnosis.
+        const screen = await window.textContent('#logs', { timeout: 5_000 }).catch(() => 'unavailable')
+        const phase = await window.textContent('.stage', { timeout: 5_000 }).catch(() => 'unavailable')
+        throw new Error(
+          `the packaged app never served a URL — phase: ${phase ?? 'unavailable'}; `
+          + `loading-screen logs:\n${screen ?? 'unavailable'}\nprocess output:\n${processOutput.join('\n') || '(none)'}`,
+          { cause: error },
+        )
+      })
       expect(window.url()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\//)
       await expect.poll(() => window.title(), { timeout: 60_000 }).toBe('DeepSeek Harness')
       const url = window.url()
