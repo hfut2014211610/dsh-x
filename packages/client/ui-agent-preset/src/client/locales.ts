@@ -5,6 +5,7 @@ export type AgentPresetSettingsKey =
   | 'title' | 'description' | 'loading' | 'error' | 'userTrust' | 'seatHint' | 'headerHint'
   | 'nav' | 'sectionIntro' | 'builtIn' | 'setDefault' | 'view'
   | 'presetStandardName' | 'presetStandardDescription'
+  | 'presetAnchoredName' | 'presetAnchoredDescription'
   | 'presetCodeName' | 'presetCodeDescription'
   | 'presetMinimalName' | 'presetMinimalDescription'
   | 'presetCordisName' | 'presetCordisDescription'
@@ -37,6 +38,9 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   presetStandardName: 'Standard mode',
   presetStandardDescription:
     'Full coding agent with file editing, shell, file and web search, skills, planning, goals, subagents, and workflows.',
+  presetAnchoredName: 'Anchored Standard mode',
+  presetAnchoredDescription:
+    'Anchors the first model request on the Minimal two-tool, zero-injection condition, then promotes to an on-demand-unlocked Standard toolset.',
   presetCodeName: 'Code mode',
   presetCodeDescription:
     'All Standard mode capabilities, with tools exposed through the Code Mode SDK so the model can combine multi-step operations in one TypeScript program.',
@@ -100,6 +104,8 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   view: '查看',
   presetStandardName: '标准模式',
   presetStandardDescription: '功能完整的编码 Agent，支持文件编辑、Shell、文件与网页检索、Skills、计划、目标、子代理和工作流。',
+  presetAnchoredName: '锚定标准模式',
+  presetAnchoredDescription: '首轮以 Minimal 双工具与零注入上下文锚定轨迹，晋升后进入按需解锁的 Standard 工具集。',
   presetCodeName: 'PTC 模式',
   presetCodeDescription: '具备标准模式的全部能力，并通过 Code Mode SDK 呈现工具，让模型用一个 TypeScript 程序组合多步操作。',
   presetMinimalName: '极简模式',
@@ -168,6 +174,7 @@ interface PresetLocaleKeys {
 
 const BUILT_IN_PRESET_KEYS: Readonly<Partial<Record<string, PresetLocaleKeys>>> = {
   standard: { name: 'presetStandardName', description: 'presetStandardDescription' },
+  'anchored-standard': { name: 'presetAnchoredName', description: 'presetAnchoredDescription' },
   code: { name: 'presetCodeName', description: 'presetCodeDescription' },
   minimal: { name: 'presetMinimalName', description: 'presetMinimalDescription' },
   cordis: { name: 'presetCordisName', description: 'presetCordisDescription' },

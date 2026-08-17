@@ -13,7 +13,8 @@ import { afterAll, beforeAll, describe, expect, it } from 'vitest'
 import { settingsNamespace } from '@deepseek-ai/dsh-settings'
 import { resolveSessionPreset, SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-agent-presets'
 import { applyChildComposition, childSessionMeta } from '@deepseek-ai/dsh-subagent'
-import { CallId } from '@deepseek-ai/dsh-llm'
+import { CallId, createMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
+import { CompactionId } from '@deepseek-ai/dsh-compaction'
 import type {} from '@deepseek-ai/dsh-compaction-basic'
 import type {} from '@deepseek-ai/dsh-skill'
 import type {} from '@deepseek-ai/dsh-tools'
@@ -184,10 +185,12 @@ describe('the shipped Web composition', () => {
     }
   })
 
-  it('supplies both shipped presets, and only those, from the system root', async () => {
+  it('supplies every shipped preset, and only those, from the system root', async () => {
     const listed = await ctx.agentPresets.list()
 
-    expect(listed.map(preset => preset.id).sort()).toEqual(['code', 'cordis', 'minimal', 'standard'])
+    expect(listed.map(preset => preset.id).sort()).toEqual([
+      'anchored-standard', 'code', 'cordis', 'minimal', 'standard',
+    ])
     expect(listed.every(preset => preset.trust === 'system')).toBe(true)
     expect(ctx.agentPresets.defaultId).toBe('standard')
   })
@@ -230,6 +233,107 @@ describe('the shipped Web composition', () => {
         .toContain('Absolute path')
       expect(ctx.agentPresets.serviceFor(handle.agent, 'compaction')).toBeUndefined()
       expect(handle.agent.ctx.get('compaction')).toBeUndefined()
+    } finally {
+      await handle.dispose()
+    }
+  })
+
+  it('anchors `anchored-standard` on the Minimal pair, then promotes to a resident, unlockable set', async () => {
+    const handle = await ctx.agents.create({
+      // Unique per run: the composition persists into the ambient DSH home,
+      // and a fixed id would collide with a log an earlier run left there.
+      sessionId: SessionId(`preset-anchored-${randomUUID()}`),
+      setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'anchored-standard').then(() => undefined),
+    })
+    try {
+      // Bootstrap phase: exactly the Minimal pair with the Minimal bash
+      // description, and no assembled runtime contexts — the anchor
+      // condition.
+      const boot = await ctx.systemPrompt.assemble({ agent: handle.agent, scope: handle.agent })
+      expect(boot.tools.map(tool => tool.name)).toEqual(['bash', 'str_replace_editor'])
+      expect(boot.tools.find(tool => tool.name === 'bash')?.description).toBe(MINIMAL_BASH_DESCRIPTION)
+      expect(boot.sections).toEqual([{ name: 'deployment:persona', text: MINIMAL_PROMPT }])
+      expect(boot.contexts).toEqual([])
+
+      // The registry still carries the full catalog; only the assembly
+      // narrows, so dev_tool_search has something to find.
+      expect(toolNames(ctx, handle.agent).length).toBeGreaterThan(10)
+
+      // A durable assistant reply promotes: the next assembly carries the
+      // resident set — the bootstrap pair plus the three discovery tools.
+      const session = handle.agent.session
+      session.append('turn/start', { turn: 1 })
+      session.append('step/start', { turn: 1, step: 1 })
+      session.append('assistant/message', {
+        turn: 1,
+        step: 1,
+        message: createMessage({
+          role: 'assistant',
+          content: [{ type: 'text', text: 'anchored reply' }],
+          source: { kind: 'model', provider: 'spec', model: 'spec' },
+        }),
+      }, { surfaceOp: 'append' })
+      session.append('step/end', { turn: 1, step: 1 })
+      session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+
+      const resident = await ctx.systemPrompt.assemble({ agent: handle.agent, scope: handle.agent })
+      expect(resident.tools.map(tool => tool.name)).toEqual([
+        'bash', 'dev_tool_search', 'skill_load', 'skill_search', 'str_replace_editor',
+      ])
+
+      // An explicit unlock joins the resident set from the next assembly on.
+      // The registry execution proves the search face finds preset-layer
+      // tools; the durable unlock itself is the logged `tool/call` arguments,
+      // so the spec logs the full assistant tool-call sequence.
+      const searched = await ctx.tools.execute({
+        callId: CallId('preset-anchored-search'),
+        name: 'dev_tool_search',
+        arguments: { query: 'web' },
+        signal: new AbortController().signal,
+        agent: handle.agent,
+      })
+      expect(searched.isError).toBe(false)
+      expect(JSON.stringify(searched.content)).toContain('web_search')
+
+      const unlockCall = CallId('preset-anchored-unlock')
+      const unlockArgs = JSON.stringify({ toolNames: ['web_search'] })
+      session.append('turn/start', { turn: 2 })
+      session.append('step/start', { turn: 2, step: 1 })
+      session.append('assistant/message', {
+        turn: 2,
+        step: 1,
+        message: createMessage({
+          role: 'assistant',
+          content: [{ type: 'tool-call', id: unlockCall, name: 'dev_tool_search', arguments: unlockArgs }],
+          source: { kind: 'model', provider: 'spec', model: 'spec' },
+        }),
+      }, { surfaceOp: 'append' })
+      session.append('tool/call', { turn: 2, step: 1, callId: unlockCall, name: 'dev_tool_search', arguments: unlockArgs })
+      session.append('tool/result', {
+        turn: 2,
+        step: 1,
+        message: createToolResultMessage({
+          callId: unlockCall,
+          content: [{ type: 'text', text: 'Unlocked for the next request: web_search' }],
+          isError: false,
+        }),
+      }, { surfaceOp: 'append' })
+      session.append('step/end', { turn: 2, step: 1 })
+      session.append('turn/end', { turn: 2, reason: { kind: 'completed' } })
+      const afterUnlock = await ctx.systemPrompt.assemble({ agent: handle.agent, scope: handle.agent })
+      expect(afterUnlock.tools.map(tool => tool.name)).toContain('web_search')
+
+      // A compaction boundary demotes: the next request is a "second first
+      // request" on the bootstrap pair plus the compaction work set, until a
+      // new durable promotion signal lands.
+      const compactionId = CompactionId('preset-anchored-spec')
+      session.append('compaction/start', { compactionId, turn: null })
+      session.append('compaction/end', { compactionId, turn: null, error: 'spec boundary' })
+      const postCompaction = await ctx.systemPrompt.assemble({ agent: handle.agent, scope: handle.agent })
+      expect(postCompaction.tools.map(tool => tool.name)).toEqual([
+        'ask_user_question', 'bash', 'edit', 'glob', 'grep', 'read',
+        'str_replace_editor', 'todo_write', 'write',
+      ])
     } finally {
       await handle.dispose()
     }
