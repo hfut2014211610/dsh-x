@@ -134,7 +134,11 @@ jobs:
           tar -a -cf apps/desktop/resources/dsh-runtime.zip -C "$stage" .
 
       - name: Package installers
-        run: pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --mac dmg --publish never
+        # Two explicit invocations, one per arch: the config-level arch list
+        # builds only the host arch on this electron-builder build.
+        run: |
+          pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --mac dmg --arm64 --publish never
+          pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --mac dmg --x64 --publish never
 
       - uses: actions/upload-artifact@v4
         with:
