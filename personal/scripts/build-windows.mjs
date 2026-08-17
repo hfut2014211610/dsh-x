@@ -86,7 +86,8 @@ run('pnpm', ['exec', 'tsx', 'scripts/release/desktop-runtime.ts',
   '--stage', 'dist/runtime-stage'])
 
 console.log('[build-windows] 4/6 installing the runtime stage')
-run('npm', ['install', '--prefix', 'dist/runtime-stage', '--no-audit', '--no-fund', '--package-lock=false', '--omit=dev'],
+// cwd 而非 --prefix：两者叠加会把前缀再接到 cwd 之后。
+run('npm', ['install', '--no-audit', '--no-fund', '--package-lock=false', '--omit=dev'],
   { cwd: join(root, 'dist/runtime-stage') })
 
 console.log('[build-windows] 5/6 zipping the bundled runtime')

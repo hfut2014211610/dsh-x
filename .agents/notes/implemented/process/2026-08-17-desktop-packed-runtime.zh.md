@@ -32,3 +32,5 @@ landlock entry 包（`@deepseek-ai/node-addon-landlock-run`，dsh-sandbox-local 
 - packed stage 的外部依赖与原生预编译仍从 npm registry 解析，因此封闭性只覆盖 `@deepseek-ai` 面——registry 故障或预编译被下架同样会使安装失败，与 npm 路径一致。
 - `--clobber` 让同一 Release 的重复派发上传具有幂等性。
 - runtime 闭包每次运行都从打包清单重新求解，新的家族成员只有通过依赖边才会进入 runtime，绝不默认进入。
+
+stage 安装的旗标与 registry 路径一致（`--omit=dev`、保留 optional）：koffi 与 landlock 的原生预编译以 optional 平台包分发，省略 optional 会触发源码构建（实测：无 CMake 时 koffi 失败）。win32 上清单读取器按绝对路径解析 SYSTEM bsdtar——PATH 里的 `tar` 可能是 GNU tar，会把 `D:` 盘符参数当作远程主机语法拒绝；在 Windows runner 上它曾让闭包步骤静默死亡（pwsh 对原生命令非零退出不中断），把空 runtime 打进了安装包；现在两个平台的装配步骤都会先证明 stage 里存在 `node_modules/@deepseek-ai/dsh/package.json` 再打包。

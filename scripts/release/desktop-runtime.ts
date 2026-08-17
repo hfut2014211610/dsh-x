@@ -24,6 +24,16 @@ import { pathToFileURL } from 'node:url'
 import { parseArgs } from 'node:util'
 import { capture, isEntry } from './process.ts'
 
+/**
+ * The tar that reads packed manifests. On Windows resolved by absolute path
+ * to the SYSTEM bsdtar: a PATH `tar` may be GNU tar (MSYS), which rejects
+ * `D:` drive-letter arguments as remote-host syntax — the same resolution the
+ * desktop shell's extractor applies.
+ */
+const TAR = process.platform === 'win32'
+  ? join(process.env.SystemRoot ?? 'C:\\Windows', 'system32', 'tar.exe')
+  : 'tar'
+
 /** The runtime's entry package: the closure is computed from its dependencies. */
 const ENTRY_PACKAGE = '@deepseek-ai/dsh'
 
@@ -35,7 +45,7 @@ interface PackedNode {
 
 /** Read one tarball's manifest straight out of the archive. */
 function packedManifest(tarball: string): { name: string; dependencies: Record<string, string>; peerDependencies: Record<string, string> } {
-  const manifest: unknown = JSON.parse(capture('tar', ['-xOzf', tarball, 'package/package.json']))
+  const manifest: unknown = JSON.parse(capture(TAR, ['-xOzf', tarball, 'package/package.json']))
   if (manifest === null || typeof manifest !== 'object') throw new Error(`${tarball} has no manifest`)
   const { name, dependencies, peerDependencies } = manifest as Record<string, unknown>
   if (typeof name !== 'string') throw new Error(`${tarball} manifest lacks a name`)

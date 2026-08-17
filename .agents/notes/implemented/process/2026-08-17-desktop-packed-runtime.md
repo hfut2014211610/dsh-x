@@ -16,6 +16,8 @@ The desktop release workflow installs the bundled dsh runtime from the npm regis
 
 The landlock entry package (`@deepseek-ai/node-addon-landlock-run`, a plain dependency of `dsh-sandbox-local`) is not part of either packed family; the workflow builds its TypeScript and packs it separately, exactly as `release.yml`'s verify step does.
 
+The stage install keeps the registry path's flag set (`--omit=dev`, optionals enabled): koffi and landlock ship native prebuilts as optional platform packages, and omitting optionals forces a source build (measured: koffi fails without CMake). On win32 the manifest reader resolves the SYSTEM bsdtar by absolute path — a PATH `tar` may be GNU tar, which rejects `D:` drive-letter arguments as remote-host syntax and, on the workflow's Windows runner, killed the closure step silently under pwsh (native non-zero exits do not stop a pwsh step), shipping an empty runtime archive; both assembly steps now prove the stage holds `node_modules/@deepseek-ai/dsh/package.json` before anything zips it.
+
 ## Alternatives considered
 
 **Dispatch the existing workflow with an upstream version.** Rejected: the installers would be labeled with this fork's version while embedding upstream's runtime — the release's headline feature (the anchored preset lives in the runtime package) would be absent from its own installers.
