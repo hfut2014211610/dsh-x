@@ -1,17 +1,30 @@
 name: Desktop release
 
-# Pack and publish the desktop shell installers (Stage A sidecar shape). Every
-# artifact embeds the bundled dsh runtime from the npm release of the same
-# version, so this workflow runs after the dsh family publish and never builds
-# a runtime from source. Windows ships first; macOS and Linux follow on the
-# same workflow. Code signing rides CSC_LINK/CSC_KEY_PASSWORD when the secrets
-# exist and stays a valid unsigned fallback when they do not.
+# Pack and publish the desktop shell installers (Stage A sidecar shape). By
+# default every artifact embeds the bundled dsh runtime from the npm release of
+# the given version, so the workflow runs after the dsh family publish. The
+# `packed` runtime source instead packs the dsh and vendor families from THIS
+# commit and installs the stage from those tarballs, for a release whose
+# version is not (or not yet) on the npm registry. Windows ships first; macOS
+# and Linux follow on the same workflow. Code signing rides
+# CSC_LINK/CSC_KEY_PASSWORD when the secrets exist and stays a valid unsigned
+# fallback when they do not.
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Published @deepseek-ai/dsh version to bundle (defaults to latest)'
+        description: 'Published @deepseek-ai/dsh version to bundle (npm source only; defaults to latest)'
+        required: false
+        default: ''
+      runtime:
+        description: 'Runtime source: npm installs the published version; packed builds it from this commit'
+        required: false
+        default: 'npm'
+        type: choice
+        options: ['npm', 'packed']
+      release-tag:
+        description: 'Existing release tag to upload the installers to (e.g. dsh-v0.2.0); empty skips the upload'
         required: false
         default: ''
   push:
@@ -31,6 +44,7 @@ jobs:
     timeout-minutes: 40
     env:
       BUNDLED_VERSION: ${{ github.event.inputs.version || github.ref_name }}
+      RUNTIME_SOURCE: ${{ github.event.inputs.runtime || 'npm' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -59,12 +73,27 @@ jobs:
       - name: Assemble the bundled dsh runtime archive
         shell: pwsh
         run: |
-          $version = if ($env:BUNDLED_VERSION -match '^desktop-v(.+)$') { $Matches[1] } else { $env:BUNDLED_VERSION }
-          # A dispatch on a branch yields a ref name, not a version — anything
-          # that does not start like a version resolves to latest.
-          $spec = if ($version -match '^\d') { "@deepseek-ai/dsh@$version" } else { '@deepseek-ai/dsh@latest' }
           $stage = Join-Path $env:RUNNER_TEMP 'dsh-runtime-stage'
-          npm install --prefix $stage --omit=dev $spec
+          New-Item -ItemType Directory -Force $stage | Out-Null
+          if ($env:RUNTIME_SOURCE -eq 'packed') {
+            # This commit's runtime: pack both families (plus the landlock
+            # entry, a plain dependency of dsh-sandbox-local), then install
+            # the stage from those tarballs. Optional platform prebuilts
+            # (koffi, landlock) still come from the registry, matching the
+            # npm path below.
+            pnpm run release:pack -- --family dsh --out dist/npm-dsh
+            pnpm run release:pack -- --family vendor --out dist/npm-vendor
+            pnpm --dir native/landlock-run run build:ts
+            pnpm --dir native/landlock-run/packages/entry pack --pack-destination "$PWD/dist/npm-landlock" | Out-Null
+            pnpm exec tsx scripts/release/desktop-runtime.ts --from dist/npm-dsh --from dist/npm-vendor --from dist/npm-landlock --stage $stage
+            npm install --prefix $stage --no-audit --no-fund --package-lock=false --omit=dev
+          } else {
+            $version = if ($env:BUNDLED_VERSION -match '^desktop-v(.+)$') { $Matches[1] } else { $env:BUNDLED_VERSION }
+            # A dispatch on a branch yields a ref name, not a version — anything
+            # that does not start like a version resolves to latest.
+            $spec = if ($version -match '^\d') { "@deepseek-ai/dsh@$version" } else { '@deepseek-ai/dsh@latest' }
+            npm install --prefix $stage --omit=dev $spec
+          }
           New-Item -ItemType Directory -Force apps/desktop/resources | Out-Null
           # bsdtar writes forward-slash zip entries (Compress-Archive writes
           # backslashes, which portable unzippers reject); the shell extracts
@@ -91,12 +120,21 @@ jobs:
           path: apps/desktop/release/*.exe
           if-no-files-found: error
 
+      - name: Attach installers to the release
+        if: ${{ github.event.inputs.release-tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.release-tag }}
+        shell: bash
+        run: gh release upload "$RELEASE_TAG" apps/desktop/release/*.exe --clobber
+
   macos:
     runs-on: macos-latest
     name: macos arm64 + x64 / dmg
     timeout-minutes: 40
     env:
       BUNDLED_VERSION: ${{ github.event.inputs.version || github.ref_name }}
+      RUNTIME_SOURCE: ${{ github.event.inputs.runtime || 'npm' }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -122,12 +160,27 @@ jobs:
 
       - name: Assemble the bundled dsh runtime archive
         run: |
-          version="${BUNDLED_VERSION#desktop-v}"
-          # A dispatch on a branch yields a ref name, not a version — anything
-          # that does not start like a version resolves to latest.
-          if [[ "$version" =~ ^[0-9] ]]; then spec="@deepseek-ai/dsh@$version"; else spec='@deepseek-ai/dsh@latest'; fi
           stage="$RUNNER_TEMP/dsh-runtime-stage"
-          npm install --prefix "$stage" --omit=dev "$spec"
+          mkdir -p "$stage"
+          if [[ "$RUNTIME_SOURCE" == "packed" ]]; then
+            # This commit's runtime: pack both families (plus the landlock
+            # entry, a plain dependency of dsh-sandbox-local), then install
+            # the stage from those tarballs. Optional platform prebuilts
+            # (koffi, landlock) still come from the registry, matching the
+            # npm path below.
+            pnpm run release:pack -- --family dsh --out dist/npm-dsh
+            pnpm run release:pack -- --family vendor --out dist/npm-vendor
+            pnpm --dir native/landlock-run run build:ts
+            pnpm --dir native/landlock-run/packages/entry pack --pack-destination "$PWD/dist/npm-landlock" >/dev/null
+            pnpm exec tsx scripts/release/desktop-runtime.ts --from dist/npm-dsh --from dist/npm-vendor --from dist/npm-landlock --stage "$stage"
+            npm install --prefix "$stage" --no-audit --no-fund --package-lock=false --omit=dev
+          else
+            version="${BUNDLED_VERSION#desktop-v}"
+            # A dispatch on a branch yields a ref name, not a version — anything
+            # that does not start like a version resolves to latest.
+            if [[ "$version" =~ ^[0-9] ]]; then spec="@deepseek-ai/dsh@$version"; else spec='@deepseek-ai/dsh@latest'; fi
+            npm install --prefix "$stage" --omit=dev "$spec"
+          fi
           mkdir -p apps/desktop/resources
           # bsdtar writes forward-slash zip entries; the shell extracts this
           # archive into userData on first run.
@@ -145,6 +198,13 @@ jobs:
           name: desktop-macos
           path: apps/desktop/release/*.dmg
           if-no-files-found: error
+
+      - name: Attach installers to the release
+        if: ${{ github.event.inputs.release-tag != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+          RELEASE_TAG: ${{ github.event.inputs.release-tag }}
+        run: gh release upload "$RELEASE_TAG" apps/desktop/release/*.dmg --clobber
 
   linux:
     if: false # Follows the same zip-based flow as Windows/macOS; enable when the Linux target ships.
