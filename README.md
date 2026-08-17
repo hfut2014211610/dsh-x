@@ -1,64 +1,37 @@
-# DeepSeek Harness
+# DSH-X
 
 English | [中文](README.zh.md)
 
-DeepSeek Harness (`dsh`) is an open-source agent harness developed by [DeepSeek AI](https://deepseek.com).
+DSH-X is a personal fork of [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness) (`dsh`) — the plugin-based agent harness where everything is a plugin, built on Cordis. The fork tracks upstream `master` and carries its own product surface on top.
 
-It uses an architecture where **everything is a plugin**, and is powered by [Cordis](https://github.com/cordiverse/cordis), whose design is described in [_A Programming Paradigm for Spatiotemporal Composability_](https://github.com/cordiverse/paper).
+## What DSH-X adds
 
-## DSH-X
+- **Desktop shell** — an Electron window over the `dsh --profile web` runtime, with runtime discovery, tray persistence, first-run bundled-runtime extraction, and installers for Windows (NSIS + portable) and macOS (dmg, arm64 + x64). Each release's installers embed a runtime built from that release tag itself, not from the npm registry ([apps/desktop](apps/desktop/README.md); [design note](.agents/notes/proposed/architecture/2026-08-15-desktop-runtime-surface.md)).
+- **Anchored Standard preset** — [`anchored-standard`](apps/cli/config/agent-presets/anchored-standard/), ported from the community [`dsh-anchored-standard`](https://github.com/xiaobright/dsh-anchored-standard) project: request #1 anchors on the Minimal two-tool, zero-injection condition; after the first durable reply or tool call the catalog promotes to an on-demand-unlocked resident set (`dev_tool_search` / `skill_search` / `skill_load`). Phase state derives from durable session events, and compaction boundaries re-enter the controlled phase.
+- **Usage surface** — per-request model token usage as a session projection, a `/usage` report command, and the Model-usage settings panel in the web UI.
+- **Personal layer** — local model-hub presets and plugins under [personal/](personal/README.md), and this deployment's default web port 13080.
 
-This repository is **DSH-X**, a personal fork of DeepSeek Harness that carries three additions over upstream `master`:
+## Install
 
-- the **desktop shell** — an Electron window over the official `dsh --profile web` runtime, with runtime discovery, tray persistence, and installable artifacts ([apps/desktop](apps/desktop/README.md); [design note](.agents/notes/proposed/architecture/2026-08-15-desktop-runtime-surface.md));
-- the **usage surface** — per-request model token usage as a session projection, a `/usage` report command, and the Model-usage settings panel in the web UI;
-- the **personal layer** — local model-hub presets and plugins under [personal/](personal/README.md), and this deployment's default web port 13080 (through the home-level webserver patch).
+Desktop installers ship on the [releases page](https://github.com/hfut2014211610/dsh-x/releases) (`dsh-v0.2.0` is the first release carrying them). Code signing applies only when the release secrets are configured; otherwise the installers are valid but unsigned.
 
-Everything else tracks upstream: merge from the `upstream` remote to absorb its changes.
-
-## Developer preview
-
-DeepSeek Harness is currently in _developer preview_ and is iterating rapidly. **THERE WILL BE COMPATIBILITY-BREAKING CHANGES.**
-
-## Run
-
-### Run from `npm`
-
-Install `Node.js`, then run:
+## Run from source
 
 ```sh
-npx @deepseek-ai/dsh web
-```
-
-The command starts the Web UI, served at `http://127.0.0.1:3080` by default. See [Web UI guide](docs/user/guide/index.md).
-
-### Run from source
-
-To run from a repository checkout:
-
-```sh
-git clone https://github.com/deepseek-ai/deepseek-harness.git
-cd deepseek-harness
+git clone https://github.com/hfut2014211610/dsh-x.git
+cd dsh-x
 pnpm install
 pnpm run build
 pnpm dsh web
 ```
 
-## Community and support
-
-- Feel free to submit feedback or bug reports through [GitHub Discussions](https://github.com/deepseek-ai/deepseek-harness/discussions).
-- Add the [`dsh-plugin`](https://github.com/topics/dsh-plugin) topic to your plugin repository for discoverability.
-- Join <a href="https://discord.gg/Ycq5dCaS4">DeepSeek Harness Discord community</a>.
-
-## Contributing
-
-See [CONTRIBUTING.md](CONTRIBUTING.md).
+The web UI serves at `http://127.0.0.1:13080` in this deployment. To develop the desktop shell: `pnpm run dev:desktop`.
 
 ## Development
 
-Start with the [development guide](docs/development.md) and [architecture documentation](docs/architecture.md).
+Start with the [development guide](docs/development.md) and [architecture documentation](docs/architecture.md). For agents, follow [AGENTS.md](AGENTS.md).
 
-For agents, follow [AGENTS.md](AGENTS.md).
+Everything not listed above tracks upstream: merge from the `upstream` remote to absorb its changes.
 
 ## License
 
