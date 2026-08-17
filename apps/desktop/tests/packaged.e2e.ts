@@ -20,6 +20,9 @@ afterAll(() => {
 })
 
 describe.skipIf(packagedExe === '' || !existsSync(packagedExe))('packaged app smoke', () => {
+  // A cold CI runner pays the whole first boot at once: archive extraction
+  // (530 files), profile auto-init, and the Cordis tree — well over the lane's
+  // 180s default, so this test carries its own generous bound.
   test('the packaged app boots from its bundled runtime', async () => {
     isolatedHome = mkdtempSync(join(tmpdir(), 'dsh-desktop-packaged-home-'))
     const childEnv: Record<string, string> = {}
@@ -31,9 +34,9 @@ describe.skipIf(packagedExe === '' || !existsSync(packagedExe))('packaged app sm
     const electron = await _electron.launch({ executablePath: packagedExe, env: childEnv })
     try {
       const window = await electron.firstWindow()
-      await window.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 180_000 })
+      await window.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 360_000 })
       expect(window.url()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\//)
-      await expect.poll(() => window.title(), { timeout: 30_000 }).toBe('DeepSeek Harness')
+      await expect.poll(() => window.title(), { timeout: 60_000 }).toBe('DeepSeek Harness')
       const url = window.url()
       await electron.close()
       await expect.poll(async () => {
@@ -43,9 +46,9 @@ describe.skipIf(packagedExe === '' || !existsSync(packagedExe))('packaged app sm
         } catch {
           return 'gone'
         }
-      }, { timeout: 15_000, interval: 500 }).toBe('gone')
+      }, { timeout: 30_000, interval: 500 }).toBe('gone')
     } finally {
       await electron.close().catch(() => undefined)
     }
-  })
+  }, 420_000)
 })

@@ -90,9 +90,11 @@ jobs:
           if-no-files-found: error
 
   macos:
-    if: false # macOS and Linux artifacts follow the Windows-first gate; enable with the signing budget.
     runs-on: macos-latest
     name: macos arm64 + x64 / dmg
+    timeout-minutes: 40
+    env:
+      BUNDLED_VERSION: ${{ github.event.inputs.version || github.ref_name }}
     steps:
       - uses: actions/checkout@v6
         with:
@@ -109,14 +111,26 @@ jobs:
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
-      - name: Build and package
+      - name: Build the shell and its runtime inputs
         run: |
           pnpm run desktop:prepare
           pnpm run build:lib
           pnpm run build:web
           npx tsc -b apps/desktop/tsconfig.json
-          npm install --prefix apps/desktop/resources/dsh-runtime --omit=dev "@deepseek-ai/dsh@${GITHUB_REF_NAME#desktop-v}"
-          pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --mac dmg --publish never
+
+      - name: Assemble the bundled dsh runtime archive
+        run: |
+          version="${BUNDLED_VERSION#desktop-v}"
+          if [ -z "$version" ]; then spec='@deepseek-ai/dsh@latest'; else spec="@deepseek-ai/dsh@$version"; fi
+          stage="$RUNNER_TEMP/dsh-runtime-stage"
+          npm install --prefix "$stage" --omit=dev "$spec"
+          mkdir -p apps/desktop/resources
+          # bsdtar writes forward-slash zip entries; the shell extracts this
+          # archive into userData on first run.
+          tar -a -cf apps/desktop/resources/dsh-runtime.zip -C "$stage" .
+
+      - name: Package installers
+        run: pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --mac dmg --publish never
 
       - uses: actions/upload-artifact@v4
         with:
@@ -125,7 +139,7 @@ jobs:
           if-no-files-found: error
 
   linux:
-    if: false # macOS and Linux artifacts follow the Windows-first gate; enable with the signing budget.
+    if: false # Follows the same zip-based flow as Windows/macOS; enable when the Linux target ships.
     runs-on: ubuntu-latest
     name: linux x64 / AppImage + deb
     steps:
@@ -150,7 +164,10 @@ jobs:
           pnpm run build:lib
           pnpm run build:web
           npx tsc -b apps/desktop/tsconfig.json
-          npm install --prefix apps/desktop/resources/dsh-runtime --omit=dev "@deepseek-ai/dsh@${GITHUB_REF_NAME#desktop-v}"
+          stage="$RUNNER_TEMP/dsh-runtime-stage"
+          npm install --prefix "$stage" --omit=dev "@deepseek-ai/dsh@latest"
+          mkdir -p apps/desktop/resources
+          tar -a -cf apps/desktop/resources/dsh-runtime.zip -C "$stage" .
           sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0t64 libnss3 libasound2t64
           pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --linux AppImage deb --publish never
 
