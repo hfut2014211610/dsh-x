@@ -60,7 +60,9 @@ jobs:
         shell: pwsh
         run: |
           $version = if ($env:BUNDLED_VERSION -match '^desktop-v(.+)$') { $Matches[1] } else { $env:BUNDLED_VERSION }
-          $spec = if ($version -eq '') { '@deepseek-ai/dsh@latest' } else { "@deepseek-ai/dsh@$version" }
+          # A dispatch on a branch yields a ref name, not a version — anything
+          # that does not start like a version resolves to latest.
+          $spec = if ($version -match '^\d') { "@deepseek-ai/dsh@$version" } else { '@deepseek-ai/dsh@latest' }
           $stage = Join-Path $env:RUNNER_TEMP 'dsh-runtime-stage'
           npm install --prefix $stage --omit=dev $spec
           New-Item -ItemType Directory -Force apps/desktop/resources | Out-Null
@@ -121,7 +123,9 @@ jobs:
       - name: Assemble the bundled dsh runtime archive
         run: |
           version="${BUNDLED_VERSION#desktop-v}"
-          if [ -z "$version" ]; then spec='@deepseek-ai/dsh@latest'; else spec="@deepseek-ai/dsh@$version"; fi
+          # A dispatch on a branch yields a ref name, not a version — anything
+          # that does not start like a version resolves to latest.
+          if [[ "$version" =~ ^[0-9] ]]; then spec="@deepseek-ai/dsh@$version"; else spec='@deepseek-ai/dsh@latest'; fi
           stage="$RUNNER_TEMP/dsh-runtime-stage"
           npm install --prefix "$stage" --omit=dev "$spec"
           mkdir -p apps/desktop/resources
