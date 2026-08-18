@@ -46,18 +46,34 @@
 
 **Open Design 相关事项已作废**（2026-08-18 决定）：不引入第三方设计工具，不 vendor 第三方设计系统，也不再走"先跑一遍其 MCP 路线"这个先决动作。代价是预设不携带成文设计规范，设计判断依赖模型自身知识；接入点（预设内 skill 根，`baseUrl` 推导，机制已由 `cordis` 预设验证）保留给日后自撰内容。
 
-**C 阶段待安排**：预览视图 `dsh-x-ui-ued`，经 `conversation.view` 注册，iframe 渲染 + `documents/changed` 驱动刷新。验收：面板随子线程写入自动刷新；原型内脚本无法触达宿主 RPC 通道。iframe 沙箱逃逸按提案要求单独评审，不与功能一起赶工。
+**B 阶段实测结论**（见[实测笔记](notes/proposed/2026-08-18-ued-b-stage-live-run.md)）：真实会话验出**迭代闭环是断的**。`document_read` 的 `render` 只输出 `content`，从不把 `version` 交给模型，而 `document_edit` 的 `base_version` 只能来自它——三轮修改指令约 60 次工具调用，成功编辑零次，模型最后去读 harness 源码反推 version 格式。该缺陷同样命中 `writing` 预设。另有两处：文档工具未声明 `presentationMeta`，所以产物不生成 deliverables chip；`ui-writing` 硬门在 `writing`，所以 `ued` 会话没有任何工作区视图。**并发那一组全部成立**：委派、非阻塞、会话头子代理目录、落定通知、`send_message` 续投均实测通过。修复顺序见笔记。
+
+**C 阶段待安排**：预览视图 `dsh-x-ui-ued`，经 `conversation.view` 注册，iframe 渲染 + `documents/changed` 驱动刷新。[安全评审已完成](notes/proposed/2026-08-18-ued-preview-iframe-security.md)：结论是沙箱 iframe 相对现状（原型在用户默认浏览器里 `file://` 裸跑）是**降风险**，落地收敛为五条硬规则，其中"`allow-scripts` 永不与 `allow-same-origin` 同列"是唯一失效即全盘失守且完全静默的一条，必须由双向断言的单测兜底。**前置**：三处缺陷修好前不启动 C——预览面板会一直预览同一份从未被改动过的初稿。
 
 ### 锚定收益的受控证据
 
-[笔记](notes/implemented/2026-08-18-anchor-probe-and-session-guide.md)已把 `anchored-standard` 的轨迹收益从"无本机证据"推进到"有观测证据"：751 个推理块上，锚定组与非锚定组的 `we` / `let me` 指纹近乎完全分离。但两组的任务、模型、长度都不同，仍是相关性。
+[笔记](notes/implemented/2026-08-18-anchor-probe-and-session-guide.md)已把 `anchored-standard` 的轨迹收益推进到**有本机受控证据**，并把预设的三条杠杆全部分开测了（本地网关 `x-models`，三个模型 × 两协议，共 108 次请求）：
 
-| 动作 | 命令 | 退出条件 |
+| 杠杆 | 预设机制 | 结论 |
 |---|---|---|
-| 受控 2×2 重放 | `node --import tsx/esm personal/probe/replay-first-request.ts --run --n 3` | 工具面杠杆（A vs B）与 persona 杠杆（A vs C）各自有分离的数字；结果落 `personal/probe/results/` |
-| `session-guide` A/B | 新会话开启该行，再跑 `compare-presets.ts` | 长会话（≥10 轮）的指纹与步数与关闭时可比；Pro 与 Flash 分开看——上游数据显示效果按模型反转 |
+| **persona** | `persona` 行（`complete: true`） | **承重，12/12 翻转** |
+| 工具目录 | `tool-bootstrap` + `dev-tool-search` | Flash-0731（默认路由）为零；两个 Pro 有效 |
+| 上下文注入 | `context-gate` + `instruction-hint` + `skill-search` | **为零，方向还相反**——抑制它让两个 Pro 锚得更差 |
 
-两项都要花钱或花时间，且都必须在**新会话**上做：开启引导行会改变该会话之后所有请求的前缀。
+长程漂移另测（免费，`drift.ts`）：**锚定不衰减**，486 块的会话十个位置桶 `let me` 全为 0%。但代词指纹不覆盖思考长度，同一会话块中位长度从 253 涨到 2077。
+
+这两点合起来意味着：预设绝大部分复杂度与全部前缀缓存代价，来自两组**本机数据不支持**的机制。
+
+| 动作 | 状态 | 退出条件 |
+|---|---|---|
+| 受控三杠杆分离 | ✅ 已完成，结果在 `personal/probe/results/` | 三条杠杆各自有分离的数字 |
+| 长程漂移 | ✅ 已完成 | 锚定组按位置分桶无单调下滑 |
+| **大样本复核**（做减法之前的门禁） | 待做 | n≥10、≥3 个任务、中英各半，复核单元 B 与单元 E。n=3 单任务不足以据此拆预设机制 |
+| **修正 `agent.cordis.yml` 头部因果说明** | 待做，便宜 | 头部仍称工具目录是关键杠杆，与本机数据相反；留着会让后人优化错地方 |
+| 压缩边界重锚 | **从未验证** | 语料里没有任何会话触发过压缩，契约里 `compaction-reanchor` 永远是 `skip`。需要构造一个足够长的会话 |
+| `session-guide` A/B | 待做，优先级已下调 | 其前提（长会话稀释）在本机找不到证据；但指纹不覆盖目标遵从度，所以不是已被证伪 |
+
+减法必须等大样本：n=3、单任务、单语言的证据可以推翻一个说法，不足以拆掉一套正在工作的机制。
 
 ## 状态订正待办
 
