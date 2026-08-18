@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
+import { mkdtemp, realpath, rm, writeFile, mkdir } from 'node:fs/promises'
 import JSZip from 'jszip'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -25,7 +25,10 @@ let documents: DocumentsLocal
 const SID = SessionId('session-1')
 
 beforeEach(async () => {
-  dir = await mkdtemp(join(tmpdir(), 'dsh-documents-'))
+  // Canonical, not merely unique: macOS puts the temp directory behind the
+  // /var -> /private/var symlink, and the sandbox policy resolves the session
+  // cwd, so an unresolved fixture root compares unequal to its own policy.
+  dir = await realpath(await mkdtemp(join(tmpdir(), 'dsh-documents-')))
   ctx = new Context()
   policyFiber = await ctx.plugin(SandboxPolicyService, { mode: 'danger-full-access', workspaceRoot: dir })
   fsFiber = await ctx.plugin(LocalFileSystem, { cwd: dir })
@@ -175,7 +178,7 @@ describe('documents-local', () => {
     await docsFiber.dispose()
     await fsFiber.dispose()
     await policyFiber.dispose()
-    const elsewhere = await mkdtemp(join(tmpdir(), 'dsh-documents-fallback-'))
+    const elsewhere = await realpath(await mkdtemp(join(tmpdir(), 'dsh-documents-fallback-')))
     try {
       policyFiber = await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: elsewhere })
       fsFiber = await ctx.plugin(SandboxedFileSystem, { cwd: dir })
