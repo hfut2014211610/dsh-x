@@ -44,6 +44,18 @@ export interface LarkResult {
   readonly error?: string
 }
 
+type LarkOutputFormat = 'json' | 'ndjson'
+
+function recordOf(value: unknown): Record<string, unknown> | undefined {
+  return typeof value === 'object' && value !== null ? value as Record<string, unknown> : undefined
+}
+
+function errorOf(value: unknown): string {
+  const record = recordOf(value)
+  const error = recordOf(record?.error)
+  return typeof error?.message === 'string' ? error.message : JSON.stringify(value)
+}
+
 /**
  * 调一次 `lark-cli api`。
  * @param method - HTTP 方法。
@@ -57,14 +69,23 @@ export async function larkApi(
   path: string,
   body?: unknown,
   query?: Record<string, string>,
+  format: LarkOutputFormat = 'json',
 ): Promise<LarkResult> {
-  const args = ['api', method, path, '--as', 'bot']
+  const args = ['api', method, path, '--as', 'bot', '--format', format]
   if (body !== undefined) args.push('--data', JSON.stringify(body))
   if (query !== undefined) args.push('--params', JSON.stringify(query))
   try {
     const { stdout } = await run('lark-cli', args, { timeout: CALL_TIMEOUT_MS, maxBuffer: 8 * 1024 * 1024 })
     const parsed: unknown = stdout.trim() === '' ? {} : JSON.parse(stdout)
-    return { ok: true, data: parsed }
+    const record = recordOf(parsed)
+    if (format === 'ndjson') {
+      return record?.code === 0
+        ? { ok: true, data: parsed }
+        : { ok: false, error: errorOf(parsed) }
+    }
+    return record?.ok === true
+      ? { ok: true, data: record.data }
+      : { ok: false, error: errorOf(parsed) }
   } catch (error: unknown) {
     return { ok: false, error: error instanceof Error ? error.message : String(error) }
   }
@@ -165,25 +186,23 @@ export function patchCard(messageId: string, card: unknown): Promise<LarkResult>
 }
 
 /**
- * 从返回里取 message_id。飞书的包裹层是 `{code,msg,data:{message_id}}`，
- * lark-cli 可能再包一层，两种都试。
+ * 从 lark-cli 成功信封的 data 里取 message_id。
  * @param result - 调用结果。
  * @returns 消息 id，取不到时 `undefined`。
  */
 export function messageIdOf(result: LarkResult): string | undefined {
-  const seen = new Set<unknown>()
-  const walk = (value: unknown, depth: number): string | undefined => {
-    if (depth > 5 || typeof value !== 'object' || value === null || seen.has(value)) return undefined
-    seen.add(value)
-    const record = value as Record<string, unknown>
-    if (typeof record.message_id === 'string') return record.message_id
-    for (const nested of Object.values(record)) {
-      const found = walk(nested, depth + 1)
-      if (found !== undefined) return found
-    }
-    return undefined
-  }
-  return walk(result.data, 0)
+  const messageId = recordOf(result.data)?.message_id
+  return typeof messageId === 'string' ? messageId : undefined
+}
+
+/**
+ * 从 `/open-apis/bot/v3/info` 的原始响应里取机器人 open_id。
+ * @param value - ndjson 格式保留的原始响应。
+ * @returns 机器人 open_id，取不到时 `undefined`。
+ */
+export function botOpenIdOf(value: unknown): string | undefined {
+  const openId = recordOf(recordOf(value)?.bot)?.open_id
+  return typeof openId === 'string' ? openId : undefined
 }
 
 /**
@@ -191,19 +210,9 @@ export function messageIdOf(result: LarkResult): string | undefined {
  * @returns open_id，取不到时 `undefined`。
  */
 export async function resolveBotOpenId(): Promise<string | undefined> {
-  const result = await larkApi('GET', ENDPOINTS.botInfo)
+  // v1.0.87 的 json 输出只保留 OpenAPI data 字段，而 bot/v3/info 把结果放在顶层 bot；
+  // ndjson 才会保留完整原始响应。
+  const result = await larkApi('GET', ENDPOINTS.botInfo, undefined, undefined, 'ndjson')
   if (!result.ok) return undefined
-  const seen = new Set<unknown>()
-  const walk = (value: unknown, depth: number): string | undefined => {
-    if (depth > 5 || typeof value !== 'object' || value === null || seen.has(value)) return undefined
-    seen.add(value)
-    const record = value as Record<string, unknown>
-    if (typeof record.open_id === 'string') return record.open_id
-    for (const nested of Object.values(record)) {
-      const found = walk(nested, depth + 1)
-      if (found !== undefined) return found
-    }
-    return undefined
-  }
-  return walk(result.data, 0)
+  return botOpenIdOf(result.data)
 }

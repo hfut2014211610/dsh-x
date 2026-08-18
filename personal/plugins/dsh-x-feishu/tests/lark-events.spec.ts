@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import {
-  DEFAULT_POLICY, MessageDedup, admit, chatKeyOf, mentionsBot, stripMentions,
+  DEFAULT_POLICY, MessageDedup, admit, cardActionValue, chatKeyOf, mentionsBot, stripMentions,
   type AccessPolicy, type LarkMessageEvent,
 } from '../src/lark-events.ts'
 
@@ -57,6 +57,18 @@ describe('mentionsBot', () => {
     expect(mentionsBot(event({ mentions: [{ id: BOT, key: '@_user_1', name: '小助手' }] }), BOT)).toBe(true)
     expect(mentionsBot(event({ mentions: [{ id: 'ou_bob', key: '@_user_1', name: '小助手' }] }), BOT)).toBe(false)
     expect(mentionsBot(event(), BOT)).toBe(false)
+  })
+})
+
+describe('cardActionValue', () => {
+  it('把 action_value 的 JSON 字符串还原成按钮对象', () => {
+    expect(cardActionValue({ action_value: '{"kind":"approval","askId":"a1","decision":"allow"}' }))
+      .toEqual({ kind: 'approval', askId: 'a1', decision: 'allow' })
+  })
+
+  it('普通字符串保持原样，空值返回 undefined', () => {
+    expect(cardActionValue({ action_value: 'stop' })).toBe('stop')
+    expect(cardActionValue({})).toBeUndefined()
   })
 })
 

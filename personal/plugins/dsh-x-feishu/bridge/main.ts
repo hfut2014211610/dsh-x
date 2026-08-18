@@ -30,7 +30,7 @@ import {
   type Ack, type OutboundCommand,
 } from '../src/protocol.ts'
 import {
-  DEFAULT_POLICY, MessageDedup, admit,
+  DEFAULT_POLICY, MessageDedup, admit, cardActionValue,
   type AccessPolicy, type LarkCardActionEvent, type LarkMessageEvent,
 } from '../src/lark-events.ts'
 import { EventConsumer } from './consumer.ts'
@@ -206,7 +206,7 @@ class Bridge {
       chatKey: chatId,
       messageId,
       operatorId: event.operator_id ?? '',
-      value: event.action?.value,
+      value: cardActionValue(event),
     })
   }
 

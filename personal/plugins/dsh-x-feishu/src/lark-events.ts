@@ -33,7 +33,24 @@ export interface LarkCardActionEvent {
   readonly message_id?: string
   readonly chat_id?: string
   readonly operator_id?: string
-  readonly action?: { readonly value?: unknown; readonly tag?: string }
+  /** lark-cli 扁平化后的 JSON 字符串，不是嵌套的 action.value。 */
+  readonly action_value?: string
+  readonly action_tag?: string
+}
+
+/**
+ * 还原卡片组件 value；对象值由 lark-cli 作为 JSON 字符串输出。
+ * @param event - `card.action.trigger` 事件。
+ * @returns 组件原值；非 JSON 字符串保持原样。
+ */
+export function cardActionValue(event: LarkCardActionEvent): unknown {
+  const value = event.action_value
+  if (value === undefined || value === '') return undefined
+  try {
+    return JSON.parse(value)
+  } catch {
+    return value
+  }
 }
 
 /** 准入策略。 */
