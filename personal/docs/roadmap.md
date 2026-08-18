@@ -64,11 +64,15 @@
 - **缺陷 4（严重）**：模型想要不存在的字符串锚定替换，编出 `{find, unit:'line'}` 但没有 `start`/`end`。`applyTextEdit` 的越界检查对 `undefined` 全为假，偏移量算成整份文档，于是 **21 931 字节的页面被 168 字节替换文本静默覆盖，`isError: false`，版本守卫也看不见**。写作模式下更危险，长文会被一次"看起来成功"的编辑清空。
 - **policy 少一句**：子线程在父会话回合结束后还在干活，父会话却立刻读文件核对，读到"不存在"当成失败，还重发了一遍。已补上"落定通知到达前不要读文件核对"。
 
-**C 阶段已做完**（见[实施笔记](notes/implemented/2026-08-18-ued-preview-view.md)）：`packages/client/ui-ued/`，一个 `conversation.view` 标签页，左边列原型、右边沙箱 iframe 渲染，`documents/changed` 带 400ms 尾沿去抖触发刷新。实机验证：iframe 属性恰好是 `allow-scripts`，框内 CSP meta 到位，原型的内联脚本与交互正常。落地位置偏离提案——放 `packages/client/` 而不是 `personal/plugins/`，因为发行流程只打 `packages/*/*` 和 `apps/*`，放个人插件层的话安装包里不会有这个视图。
+**C 阶段已做完**（见[实施笔记](notes/implemented/2026-08-18-ued-preview-view.md)）：`packages/client/ui-ued/`，一个 `conversation.view` 标签页，左边列原型、右边沙箱 iframe 渲染，`documents/changed` 带 400ms 尾沿去抖触发刷新。实机验证：iframe 属性恰好是 `allow-scripts`，框内 CSP meta 到位，原型的内联脚本与交互正常。位置偏离提案——放 `packages/client/` 而不是 `personal/plugins/`，因为发行流程只打 `packages/*/*` 和 `apps/*`，放个人插件层的话安装包里不会有这个视图。
 
 [安全评审](notes/proposed/2026-08-18-ued-preview-iframe-security.md)的两条要点都成立。一是方向：在此之前原型是在用户默认浏览器里以 `file://` 裸跑，沙箱 iframe 是**降低**风险而不是引入风险。二是五条硬规则里只有一条错了会全盘失守而且完全看不出来——`allow-scripts` 绝不能和 `allow-same-origin` 同列——它由单测的白名单加黑名单双向断言兜住，web e2e 里再断言一次装配后的真实属性。规则 1 和规则 4 已在本机 Chromium 上实测过。
 
 **缺陷 3 随 C 阶段消解**：`ued` 会话现在有自己的视图，不需要放宽 `ui-writing` 的门。
+
+**缺陷 5（阻断，已修复）**：装了安装包之后 UED 一写文件就报 `file access denied under workspace-write mode`。`documents-local` 调 `fs.writeText` 时不带 per-call 策略，围栏于是用环境策略；而 `sandboxPolicy.resolve()` 不带会话时回落到部署配置的根，Web bundle 把它取自运行时的 `process.cwd()`——开发时在仓库里启动服务，那个目录**正好**等于工作区，所以一直没暴露；打包后它是安装目录，于是每次文档写入都被拒。`writing` 预设同样中招。现在带着调用方会话解析策略（`tool-fs` 本来就是这么做的）。回归断在接缝上而非靠"被拒"：`writableRoots` 永远包含系统临时目录，测试工作区就在那里，根写错了在测试里照样放行。已用 `--patch` 把兜底根指到工作区之外真跑一轮复现并验证。**未修**：`applyStructuredEdit`（`.docx`/`.xlsx`）直接用 `node:fs` 写，完全绕过围栏，要走通得给 fs 接缝加写字节的方法。
+
+**两个视图的边栏可调宽**：`ui-primitives` 新增 `ResizeHandle`（指针捕获、移动合并到一帧、方向键、`role="separator"` 带实时 `aria-valuenow`），设计视图的原型栏与写作视图的工具面板共用。宽度存在视图状态里，卸载后回到默认。没有跟应用外框那个分隔条合并——那个是覆盖层定位且与外框列求解耦合。
 
 ### 锚定收益的受控证据
 
