@@ -1,0 +1,12 @@
+{
+  "//": "只用来手动查类型（pnpm exec tsc -p personal/plugins/dsh-x-feishu --noEmit）。个人插件不在 workspace 里，根 tsc -b 覆盖不到，所以这一步得自己跑。",
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "noEmit": true,
+    "composite": false,
+    "incremental": false,
+    "types": ["node"],
+    "allowImportingTsExtensions": true
+  },
+  "include": ["src/**/*.ts", "bridge/**/*.ts", "tests/**/*.ts"]
+}
