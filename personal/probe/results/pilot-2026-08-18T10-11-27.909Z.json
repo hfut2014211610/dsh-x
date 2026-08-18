@@ -1,0 +1,24 @@
+[
+  {
+    "task": "t6",
+    "condition": "anchored",
+    "passed": false,
+    "detail": "node --test failed",
+    "valid": true,
+    "validity": "phase contract clean",
+    "steps": 24,
+    "blocks": 22,
+    "session": "session-4b8266bb-7100-492c-808e-5f538a04c8f4"
+  },
+  {
+    "task": "t6",
+    "condition": "wide",
+    "passed": false,
+    "detail": "suite green, 0/11 exported functions named",
+    "valid": true,
+    "validity": "contract n/a for this arm",
+    "steps": 30,
+    "blocks": 17,
+    "session": "session-b3c86a16-7708-4d62-a39b-d54afb458abf"
+  }
+]

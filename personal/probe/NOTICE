@@ -1,0 +1,38 @@
+personal/probe — attribution
+============================
+
+lib/classifier.ts
+-----------------
+The trajectory lexicon, its scoring weights, and the `minimal-like` /
+`standard-like` / `ambiguous` thresholds are ported from:
+
+  yjh051108/dsh-router-standard — probe/classifier.mjs
+  https://github.com/yjh051108/dsh-router-standard
+  MIT License
+
+which states that it mirrors:
+
+  xiaobright/modeltest — evaluator/trigger_probe/src/classifier.mjs
+  https://github.com/xiaobright/modeltest
+  MIT License
+
+The weights are kept byte-for-byte on purpose: identical weights are what
+make a number produced here comparable with the numbers those projects
+published. The added aggregates (`weOnlyShare`, `letMeShare`, `languageOf`)
+and the documented recalibration caveat are this fork's.
+
+replay-first-request.ts
+-----------------------
+The idea of a first-request condition matrix comes from the same repository's
+probe/matrix.mjs (MIT). The implementation here is not a port: upstream sends
+hand-written tool-schema fixtures, while this script lifts the exact system
+prompt and tool schemas from a stored session's `request/header` events and
+controls the output cap as a separate flag.
+
+Everything else
+---------------
+lib/log.ts, lib/phases.ts, lib/endpoint.ts, analyze-session.ts, and
+compare-presets.ts are original to this fork. The phase contract encodes the
+behavior of apps/cli/config/agent-presets/anchored-standard/, and the session
+container is read through the harness's own frame scanner in
+packages/session/session-persistence-jsonl/.

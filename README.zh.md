@@ -6,7 +6,7 @@ DSH-X 是 [DeepSeek Harness](https://github.com/deepseek-ai/deepseek-harness)（
 
 ## 本分支的特点
 
-- **桌面壳**——`dsh --profile web` 运行时之上的 Electron 窗口，带运行时发现、托盘驻留、首启内嵌 runtime 解压，以及 Windows（NSIS + 便携版）与 macOS（dmg，arm64 + x64）安装包。每个 Release 的安装包内嵌的 runtime 直接由该 release tag 构建，而非取自 npm registry（[apps/desktop](apps/desktop/README.md)；[设计笔记](.agents/notes/proposed/architecture/2026-08-15-desktop-runtime-surface.md)）。
+- **桌面壳**——`dsh --profile web` 运行时之上的 Electron 窗口，带运行时发现、托盘驻留、首启内嵌 runtime 解压，以及 Windows（NSIS + 便携版）与 macOS（dmg，arm64 + x64）安装包。每个 Release 的安装包内嵌的 runtime 直接由该 release tag 构建，而非取自 npm registry（[apps/desktop](apps/desktop/README.md)；[设计笔记](personal/docs/notes/proposed/2026-08-15-desktop-runtime-surface.md)）。
 - **锚定标准模式**——[`anchored-standard`](apps/cli/config/agent-presets/anchored-standard/)，移植自社区项目 [`dsh-anchored-standard`](https://github.com/xiaobright/dsh-anchored-standard)：请求 #1 锚定在 Minimal 双工具、零注入条件上；会话落库首个持久回复或工具调用后，目录晋升为按需解锁的 resident 集（`dev_tool_search` / `skill_search` / `skill_load`）。相位状态从持久会话事件推导，压缩边界重新进入受控相位。
 - **用量面板**——逐请求的模型 token 用量作为会话投影、`/usage` 报告命令，以及 Web UI 中的"模型用量"设置分区。
 - **个人层**——[personal/](personal/README.md) 下的本地 model-hub 预设与插件，以及本部署默认 web 端口 13080。

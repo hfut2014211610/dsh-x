@@ -43,7 +43,7 @@ dsh 现在有三个面：CLI、Web、桌面壳，三个都要求人坐在电脑�
 
 1. **同一个 event key 只允许一个消费者**（已实测确认）。这条直接推翻了"平时插件消费、崩了守护接管"的交接式设计——没得争，只能让一个常驻进程从头持有。
 2. **每次调用约 300ms 进程启动**（实测 `lark-cli --version` 五次：339 / 361 / 291 / 343 / 282 ms，真发 API 还要加 token 解析与网络）。逐字流式卡片要 200–500ms 更新一次，光启动就吃满了。**逐字打字机这条路不通。**
-3. **没有 `cardkit` 域**。域列表里 application/approval/…/wiki 没有它，CardKit 只能走 `lark-cli api` 这个 raw escape hatch，还是回到第 2 条。技能里给卡片更新指的是 `interactive/v1/card/update`，那是回调用的 token，**最多更新 2 次**，不是流式那套。
+3. **没有 `cardkit` 域，也没有 `im.messages.patch` typed command**。CardKit 和已发送卡片更新只能走 `lark-cli api` 这个 raw escape hatch，还是回到第 2 条。`interactive/v1/card/update` 是回调 token 路径，**30 分钟有效、最多更新 2 次**，不能拿来反复刷新进度卡片。
 4. **`lark-cli auth` 导不出 token**（只有 check/list/login/logout/qrcode/scopes/status），所以"入站用 lark-cli、出站自己发 HTTP"这条折中也堵死了。
 
 ### 结构：桥接进程当唯一消费者
@@ -162,7 +162,7 @@ agent.followup(createUserMessage({ content: [{ type: 'text', text }], source: { 
 | lark-cli 每次调用约 300ms | 出站降到按阶段更新之后够用，但一个回合里工具调用密集时仍可能积压。要拿真实回合量一次 |
 | `event consume` 会丢事件 | 技能明确说 `--quiet` 会隐藏丢事件警告，说明存在丢的可能。桥接不加 `--quiet`，把丢事件警告记进日志 |
 | 桥接自身跟着崩 | 它只依赖 node 内置和 lark-cli 子进程，不 import 任何 dsh 包。这条一旦破例，兜底就不成立 |
-| CardKit 只能走 `lark-cli api` | 没有 typed command 意味着没有参数校验，请求形状写错只能在运行时发现。先用一次性脚本把建卡片和更新元素跑通再接进桥接 |
+| CardKit 只能走 `lark-cli api` | 没有 typed command 意味着没有参数校验。已用真实凭证打通发送、回复和 `PATCH /open-apis/im/v1/messages/:message_id`，并把成功响应固定解析为 `data.message_id`、机器人身份固定解析为 `bot.open_id`；升级 lark-cli 后仍要回归 |
 | 共用工作区导致串行 | 有意为之。排队要给明确回执，不能静默等 |
 | 插件把 web 进程搞崩时 Web UI 仍会断 | 桥接只保证飞书侧有应答并把 dsh 拉回来，Web UI 在重启完成前照样不可用 |
 | lark-cli 是外部工具，版本会动 | 现在钉在 v1.0.87 的行为上。它自带 `update` 命令，升级后事件形状或命令名变化会静默打断桥接 |

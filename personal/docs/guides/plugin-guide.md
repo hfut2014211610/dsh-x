@@ -90,7 +90,7 @@ export function apply(ctx: Context, config: Config): void {
 
 - 失败挂着期间，**活注册表停在旧状态、与配置文档脱节**：凡是按文档解析出名字再去调运行时的读路径（如探活按编译路由名发请求），都要先对活注册表（`ctx.llm.listProviders()`）核对，对未生效的名字直接回"未生效 + 待处理的失败原因"，否则用户看到的是下游抛出的晦涩错误（如 `NO_ADAPTER`），而不是真正的配置问题（参考 dsh-x-model-hub 的 `resolveProbeRoutes`，真实踩过）。
 - 编译输出要**按接收方的校验规则过滤继承字段**，不能整张供应商默认表透传到每条派生路由：llm-pi-ai 的 `compat.thinkingFormat`/`supportsReasoningEffort` 只存在于 openai-completions，透传到 anthropic-messages 组会让整段编译被拒（真实踩过）。
-- **端点路径约定随 SDK 而不同**：openai 系把 baseURL 当前缀（`{baseURL}/chat/completions`），Anthropic SDK 会自己在 baseURL 后拼 `/v1/messages`。同一网关开两种协议时端点往往不同（如 OpenAI 在 `/v1`、Anthropic 在根），所以"供应商 = 一个端点"的抽象需要按协议覆盖出口（dsh-x-model-hub 的 `endpoints` 字段）；直接把带 `/v1` 的 baseURL 给 anthropic 路由会打成 `/v1/v1/messages` 吃 404（真实踩过，完整复盘见 [postmortem-2026-08-15-model-hub-probe.md](postmortem-2026-08-15-model-hub-probe.md)）。
+- **端点路径约定随 SDK 而不同**：openai 系把 baseURL 当前缀（`{baseURL}/chat/completions`），Anthropic SDK 会自己在 baseURL 后拼 `/v1/messages`。同一网关开两种协议时端点往往不同（如 OpenAI 在 `/v1`、Anthropic 在根），所以"供应商 = 一个端点"的抽象需要按协议覆盖出口（dsh-x-model-hub 的 `endpoints` 字段）；直接把带 `/v1` 的 baseURL 给 anthropic 路由会打成 `/v1/v1/messages` 吃 404（真实踩过，完整复盘见 [postmortem-2026-08-15-model-hub-probe.md](../archive/postmortem-2026-08-15-model-hub-probe.md)）。
 
 ### 事件
 
@@ -203,7 +203,7 @@ pnpm exec vitest run --config personal/plugins/dsh-x-<name>/vitest.config.ts
 
 ## 6. 调试工具箱
 
-- **请求抓包**：怀疑"客户端发的请求有错"却比对不出来时，起一个本地 404 echo server（二十行 Node，记录 method/path/headers/body）当供应商 baseURL，让被测链路把真实请求发过来——比读代码猜路径快一个量级。配套手法：curl 逐字段对照矩阵（body/headers/key）、进程内最小复现（直接 import pi-ai 的 `stream` 切开 dsh 组装层与传输层）、编译型插件比对"文档编译结果 vs 活注册表"。完整案例见 [postmortem-2026-08-15-model-hub-probe.md](postmortem-2026-08-15-model-hub-probe.md)。
+- **请求抓包**：怀疑"客户端发的请求有错"却比对不出来时，起一个本地 404 echo server（二十行 Node，记录 method/path/headers/body）当供应商 baseURL，让被测链路把真实请求发过来——比读代码猜路径快一个量级。配套手法：curl 逐字段对照矩阵（body/headers/key）、进程内最小复现（直接 import pi-ai 的 `stream` 切开 dsh 组装层与传输层）、编译型插件比对"文档编译结果 vs 活注册表"。完整案例见 [postmortem-2026-08-15-model-hub-probe.md](../archive/postmortem-2026-08-15-model-hub-probe.md)。
 
 - **会话日志**：`node --import tsx/esm personal/scripts/dump-session.ts <session.jsonl.zstd> [事件类型]`——`.zstd` 是分帧拼接格式，Node 内置解压只读首帧。
 - **组合树**：`pnpm dsh --profile web --dump-config` 看插件行是否真在树里。

@@ -1,0 +1,14 @@
+[
+  {
+    "task": "l1",
+    "condition": "anchored",
+    "attempt": 1,
+    "passed": false,
+    "detail": "still red: tools",
+    "valid": true,
+    "validity": "phase contract clean",
+    "steps": 35,
+    "blocks": 0,
+    "session": "session-144d733b-9d77-4973-87dc-615ae7fa0849"
+  }
+]

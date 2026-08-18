@@ -48,6 +48,7 @@ apps/desktop/resources/
 
 # Local agent session state.
 .zcode/
+.freebuff/
 
 # Personal design docs (local drafts, not committed).
 personal/docs/design/

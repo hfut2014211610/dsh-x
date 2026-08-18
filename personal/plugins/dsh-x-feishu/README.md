@@ -77,14 +77,17 @@ pnpm exec tsc -p personal/plugins/dsh-x-feishu --noEmit
 
 个人插件不在 workspace 里，根 `tsc -b` 覆盖不到，所以类型检查得单独跑。
 
-## 还没验过的部分
+## 真实凭证验收
 
-没有飞书凭证就验不了的东西，都还没验：
+已用 `lark-cli` v1.0.87 和真实群聊打通这些 raw escape hatch：
 
-- **出站的 REST 形状**。`lark.ts` 的 `ENDPOINTS` 走的是 `lark-cli api` 逃生口——v1.0.87 没有 `im.messages.patch`，也没有 `cardkit` 域，所以没有参数校验兜底。接真凭证前要先用一次性脚本把发消息、回复、更新卡片各打通一次。
-- **`resolveBotOpenId` 的返回形状**。取 open_id 的解析是按常见包裹层递归找的，实际形状要看一次真实返回。
-- **卡片按钮回传值**。`card.action.trigger` 的 `action.value` 能不能原样带回我们塞进去的对象，要验。
-- **事件丢失**。技能里写明 `--quiet` 会藏掉丢事件告警，所以消费者没加那个开关；真实丢失率要看日志。
+- 发消息：`POST /open-apis/im/v1/messages?receive_id_type=chat_id`，`--params` 传查询参数，`--data` 传 `{ receive_id, msg_type, content }`；`content` 是完整消息 JSON 的字符串。
+- 回复：`POST /open-apis/im/v1/messages/:message_id/reply`，成功响应的消息 ID 固定取 `data.message_id`。
+- 更新卡片：`PATCH /open-apis/im/v1/messages/:message_id`，body 是 `{ content }`，其中 `content` 是完整卡片 JSON 的字符串。
+- 机器人身份：`GET /open-apis/bot/v3/info` 的原始响应固定取 `bot.open_id`。这里必须用 `--format ndjson` 保留原始形状；v1.0.87 的 `--format json` 会把该响应规整成空的 `data`。
+- 按钮回调：事件 schema 的字段是顶层 `action_value`，值是开发者定义对象的 JSON 字符串，不是 `action.value`；桥接会解析成原对象后再路由审批或停止动作。
+
+`event consume` 不加 `--quiet`，避免隐藏丢事件告警；真实丢失率仍需靠常驻日志长期观察。
 
 ## 已经量过的数
 

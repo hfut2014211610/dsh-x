@@ -1,0 +1,20 @@
+[
+  {
+    "task": "t1",
+    "condition": "anchored",
+    "passed": false,
+    "detail": "suite still red",
+    "valid": false,
+    "validity": "no session produced",
+    "session": "(none)"
+  },
+  {
+    "task": "t1",
+    "condition": "wide",
+    "passed": false,
+    "detail": "suite still red",
+    "valid": true,
+    "validity": "n/a",
+    "session": "(none)"
+  }
+]

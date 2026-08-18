@@ -12,7 +12,7 @@
 
 机制链：把 `minimax-m3` 改成 anthropic-messages → local-gateway 变双协议供应商 → 编译出的 `local-gateway~anthropic-messages` 组继承了供应商级 `compat.thinkingFormat: deepseek` → 该开关只存在于 openai-completions 协议，llm-pi-ai 拒绝**整段**编译结果 → 注册表停在旧的裸 `local-gateway` 路由 → 探活按新文档解析出 `local-gateway~openai-completions` → 注册表里没有 → NO_ADAPTER。
 
-定位：`getDoc.reconcileError` 横幅机制直接给出了官方拒绝文案——之前沉淀的"跨命名空间失败要回显"发挥了作用。教训是链路的下半环：reconcile 失败挂着期间，**配置文档与活注册表脱节**，此时按文档解析名字再调运行时的任何读路径都会撞上晦涩的下游错误（NO_ADAPTER），而不是真正的配置问题。
+定位：`getDoc.reconcileError` 横幅直接把官方的拒绝文案摆了出来，之前定下的"跨命名空间失败要回显"这条规矩起了作用。教训在链路的后半段：reconcile 挂着的这段时间里，**配置文档和活注册表是脱节的**，谁在这时候按文档解析出名字再去调运行时，撞到的都是一个看不懂的下游错误（NO_ADAPTER），而不是真正的配置问题。
 
 修复：`inheritedCompat` 只把供应商 compat 继承到 openai-completions 组；`resolveProbeRoutes` 先核对活注册表，未生效路由直接回 `ROUTE_NOT_LIVE` + 待处理的 reconcile 失败原因。
 
@@ -51,7 +51,7 @@
 | `NO_ADAPTER: no adapter registered for provider ...` | 文档与注册表脱节——看 reconcileError 横幅 |
 | `ROUTE_NOT_LIVE` | 同上，但这是探活直接给出的明示 |
 
-## 沉淀位置
+## 结论记到了哪里
 
-- `personal/docs/plugin-guide.md` §3：compat 按协议过滤、endpoints 按协议覆盖、reconcile 失败期读路径对活注册表兜底；§6：请求抓包进调试工具箱。
+- [插件开发指南](../guides/plugin-guide.md) §3：compat 按协议过滤、endpoints 按协议覆盖、reconcile 失败期间读路径要对活注册表兜底；§6：请求抓包进调试工具箱。
 - `personal/plugins/dsh-x-model-hub/README.md`：编译规则 4（端点按协议）与 5（compat 按协议）、探活的 ROUTE_NOT_LIVE 语义。

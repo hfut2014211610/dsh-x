@@ -1,0 +1,12 @@
+[
+  {
+    "task": "l1",
+    "condition": "anchored",
+    "attempt": 1,
+    "passed": false,
+    "detail": "still red: session, system-prompt, tools",
+    "valid": false,
+    "validity": "no session produced",
+    "session": "(none)"
+  }
+]

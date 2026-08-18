@@ -1,0 +1,264 @@
+{
+  "models": [
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-pro-0813"
+  ],
+  "protocol": "openai",
+  "maxTokens": 32768,
+  "runs": 3,
+  "anchoredSource": "session-a69c76e8-db02-42ac-89a0-6b7b1affd036",
+  "wideSource": "session-1a62c19c-715c-464c-9ba6-930286b72fed header#0 (25 tools, system 6200 chars)",
+  "promptChars": 278,
+  "promptLanguage": "zh",
+  "results": [
+    {
+      "model": "deepseek-v4-flash-0731",
+      "protocol": "openai",
+      "cell": "A-minimal-system+bootstrap-pair",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "labels": {
+        "minimal-like": 2,
+        "ambiguous": 1
+      },
+      "weOnlyShare": 1,
+      "letMeShare": 0,
+      "avgPerBlock": {
+        "we": "3.7",
+        "letMe": "0.0",
+        "lets": "1.0",
+        "i": "0.0"
+      },
+      "reasoningChars": 2369,
+      "medianBlockChars": 581,
+      "firstTokens": "Wex2 Thex1",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 826
+    },
+    {
+      "model": "deepseek-v4-flash-0731",
+      "protocol": "openai",
+      "cell": "B-minimal-system+wide-catalog",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "labels": {
+        "minimal-like": 2,
+        "ambiguous": 1
+      },
+      "weOnlyShare": 1,
+      "letMeShare": 0,
+      "avgPerBlock": {
+        "we": "7.3",
+        "letMe": "0.0",
+        "lets": "2.0",
+        "i": "0.0"
+      },
+      "reasoningChars": 2034,
+      "medianBlockChars": 650,
+      "firstTokens": "Wex2 Thex1",
+      "toolsRequested": [
+        "pwsh",
+        "glob",
+        "pwsh",
+        "glob",
+        "glob",
+        "pwsh",
+        "glob"
+      ],
+      "outputTokens": 909
+    },
+    {
+      "model": "deepseek-v4-flash-0731",
+      "protocol": "openai",
+      "cell": "C-wide-system+bootstrap-pair",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "labels": {
+        "ambiguous": 3
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.7",
+        "letMe": "4.0",
+        "lets": "0.0",
+        "i": "1.3"
+      },
+      "reasoningChars": 4289,
+      "medianBlockChars": 1379,
+      "firstTokens": "Thex3",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 1270
+    },
+    {
+      "model": "deepseek-v4-flash-0731",
+      "protocol": "openai",
+      "cell": "D-wide-system+wide-catalog",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "labels": {
+        "ambiguous": 2,
+        "standard-like": 1
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.3",
+        "letMe": "11.3",
+        "lets": "0.0",
+        "i": "13.3"
+      },
+      "reasoningChars": 10940,
+      "medianBlockChars": 3978,
+      "firstTokens": "Thex2 Letx1",
+      "toolsRequested": [
+        "pwsh",
+        "todo_write",
+        "pwsh",
+        "glob",
+        "pwsh",
+        "glob"
+      ],
+      "outputTokens": 3293
+    },
+    {
+      "model": "deepseek-v4-pro-0813",
+      "protocol": "openai",
+      "cell": "A-minimal-system+bootstrap-pair",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "labels": {
+        "minimal-like": 3
+      },
+      "weOnlyShare": 1,
+      "letMeShare": 0,
+      "avgPerBlock": {
+        "we": "4.3",
+        "letMe": "0.0",
+        "lets": "1.7",
+        "i": "0.3"
+      },
+      "reasoningChars": 1957,
+      "medianBlockChars": 554,
+      "firstTokens": "Wex3",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 667
+    },
+    {
+      "model": "deepseek-v4-pro-0813",
+      "protocol": "openai",
+      "cell": "B-minimal-system+wide-catalog",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "labels": {
+        "ambiguous": 3
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.0",
+        "letMe": "4.3",
+        "lets": "0.3",
+        "i": "9.0"
+      },
+      "reasoningChars": 5215,
+      "medianBlockChars": 1495,
+      "firstTokens": "Thex3",
+      "toolsRequested": [
+        "glob",
+        "glob",
+        "glob",
+        "pwsh",
+        "pwsh",
+        "glob",
+        "grep"
+      ],
+      "outputTokens": 1627
+    },
+    {
+      "model": "deepseek-v4-pro-0813",
+      "protocol": "openai",
+      "cell": "C-wide-system+bootstrap-pair",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "labels": {
+        "ambiguous": 3
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.0",
+        "letMe": "6.3",
+        "lets": "0.0",
+        "i": "4.0"
+      },
+      "reasoningChars": 6663,
+      "medianBlockChars": 2456,
+      "firstTokens": "Thex3",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 1969
+    },
+    {
+      "model": "deepseek-v4-pro-0813",
+      "protocol": "openai",
+      "cell": "D-wide-system+wide-catalog",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "labels": {
+        "ambiguous": 3
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.3",
+        "letMe": "12.3",
+        "lets": "0.0",
+        "i": "12.3"
+      },
+      "reasoningChars": 11835,
+      "medianBlockChars": 3832,
+      "firstTokens": "Thex3",
+      "toolsRequested": [
+        "pwsh",
+        "pwsh",
+        "todo_write",
+        "glob",
+        "glob",
+        "todo_write",
+        "pwsh",
+        "pwsh"
+      ],
+      "outputTokens": 3676
+    }
+  ]
+}

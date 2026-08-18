@@ -1,0 +1,210 @@
+{
+  "models": [
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-pro-0813",
+    "deepseek-v4-pro"
+  ],
+  "protocol": "openai",
+  "maxTokens": 32768,
+  "runs": 3,
+  "anchoredSource": "session-a69c76e8-db02-42ac-89a0-6b7b1affd036",
+  "wideSource": "session-1a62c19c-715c-464c-9ba6-930286b72fed header#0 (25 tools, system 6200 chars)",
+  "promptChars": 278,
+  "promptLanguage": "zh",
+  "results": [
+    {
+      "model": "deepseek-v4-flash-0731",
+      "protocol": "openai",
+      "cell": "E-minimal+bootstrap+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "injectedChars": 9569,
+      "labels": {
+        "minimal-like": 3
+      },
+      "weOnlyShare": 1,
+      "letMeShare": 0,
+      "avgPerBlock": {
+        "we": "5.3",
+        "letMe": "0.0",
+        "lets": "1.0",
+        "i": "0.0"
+      },
+      "reasoningChars": 2368,
+      "medianBlockChars": 768,
+      "firstTokens": "Wex3",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 811
+    },
+    {
+      "model": "deepseek-v4-flash-0731",
+      "protocol": "openai",
+      "cell": "F-wide+wide+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "injectedChars": 9569,
+      "labels": {
+        "ambiguous": 2,
+        "standard-like": 1
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 0.667,
+      "avgPerBlock": {
+        "we": "0.0",
+        "letMe": "6.7",
+        "lets": "0.0",
+        "i": "5.3"
+      },
+      "reasoningChars": 8032,
+      "medianBlockChars": 1590,
+      "firstTokens": "用户想为x1 Thex1 Letx1",
+      "toolsRequested": [
+        "todo_write",
+        "pwsh",
+        "pwsh",
+        "pwsh",
+        "pwsh",
+        "pwsh"
+      ],
+      "outputTokens": 3100
+    },
+    {
+      "model": "deepseek-v4-pro-0813",
+      "protocol": "openai",
+      "cell": "E-minimal+bootstrap+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "injectedChars": 9569,
+      "labels": {
+        "minimal-like": 3
+      },
+      "weOnlyShare": 1,
+      "letMeShare": 0,
+      "avgPerBlock": {
+        "we": "4.3",
+        "letMe": "0.0",
+        "lets": "1.7",
+        "i": "0.0"
+      },
+      "reasoningChars": 2855,
+      "medianBlockChars": 856,
+      "firstTokens": "Wex3",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 896
+    },
+    {
+      "model": "deepseek-v4-pro-0813",
+      "protocol": "openai",
+      "cell": "F-wide+wide+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "injectedChars": 9569,
+      "labels": {
+        "standard-like": 1,
+        "ambiguous": 2
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.0",
+        "letMe": "18.0",
+        "lets": "0.3",
+        "i": "18.0"
+      },
+      "reasoningChars": 29733,
+      "medianBlockChars": 9405,
+      "firstTokens": "Thex2 Letx1",
+      "toolsRequested": [
+        "todo_write",
+        "skill",
+        "skill",
+        "pwsh",
+        "glob",
+        "glob",
+        "glob",
+        "pwsh",
+        "glob"
+      ],
+      "outputTokens": 8063
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "protocol": "openai",
+      "cell": "E-minimal+bootstrap+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "injectedChars": 9569,
+      "labels": {
+        "minimal-like": 3
+      },
+      "weOnlyShare": 1,
+      "letMeShare": 0,
+      "avgPerBlock": {
+        "we": "8.3",
+        "letMe": "0.0",
+        "lets": "2.0",
+        "i": "0.0"
+      },
+      "reasoningChars": 4225,
+      "medianBlockChars": 1683,
+      "firstTokens": "Wex3",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 1416
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "protocol": "openai",
+      "cell": "F-wide+wide+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "injectedChars": 9569,
+      "labels": {
+        "ambiguous": 2,
+        "standard-like": 1
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.0",
+        "letMe": "16.3",
+        "lets": "0.0",
+        "i": "20.3"
+      },
+      "reasoningChars": 20918,
+      "medianBlockChars": 8436,
+      "firstTokens": "Thex2 Letx1",
+      "toolsRequested": [
+        "pwsh",
+        "glob",
+        "pwsh",
+        "pwsh",
+        "pwsh",
+        "read",
+        "pwsh"
+      ],
+      "outputTokens": 5740
+    }
+  ]
+}

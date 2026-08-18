@@ -1,0 +1,46 @@
+[
+  {
+    "task": "t1",
+    "condition": "anchored",
+    "passed": true,
+    "detail": "suite green, tests untouched",
+    "valid": true,
+    "validity": "phase contract clean",
+    "steps": 11,
+    "blocks": 0,
+    "session": "session-831dd055-b0a5-469c-b57a-c17112b7a0c7"
+  },
+  {
+    "task": "t1",
+    "condition": "wide",
+    "passed": true,
+    "detail": "suite green, tests untouched",
+    "valid": true,
+    "validity": "contract n/a for this arm",
+    "steps": 11,
+    "blocks": 0,
+    "session": "session-ed42a421-e952-4063-a79b-edfc23c0f061"
+  },
+  {
+    "task": "t6",
+    "condition": "anchored",
+    "passed": false,
+    "detail": "suite green, 11/11 exported functions named",
+    "valid": true,
+    "validity": "phase contract clean",
+    "steps": 41,
+    "blocks": 38,
+    "session": "session-a66517a5-9188-49ef-b5ab-0b08cfbd7343"
+  },
+  {
+    "task": "t6",
+    "condition": "wide",
+    "passed": false,
+    "detail": "suite green, 11/11 exported functions named",
+    "valid": true,
+    "validity": "contract n/a for this arm",
+    "steps": 31,
+    "blocks": 21,
+    "session": "session-211a7f66-3c8d-4908-8c21-23c4cb1e1d29"
+  }
+]

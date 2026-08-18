@@ -1,0 +1,141 @@
+{
+  "models": [
+    "deepseek-v4-pro"
+  ],
+  "protocol": "openai",
+  "maxTokens": 32768,
+  "runs": 3,
+  "anchoredSource": "session-a69c76e8-db02-42ac-89a0-6b7b1affd036",
+  "wideSource": "session-1a62c19c-715c-464c-9ba6-930286b72fed header#0 (25 tools, system 6200 chars)",
+  "promptChars": 278,
+  "promptLanguage": "zh",
+  "results": [
+    {
+      "model": "deepseek-v4-pro",
+      "protocol": "openai",
+      "cell": "A-minimal-system+bootstrap-pair",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "labels": {
+        "ambiguous": 2,
+        "minimal-like": 1
+      },
+      "weOnlyShare": 0.333,
+      "letMeShare": 0.333,
+      "avgPerBlock": {
+        "we": "1.7",
+        "letMe": "0.3",
+        "lets": "0.7",
+        "i": "0.7"
+      },
+      "reasoningChars": 1422,
+      "medianBlockChars": 291,
+      "firstTokens": "用户要求为x1 Thex1 Wex1",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 584
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "protocol": "openai",
+      "cell": "B-minimal-system+wide-catalog",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "labels": {
+        "ambiguous": 3
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "2.7",
+        "letMe": "3.0",
+        "lets": "1.0",
+        "i": "6.3"
+      },
+      "reasoningChars": 5252,
+      "medianBlockChars": 1754,
+      "firstTokens": "Thex3",
+      "toolsRequested": [
+        "glob",
+        "glob",
+        "glob",
+        "glob",
+        "glob",
+        "pwsh",
+        "glob"
+      ],
+      "outputTokens": 1497
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "protocol": "openai",
+      "cell": "C-wide-system+bootstrap-pair",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "labels": {
+        "ambiguous": 3
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.0",
+        "letMe": "6.3",
+        "lets": "0.0",
+        "i": "4.3"
+      },
+      "reasoningChars": 7179,
+      "medianBlockChars": 1842,
+      "firstTokens": "Thex3",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 2111
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "protocol": "openai",
+      "cell": "D-wide-system+wide-catalog",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "labels": {
+        "ambiguous": 2,
+        "standard-like": 1
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.3",
+        "letMe": "10.7",
+        "lets": "0.0",
+        "i": "9.3"
+      },
+      "reasoningChars": 9593,
+      "medianBlockChars": 3286,
+      "firstTokens": "Thex2 Letx1",
+      "toolsRequested": [
+        "todo_write",
+        "pwsh",
+        "pwsh",
+        "pwsh",
+        "pwsh",
+        "pwsh",
+        "pwsh",
+        "glob"
+      ],
+      "outputTokens": 3123
+    }
+  ]
+}

@@ -24,4 +24,4 @@
 
 `pnpm run dev:desktop` 下载 Electron 二进制（`desktop:prepare`；workspace 的构建脚本门禁刻意跳过它）、构建仓库产物，并让窗口走与安装版相同的发现链：探测 origin 上有服务实例就附着，否则拉起机器上任何通过校验的 `dsh`（仓库检出内没有 `dsh` shim——全局安装一个、或在 `PATH` 上临时放置一个 shim 目录即可演练拉起路径）。`pnpm run test:desktop` 以同样方式运行无 key 的 Playwright-on-Electron 冒烟：探测 origin 有服务实例时附着（并断言退出后该实例仍存活），否则经临时 shim 在隔离 `DSH_HOME` 中拉起构建产物 CLI（并断言退出后进程被清理）；当 node 低于 22.19——无法满足运行时的 `node:zlib` 依赖——拉起分支会携带该原因自跳过。本地打包需先准备内置运行时目录：`npm install --prefix apps/desktop/resources/dsh-runtime --omit=dev @deepseek-ai/dsh@<version>`，再执行 `pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder`——见 [electron-builder.yml](electron-builder.yml) 与 desktop-release 工作流。
 
-[桌面运行时 surface 笔记](../../.agents/notes/proposed/architecture/2026-08-15-desktop-runtime-surface.md)拥有两阶段设计；[阶段 A 实现笔记](../../.agents/notes/implemented/architecture/2026-08-15-desktop-sidecar-shell.md)拥有已落地内容。
+[桌面运行时 surface 笔记](../../personal/docs/notes/proposed/2026-08-15-desktop-runtime-surface.md)拥有两阶段设计；[阶段 A 实现笔记](../../personal/docs/notes/implemented/2026-08-15-desktop-sidecar-shell.md)拥有已落地内容。

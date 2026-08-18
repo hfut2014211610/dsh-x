@@ -1,0 +1,204 @@
+{
+  "models": [
+    "deepseek-v4-flash-0731",
+    "deepseek-v4-pro-0813",
+    "deepseek-v4-pro"
+  ],
+  "protocol": "anthropic",
+  "maxTokens": 32768,
+  "runs": 3,
+  "anchoredSource": "session-a69c76e8-db02-42ac-89a0-6b7b1affd036",
+  "wideSource": "session-1a62c19c-715c-464c-9ba6-930286b72fed header#0 (25 tools, system 6200 chars)",
+  "promptChars": 278,
+  "promptLanguage": "zh",
+  "results": [
+    {
+      "model": "deepseek-v4-flash-0731",
+      "protocol": "anthropic",
+      "cell": "E-minimal+bootstrap+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "injectedChars": 9569,
+      "labels": {
+        "minimal-like": 3
+      },
+      "weOnlyShare": 1,
+      "letMeShare": 0,
+      "avgPerBlock": {
+        "we": "4.7",
+        "letMe": "0.0",
+        "lets": "1.0",
+        "i": "0.0"
+      },
+      "reasoningChars": 1948,
+      "medianBlockChars": 595,
+      "firstTokens": "Wex3",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 678
+    },
+    {
+      "model": "deepseek-v4-flash-0731",
+      "protocol": "anthropic",
+      "cell": "F-wide+wide+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "injectedChars": 9569,
+      "labels": {
+        "ambiguous": 3
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.3",
+        "letMe": "14.0",
+        "lets": "0.0",
+        "i": "17.3"
+      },
+      "reasoningChars": 24151,
+      "medianBlockChars": 8709,
+      "firstTokens": "Thex3",
+      "toolsRequested": [
+        "pwsh",
+        "pwsh",
+        "glob",
+        "read",
+        "pwsh",
+        "job_list"
+      ],
+      "outputTokens": 6261
+    },
+    {
+      "model": "deepseek-v4-pro-0813",
+      "protocol": "anthropic",
+      "cell": "E-minimal+bootstrap+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "injectedChars": 9569,
+      "labels": {
+        "minimal-like": 3
+      },
+      "weOnlyShare": 1,
+      "letMeShare": 0,
+      "avgPerBlock": {
+        "we": "8.3",
+        "letMe": "0.0",
+        "lets": "2.3",
+        "i": "0.0"
+      },
+      "reasoningChars": 6018,
+      "medianBlockChars": 1928,
+      "firstTokens": "Wex3",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 1789
+    },
+    {
+      "model": "deepseek-v4-pro-0813",
+      "protocol": "anthropic",
+      "cell": "F-wide+wide+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "injectedChars": 9569,
+      "labels": {
+        "standard-like": 2,
+        "ambiguous": 1
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.0",
+        "letMe": "11.0",
+        "lets": "0.0",
+        "i": "11.0"
+      },
+      "reasoningChars": 19633,
+      "medianBlockChars": 4065,
+      "firstTokens": "Letx2 Thex1",
+      "toolsRequested": [
+        "todo_write",
+        "todo_write",
+        "pwsh",
+        "read",
+        "pwsh",
+        "pwsh"
+      ],
+      "outputTokens": 5470
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "protocol": "anthropic",
+      "cell": "E-minimal+bootstrap+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 2,
+      "injectedChars": 9569,
+      "labels": {
+        "minimal-like": 3
+      },
+      "weOnlyShare": 1,
+      "letMeShare": 0,
+      "avgPerBlock": {
+        "we": "7.7",
+        "letMe": "0.0",
+        "lets": "1.7",
+        "i": "0.3"
+      },
+      "reasoningChars": 2978,
+      "medianBlockChars": 957,
+      "firstTokens": "Wex3",
+      "toolsRequested": [
+        "bash",
+        "bash",
+        "bash"
+      ],
+      "outputTokens": 923
+    },
+    {
+      "model": "deepseek-v4-pro",
+      "protocol": "anthropic",
+      "cell": "F-wide+wide+injection",
+      "runs": 3,
+      "failures": 0,
+      "toolCount": 25,
+      "injectedChars": 9569,
+      "labels": {
+        "ambiguous": 3
+      },
+      "weOnlyShare": 0,
+      "letMeShare": 1,
+      "avgPerBlock": {
+        "we": "0.0",
+        "letMe": "14.0",
+        "lets": "0.0",
+        "i": "12.0"
+      },
+      "reasoningChars": 12065,
+      "medianBlockChars": 4249,
+      "firstTokens": "Thex3",
+      "toolsRequested": [
+        "pwsh",
+        "glob",
+        "glob",
+        "glob",
+        "pwsh",
+        "glob",
+        "pwsh"
+      ],
+      "outputTokens": 3485
+    }
+  ]
+}

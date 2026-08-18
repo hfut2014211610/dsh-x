@@ -1,0 +1,60 @@
+# STATUS: DOES NOT REPRODUCE THE ANCHORED FIRST REQUEST. Verified by running
+# it and checking the phase contract — header#0 came back as the full 25-tool
+# standard catalog and only header#1 was anchored, because the preset mount
+# lands after request #1 (see mount-preset.mjs for the full diagnosis). Kept
+# because everything else here — the roster row, the roots, the three path
+# substitution rules — is what a fork-local headless runner would reuse.
+#
+# Overlay template: make the `headless` profile run under a real agent preset,
+# so both study arms can be driven from a script instead of twelve hand-run
+# GUI sessions.
+#
+# `%REPO%` is substituted with a file URL for the repository root by
+# `run-condition.mjs`. It cannot be relative and it cannot be computed here:
+#
+#  - a relative plugin `name` in a `--patch` overlay resolves against the
+#    PROFILE directory (`$DSH_HOME/profiles/<name>`), not against this file,
+#    and on Windows that directory is usually on another drive, which no
+#    relative path can cross;
+#  - `!!js` expressions are interpolated for config VALUES only (see
+#    `vendor/loader/src/config/utils.ts` — `interpolate` runs over an entry's
+#    config, never its `name`), so a computed name arrives as `[object Object]`;
+#  - a bare absolute win32 path is parsed as an ES module specifier with
+#    scheme `d:` and rejected, so it must be a `file://` URL.
+#
+# WHY A PRESET MOUNT RATHER THAN COPIED ROWS. Replicating the preset's rows
+# here does not work: `@deepseek-ai/dsh-persona` is agent-plane only, and on
+# the host plane it collides with `system-prompt`'s own `deployment:persona`
+# registration. Since persona is the one lever local measurement found
+# load-bearing, an overlay that cannot reproduce it is useless as the anchored
+# arm. `mount-preset.mjs` therefore recomposes each agent onto the real preset,
+# the same way the Web surface does — so the arm runs the shipped composition
+# rather than a copy that can drift.
+#
+# VERIFICATION IS NOT OPTIONAL. After a run:
+#
+#   node --import tsx/esm personal/probe/analyze-session.ts --latest
+#
+# All applicable checks must pass. In particular `bootstrap-catalog` proves the
+# mount landed BEFORE the first model request; if it fails, this arm is invalid
+# no matter what the task outcome was.
+
+- insert:
+    # headless has no preset roster. The shipped root is normally patched in by
+    # `apps/cli`'s profile composition for the Web profile only, so it is named
+    # explicitly here; `includeUserRoot` still adds `$DSH_HOME/.agent-presets`.
+    - id: agent-presets
+      name: '@deepseek-ai/dsh-agent-presets'
+      config:
+        # Required by the schema; the study never uses it, because
+        # mount-preset.mjs recomposes every agent explicitly.
+        default: standard
+        roots:
+          - path: '%REPO_PATH%/apps/cli/config/agent-presets'
+            trust: system
+
+    - id: probe-preset-setup
+      name: '%REPO%/personal/probe/tasks/preset-setup.mjs'
+      inject: [agentPresets]
+      config:
+        preset: '%PRESET%'

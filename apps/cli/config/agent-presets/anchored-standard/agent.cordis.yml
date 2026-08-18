@@ -5,12 +5,51 @@
 # https://github.com/xiaobright/dsh-anchored-standard), adapted to this
 # harness (persistent PTY shell on every platform; skill invocation policies).
 #
-# DeepSeek V4-class models strongly condition their first-chain-of-thought
-# trajectory on the API-visible tool catalog and injected context of the FIRST
-# model request: the Minimal pair (persistent `bash` + `str_replace_editor`)
-# anchored 5/5 measured runs on the Minimal trajectory, while every
-# standard-family schema fell to standard-like behavior 11/11. This preset
-# splits "first trajectory" from "full tool capability" in two phases:
+# WHY IT WORKS — inherited claim vs local measurement. Read both before
+# optimizing anything here; they disagree, and the disagreement decides which
+# rows are load-bearing.
+#
+# INHERITED (upstream `dsh-anchored-standard`, its own evaluation): the
+# API-visible TOOL CATALOG of the first request is the key lever — the Minimal
+# pair anchored 5/5 runs while every standard-family schema fell to
+# standard-like behavior 11/11 — and auto-injected context is a second lever
+# (0/9 anchored with the skill catalog present).
+#
+# MEASURED HERE (`personal/probe/`, 108 requests over a local gateway, three
+# DeepSeek routes x two protocols, n=3 per cell, one Chinese task) — the
+# first-request levers separate as:
+#
+#   persona          LOAD-BEARING. Swapping the Minimal sentence for a
+#                    standard system prompt flipped the trajectory 12/12,
+#                    every model, every protocol, no exception.
+#   tool catalog     Model-conditional. On `deepseek-v4-flash-0731` the
+#                    Minimal persona held 100% anchored WITH the full 25-tool
+#                    catalog visible and in use; on the two Pro routes
+#                    widening the catalog broke the anchor.
+#   injected context NOT a lever, and the sign is backwards: adding 9.5KB of
+#                    real injected context to the anchored request took the
+#                    Pro routes from partly anchored to fully anchored
+#                    (4/9 -> 9/9 in the cells with room to move).
+#
+# Long-horizon (`personal/probe/drift.ts`, free): the anchor does not decay —
+# 486 reasoning blocks across ten position buckets, zero `let me`. Block
+# LENGTH does grow (253 -> 2077 median chars), which the pronoun fingerprint
+# does not capture.
+#
+# WHAT THIS MEANS FOR THIS FILE: the persona row carries the effect. The
+# two-phase catalog machinery (`tool-bootstrap` + `dev-tool-search`) and the
+# injection suppression (`context-gate` + `instruction-hint` + `skill-search`)
+# are where nearly all the complexity and every prefix-cache break live, and
+# neither is supported by the local numbers. They are kept anyway, for now:
+# n=3 on a single task can overturn a claim but cannot justify removing
+# working machinery, and no measurement here covers TASK OUTCOME — the whole
+# corpus measures a lexical proxy for the trajectory, never whether the work
+# came out better. See `personal/docs/notes/implemented/
+# 2026-08-18-anchor-probe-and-session-guide.md` for the full tables and the
+# conditions under which these rows should be made optional.
+#
+# This preset splits "first trajectory" from "full tool capability" in two
+# phases:
 #
 #  Request #1 (bootstrap): exactly the Minimal preset's REAL tool pair, with
 #  every auto-injected context stripped (no AGENTS.md digest, no skill
@@ -66,6 +105,10 @@
 # the empty inject list and the pre-step listener's `prepend` flag) makes the
 # gate the outermost transform — nothing registered later re-injects past it.
 # Measured upstream: with the skill catalog present, 0/9 sessions anchored.
+# NOT reproduced here — see the file header: locally, injected context did not
+# break the anchor on any route, and removing it made the Pro routes WORSE.
+# This row is retained pending an outcome-level measurement, not because the
+# local numbers support it.
 #
 # `includeSubagents: true` gates subagents the same way — their first request
 # is clean too, and their own first reply or tool call opens the gate — so a
@@ -127,6 +170,27 @@
 # gate's stripped first request.
 - id: instruction-hint
   name: ./instruction-hint.mjs
+  config:
+    promoteOn: either
+    includeSubagents: true
+
+# Near-field guidance (./session-guide.mjs), DISABLED. Every other row here
+# controls the FIRST request and then stops; over a long session the anchored
+# conditions stay in the prefix but nothing re-states the working posture.
+# This row appends one short line after each real user message — spliced right
+# after the claimed batch, so the prefix cache holds — carrying the three
+# anchors the community router preset reports (recall, anti-runaway,
+# convergence).
+#
+# It ships off for a reason. Nothing in this fork has measured dilution, let
+# alone this remedy; upstream's own data has the same anchors helping Flash
+# and HURTING Pro; and the published implementation of the idea throws before
+# it injects anything (see the file header). Establish a baseline with
+# `personal/probe/compare-presets.ts` first, then turn this on and measure
+# again — the default text is a starting point, not a result.
+- id: session-guide
+  name: ./session-guide.mjs
+  disabled: true
   config:
     promoteOn: either
     includeSubagents: true
@@ -262,7 +326,8 @@
 # `skill-filesystem` contributes local-root discovery for agents on this
 # preset. The full skill CATALOG injection (`dsh-tool-skill`, the ~9KB
 # `<available_skills>` reminder) is REMOVED: it perturbs the trajectory
-# (measured upstream: 0/9 anchored with the catalog present vs ~81% without).
+# (measured upstream: 0/9 anchored with the catalog present vs ~81% without;
+# again NOT reproduced here — see the file header).
 # Instead `skill-search` exposes two small on-demand tools — skill_search
 # (list matching summaries) and skill_load (inject one skill's full
 # instructions) — the tool-search pattern. Mounting `dsh-tool-skill` beside

@@ -1,0 +1,62 @@
+[
+  {
+    "task": "l1",
+    "condition": "anchored",
+    "attempt": 1,
+    "passed": false,
+    "detail": "still red: session, system-prompt, tools",
+    "valid": false,
+    "validity": "no session produced",
+    "session": "(none)"
+  },
+  {
+    "task": "l1",
+    "condition": "anchored",
+    "attempt": 2,
+    "passed": false,
+    "detail": "still red: session, system-prompt, tools",
+    "valid": false,
+    "validity": "no session produced",
+    "session": "(none)"
+  },
+  {
+    "task": "l1",
+    "condition": "anchored",
+    "attempt": 3,
+    "passed": false,
+    "detail": "still red: session, system-prompt, tools",
+    "valid": false,
+    "validity": "no session produced",
+    "session": "(none)"
+  },
+  {
+    "task": "l1",
+    "condition": "wide",
+    "attempt": 1,
+    "passed": false,
+    "detail": "still red: session, system-prompt, tools",
+    "valid": false,
+    "validity": "no session produced",
+    "session": "(none)"
+  },
+  {
+    "task": "l1",
+    "condition": "wide",
+    "attempt": 2,
+    "passed": false,
+    "detail": "still red: session, system-prompt, tools",
+    "valid": false,
+    "validity": "no session produced",
+    "session": "(none)"
+  },
+  {
+    "task": "l1",
+    "condition": "wide",
+    "attempt": 3,
+    "passed": false,
+    "detail": "still red: session, system-prompt, tools",
+    "valid": false,
+    "validity": "no session produced",
+    "session": "(none)"
+  }
+]

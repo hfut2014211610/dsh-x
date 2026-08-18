@@ -9,6 +9,8 @@
     "docs/i18n/terminology.md",
     "docs/i18n/translation-prompt.md",
     "personal/README.md",
-    "personal/plugins/dsh-x-model-tuning/README.md"
+    "personal/docs/",
+    "personal/plugins/dsh-x-model-tuning/README.md",
+    "personal/probe/README.md"
   ]
 }
