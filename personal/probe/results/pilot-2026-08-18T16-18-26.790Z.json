@@ -1,0 +1,14 @@
+[
+  {
+    "task": "l1",
+    "condition": "wide",
+    "attempt": 1,
+    "passed": true,
+    "detail": "all three suites green, tests untouched",
+    "valid": true,
+    "validity": "contract n/a for this arm",
+    "steps": 47,
+    "blocks": 0,
+    "session": "session-5c92d992-ab90-42bb-8d37-331c78074d97"
+  }
+]

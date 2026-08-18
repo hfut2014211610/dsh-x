@@ -1,0 +1,14 @@
+[
+  {
+    "task": "l1",
+    "condition": "anchored",
+    "attempt": 1,
+    "passed": true,
+    "detail": "all three suites green, tests untouched",
+    "valid": true,
+    "validity": "phase contract clean",
+    "steps": 29,
+    "blocks": 0,
+    "session": "session-00d9b465-f07d-4a0e-a2ab-763b9dcac004"
+  }
+]
