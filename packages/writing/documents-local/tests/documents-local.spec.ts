@@ -9,6 +9,8 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { LocalFileSystem } from '@deepseek-ai/dsh-fs-local'
+import SandboxedFileSystem from '@deepseek-ai/dsh-fs-sandbox'
+import SandboxPolicyService from '@deepseek-ai/dsh-sandbox-policy'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { DocumentsLocal } from '../src/index.ts'
 import type { DocumentEdit } from '@deepseek-ai/dsh-documents'
@@ -18,12 +20,14 @@ let ctx: Context
 let fsFiber: Awaited<ReturnType<Context['plugin']>>
 let sessionFiber: Awaited<ReturnType<Context['plugin']>>
 let docsFiber: Awaited<ReturnType<Context['plugin']>>
+let policyFiber: Awaited<ReturnType<Context['plugin']>>
 let documents: DocumentsLocal
 const SID = SessionId('session-1')
 
 beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'dsh-documents-'))
   ctx = new Context()
+  policyFiber = await ctx.plugin(SandboxPolicyService, { mode: 'danger-full-access', workspaceRoot: dir })
   fsFiber = await ctx.plugin(LocalFileSystem, { cwd: dir })
   sessionFiber = await ctx.plugin(SessionStore)
   ctx.sessions.create(SID, { meta: { cwd: dir } })
@@ -35,6 +39,7 @@ afterEach(async () => {
   await docsFiber.dispose()
   await sessionFiber.dispose()
   await fsFiber.dispose()
+  await policyFiber.dispose()
   await rm(dir, { recursive: true, force: true })
 })
 
@@ -154,6 +159,46 @@ describe('documents-local', () => {
     const created = await documents.create({ sessionId: SID, path: 'new.txt', content: 'hello' })
     expect(created.version.length).toBeGreaterThan(0)
     expect(changed).toHaveLength(1)
+  })
+
+  // The packaged desktop app's situation. A document write that does not carry
+  // its own session resolves against the deployment's FALLBACK root, which the
+  // Web bundle derives from `process.cwd()` — the installation directory there,
+  // and only by coincidence the workspace when a developer launches the server
+  // from inside it. Every write was then denied in the very workspace the
+  // session is bound to.
+  //
+  // Asserted at the seam rather than by a denial: `writableRoots` always adds
+  // the OS temp directory, and a test workspace lives there, so a wrong root
+  // would still be allowed here while failing on a real workspace.
+  it('hands every write a policy anchored on the calling session workspace', async () => {
+    await docsFiber.dispose()
+    await fsFiber.dispose()
+    await policyFiber.dispose()
+    const elsewhere = await mkdtemp(join(tmpdir(), 'dsh-documents-fallback-'))
+    try {
+      policyFiber = await ctx.plugin(SandboxPolicyService, { mode: 'workspace-write', workspaceRoot: elsewhere })
+      fsFiber = await ctx.plugin(SandboxedFileSystem, { cwd: dir })
+      docsFiber = await ctx.plugin(DocumentsLocal, {})
+      documents = ctx.documents as DocumentsLocal
+      const writeText = vi.spyOn(ctx.fs, 'writeText')
+
+      await documents.create({ sessionId: SID, path: 'probe.txt', content: 'hello' })
+      expect(writeText.mock.calls.at(-1)?.[4]).toMatchObject({ mode: 'workspace-write', workspaceRoot: dir })
+
+      const before = await documents.read({ sessionId: SID, path: 'probe.txt' })
+      await documents.apply({
+        sessionId: SID,
+        path: 'probe.txt',
+        baseVersion: before.version,
+        edit: { kind: 'replace', locator: { unit: 'line', start: 1, end: 1 }, text: 'edited' },
+      })
+      expect(writeText.mock.calls.at(-1)?.[4]).toMatchObject({ mode: 'workspace-write', workspaceRoot: dir })
+      await expect(documents.read({ sessionId: SID, path: 'probe.txt' }))
+        .resolves.toMatchObject({ content: 'edited' })
+    } finally {
+      await rm(elsewhere, { recursive: true, force: true })
+    }
   })
 
   it('applies a version-guarded line replace', async () => {

@@ -6,6 +6,8 @@ Local workspace document provider for writing mode. It implements `ctx.documents
 
 A text edit addresses a `line` or `paragraph` range and nothing else. The bounds are validated as integers before the range is checked, because the locator arrives from model-authored tool JSON where the schema accepts any locator object: against a missing `start`/`end` every range comparison is false, the offsets would resolve to the whole document, and a replace would silently overwrite the entire file with its replacement text — a successful call that destroys the document, past a version guard that cannot see it. A locator without integer bounds is rejected with `DOCUMENT_LOCATOR_UNSUPPORTED`.
 
+Every mutation carries the sandbox policy of its CALLING session, resolved through `ctx.sandboxPolicy` with that session. Without it the policy service falls back to the deployment's configured root, which the Web bundle derives from the runtime's `process.cwd()` — the same directory as the workspace only when a developer happens to launch the server from inside it. In a packaged app that directory is the installation, so `workspace-write` denied every document write in the workspace the person had actually opened.
+
 ## Config
 
 | Key | Default | Meaning |

@@ -21,6 +21,8 @@ import type {
   DocumentSearchResult,
 } from '@deepseek-ai/dsh-documents'
 import type { FsTarget } from '@deepseek-ai/dsh-fs'
+import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
+import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 
 /** Configuration for the local documents provider. */
@@ -160,7 +162,7 @@ async function applyStructuredEdit(ctx: Context, target: FsTarget, format: 'docx
 
 /** Local-filesystem provider for `ctx.documents`, bounded by each calling session's workspace. */
 export class DocumentsLocal extends Documents {
-  static inject = ['fs', 'sessions']
+  static inject = ['fs', 'sessions', 'sandboxPolicy']
 
   static Config: z<Config> = z.object({
     maxReadChars: z.number().default(DEFAULT_MAX_READ_CHARS),
@@ -194,6 +196,24 @@ export class DocumentsLocal extends Documents {
       throw new DocumentError(`session "${sessionId}" has no project cwd`, 'DOCUMENT_IO_ERROR')
     }
     return cwd
+  }
+
+  /**
+   * The per-call sandbox policy for one document mutation, anchored on the
+   * CALLING session's workspace.
+   *
+   * Every write must carry this. Without a session the policy service falls
+   * back to the deployment's configured root, which the Web bundle derives from
+   * the runtime's `process.cwd()` — the same directory as the workspace only
+   * when a developer happens to launch the server from it. In the packaged
+   * desktop app that directory is the installation, so `workspace-write` denied
+   * every document write in a workspace the person had actually opened.
+   * @param sessionId - the calling session.
+   * @returns the resolved mode and workspace root for this call.
+   */
+  private policyFor(sessionId: SessionId): SandboxExecutionPolicy {
+    const session = this.ctx.sessions.get(sessionId)
+    return this.ctx.sandboxPolicy.resolve(session === undefined ? {} : { session })
   }
 
   private async resolveWorkspaceTarget(sessionId: SessionId): Promise<FsTarget> {
@@ -315,7 +335,7 @@ export class DocumentsLocal extends Documents {
 
   override async create(request: { sessionId: SessionId; path: string; content: string }): Promise<{ path: string; version: string }> {
     const target = await this.resolveDocument(request.sessionId, request.path)
-    const outcome = await this.ctx.fs.writeText(target, request.content, { kind: 'createIfAbsent' })
+    const outcome = await this.ctx.fs.writeText(target, request.content, { kind: 'createIfAbsent' }, undefined, this.policyFor(request.sessionId))
     this.ctx.emit('documents/changed', { sessionId: request.sessionId, path: request.path, baseVersion: '', version: String(outcome.version), patches: null })
     return { path: request.path, version: String(outcome.version) }
   }
@@ -340,7 +360,7 @@ export class DocumentsLocal extends Documents {
     }
     const content = await this.ctx.fs.readText(target)
     const edited = applyTextEdit(content, request.edit)
-    const outcome = await this.ctx.fs.writeText(target, edited.content, { kind: 'replaceIfVersion', version: info.version })
+    const outcome = await this.ctx.fs.writeText(target, edited.content, { kind: 'replaceIfVersion', version: info.version }, undefined, this.policyFor(request.sessionId))
     this.ctx.emit('documents/changed', { sessionId: request.sessionId, path: request.path, baseVersion: request.baseVersion, version: String(outcome.version), patches: edited.patches })
     return { version: String(outcome.version) }
   }
