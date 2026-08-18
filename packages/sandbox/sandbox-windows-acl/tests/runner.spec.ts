@@ -25,6 +25,13 @@ function pwshAvailable(): boolean {
   return spawnSync(resolvePwshPath(), ['-NoLogo', '-NoProfile', '-NonInteractive', '-Command', '$true'], { encoding: 'utf8' }).status === 0
 }
 
+// The confined child is launched by CreateProcessAsUserW, which resolves no
+// PATH of its own: a bare `pwsh` fails Win32 2 on a host that has only Windows
+// PowerShell. The probe above already accepts that host through
+// `resolvePwshPath`'s documented 5.1 fallback, so the invocation has to use the
+// same resolved path or the suite runs and cannot possibly pass.
+const pwshExe = resolvePwshPath()
+
 function runRunner(args: string[], timeoutMs = 30_000) {
   return spawnSync(process.execPath, ['--import', 'tsx/esm', runnerEntry, ...args], {
     timeout: timeoutMs,
@@ -94,7 +101,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     ].join('')
     const result = runRunner([
       '--workspace', writableDir, '--temp', isolatedTemp, '--mode', 'workspace-write',
-      '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
+      '--', pwshExe, '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
     ])
     expect(result.status, `stderr: ${result.stderr}`).toBe(0)
     expect(result.stdout).toContain('LANGMODE: FullLanguage')
@@ -126,7 +133,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     ].join('')
     const result = runRunner([
       '--workspace', writableDir, '--temp', isolatedTemp, '--mode', 'read-only',
-      '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
+      '--', pwshExe, '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
     ])
     expect(result.status, `stderr: ${result.stderr}`).toBe(0)
     expect(result.stdout).toContain('LANGMODE: ConstrainedLanguage')
@@ -155,7 +162,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     ].join('')
     const result = runRunner([
       '--workspace', writableDir, '--temp', isolatedTemp, '--mode', 'workspace-write',
-      '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
+      '--', pwshExe, '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
     ])
     expect(result.status, `stderr: ${result.stderr}`).toBe(0)
     expect(result.stdout).toContain('DELETE-FILE: OK')
@@ -184,7 +191,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
       const result = runRunner([
         '--workspace', seamWorkspace, '--temp', privateTemp, '--mode', 'workspace-write', '--write-sid', writeSid,
         '--temp-write-sid', privateTempSid,
-        '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
+        '--', pwshExe, '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
       ])
       expect(result.status, `stderr: ${result.stderr}`).toBe(0)
       // The runner granted nothing (only the caller's temp-SID grant
@@ -347,7 +354,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
       ].join('')
       const downgraded = runRunner([
         '--workspace', writableDir, '--temp', isolatedTemp, '--mode', 'read-only',
-        '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', downgradeProbe,
+        '--', pwshExe, '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', downgradeProbe,
       ])
       expect(downgraded.status, `stderr: ${downgraded.stderr}`).toBe(0)
       expect(downgraded.stdout).toContain('DOWNGRADE-WRITE: DENIED')
@@ -360,7 +367,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
       const reupgraded = runRunner([
         '--workspace', writableDir, '--temp', privateTemp, '--mode', 'workspace-write', '--write-sid', writeSid,
         '--temp-write-sid', privateTempSid,
-        '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', reupgradeProbe,
+        '--', pwshExe, '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', reupgradeProbe,
       ])
       expect(reupgraded.status, `stderr: ${reupgraded.stderr}`).toBe(0)
       expect(reupgraded.stdout).toContain('REUPGRADE-WRITE: OK')
@@ -387,7 +394,7 @@ describe.skipIf(!isWin32 || !pwshAvailable())('windows-acl runner', () => {
     for (const mode of ['read-only', 'workspace-write'] as const) {
       const result = runRunner([
         '--workspace', writableDir, '--temp', isolatedTemp, '--mode', mode,
-        '--', 'pwsh', '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
+        '--', pwshExe, '/NoLogo', '/NonInteractive', '/NoProfile', '/Command', probe,
       ])
       expect(result.status, `stderr: ${result.stderr}`).toBe(0)
       expect(result.stdout, `mode: ${mode}`).toContain('PUBLIC-WRITE: DENIED')
