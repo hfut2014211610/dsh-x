@@ -30,11 +30,18 @@ C 的沙箱 iframe 是把"在用户真实浏览器里裸跑"换成"在应用内�
 
 **1. `sandbox="allow-scripts"`，且永远不与 `allow-same-origin` 同列。** 两者同列等于没有沙箱：框内文档与父页同源，可以拿到 `parent.document` 把自己的 `sandbox` 属性删掉再重载，取得完整宿主权限。这是整份评审里唯一一条"错了就全盘失守"的规则，也是唯一失效时**完全静默**的规则——预览照常工作，看不出任何异常。
 
+本机 Chromium 实测（见下节），两种配置的差别是二元的：
+
+| iframe 属性 | 框内脚本访问 `parent.document` | 父页读 `iframe.contentDocument` |
+|---|---|---|
+| `sandbox="allow-scripts"` | **被拒** | **`null`** |
+| `sandbox="allow-scripts allow-same-origin"` | **成功** | **可读** |
+
 **2. 不给 `allow-top-navigation*`、`allow-popups`、`allow-modals`、`allow-downloads`、`allow-forms`。** 顶层导航会把整个应用导走；`allow-modals` 的 `alert`/`confirm` 会阻塞宿主 UI 线程；表单提交交给原型自己的内联 JS `preventDefault`——B 阶段实测产出的登录页原型本来就是这么写的，所以这条不牺牲任何真实能力。
 
 **3. 产物只经 `srcdoc` 注入，绝不从宿主源提供。** 今天 `packages/host/frontend-static/src/index.ts` 只服务 `distRoot` 且做了穿越拒绝，全仓没有任何路由把工作区文件挂到宿主源上。**C 不得新增这样的路由**：同源提供 + 无沙箱 = 原型脚本带着合法的同源 Origin 直接调 `/api`，那才是真正的逃逸，而且会绕过规则 1。`blob:` URL 同样要小心——它继承创建者的 origin，只有在沙箱剥掉同源之后才是 opaque；`srcdoc` 没有这个歧义，也免掉 URL 生命周期管理。
 
-**4. CSP 作为增强项，不作为防线。** srcdoc 文档继承父文档的 CSP，而本仓库当前没有 CSP，等于继承"无"。可行做法是注入前把一条 meta 插进模型 HTML 的 `<head>` 之后：
+**4. CSP 作为增强项，不作为防线。** srcdoc 文档继承父文档的 CSP——这一条已实测确认（父页声明 `img-src 'none'` 时，沙箱 srcdoc 子框加载 data URI 图片被拒；父页无 CSP 时同一段代码加载成功）。而本仓库当前没有任何 CSP，等于继承"无"。可行做法是注入前把一条 meta 插进模型 HTML 的 `<head>` 之后：
 
 ```
 default-src 'none'; img-src data:; style-src 'unsafe-inline' data:;
@@ -45,6 +52,10 @@ form-action 'none'; base-uri 'none'
 这恰好把 policy 里"自包含、无外部资源"从"告诉模型"升级成"强制执行"，并且直接堵上前一节那个无 Origin GET 缺口。**但字符串插入是脆的**：没有 `<head>` 时要兜底，插到 `<!doctype>` 之前会掉进 quirks mode 改变渲染。因此它是增强项，规则 1–3 才是防线。iframe 的 `csp` 属性不可用：它需要被嵌资源以 `Allow-CSP-From` 响应头 opt-in，srcdoc 根本没有响应头，且仅 Chromium 支持。
 
 **5. 该视图只对 `ued` 会话挂载。** 照 `ui-writing` 的做法硬门在 `agentPreset === 'ued'`，不让预览面板出现在别的预设的会话里——否则任何预设的任何 HTML 文件都会获得一个渲染入口，把这条边界的暴露面从"设计会话"扩大到"全部会话"。
+
+## 实测方法
+
+规则 1 与规则 4 原本是按规范陈述的，已在本机 Chromium（Playwright 1.61）上实测坐实，方法记在这里以便复现：父页 `setContent` 一段 HTML，内嵌一个 `srcdoc` iframe，框内脚本经 `postMessage` 向父页汇报——**信号必须是 `postMessage`**，因为 opaque origin 的子框调不到宿主注入的函数（第一版探针用 `exposeFunction` 汇报，两组都收不到消息，无法区分"被 CSP 拦下"与"跑了但报不回来"）。CSP 那组同样不能用 `script-src 'none'` 做区分信号，它会连父页自己的内联脚本一起挡掉；改用 `img-src 'none'` 加子框内的 data URI 图片，父页脚本不受影响，唯一被该指令决定的就是子框的取用结果。
 
 ## 备选方案
 

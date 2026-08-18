@@ -365,6 +365,20 @@ function applyTextEdit(content: string, edit: DocumentEdit): TextEditResult {
   if (locator.unit !== 'line' && locator.unit !== 'paragraph') {
     throw new DocumentError(`locator unit ${locator.unit} is not supported for text documents`, 'DOCUMENT_LOCATOR_UNSUPPORTED')
   }
+  // The locator arrives from model-authored tool JSON, where the tool schema
+  // accepts any locator object because the units differ in which fields they
+  // carry. A missing `start`/`end` must be rejected HERE: every comparison
+  // below is false against `undefined`, so the range check would pass
+  // vacuously, `offsets[NaN] ?? 0` and `offsets[undefined] ?? content.length`
+  // would resolve to the whole document, and a replace would silently
+  // overwrite the entire file with its replacement text — a successful call
+  // that destroys the document, which the version guard cannot detect.
+  if (!Number.isInteger(locator.start) || !Number.isInteger(locator.end)) {
+    throw new DocumentError(
+      'line/paragraph locator needs integer start and end (1-based, inclusive); there is no string-anchored locator',
+      'DOCUMENT_LOCATOR_UNSUPPORTED',
+    )
+  }
   if (locator.start < 1 || locator.end < locator.start || locator.end > lines.length) {
     throw new DocumentError('line/paragraph range out of bounds', 'DOCUMENT_LOCATOR_UNSUPPORTED')
   }

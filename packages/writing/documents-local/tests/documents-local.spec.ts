@@ -175,6 +175,31 @@ describe('documents-local', () => {
     expect(reread.content).toBe('one\nTWO\nthree')
   })
 
+  // A model reaching for a string-anchored replace (there is none) sends a
+  // locator with no `start`/`end`. Every range comparison is false against
+  // `undefined`, so without this rejection the offsets resolve to the whole
+  // document and the replacement text silently becomes the entire file — a
+  // successful call that destroys it, past a version guard that cannot see it.
+  it('rejects a line locator with no numeric range instead of overwriting the document', async () => {
+    await writeFile(join(dir, 'whole.txt'), 'one\ntwo\nthree')
+    const before = await documents.read({ sessionId: SID, path: 'whole.txt' })
+    const malformed: unknown[] = [
+      { unit: 'line', find: 'two' },
+      { unit: 'line', start: 1 },
+      { unit: 'paragraph', start: 1.5, end: 2 },
+    ]
+    for (const locator of malformed) {
+      await expect(documents.apply({
+        sessionId: SID,
+        path: 'whole.txt',
+        baseVersion: before.version,
+        edit: { kind: 'replace', locator, text: 'GONE' } as DocumentEdit,
+      })).rejects.toMatchObject({ code: 'DOCUMENT_LOCATOR_UNSUPPORTED' })
+    }
+    const reread = await documents.read({ sessionId: SID, path: 'whole.txt' })
+    expect(reread.content).toBe('one\ntwo\nthree')
+  })
+
   it('rejects stale version edits', async () => {
     await writeFile(join(dir, 'stale.txt'), 'original')
     const before = await documents.read({ sessionId: SID, path: 'stale.txt' })
