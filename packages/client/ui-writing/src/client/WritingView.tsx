@@ -40,6 +40,27 @@ type DirectoryState = {
   readonly truncated: boolean
   readonly error?: string
 }
+type TextSelection = { readonly start: number; readonly end: number }
+
+const TEXTAREA_MIRROR_PROPERTIES = [
+  'box-sizing',
+  'width',
+  'padding-top',
+  'padding-right',
+  'padding-bottom',
+  'padding-left',
+  'border-top-width',
+  'border-right-width',
+  'border-bottom-width',
+  'border-left-width',
+  'font-family',
+  'font-size',
+  'font-style',
+  'font-weight',
+  'letter-spacing',
+  'line-height',
+  'tab-size',
+] as const
 
 /** Injected document actions supplied by the writing plugin. */
 export interface WritingViewInjected {
@@ -144,6 +165,90 @@ function documentName(path: string, untitled: string): string {
   return name === undefined || name === '' ? untitled : name
 }
 
+function parentDirectory(path: string): string {
+  const normalized = path.replaceAll('\\', '/')
+  const separator = normalized.lastIndexOf('/')
+  return separator === -1 ? '' : normalized.slice(0, separator)
+}
+
+function lineOffsets(content: string): number[] {
+  const offsets = [0]
+  for (let index = 0; index < content.length; index += 1) {
+    if (content[index] === '\n') offsets.push(index + 1)
+  }
+  return offsets
+}
+
+function selectionForOutline(content: string, entry: DocumentOutlineEntry): TextSelection | null {
+  if (entry.locator.unit === 'line') {
+    const offsets = lineOffsets(content)
+    const lineStart = offsets[entry.locator.start - 1]
+    if (lineStart !== undefined) {
+      const rangeEnd = offsets[entry.locator.end] ?? content.length
+      const titleStart = content.indexOf(entry.title, lineStart)
+      if (titleStart >= lineStart && titleStart < rangeEnd) {
+        return { start: titleStart, end: titleStart + entry.title.length }
+      }
+    }
+  }
+  const titleStart = content.indexOf(entry.title)
+  return titleStart < 0 ? null : { start: titleStart, end: titleStart + entry.title.length }
+}
+
+function markdownHeadingIndex(content: string, entry: DocumentOutlineEntry): number | null {
+  const targetLine = entry.locator.unit === 'line' ? entry.locator.start : null
+  let nearest: { index: number; distance: number } | null = null
+  let headingIndex = 0
+  for (const [lineIndex, line] of content.split(/\r?\n/).entries()) {
+    const match = /^(#{1,6})\s+(.+)$/.exec(line)
+    if (match === null) continue
+    const lineNumber = lineIndex + 1
+    const title = (match[2] ?? '').trim()
+    if (title === entry.title) {
+      if (targetLine === lineNumber) return headingIndex
+      const distance = targetLine === null ? headingIndex : Math.abs(targetLine - lineNumber)
+      if (nearest === null || distance < nearest.distance) nearest = { index: headingIndex, distance }
+    }
+    headingIndex += 1
+  }
+  return nearest?.index ?? null
+}
+
+function revealPreviewHeading(preview: HTMLElement, heading: HTMLElement): void {
+  const previewRect = preview.getBoundingClientRect()
+  const headingRect = heading.getBoundingClientRect()
+  const maximum = Math.max(0, preview.scrollHeight - preview.clientHeight)
+  preview.scrollTop = Math.min(maximum, Math.max(0, preview.scrollTop + headingRect.top - previewRect.top - 24))
+}
+
+function revealTextareaOffset(editor: HTMLTextAreaElement, offset: number): void {
+  if (editor.scrollHeight <= editor.clientHeight) return
+  const computed = getComputedStyle(editor)
+  const mirror = document.createElement('div')
+  for (const property of TEXTAREA_MIRROR_PROPERTIES) {
+    mirror.style.setProperty(property, computed.getPropertyValue(property))
+  }
+  mirror.style.position = 'fixed'
+  mirror.style.inset = '0 auto auto -10000px'
+  mirror.style.visibility = 'hidden'
+  mirror.style.whiteSpace = 'pre-wrap'
+  mirror.style.overflowWrap = 'break-word'
+  mirror.textContent = editor.value.slice(0, offset)
+  const marker = document.createElement('span')
+  marker.textContent = '\u200b'
+  mirror.append(marker)
+  document.body.append(mirror)
+  const maximum = editor.scrollHeight - editor.clientHeight
+  editor.scrollTop = Math.min(maximum, Math.max(0, marker.offsetTop - editor.clientHeight / 4))
+  mirror.remove()
+}
+
+function focusEditorSelection(editor: HTMLTextAreaElement, selection: TextSelection): void {
+  editor.focus({ preventScroll: true })
+  editor.setSelectionRange(selection.start, selection.end)
+  revealTextareaOffset(editor, selection.start)
+}
+
 function RailButton({ active, label, onClick, children }: {
   active: boolean
   label: string
@@ -199,6 +304,7 @@ export function WritingView({
   const [markdown, setMarkdown] = useState(false)
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
   const editorRef = useRef<HTMLTextAreaElement>(null)
+  const previewRef = useRef<HTMLElement>(null)
   const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null)
   const currentPathRef = useRef(currentPath)
   const draftRef = useRef(draft)
@@ -233,7 +339,7 @@ export function WritingView({
     })
   }, [list])
 
-  const loadDocument = useCallback(async (targetPath: string, source: 'manual' | 'tree' | 'external' = 'manual') => {
+  const loadDocument = useCallback(async (targetPath: string, source: 'manual' | 'tree' | 'reload' | 'external' = 'manual') => {
     const normalizedPath = targetPath.trim()
     if (normalizedPath === '') {
       setPanel('document')
@@ -243,10 +349,12 @@ export function WritingView({
     setStatus('loading')
     const result = await load(normalizedPath)
     if ('error' in result) {
+      void loadDirectory(parentDirectory(normalizedPath))
       setError(result.error)
       setStatus('error')
       return
     }
+    void loadDirectory(parentDirectory(normalizedPath))
     setCurrentPath(normalizedPath)
     setPathInput(normalizedPath)
     setDraft(result.content)
@@ -258,7 +366,7 @@ export function WritingView({
     setEntries(await outline(normalizedPath))
     setStatus(source === 'external' ? 'external' : 'saved')
     if (source === 'manual') setPanel(null)
-  }, [load, outline])
+  }, [load, loadDirectory, outline])
 
   useEffect(() => {
     if (panel !== 'document' || directories.has('')) return
@@ -284,8 +392,8 @@ export function WritingView({
     if (viewMode !== 'edit' || pendingSelectionRef.current === null) return
     const selection = pendingSelectionRef.current
     pendingSelectionRef.current = null
-    editorRef.current?.focus()
-    editorRef.current?.setSelectionRange(selection.start, selection.end)
+    const editor = editorRef.current
+    if (editor !== null) focusEditorSelection(editor, selection)
   }, [viewMode])
 
   const handleSave = async () => {
@@ -294,6 +402,7 @@ export function WritingView({
     setStatus('saving')
     const result = await save(currentPath, version, draft)
     if ('error' in result) {
+      void loadDirectory(parentDirectory(currentPath))
       setError(result.error)
       setStatus('error')
       return
@@ -323,14 +432,19 @@ export function WritingView({
   }
 
   const jumpToOutline = (entry: DocumentOutlineEntry) => {
-    const index = draft.indexOf(entry.title)
-    if (index < 0) return
-    pendingSelectionRef.current = { start: index, end: index + entry.title.length }
+    if (markdown && viewMode === 'preview' && entry.kind === 'heading') {
+      const index = markdownHeadingIndex(draft, entry)
+      const heading = index === null ? undefined : previewRef.current?.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6')[index]
+      if (heading !== undefined && previewRef.current !== null) revealPreviewHeading(previewRef.current, heading)
+      return
+    }
+    const selection = selectionForOutline(draft, entry)
+    if (selection === null) return
+    pendingSelectionRef.current = selection
     if (viewMode === 'edit') {
-      const selection = pendingSelectionRef.current
       pendingSelectionRef.current = null
-      editorRef.current?.focus()
-      editorRef.current?.setSelectionRange(selection.start, selection.end)
+      const editor = editorRef.current
+      if (editor !== null) focusEditorSelection(editor, selection)
       return
     }
     setViewMode('edit')
@@ -504,7 +618,7 @@ export function WritingView({
                 className={css.iconButton}
                 aria-label={t('action.reload')}
                 disabled={currentPath === '' || status === 'loading'}
-                onClick={() => { void loadDocument(currentPath) }}
+                onClick={() => { void loadDocument(currentPath, 'reload') }}
               >
                 <IconRefreshOutline16 />
               </button>
@@ -536,14 +650,14 @@ export function WritingView({
           <div className={css.conflict} role="status">
             <IconWarningOutline16 />
             <span>{t('conflict.message')}</span>
-            <button type="button" onClick={() => { void loadDocument(currentPath) }}>{t('action.reload')}</button>
+            <button type="button" onClick={() => { void loadDocument(currentPath, 'reload') }}>{t('action.reload')}</button>
           </div>
         )}
 
         <div className={css.paper}>
           {markdown && viewMode === 'preview'
             ? (
-              <article className={css.preview} aria-label={t('preview.label')}>
+              <article ref={previewRef} className={css.preview} aria-label={t('preview.label')}>
                 <MarkdownText text={draft} />
               </article>
             )

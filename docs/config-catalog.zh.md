@@ -573,13 +573,11 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-documents-local`
 
-Requires: `fs`
+Requires: `fs` · `sessions`
 
 ```ts config-catalog
 /** Configuration for the local documents provider. */
 export interface Config {
-  /** Base directory every document path resolves against. */
-  root: string
   /** Character cap for one read result; longer content comes back truncated. */
   maxReadChars?: number
   /** Entry cap for one document's outline. */

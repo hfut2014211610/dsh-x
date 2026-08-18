@@ -58,9 +58,10 @@ export interface IConversation {
    */
   loadOlder(): Promise<void>
   /**
-   * Declare a preferred conversation view for sessions that have no explicit
-   * user tab selection. Resolvers run in registration order; the first
-   * non-null result wins.
+   * Declare a temporary preferred conversation view. While a resolver returns
+   * an id, that view takes precedence without replacing the user's persisted
+   * tab selection; when it returns null, the prior tab becomes active again.
+   * Resolvers run in registration order; the first non-null result wins.
    * @param resolver - returns a conversation.view entry id or null.
    * @returns disposer that removes this resolver.
    */

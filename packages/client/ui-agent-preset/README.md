@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-The agent-preset surfaces: a General-settings row choosing which [preset](../../preset/agent-presets/README.md) new sessions are composed from, a chip on the new-session screen choosing the next session's, a read-only label in the session header, and a settings section that manages the roster — copy, delete, default, and the way into a preset's own files.
+The agent-preset surfaces: a General-settings row choosing which [preset](../../preset/agent-presets/README.md) new sessions are composed from, a chip on the new-session screen choosing the next session's, a session-header surface that stays selectable while the session is blank and becomes a read-only label after it starts, and a settings section that manages the roster — copy, delete, default, and the way into a preset's own files.
 
 ## Why it is a new-session preference
 
@@ -16,9 +16,9 @@ The chip opens on the deployment default and its pick is *staged* — the screen
 
 A session that has started is refused rather than queued: the host answers `agent-preset-locked`, and the stage is dropped instead of waiting for a session that will never accept it.
 
-## The session-header label
+## The session-header surface
 
-A third surface, beside the session title: the preset THIS session runs, as static chrome. A control there would promise a switch the host refuses outright. It reads the preset from the session's own summary and resolves the display name against the same roster the General row reads. Forwarded `agent-preset/selected` owner events fold committed blank-session switches into that shared summary in every tab; the initiating tab may already have applied the RPC echo, and the merge is idempotent.
+A third surface sits beside the session title. While the session is blank, it reuses the new-session picker so a preferred workspace such as Writing can replace the Hero without removing the control needed to leave that preset. After the first turn starts, it becomes static chrome naming the preset THIS session runs; a control then would promise a switch the host refuses outright. It reads the preset from the session's own summary and resolves the display name against the same roster the General row reads. Forwarded `agent-preset/selected` owner events fold committed blank-session switches into that shared summary in every tab; the initiating tab may already have applied the RPC echo, and the merge is idempotent.
 
 ## What it reads and writes
 

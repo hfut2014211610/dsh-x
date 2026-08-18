@@ -9,13 +9,14 @@ import { tmpdir } from 'node:os'
 import { join } from 'node:path'
 import { Context } from '@deepseek-ai/cordis'
 import { LocalFileSystem } from '@deepseek-ai/dsh-fs-local'
-import { SessionId } from '@deepseek-ai/dsh-session'
+import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import { DocumentsLocal } from '../src/index.ts'
 import type { DocumentEdit } from '@deepseek-ai/dsh-documents'
 
 let dir: string
 let ctx: Context
 let fsFiber: Awaited<ReturnType<Context['plugin']>>
+let sessionFiber: Awaited<ReturnType<Context['plugin']>>
 let docsFiber: Awaited<ReturnType<Context['plugin']>>
 let documents: DocumentsLocal
 const SID = SessionId('session-1')
@@ -24,12 +25,15 @@ beforeEach(async () => {
   dir = await mkdtemp(join(tmpdir(), 'dsh-documents-'))
   ctx = new Context()
   fsFiber = await ctx.plugin(LocalFileSystem, { cwd: dir })
-  docsFiber = await ctx.plugin(DocumentsLocal, { root: dir })
+  sessionFiber = await ctx.plugin(SessionStore)
+  ctx.sessions.create(SID, { meta: { cwd: dir } })
+  docsFiber = await ctx.plugin(DocumentsLocal, {})
   documents = ctx.documents as DocumentsLocal
 })
 
 afterEach(async () => {
   await docsFiber.dispose()
+  await sessionFiber.dispose()
   await fsFiber.dispose()
   await rm(dir, { recursive: true, force: true })
 })
@@ -72,7 +76,7 @@ describe('documents-local', () => {
 
   it('bounds directory listings and omits entries outside the workspace', async () => {
     await docsFiber.dispose()
-    docsFiber = await ctx.plugin(DocumentsLocal, { root: dir, maxBrowseEntries: 1 })
+    docsFiber = await ctx.plugin(DocumentsLocal, { maxBrowseEntries: 1 })
     documents = ctx.documents as DocumentsLocal
     await mkdir(join(dir, 'notes'))
     await writeFile(join(dir, 'hidden.md'), '# Hidden')
@@ -88,6 +92,32 @@ describe('documents-local', () => {
     const bounded = await documents.list({ sessionId: SID })
     expect(bounded.entries).toHaveLength(1)
     expect(bounded.truncated).toBe(true)
+  })
+
+  it('resolves each request against its session workspace', async () => {
+    await writeFile(join(dir, 'root.md'), '# Root')
+    const second = join(dir, 'second')
+    await mkdir(second)
+    await writeFile(join(second, 'second.md'), '# Second')
+    const secondSession = SessionId('session-2')
+    ctx.sessions.create(secondSession, { meta: { cwd: second } })
+
+    await expect(documents.list({ sessionId: secondSession })).resolves.toEqual({
+      path: '',
+      entries: [{ name: 'second.md', path: 'second.md', kind: 'file', format: 'markdown' }],
+      truncated: false,
+    })
+    await expect(documents.read({ sessionId: secondSession, path: 'root.md' }))
+      .rejects.toMatchObject({ code: 'DOCUMENT_NOT_FOUND' })
+  })
+
+  it('rejects sessions without an attached workspace', async () => {
+    await expect(documents.list({ sessionId: SessionId('missing') }))
+      .rejects.toMatchObject({ code: 'DOCUMENT_IO_ERROR', message: 'session "missing" is not attached' })
+    const withoutCwd = SessionId('without-cwd')
+    ctx.sessions.create(withoutCwd)
+    await expect(documents.list({ sessionId: withoutCwd }))
+      .rejects.toMatchObject({ code: 'DOCUMENT_IO_ERROR', message: 'session "without-cwd" has no project cwd' })
   })
 
   it('reads a text document with its version', async () => {

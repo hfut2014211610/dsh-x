@@ -1,0 +1,63 @@
+- banner:
+  - navigation "Session hierarchy":
+    - button "workspace" [disabled]
+  - button "写作模式":
+    - img
+    - text: 写作模式
+    - img
+  - button "Session log":
+    - text: Session log
+    - img
+- main:
+  - navigation "Document tools":
+    - button "Files" [pressed]:
+      - img
+    - button "Outline":
+      - img
+    - button "Search":
+      - img
+  - complementary "Open document":
+    - strong: Open document
+    - button "Close":
+      - img
+    - text: Workspace-relative path
+    - textbox "Workspace-relative path":
+      - /placeholder: docs/subsystems/writing.md
+    - button "Open document" [disabled]:
+      - img
+      - text: Open document
+    - region "Workspace files":
+      - strong: Workspace files
+      - button "Refresh files":
+        - img
+      - tree "Workspace document tree":
+        - treeitem ".agents":
+          - button ".agents":
+            - img
+            - img
+            - text: .agents
+        - treeitem "outline-navigation.md":
+          - button "outline-navigation.md":
+            - img
+            - text: outline-navigation.md
+  - text: Writing /
+  - strong: No document open
+  - img
+  - text: Open a document
+  - button "Reload" [disabled]:
+    - img
+  - button "Open in new window" [disabled]:
+    - img
+  - button "Save" [disabled]
+  - textbox "Document editor":
+    - /placeholder: Open a document from the left, or start writing here.
+  - text: 0 characters Version protection on
+- complementary "Assistant"
+- textbox "Message the agent"
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace Write"'
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]

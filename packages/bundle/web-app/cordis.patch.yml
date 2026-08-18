@@ -67,8 +67,6 @@
         maxNoteBytes: 8192
     - id: documents-local
       name: '@deepseek-ai/dsh-documents-local'
-      config:
-        root: !!js process.env.DSH_CWD ?? process.cwd()
 
 
     # Browser Session export: `/export` command plus the shared download dialog.

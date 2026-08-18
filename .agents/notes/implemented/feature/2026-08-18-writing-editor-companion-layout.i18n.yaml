@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-writing-editor-companion-layout.md
-2026-08-18-writing-editor-companion-layout.md: a660f51cfadece039a5be947392a4c762d676036
-2026-08-18-writing-editor-companion-layout.zh.md: 0233e40ee9ab064d5b8378d9aabe1ecd6e24129f
+2026-08-18-writing-editor-companion-layout.md: 0aef2db0a1eea399662c457af2d5450539ad5278
+2026-08-18-writing-editor-companion-layout.zh.md: ce81326a6edc995675a608cbfdcb382b0611e8a7

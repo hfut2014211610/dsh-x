@@ -164,6 +164,6 @@ Source: [`packages/writing/documents/src/types.ts:107`](../../packages/writing/d
 
 ## 浏览器 UI
 
-`dsh-client-ui-writing` 注册 `writing` `conversation.view`，为 `agentPreset` 为 `writing` 的会话声明该默认视图，并把 Chat 声明为它的伴随视图。`ui-conversation` 同时渲染活跃视图与伴随视图，隐藏互斥 tab 栏，并把既有 Chat 消息流与 composer 放在伴随栏；普通会话仍使用单视图布局。
+`dsh-client-ui-writing` 注册 `writing` `conversation.view`，为 `agentPreset` 为 `writing` 的会话声明临时优先视图，并把 Chat 声明为它的伴随视图。`ui-conversation` 会让空白写作会话也立即进入合并工作区，同时渲染编辑器与伴随视图，隐藏互斥 tab 栏，并把既有 Chat 消息流与 composer 放在伴随栏。之前的 tab 或新建会话 Hero 在底层保持不变，并会在 preset 改变时恢复；空白会话的 preset 选择器会保留在会话页头中，用户可以由此离开 Writing。
 
 写作视图包含专注的源码编辑区，以及文件、大纲和工作区搜索面板。文件面板打开时调用 `documents.list` 加载工作区根目录，展开目录时读取子级，并在用户切换文档时保留目录树。Markdown 文档默认进入渲染预览；预览与编辑共用实时草稿，切换模式不会保存或丢弃修改。手工保存使用最近一次读取返回的版本调用 `documents.apply`。编辑器没有未保存内容时，`documents/changed` 事件会重新载入状态；本地文本已修改时，该事件显示冲突提示并保留草稿。`@doc` 输入源把当前工作区相对路径插入普通 composer。结构化 `.docx`/`.xlsx` 文件支持提取文本的读取、大纲、搜索和基础文本替换往返。

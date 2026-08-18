@@ -2,13 +2,12 @@
 
 English | [中文](README.zh.md)
 
-Local workspace document provider for writing mode. It implements `ctx.documents` over `ctx.fs`, enforcing workspace containment, bounded directory browsing, text/markdown/code reading, simple outline extraction, content search, creation, and version-guarded edits.
+Local workspace document provider for writing mode. It implements `ctx.documents` over `ctx.fs`, resolving every request against the attached session's `header.cwd` and enforcing containment within that workspace. An unknown session or one without a project cwd rejects with `DOCUMENT_IO_ERROR`; bounded directory browsing, text/markdown/code reading, simple outline extraction, content search, creation, and version-guarded edits all use the same session-owned root.
 
 ## Config
 
 | Key | Default | Meaning |
 |---|---|---|
-| `root` | required | Workspace root for resolving relative paths and containment. |
 | `maxReadChars` | `200000` | Maximum characters returned by `read` before truncation. |
 | `maxOutlineItems` | `1000` | Maximum outline entries returned by `outline`. |
 | `maxSearchFiles` | `50000` | Maximum files scanned by one `search` query. |

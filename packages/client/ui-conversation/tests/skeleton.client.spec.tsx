@@ -91,6 +91,8 @@ function mount(
     overlayTakeover?: boolean
     /** The session list summary's `blank` flag — independent of the snapshot's. */
     summaryBlank?: boolean
+    /** Agent preset recorded on the session summary. */
+    summaryAgentPreset?: string
     /** Drop the session's summary row entirely (a session the list has not caught up with). */
     omitSummaryRow?: boolean
     /** Classify the selected child as a subagent instead of an ordinary fork. */
@@ -109,6 +111,7 @@ function mount(
     id: SID, displayTitle: 'Child', parentId: root, cwd: '/projects/one',
     running: false, blank: options.summaryBlank ?? false, updatedAt: 2,
     ...(options.summaryOrigin === undefined ? {} : { origin: options.summaryOrigin }),
+    ...(options.summaryAgentPreset === undefined ? {} : { agentPreset: options.summaryAgentPreset }),
   }
   const listed = options.omitSummaryRow !== true
   const sessions = createSnapshotStore<SessionListState>({
@@ -136,7 +139,8 @@ function mount(
     list: () => viewTabs,
     subscribe: () => () => {},
     version: () => 1,
-    preferred: () => null,
+    preferred: (sessionId: SessionId) =>
+      sessions.getSnapshot().byId[sessionId]?.agentPreset === 'writing' ? 'writing' : null,
     companion: options.companion ?? (() => null),
   }
   /** Owner share handed to the two composer tool-row seats, per render. */
@@ -250,12 +254,22 @@ function mount(
     inputActions,
     renderSlot,
     renderSlotChain,
+    views,
     selectWorkspace: retargetWorkspace,
     t,
   }
   const view = render(<ConversationRoot {...props} />)
   return {
-    view, chat, sink, retargetWorkspace, session, slotCalls, seatOwners, open,
+    view, chat, sink, retargetWorkspace, session, sessions, slotCalls, seatOwners, open,
+    setAgentPreset: (agentPreset: string) => {
+      const current = sessions.getSnapshot()
+      const summary = current.byId[SID]
+      if (summary === undefined) throw new Error('session summary missing')
+      sessions.set({
+        ...current,
+        byId: { ...current.byId, [SID]: { ...summary, agentPreset } },
+      })
+    },
     pickerOwner: () => pickerOwner,
     rerender: () => { view.rerender(<ConversationRoot {...props} />) },
   }
@@ -462,6 +476,64 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.queryByRole('tab')).toBeNull()
     expect(b.view.container.querySelector('[data-conversation-companion-layout]')).toBeTruthy()
     expect(b.view.container.querySelector('[data-composer-seat]')).toBeTruthy()
+  })
+
+  it('opens a blank writing session directly and restores the Hero after leaving the preset', () => {
+    const b = mount(
+      conversationSnapshot({ blank: true, composerPhase: 'blank' }),
+      undefined,
+      undefined,
+      {
+        summaryBlank: true,
+        summaryAgentPreset: 'standard',
+        viewTabs: [
+          { id: 'chat', label: 'Chat' },
+          { id: 'writing', label: 'Writing' },
+        ],
+        companion: (_sessionId, activeViewId) => activeViewId === 'writing'
+          ? { id: 'chat', label: 'Assistant' }
+          : null,
+      },
+    )
+    expect(b.view.container.querySelector('[data-phase]')?.getAttribute('data-phase')).toBe('hero')
+    expect(b.view.queryByTestId('view-writing')).toBeNull()
+
+    act(() => { b.setAgentPreset('writing') })
+
+    expect(b.view.container.querySelector('[data-phase]')?.getAttribute('data-phase')).toBe('active')
+    expect(b.view.getByTestId('view-writing')).toBeTruthy()
+    expect(b.view.getByTestId('view-chat')).toBeTruthy()
+    expect(b.view.getByRole('complementary', { name: 'Assistant' })).toBeTruthy()
+
+    act(() => { b.setAgentPreset('standard') })
+
+    expect(b.view.container.querySelector('[data-phase]')?.getAttribute('data-phase')).toBe('hero')
+    expect(b.view.queryByTestId('view-writing')).toBeNull()
+    expect(b.view.getByText('探索未至之境')).toBeTruthy()
+  })
+
+  it('restores the prior tab after a preferred writing view releases an active session', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      summaryAgentPreset: 'standard',
+      viewTabs: [
+        { id: 'chat', label: 'Chat' },
+        { id: 'trajectory', label: 'Trajectory' },
+        { id: 'writing', label: 'Writing' },
+      ],
+      companion: (_sessionId, activeViewId) => activeViewId === 'writing'
+        ? { id: 'chat', label: 'Assistant' }
+        : null,
+    })
+    act(() => { b.chat.actions.setView('trajectory') })
+    expect(b.view.getByTestId('view-trajectory')).toBeTruthy()
+
+    act(() => { b.setAgentPreset('writing') })
+    expect(b.view.getByTestId('view-writing')).toBeTruthy()
+    expect(b.view.queryByRole('tab')).toBeNull()
+
+    act(() => { b.setAgentPreset('standard') })
+    expect(b.view.getByTestId('view-trajectory')).toBeTruthy()
+    expect(b.view.getByRole('tab', { name: 'Trajectory' }).getAttribute('aria-selected')).toBe('true')
   })
 
   it('keeps the Chat fallback selected by id when a view is inserted before it', () => {

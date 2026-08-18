@@ -491,6 +491,8 @@ describe('ui-agent-preset apply', () => {
     await ctx.plugin({ inject: [...inject, 'conversation', 'sessions', 'workspaces'], apply }).await()
     const label = (slots.entries('conversation.session.header.actions')[0]!
       .inject as unknown as () => AgentPresetLabelInjected)()
+    const seat = (slots.entries('conversation.hero.agentPreset')[0]!
+      .inject as unknown as () => AgentPresetSeatInjected)()
     const row = (slots.entries('settings.general.item')[0]!
       .inject as unknown as () => AgentPresetRowInjected)()
 
@@ -500,6 +502,7 @@ describe('ui-agent-preset apply', () => {
     // load already fetched, rather than issuing a second read per session.
     expect(label.hooks.agentPresets).toBe(row.hooks.agentPreset)
     expect(label.hooks.agentPresets.getSnapshot().options).toEqual([{ id: 'standard', trust: 'system' }])
+    expect(label.hooks.agentPresetSeat).toBe(seat.hooks.agentPresetSeat)
   })
 
   it('stages the creator preset and starts a session from the section', async () => {

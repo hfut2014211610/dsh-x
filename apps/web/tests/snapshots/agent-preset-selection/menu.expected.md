@@ -2,6 +2,8 @@
   - menuitem "Standard mode Full coding agent with file editing, shell, file and web search, skills, planning, goals, subagents, and workflows.":
     - text: Standard mode Full coding agent with file editing, shell, file and web search, skills, planning, goals, subagents, and workflows.
     - img
+  - menuitem "Anchored Standard mode Anchors the first model request on the Minimal two-tool, zero-injection condition, then promotes to an on-demand-unlocked Standard toolset."
   - menuitem "Code mode All Standard mode capabilities, with tools exposed through the Code Mode SDK so the model can combine multi-step operations in one TypeScript program."
   - menuitem "Minimal mode Two-tool coding agent with persistent bash and str_replace_editor."
   - menuitem "Creator mode Built for creating custom agent presets, with all Standard mode capabilities plus runtime inspection, plugin experiments, and preset-authoring guidance."
+  - menuitem "写作模式 面向文档编写与修订的写作 Agent，只提供 document_* 文档工具。"

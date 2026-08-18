@@ -2,9 +2,9 @@
 /**
  * The three conversation-adjacent surfaces: the General-settings row naming the
  * default for later sessions, the new-session chip naming the next one's, and
- * the session header's read-only label. The split is the host's rule — a
- * session's history is produced under its preset's tools, so the choice is
- * only ever offered before one starts.
+ * the session header's blank-session picker or read-only running label. The
+ * split is the host's rule — a session's history is produced under its
+ * preset's tools, so the choice is only ever offered before one starts.
  */
 
 import { act, cleanup, fireEvent, render, screen, waitFor } from '@testing-library/react'
@@ -78,16 +78,27 @@ function renderLabel(
   const store = createSnapshotStore<AgentPresetSettingsState>({
     ...ROW_READY, options: SEAT_READY.options, ...roster,
   })
+  const seatStore = createSnapshotStore<AgentPresetSeatState>({
+    ...SEAT_READY,
+    current: summary?.agentPreset ?? SEAT_READY.current,
+  })
   const sessions = createSnapshotStore({ byId: summary === undefined ? {} : { s1: summary } })
   const load = vi.fn(() => Promise.resolve())
+  const loadSeat = vi.fn(() => Promise.resolve())
+  const select = vi.fn(() => Promise.resolve())
+  const introduced = vi.fn()
   const view = render(<AgentPresetLabel {...({
     load,
+    loadSeat,
+    select,
+    introduced,
     sessionId: 's1',
     useSessions: bindSnapshotSelector(sessions),
     useAgentPresets: bindSnapshotSelector(store),
+    useAgentPresetSeat: bindSnapshotSelector(seatStore),
     t: (key: keyof typeof en) => en[key],
   } as unknown as AgentPresetLabelProps)} />)
-  return { load, view }
+  return { load, loadSeat, select, introduced, view }
 }
 
 describe('the General-settings row', () => {
@@ -376,9 +387,19 @@ describe('the session-header label', () => {
   })
 
   it('falls back to the id, and to the generic hint, when metadata is absent', () => {
-    renderLabel({ blank: true, agentPreset: 'mine' })
+    renderLabel({ blank: false, agentPreset: 'mine' })
 
     expect(screen.getByTitle(en.headerHint).textContent).toBe('mine')
+  })
+
+  it('keeps the preset picker available while a preferred view owns a blank session', async () => {
+    const { loadSeat, select } = renderLabel({ blank: true, agentPreset: 'standard' })
+
+    await waitFor(() => { expect(loadSeat).toHaveBeenCalledTimes(1) })
+    fireEvent.click(screen.getByRole('button', { name: /Standard mode/ }))
+    fireEvent.click(screen.getByText('mine'))
+
+    expect(select).toHaveBeenCalledWith('mine')
   })
 
   it('shows the id until the roster resolves it', () => {
@@ -401,5 +422,7 @@ describe('the session-header label', () => {
     await act(async () => { await Promise.resolve() })
     expect(absent.load).not.toHaveBeenCalled()
     expect(unknown.load).not.toHaveBeenCalled()
+    expect(absent.loadSeat).not.toHaveBeenCalled()
+    expect(unknown.loadSeat).not.toHaveBeenCalled()
   })
 })

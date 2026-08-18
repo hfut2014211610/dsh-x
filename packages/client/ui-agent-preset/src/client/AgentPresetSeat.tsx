@@ -63,12 +63,20 @@ export type AgentPresetSeatProps =
   & PropsLocale<'settings.agentPreset'>
   & InjectFace<AgentPresetSeatInjected>
 
+/** Shared picker props used by the Hero seat and a still-blank session header. */
+export type AgentPresetPickerProps = Pick<
+  AgentPresetSeatProps,
+  'load' | 'select' | 'introduced' | 'useAgentPresetSeat' | 't'
+>
+
 /**
- * Render the new-session agent-preset chip.
+ * Render the shared blank-session agent-preset picker.
  * @param props - composed slot props.
  * @returns the chip, or null when the deployment composes no presets.
  */
-export function AgentPresetSeat({ load, select, introduced, useAgentPresetSeat, t }: AgentPresetSeatProps) {
+export function AgentPresetPicker({
+  load, select, introduced, useAgentPresetSeat, t,
+}: AgentPresetPickerProps) {
   const state = useAgentPresetSeat(snapshot => snapshot)
   const [open, setOpen] = useState(false)
 
@@ -167,4 +175,13 @@ export function AgentPresetSeat({ load, select, introduced, useAgentPresetSeat, 
       )}
     />
   )
+}
+
+/**
+ * Render the root-scoped new-session preset seat.
+ * @param props - composed slot props.
+ * @returns the shared preset picker.
+ */
+export function AgentPresetSeat(props: AgentPresetSeatProps) {
+  return <AgentPresetPicker {...props} />
 }

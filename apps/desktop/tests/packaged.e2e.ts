@@ -35,7 +35,11 @@ describe.skipIf(packagedExe === '' || !existsSync(packagedExe))('packaged app sm
     // The GUI process detaches from the runner's console; Electron's logging
     // switch is the only way its own output reaches a captured pipe.
     childEnv.ELECTRON_ENABLE_LOGGING = '1'
-    const electron = await _electron.launch({ executablePath: packagedExe, env: childEnv })
+    const electron = await _electron.launch({
+      executablePath: packagedExe,
+      args: [`--user-data-dir=${join(isolatedHome, 'electron')}`],
+      env: childEnv,
+    })
     /** Everything the app printed, so a CI failure names its cause. */
     const processOutput: string[] = []
     for (const stream of [electron.process().stdout, electron.process().stderr]) {

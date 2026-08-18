@@ -29,6 +29,8 @@ import { connectFreshWorkspace, newEnglishPage, saveFailureShot } from './suppor
 const SNAPSHOT_DIR = fileURLToPath(new URL('./snapshots/agent-preset-selection', import.meta.url))
 const HERO_EXPECTED = join(SNAPSHOT_DIR, 'hero.expected.md')
 const MENU_EXPECTED = join(SNAPSHOT_DIR, 'menu.expected.md')
+const WRITING_EXPECTED = join(SNAPSHOT_DIR, 'writing.expected.md')
+const WRITING_OUTLINE_EXPECTED = join(SNAPSHOT_DIR, 'writing-outline.expected.md')
 const HEADER_EXPECTED = join(SNAPSHOT_DIR, 'header.expected.md')
 /** The shipped roster, beside the composition that names it. */
 const SHIPPED_PRESETS = fileURLToPath(new URL('../../cli/config/agent-presets', import.meta.url))
@@ -36,6 +38,7 @@ const MODE = webSnapshotMode()
 const SEED_ID = 'agent-preset-selection-web-e2e'
 /** A project skill only a preset that mounts `skill-filesystem` can discover. */
 const SKILL_NAME = 'preset-catalog-demo'
+const OUTLINE_DOCUMENT = 'outline-navigation.md'
 
 /**
  * Seed one project skill under the connected workspace.
@@ -55,6 +58,25 @@ async function seedWorkspaceSkill(workspaceCwd: string): Promise<void> {
     '---',
     '',
     'Body.',
+    '',
+  ].join('\n'))
+}
+
+/** Seed a long Markdown document whose final headings require visible scrolling. */
+async function seedOutlineDocument(workspaceCwd: string): Promise<void> {
+  const filler = Array.from({ length: 24 }, (_, index) => `Paragraph ${String(index + 1)} keeps the target below the fold.`)
+  await writeFile(join(workspaceCwd, 'workspace', OUTLINE_DOCUMENT), [
+    '# Opening',
+    '',
+    ...filler.flatMap(line => [line, '']),
+    '## Repeated title',
+    '',
+    ...filler.flatMap(line => [line, '']),
+    '## Repeated title',
+    '',
+    '## Final target',
+    '',
+    'The outline must reveal this heading.',
     '',
   ].join('\n'))
 }
@@ -181,6 +203,7 @@ describe('web e2e: agent-preset selection', () => {
     const seededId = await seedSession(scaffold, seedLog(), SEED_ID, 'minimal')
     await seedSubagent(scaffold, seededId)
     await seedWorkspaceSkill(scaffold.workspaceCwd)
+    await seedOutlineDocument(scaffold.workspaceCwd)
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
@@ -268,6 +291,57 @@ describe('web e2e: agent-preset selection', () => {
     expect(onStandard.some(option => option.startsWith('plan'))).toBe(true)
     await composer.fill('')
   }, 90_000)
+
+  it('enters the writing workspace immediately and restores the Hero on exit', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-writing'))
+    await page.getByRole('button', { name: 'Standard mode' }).click()
+    await page.getByRole('menuitem', { name: /写作模式/ }).click()
+    await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('writing')
+
+    const writingTree = page.getByRole('tree', { name: 'Workspace document tree' })
+    await writingTree.waitFor({ timeout: 15_000 })
+    await page.getByRole('complementary', { name: 'Assistant' }).waitFor()
+    const snapshot = await captureStableAria(page, '[data-phase="active"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(WRITING_EXPECTED, snapshot, MODE)
+
+    await page.getByRole('button', { name: OUTLINE_DOCUMENT, exact: true }).click()
+    const preview = page.getByRole('article', { name: 'Markdown preview' })
+    await preview.waitFor({ timeout: 15_000 })
+    await page.getByRole('button', { name: 'Outline', exact: true }).click()
+    await page.getByRole('button', { name: /Final target/ }).click()
+    const previewPosition = await preview.evaluate((article) => {
+      const target = [...article.querySelectorAll('h1, h2, h3, h4, h5, h6')]
+        .find(heading => heading.textContent?.trim() === 'Final target')
+      if (target === undefined) throw new Error('Final target heading was not rendered')
+      const viewport = article.getBoundingClientRect()
+      const heading = target.getBoundingClientRect()
+      return { scrollTop: article.scrollTop, targetTop: heading.top - viewport.top, clientHeight: article.clientHeight }
+    })
+    expect(previewPosition.scrollTop).toBeGreaterThan(0)
+    expect(previewPosition.targetTop).toBeGreaterThanOrEqual(0)
+    expect(previewPosition.targetTop).toBeLessThan(previewPosition.clientHeight)
+    expect(await page.getByRole('textbox', { name: 'Document editor' }).count()).toBe(0)
+    const outlineSnapshot = await captureStableAria(page, '[class*="editorHeader"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(WRITING_OUTLINE_EXPECTED, outlineSnapshot, MODE)
+
+    await page.getByRole('button', { name: 'Edit', exact: true }).click()
+    const editor = page.getByRole('textbox', { name: 'Document editor' })
+    await page.getByRole('button', { name: /Final target/ }).click()
+    await expect.poll(() => editor.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
+    expect(await editor.evaluate((element) => {
+      if (!(element instanceof HTMLTextAreaElement)) throw new Error('Document editor is not a textarea')
+      return element.value.slice(element.selectionStart, element.selectionEnd)
+    })).toBe('Final target')
+
+    // The blank-session selector moves into the active header, so entering a
+    // preferred workspace never strands the user without a way back.
+    await page.getByRole('button', { name: '写作模式' }).click()
+    await page.getByRole('menuitem', { name: /^Standard mode/ }).first().click()
+    await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('standard')
+    await page.getByText('Into the Unknown').waitFor({ timeout: 15_000 })
+    expect(await page.locator('[data-writing-view]').count()).toBe(0)
+    expect(await page.locator('[data-phase="hero"]').count()).toBe(1)
+  })
 
   it('labels a resumed session with the preset it was created under', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-header'))

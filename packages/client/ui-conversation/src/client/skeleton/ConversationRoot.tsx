@@ -2,7 +2,7 @@
 // chain, AND the composer bar (session-maybe slot) stay mounted across
 // no-session/session transitions — the bar renders inert via owner props.
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import type { WorkspaceId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConversationSlotProps, InputZone } from '../contract/slots.ts'
@@ -14,7 +14,7 @@ export type ConversationRootProps = ConversationSlotProps
 
 export function ConversationRoot({
   sessionId, useSession, useSessions, useWorkspaces, useInput, useComposerBlock,
-  renderSlot, renderSlotChain, selectWorkspace, t,
+  renderSlot, renderSlotChain, selectWorkspace, views, t,
 }: ConversationRootProps) {
   const openState = useSession(s => s.openState)
   const composerPhase = useSession(s => s.composerPhase)
@@ -27,6 +27,11 @@ export function ConversationRoot({
   // A plugin this package cannot import (ui-model-selection) says this session cannot
   // send; its reason is already localized by whoever raised it.
   const composerBlock = useComposerBlock(block => block)
+  useSyncExternalStore(views.subscribe, views.version)
+  const preferredViewId = useSessions(() => sessionId === undefined ? null : views.preferred(sessionId))
+  const preferredSessionView = sessionId !== undefined
+    && preferredViewId !== null
+    && views.list().some(view => view.id === preferredViewId)
 
   const [pickerOpen, setPickerOpen] = useState(false)
   const [pendingWorkspaceId, setPendingWorkspaceId] = useState<WorkspaceId | undefined>()
@@ -74,10 +79,12 @@ export function ConversationRoot({
   // The exemption is deliberately open-state-wide, not loading-only: a
   // summary-blank session is the hero before its open starts (`cold`) and
   // after one fails (`error`) for the same reason — there is no history.
-  const settling = sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
+  const settling = !preferredSessionView
+    && sessionId !== undefined && composerPhase === 'blank' && openState === 'loading'
     && summaryBlank !== true
   const hero = sessionId === undefined
-    || (composerPhase === 'blank' && (openState === 'open' || summaryBlank === true))
+    || (!preferredSessionView
+      && composerPhase === 'blank' && (openState === 'open' || summaryBlank === true))
   const zone: InputZone | undefined =
     session === undefined || inputState === undefined ? undefined : { session, input: inputState }
 

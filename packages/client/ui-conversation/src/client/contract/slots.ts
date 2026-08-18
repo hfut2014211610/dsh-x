@@ -409,6 +409,20 @@ export type ConvViewProps = PropsRuntime<'conversation.view'>
 /** The shared chat store handle type declared by the Session header/body, details, and chat-view registrations. */
 export type ChatStore = ReturnType<typeof createChatStore>
 
+/** Live conversation-view registry shared by the root, header, and session body. */
+export interface ConversationViews {
+  /** Registered conversation-view tabs in presentation order. */
+  list: () => readonly ViewTab[]
+  /** Subscribe to conversation-view registration changes. */
+  subscribe: (fn: () => void) => () => void
+  /** Current conversation-view registration version. */
+  version: () => number
+  /** Resolve a temporary session-preferred view, or null. */
+  preferred: (sessionId: SessionId) => string | null
+  /** Resolve the secondary view for one active view, or null. */
+  companion: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null
+}
+
 /** Business callbacks injected into the conversation slot. */
 export interface ConversationInjected {
   /**
@@ -416,6 +430,8 @@ export interface ConversationInjected {
    * When a blank session is already current, carry its draft to the target.
    */
   selectWorkspace: (workspaceId: WorkspaceId) => Promise<void>
+  /** View registry used to promote a blank session into a feature-owned surface. */
+  views: ConversationViews
   /**
    * Framework-bound sources. `composerBlock` is this session's block when a
    * plugin raised one; the reason is the blocker's own localized copy, which
@@ -427,13 +443,7 @@ export interface ConversationInjected {
 /** Business callbacks injected into the strict Session body seat. */
 export interface ConversationSessionInjected {
   /** Views projected from the `conversation.view` slot ledger. */
-  views: {
-    list: () => readonly ViewTab[]
-    subscribe: (fn: () => void) => () => void
-    version: () => number
-    preferred: (sessionId: SessionId) => string | null
-    companion: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null
-  }
+  views: ConversationViews
   /** Release historical image URLs when this rendered session scope unmounts. */
   releaseSessionImages: (sessionId: SessionId) => void
   /** Bind the input machine's draft persistence mirror to the session store. */
@@ -443,13 +453,7 @@ export interface ConversationSessionInjected {
 /** Business callbacks injected into the strict session header seat. */
 export interface ConversationSessionHeaderInjected {
   /** Views projected from the `conversation.view` slot ledger. */
-  views: {
-    list: () => readonly ViewTab[]
-    subscribe: (fn: () => void) => () => void
-    version: () => number
-    preferred: (sessionId: SessionId) => string | null
-    companion: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null
-  }
+  views: ConversationViews
   /** Select a real Session through the runtime navigation owner. */
   open: (sessionId: SessionId) => void
 }

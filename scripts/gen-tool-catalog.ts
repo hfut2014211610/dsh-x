@@ -561,9 +561,10 @@ const TOOL_PACKAGES: ToolPackage[] = [
     writes: ['tool/call', 'documents/changed through ctx.documents.apply on mutations', 'tool/result'],
     async mount(ctx) {
       // The real local provider satisfies `inject: ['documents']`; the schema
-      // harvest never executes a call, so its filesystem stays untouched.
+      // harvest never executes a call, so no session or filesystem state is needed.
       await ctx.plugin(LocalFileSystem)
-      await ctx.plugin(DocumentsLocal, { root: 'tool-catalog-documents' })
+      await ctx.plugin(SessionStore)
+      await ctx.plugin(DocumentsLocal, {})
       await ctx.plugin(ToolDocuments)
     },
     note:

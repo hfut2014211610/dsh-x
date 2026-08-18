@@ -1,0 +1,12 @@
+- text: Writing /
+- strong: outline-navigation.md
+- group "Document display mode":
+  - button "Edit"
+  - button "Preview" [pressed]
+- img
+- text: Saved
+- button "Reload":
+  - img
+- button "Open in new window":
+  - img
+- button "Save" [disabled]

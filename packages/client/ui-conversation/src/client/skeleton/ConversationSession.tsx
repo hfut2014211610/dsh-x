@@ -22,13 +22,13 @@ interface Breadcrumb {
 
 const DEFAULT_VIEW_ID = 'chat'
 
-/** Resolve by id and keep stale persisted selections on the stable Chat fallback. */
+/** Resolve by id; a live preferred view temporarily overrides the persisted tab. */
 function resolveActiveView(
   tabs: readonly ViewTab[],
   selectedId: string | null,
   preferredId: string | null,
 ): ViewTab | undefined {
-  const requestedId = selectedId ?? preferredId ?? DEFAULT_VIEW_ID
+  const requestedId = preferredId ?? selectedId ?? DEFAULT_VIEW_ID
   return tabs.find(view => view.id === requestedId)
     ?? tabs.find(view => view.id === DEFAULT_VIEW_ID)
 }
@@ -69,7 +69,9 @@ export function ConversationSessionHeader({
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
   const selectedId = useStore(s => s.view)
-  const active = resolveActiveView(tabs, selectedId, views.preferred(sessionId))
+  const preferredId = useSessions(() => views.preferred(sessionId))
+  const activePreferredId = tabs.some(tab => tab.id === preferredId) ? preferredId : null
+  const active = resolveActiveView(tabs, selectedId, activePreferredId)
   const companion = active === undefined ? null : views.companion(sessionId, active.id)
   const hasCompanion = companion !== null
     && companion.id !== active?.id
@@ -77,7 +79,7 @@ export function ConversationSessionHeader({
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
-  const hideChrome = blank && composerPhase === 'blank'
+  const hideChrome = blank && composerPhase === 'blank' && activePreferredId === null
 
   return (
     <header
@@ -144,13 +146,15 @@ export function ConversationSessionHeader({
  * @returns the active view area, or null while the Session remains blank.
  */
 export function ConversationSession({
-  sessionId, useSession, useInput, inputActions, useStore, actions,
+  sessionId, useSession, useSessions, useInput, inputActions, useStore, actions,
   renderSlot, views, bindDraftMirror, releaseSessionImages,
 }: ConversationSessionProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
   const selectedId = useStore(s => s.view)
-  const active = resolveActiveView(tabs, selectedId, views.preferred(sessionId))
+  const preferredId = useSessions(() => views.preferred(sessionId))
+  const activePreferredId = tabs.some(tab => tab.id === preferredId) ? preferredId : null
+  const active = resolveActiveView(tabs, selectedId, activePreferredId)
   const declaredCompanion = active === undefined ? null : views.companion(sessionId, active.id)
   const companion = declaredCompanion !== null
     && declaredCompanion.id !== active?.id
@@ -176,7 +180,7 @@ export function ConversationSession({
     releaseSessionImages(sessionId)
   }, [releaseSessionImages, sessionId])
 
-  if (blank && composerPhase === 'blank') return null
+  if (blank && composerPhase === 'blank' && activePreferredId === null) return null
   const owner = {
     inspect,
     onInspectDone: () => { actions.setInspect(null) },

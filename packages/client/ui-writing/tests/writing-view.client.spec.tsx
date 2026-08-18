@@ -17,11 +17,16 @@ const entry: DocumentOutlineEntry = {
   id: 'heading:intro',
   kind: 'heading',
   title: '简介',
-  locator: { unit: 'heading', id: 'intro' },
+  locator: { unit: 'line', start: 1, end: 1 },
 }
 
-function setup() {
+function setup(options: {
+  readonly content?: string
+  readonly entries?: readonly DocumentOutlineEntry[]
+} = {}) {
   let changed: ((change: DocumentChange) => void) | undefined
+  const content = options.content ?? '# 简介\n\n初始内容'
+  const outlineEntries = options.entries ?? [entry]
   const list = vi.fn(async (path?: string) => ({
     path: path ?? '',
     entries: path === 'docs'
@@ -39,11 +44,11 @@ function setup() {
     path,
     format: 'markdown' as const,
     version: 'v1',
-    content: '# 简介\n\n初始内容',
+    content,
     truncated: false,
   }))
   const save = vi.fn(async () => ({ version: 'v2' }))
-  const outline = vi.fn(async () => [entry])
+  const outline = vi.fn(async () => outlineEntries)
   const search = vi.fn(async () => [{
     path: 'docs/result.md',
     title: '搜索结果',
@@ -87,8 +92,17 @@ describe('WritingView', () => {
     fireEvent.click(await b.view.findByRole('button', { name: 'plan.md' }))
 
     await waitFor(() => { expect(b.load).toHaveBeenCalledWith('docs/plan.md') })
+    await waitFor(() => {
+      expect(b.list.mock.calls.filter(([path]) => path === 'docs')).toHaveLength(2)
+    })
     expect(b.view.getByText('工作区文件')).toBeTruthy()
     expect(b.view.getByRole('treeitem', { name: 'plan.md' }).getAttribute('aria-current')).toBe('page')
+
+    fireEvent.click(b.view.getByRole('button', { name: '重新载入' }))
+    await waitFor(() => {
+      expect(b.list.mock.calls.filter(([path]) => path === 'docs')).toHaveLength(3)
+    })
+    expect(b.view.getByRole('treeitem', { name: 'plan.md' })).toBeTruthy()
   })
 
   it('opens, edits, saves, and protects a dirty draft from an external change', async () => {
@@ -137,8 +151,17 @@ describe('WritingView', () => {
     await waitFor(() => { expect(editor.value).toContain('模型修改后的内容') })
   })
 
-  it('searches documents, opens a result, navigates the outline, and opens a second window', async () => {
-    const b = setup()
+  it('searches documents, navigates duplicate outline headings in preview and edit modes, and opens a second window', async () => {
+    const secondEntry: DocumentOutlineEntry = {
+      id: 'heading:intro-2',
+      kind: 'heading',
+      title: '简介',
+      locator: { unit: 'line', start: 5, end: 5 },
+    }
+    const b = setup({
+      content: '# 简介\n\n正文\n\n## 简介\n\n初始内容',
+      entries: [entry, secondEntry],
+    })
     fireEvent.click(b.view.getByRole('button', { name: '搜索' }))
     const searchInput = b.view.getByLabelText('搜索文档')
     fireEvent.change(searchInput, { target: { value: '结果' } })
@@ -148,10 +171,26 @@ describe('WritingView', () => {
     await waitFor(() => { expect(b.load).toHaveBeenCalledWith('docs/result.md') })
 
     fireEvent.click(b.view.getByRole('button', { name: '大纲' }))
-    fireEvent.click(b.view.getByRole('button', { name: /简介/ }))
+    const preview = b.view.getByLabelText('Markdown 预览')
+    const headings = preview.querySelectorAll('h1, h2, h3, h4, h5, h6')
+    Object.defineProperties(preview, {
+      clientHeight: { configurable: true, value: 400 },
+      scrollHeight: { configurable: true, value: 1600 },
+      scrollTop: { configurable: true, value: 0, writable: true },
+    })
+    preview.getBoundingClientRect = vi.fn(() => ({ top: 100 } as DOMRect))
+    const secondHeading = headings[1] as HTMLElement
+    secondHeading.getBoundingClientRect = vi.fn(() => ({ top: 900 } as DOMRect))
+    const outlineButtons = b.view.getAllByRole('button', { name: /简介/ })
+    fireEvent.click(outlineButtons[1]!)
+    expect(b.view.getByLabelText('Markdown 预览')).toBe(preview)
+    expect(preview.scrollTop).toBe(776)
+
+    fireEvent.click(b.view.getByRole('button', { name: '编辑' }))
+    fireEvent.click(outlineButtons[1]!)
     const editor = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
-    expect(editor.selectionStart).toBe(2)
-    expect(editor.selectionEnd).toBe(4)
+    expect(editor.selectionStart).toBe(13)
+    expect(editor.selectionEnd).toBe(15)
 
     const open = vi.fn()
     vi.stubGlobal('open', open)
@@ -163,9 +202,10 @@ describe('WritingView', () => {
   it('surfaces document read failures without replacing the editor', async () => {
     const b = setup()
     b.load.mockResolvedValueOnce({ error: 'document unavailable' })
-    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'missing.md' } })
+    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'docs/missing.md' } })
     fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
     expect((await b.view.findByRole('alert')).textContent).toContain('document unavailable')
     expect(b.view.getByText('操作失败')).toBeTruthy()
+    await waitFor(() => { expect(b.list).toHaveBeenCalledWith('docs') })
   })
 })

@@ -25,8 +25,6 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 
 /** Configuration for the local documents provider. */
 export interface Config {
-  /** Base directory every document path resolves against. */
-  root: string
   /** Character cap for one read result; longer content comes back truncated. */
   maxReadChars?: number
   /** Entry cap for one document's outline. */
@@ -45,7 +43,6 @@ const MAX_STRUCTURED_BYTES = 50 * 1024 * 1024
 
 /** Config after defaults are applied; every limit is a concrete number. */
 export interface ResolvedConfig {
-  root: string
   maxReadChars: number
   maxOutlineItems: number
   maxSearchFiles: number
@@ -54,7 +51,6 @@ export interface ResolvedConfig {
 
 function resolveConfig(config: Config): ResolvedConfig {
   return {
-    root: config.root,
     maxReadChars: config.maxReadChars ?? DEFAULT_MAX_READ_CHARS,
     maxOutlineItems: config.maxOutlineItems ?? DEFAULT_MAX_OUTLINE_ITEMS,
     maxSearchFiles: config.maxSearchFiles ?? DEFAULT_MAX_SEARCH_FILES,
@@ -162,12 +158,11 @@ async function applyStructuredEdit(ctx: Context, target: FsTarget, format: 'docx
   await fsWriteFile(ctx.fs.processPath(target), buffer)
 }
 
-/** Local-filesystem provider for `ctx.documents`, bounded by its configured root. */
+/** Local-filesystem provider for `ctx.documents`, bounded by each calling session's workspace. */
 export class DocumentsLocal extends Documents {
-  static inject = ['fs']
+  static inject = ['fs', 'sessions']
 
   static Config: z<Config> = z.object({
-    root: z.string().required(),
     maxReadChars: z.number().default(DEFAULT_MAX_READ_CHARS),
     maxOutlineItems: z.number().default(DEFAULT_MAX_OUTLINE_ITEMS),
     maxSearchFiles: z.number().default(DEFAULT_MAX_SEARCH_FILES),
@@ -189,13 +184,26 @@ export class DocumentsLocal extends Documents {
     return 'code'
   }
 
-  private async resolveWorkspaceTarget(): Promise<FsTarget> {
-    return this.ctx.fs.resolve(this.resolved.root)
+  private workspaceRoot(sessionId: SessionId): string {
+    const session = this.ctx.sessions.get(sessionId)
+    if (session === undefined) {
+      throw new DocumentError(`session "${sessionId}" is not attached`, 'DOCUMENT_IO_ERROR')
+    }
+    const cwd = session.header.cwd
+    if (cwd === undefined) {
+      throw new DocumentError(`session "${sessionId}" has no project cwd`, 'DOCUMENT_IO_ERROR')
+    }
+    return cwd
   }
 
-  private async resolveDocument(path: string): Promise<FsTarget> {
-    const root = await this.resolveWorkspaceTarget()
-    const target = await this.ctx.fs.resolve(path, { cwd: this.resolved.root })
+  private async resolveWorkspaceTarget(sessionId: SessionId): Promise<FsTarget> {
+    return this.ctx.fs.resolve(this.workspaceRoot(sessionId))
+  }
+
+  private async resolveDocument(sessionId: SessionId, path: string): Promise<FsTarget> {
+    const workspaceRoot = this.workspaceRoot(sessionId)
+    const root = await this.ctx.fs.resolve(workspaceRoot)
+    const target = await this.ctx.fs.resolve(path, { cwd: workspaceRoot })
     if (!this.ctx.fs.contains(root, target)) {
       throw new DocumentError(`path escapes workspace: ${path}`, 'DOCUMENT_INVALID_PATH')
     }
@@ -204,8 +212,8 @@ export class DocumentsLocal extends Documents {
 
   override async list(request: { sessionId: SessionId; path?: string }): Promise<DocumentDirectoryListing> {
     const path = normalizeDirectoryPath(request.path)
-    const root = await this.resolveWorkspaceTarget()
-    const target = path === '' ? root : await this.resolveDocument(path)
+    const root = await this.resolveWorkspaceTarget(request.sessionId)
+    const target = path === '' ? root : await this.resolveDocument(request.sessionId, path)
     const info = await this.ctx.fs.stat(target)
     if (info === undefined) throw new DocumentError(`directory not found: ${path}`, 'DOCUMENT_NOT_FOUND')
     if (info.type !== 'directory') throw new DocumentError(`not a directory: ${path}`, 'DOCUMENT_INVALID_PATH')
@@ -234,7 +242,7 @@ export class DocumentsLocal extends Documents {
   }
 
   override async read(request: { sessionId: SessionId; path: string; locator?: DocumentLocator }): Promise<DocumentReadResult> {
-    const target = await this.resolveDocument(request.path)
+    const target = await this.resolveDocument(request.sessionId, request.path)
     const info = await this.ctx.fs.stat(target)
     if (info === undefined) throw new DocumentError(`document not found: ${request.path}`, 'DOCUMENT_NOT_FOUND')
     const format = this.formatOf(request.path)
@@ -246,7 +254,7 @@ export class DocumentsLocal extends Documents {
   }
 
   override async outline(request: { sessionId: SessionId; path: string }): Promise<DocumentOutlineResult> {
-    const target = await this.resolveDocument(request.path)
+    const target = await this.resolveDocument(request.sessionId, request.path)
     const info = await this.ctx.fs.stat(target)
     if (info === undefined) throw new DocumentError(`document not found: ${request.path}`, 'DOCUMENT_NOT_FOUND')
     const format = this.formatOf(request.path)
@@ -266,7 +274,7 @@ export class DocumentsLocal extends Documents {
   }
 
   override async search(request: { sessionId: SessionId; query: string; limit?: number }): Promise<DocumentSearchResult> {
-    const root = await this.resolveWorkspaceTarget()
+    const root = await this.resolveWorkspaceTarget(request.sessionId)
     const hits: DocumentSearchHit[] = []
     const limit = request.limit ?? 20
     const seen = new Set<string>()
@@ -306,7 +314,7 @@ export class DocumentsLocal extends Documents {
   }
 
   override async create(request: { sessionId: SessionId; path: string; content: string }): Promise<{ path: string; version: string }> {
-    const target = await this.resolveDocument(request.path)
+    const target = await this.resolveDocument(request.sessionId, request.path)
     const outcome = await this.ctx.fs.writeText(target, request.content, { kind: 'createIfAbsent' })
     this.ctx.emit('documents/changed', { sessionId: request.sessionId, path: request.path, baseVersion: '', version: String(outcome.version), patches: null })
     return { path: request.path, version: String(outcome.version) }
@@ -314,7 +322,7 @@ export class DocumentsLocal extends Documents {
 
   override async apply(request: { sessionId: SessionId; path: string; baseVersion: string; edit: DocumentEdit }):
   Promise<{ version: string }> {
-    const target = await this.resolveDocument(request.path)
+    const target = await this.resolveDocument(request.sessionId, request.path)
     const info = await this.ctx.fs.stat(target)
     if (info === undefined) throw new DocumentError(`document not found: ${request.path}`, 'DOCUMENT_NOT_FOUND')
     if (String(info.version) !== request.baseVersion) {
@@ -353,7 +361,7 @@ function lineOffsets(content: string): number[] {
 
 function applyTextEdit(content: string, edit: DocumentEdit): TextEditResult {
   const lines = content.split(/\r?\n/)
-  const locator = (edit.kind === 'insert' ? edit.at : edit.locator) as DocumentLocator
+  const locator = edit.kind === 'insert' ? edit.at : edit.locator
   if (locator.unit !== 'line' && locator.unit !== 'paragraph') {
     throw new DocumentError(`locator unit ${locator.unit} is not supported for text documents`, 'DOCUMENT_LOCATOR_UNSUPPORTED')
   }

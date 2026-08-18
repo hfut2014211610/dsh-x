@@ -123,8 +123,11 @@ export function apply(ctx: ClientContext): void {
     })
 
     const labelInjected = (): AgentPresetLabelInjected => ({
-      hooks: { agentPresets: controller.store },
+      hooks: { agentPresets: controller.store, agentPresetSeat: seat.store },
       load: () => controller.load(),
+      loadSeat: () => seat.load(),
+      select: (id: string) => seat.select(id),
+      introduced: () => { seat.introduced() },
     })
 
     scope.effect(() => {
