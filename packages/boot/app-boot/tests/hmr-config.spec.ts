@@ -9,17 +9,36 @@ import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Timer from '@deepseek-ai/cordis-plugin-timer'
 import { describe, expect, it, vi } from 'vitest'
 
-async function bootHmr(dir: string, root: string[] = [], usePolling?: boolean): Promise<Context> {
+/**
+ * Boot an HMR context watching `dir`.
+ *
+ * Polling is the default on macOS. These are exact-path watches, which
+ * chokidar serves there through FSEvents, and on the CI runner image that
+ * queue runs far enough behind that a file written moments ago is still
+ * unobserved when a ten-second wait expires — a different one of this file's
+ * six cases each run, which is what latency looks like rather than a broken
+ * watch. Polling reads the filesystem directly, so the deadline measures this
+ * plugin instead of the kernel's event backlog. Chokidar's own default is
+ * `false`, so Linux and Windows keep exactly the watcher they had.
+ *
+ * The cost is real: the FSEvents delivery path is no longer exercised on
+ * macOS by this file. Everything above it — registration, debounce, refresh
+ * serialization, error normalization — still is.
+ * @param dir - directory the context's baseUrl points at.
+ * @param root - watch roots handed to the plugin.
+ * @param usePolling - override the platform default.
+ * @returns the booted context.
+ */
+async function bootHmr(
+  dir: string,
+  root: string[] = [],
+  usePolling = process.platform === 'darwin',
+): Promise<Context> {
   const ctx = new Context()
   ctx.baseUrl = pathToFileURL(dir).href + '/'
   await ctx.plugin(Loader)
   await ctx.plugin(Timer)
-  await ctx.plugin(Hmr, {
-    root,
-    ignored: [],
-    debounce: 0,
-    ...usePolling === undefined ? {} : { usePolling },
-  })
+  await ctx.plugin(Hmr, { root, ignored: [], debounce: 0, usePolling })
   return ctx
 }
 
