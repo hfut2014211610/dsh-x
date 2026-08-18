@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-writing-mode",
   "description": "Writing-mode system-prompt section for document editing and revision",
-  "version": "0.2.0",
+  "version": "0.3.0",
   "publishConfig": {
     "access": "public"
   },
