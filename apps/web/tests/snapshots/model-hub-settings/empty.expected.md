@@ -10,6 +10,9 @@
     - button "插件":
       - img
       - text: 插件
+    - button "连接器":
+      - img
+      - text: 连接器
     - button "模型中心":
       - img
       - text: 模型中心

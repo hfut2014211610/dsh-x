@@ -6,6 +6,8 @@
     - img
   - tablist:
     - tab "Chat" [selected]
+    - tab "Writing"
+    - tab "Design"
     - tab "Trajectory"
 - text: m1 7/25 {{clock}}
 - button "Copy":

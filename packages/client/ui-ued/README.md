@@ -4,7 +4,7 @@ English | [中文](README.zh.md)
 
 Browser design-mode plugin. It registers one `conversation.view` tab (`ued`) holding a prototype list and a sandboxed preview frame, declares itself the preferred view for sessions whose `agentPreset` is `ued`, and offers `chat` back as the companion view. Nothing runs on the host: the prototypes come from the existing `documents` Remote surface, and a `documents/changed` frame repaints the preview.
 
-The gate is the preset, not the file type. Without it every session would acquire a render entry for any HTML in its workspace, which widens the untrusted-content boundary from design sessions to all of them.
+The gate is the preset, not the file type: it decides which sessions *open* on this view, so nothing renders a model-written page unless the session was started to design one. Be precise about what that gate is not — `conversation.view` has no per-session filter, so the tab itself is registered for every session, exactly as `ui-writing`'s is. A person in an ordinary chat session can still click Design and render HTML from that workspace. What the preset removes is the automatic path.
 
 ## The preview frame
 
@@ -34,3 +34,4 @@ None; this package neither assembles nor sends a provider request.
 
 - **Replacing `srcdoc` reloads the frame** — scroll position inside the prototype is lost on refresh. Restoring it means injecting script into the prototype, which conflicts with keeping it self-contained.
 - **No in-view editing** — the view reads prototypes; changing one goes through the model, as the design policy requires.
+- **The tab cannot be hidden per session** — `conversation.view` registrations are global, so Design appears beside Chat everywhere. Hiding it where it does not apply needs an availability resolver on `ctx.conversation`, beside the preferred- and companion-view ones.

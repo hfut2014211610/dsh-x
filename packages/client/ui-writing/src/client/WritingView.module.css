@@ -195,6 +195,7 @@
 
 .treeRow {
   display: flex;
+  position: relative;
   align-items: center;
   width: 100%;
   min-width: 0;
@@ -218,6 +219,20 @@
 
 .treeRow[data-current] {
   color: var(--dsw-alias-state-business-primary);
+}
+
+/* Hover and current share a fill, so once the pointer leaves the tree the
+   colour alone is what says which document the editor holds. The bar says it
+   at a glance, and survives a row scrolled past a nested indent. */
+.treeRow[data-current]::before {
+  content: '';
+  position: absolute;
+  top: 5px;
+  bottom: 5px;
+  left: -4px;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--dsw-alias-state-business-primary);
 }
 
 .treeChevron,
@@ -324,9 +339,10 @@
 
 .empty {
   margin: 20px 10px;
-  color: var(--dsw-alias-label-caption);
+  max-width: 40ch;
+  color: var(--dsw-alias-label-tertiary);
   font-size: 12px;
-  line-height: 18px;
+  line-height: 1.7;
 }
 
 .listItem,
@@ -562,6 +578,13 @@
   color: var(--dsw-alias-label-dimmed);
 }
 
+/* The browser default selection is a flat blue that fights the caret and the
+   heading colour; tinting it with the same accent keeps the page one palette. */
+.paper textarea::selection,
+.preview ::selection {
+  background: var(--dsw-alias-state-business-tertiary);
+}
+
 .preview {
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
@@ -584,6 +607,9 @@
   color: var(--dsw-alias-label-caption);
   font-size: 11px;
   line-height: 30px;
+  /* The character count changes on every keystroke; proportional digits make
+     the whole line twitch as it does. */
+  font-variant-numeric: tabular-nums;
 }
 
 @media (max-width: 1180px) {

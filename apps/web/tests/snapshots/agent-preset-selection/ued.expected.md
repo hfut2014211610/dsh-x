@@ -22,7 +22,13 @@
       - text: prototype.html
   - separator "Resize the prototype list"
   - region "Prototype preview":
-    - text: Preview — sandboxed, no network prototype.html
+    - text: Preview — sandboxed, no network
+    - strong: prototype.html
+    - group "Viewport width":
+      - button "Fit" [pressed]
+      - button "Desktop"
+      - button "Tablet"
+      - button "Phone"
     - button "Reload":
       - img
     - iframe

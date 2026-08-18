@@ -54,7 +54,7 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     await settings.waitFor({ timeout: 10_000 })
     // The onboarding step no longer navigates into Settings on dismissal, so
     // enter the Models section explicitly before exercising its normal cards.
-    await settings.getByRole('button', { name: '模型' }).click()
+    await settings.getByRole('button', { name: '模型', exact: true }).click()
     const setupKey = settings.getByRole('textbox', { name: 'API 密钥', exact: true })
     await setupKey.waitFor({ timeout: 10_000 })
 
@@ -115,7 +115,7 @@ describe.skipIf(MODE === 'record')('web e2e: another usable provider ends first-
     // setup card over a user who already has somewhere to send a request.
     await page.getByRole('button', { name: '设置', exact: true }).click()
     await settings.waitFor({ timeout: 10_000 })
-    await settings.getByRole('button', { name: '模型' }).click()
+    await settings.getByRole('button', { name: '模型', exact: true }).click()
     await settings.getByRole('button', { name: '编辑 DeepSeek (deepseek-official)' }).waitFor({ timeout: 10_000 })
     expect(await settings.getByRole('textbox', { name: 'API 密钥', exact: true }).count()).toBe(0)
 

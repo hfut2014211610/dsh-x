@@ -10,9 +10,18 @@
     - button "插件":
       - img
       - text: 插件
+    - button "连接器":
+      - img
+      - text: 连接器
+    - button "模型中心":
+      - img
+      - text: 模型中心
     - button "Agent 预设":
       - img
       - text: Agent 预设
+    - button "用量":
+      - img
+      - text: 用量
   - button "打开配置文件"
   - button "关闭":
     - img
@@ -29,6 +38,16 @@
         - img
         - text: 查看
       - 'button "复制: 标准模式"':
+        - img
+        - text: 复制
+    - listitem:
+      - 'button "设为默认: 锚定标准模式"':
+        - text: 锚定标准模式 内置 首轮以 Minimal 双工具与零注入上下文锚定轨迹，晋升后进入按需解锁的 Standard 工具集。
+        - code: anchored-standard
+      - 'button "查看: 锚定标准模式"':
+        - img
+        - text: 查看
+      - 'button "复制: 锚定标准模式"':
         - img
         - text: 复制
     - listitem:
@@ -59,6 +78,26 @@
         - img
         - text: 查看
       - 'button "复制: 创造模式"':
+        - img
+        - text: 复制
+    - listitem:
+      - 'button "设为默认: 写作模式"':
+        - text: 写作模式 内置 面向文档编写与修订的写作 Agent，只提供 document_* 文档工具。
+        - code: writing
+      - 'button "查看: 写作模式"':
+        - img
+        - text: 查看
+      - 'button "复制: 写作模式"':
+        - img
+        - text: 复制
+    - listitem:
+      - 'button "设为默认: UED 模式"':
+        - text: UED 模式 内置 面向 UI 原型设计的 Agent：产出自包含 HTML，把短指令改动分线程并发迭代，只提供 document_* 与委派工具。
+        - code: ued
+      - 'button "查看: UED 模式"':
+        - img
+        - text: 查看
+      - 'button "复制: UED 模式"':
         - img
         - text: 复制
   - heading "自定义" [level=3]

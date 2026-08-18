@@ -29,6 +29,25 @@ const RAIL_DEFAULT = 240
 const RAIL_MIN = 160
 const RAIL_MAX = 520
 
+/**
+ * Widths the stage can hold the frame at. A design prototype is written for a
+ * viewport, and the stage's own width is whatever is left beside the rail and
+ * the companion panel — so checking a layout at a stated width needs the stage
+ * to constrain the frame rather than the person to resize the window. `auto`
+ * keeps the previous behavior and stays the default.
+ */
+const VIEWPORTS: ReadonlyArray<{ key: UedKey; width?: number }> = [
+  { key: 'preview.width.auto' },
+  { key: 'preview.width.desktop', width: 1280 },
+  { key: 'preview.width.tablet', width: 768 },
+  { key: 'preview.width.mobile', width: 390 },
+]
+
+/** Name of a workspace-relative path, without its directory. */
+function baseName(path: string): string {
+  return path.slice(path.lastIndexOf('/') + 1)
+}
+
 type Listing = {
   readonly status: 'loading' | 'ready' | 'error'
   readonly entries: readonly DocumentDirectoryEntry[]
@@ -68,6 +87,7 @@ export function UedView({
   translate: t,
 }: ConvViewProps & Partial<UedViewInjected>): React.ReactElement {
   const [railWidth, setRailWidth] = useState(RAIL_DEFAULT)
+  const [viewport, setViewport] = useState<number | undefined>(undefined)
   const [directory, setDirectory] = useState('')
   const [listing, setListing] = useState<Listing>({ status: 'loading', entries: [] })
   const [selected, setSelected] = useState<string | undefined>(undefined)
@@ -165,7 +185,7 @@ export function UedView({
             className={css.row}
             onClick={() => { setDirectory(entry.path) }}
           >
-            <IconFolderClose16 />
+            <IconFolderClose16 className={css.rowFolder} />
             <span>{entry.name}</span>
           </button>
         ))}
@@ -177,7 +197,7 @@ export function UedView({
             aria-pressed={entry.path === selected}
             onClick={() => { open(entry.path) }}
           >
-            <IconCodeOutline16 />
+            <IconCodeOutline16 className={css.rowFile} />
             <span>{entry.name}</span>
           </button>
         ))}
@@ -197,7 +217,24 @@ export function UedView({
       <section className={css.stage} aria-label={label('preview.label')}>
         <header className={css.stageHeader}>
           <span className={css.badge}>{label('preview.badge')}</span>
-          <span className={css.stagePath}>{selected ?? ''}</span>
+          <span className={css.stagePath}>
+            {selected !== undefined && parentOf(selected) !== '' && (
+              <span className={css.stageDir}>{parentOf(selected)}/</span>
+            )}
+            {selected !== undefined && <strong className={css.stageName}>{baseName(selected)}</strong>}
+          </span>
+          <div className={css.widthSwitch} role="group" aria-label={label('preview.width.label')}>
+            {VIEWPORTS.map(entry => (
+              <button
+                key={entry.key}
+                type="button"
+                aria-pressed={entry.width === viewport}
+                onClick={() => { setViewport(entry.width) }}
+              >
+                {label(entry.key)}
+              </button>
+            ))}
+          </div>
           {selected !== undefined && (
             <button
               type="button"
@@ -210,7 +247,9 @@ export function UedView({
           )}
         </header>
         <div className={css.frameWrap}>
-          {preview.status === 'idle' && <p className={css.hint}>{label('preview.none')}</p>}
+          {preview.status === 'idle' && (
+            <p className={css.hint}><IconCodeOutline16 /> {label('preview.none')}</p>
+          )}
           {preview.status === 'loading' && <p className={css.hint}><IconLoadingOutline16 /> {label('preview.loading')}</p>}
           {preview.status === 'error' && (
             <p className={css.error}><IconWarningOutline16 /> {preview.error ?? label('preview.error')}</p>
@@ -223,6 +262,7 @@ export function UedView({
             // for /api and defeat the sandbox entirely.
             <iframe
               className={css.frame}
+              style={viewport === undefined ? undefined : { maxWidth: `${String(viewport)}px` }}
               title={label('preview.label')}
               sandbox={PREVIEW_SANDBOX}
               srcDoc={preview.srcdoc}

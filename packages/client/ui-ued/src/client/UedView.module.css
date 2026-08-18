@@ -19,7 +19,7 @@
   flex-direction: column;
   gap: 2px;
   min-height: 0;
-  padding: 8px;
+  padding: 0 8px 8px;
   overflow-y: auto;
   border-right: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-module-platform);
@@ -29,11 +29,23 @@
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 }
 
+/* The header sits on the same 42px baseline as the stage header beside it, so
+   the two columns start on one line rather than a few pixels apart. It stays
+   put while the rail scrolls: the refresh is the control a long list needs
+   most, and it was the first thing to scroll away. */
 .filesHeader {
+  position: sticky;
+  top: 0;
+  z-index: 1;
   display: flex;
+  flex: none;
   align-items: center;
   justify-content: space-between;
-  padding: 2px 4px 6px;
+  min-height: 42px;
+  margin: 0 -8px;
+  padding: 0 8px 0 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-module-platform);
 }
 
 .filesTitle {
@@ -43,7 +55,7 @@
 }
 
 .crumb {
-  padding: 2px 6px 6px;
+  padding: 8px 6px 6px;
   overflow: hidden;
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
@@ -53,15 +65,17 @@
 
 .row {
   display: flex;
+  position: relative;
   align-items: center;
-  gap: 6px;
+  gap: 7px;
   width: 100%;
-  padding: 5px 6px;
+  min-height: 30px;
+  padding: 5px 8px;
   overflow: hidden;
   border: 0;
   border-radius: 6px;
   background: transparent;
-  color: var(--dsw-alias-label-primary);
+  color: var(--dsw-alias-label-secondary);
   font-family: inherit;
   font-size: 12px;
   text-align: left;
@@ -76,11 +90,44 @@
 
 .row:hover {
   background: var(--dsw-alias-interactive-bg-hover-solid);
+  color: var(--dsw-alias-label-primary);
 }
 
 .rowActive {
   background: var(--dsw-alias-interactive-bg-hover-solid);
   color: var(--dsw-alias-state-business-primary);
+}
+
+/* The colour alone reads as "hovered" once the pointer leaves; the bar is what
+   says which prototype the frame is showing. */
+.rowActive::before {
+  content: '';
+  position: absolute;
+  top: 6px;
+  bottom: 6px;
+  left: 0;
+  width: 2px;
+  border-radius: 0 2px 2px 0;
+  background: var(--dsw-alias-state-business-primary);
+}
+
+.rowFolder,
+.rowFile {
+  flex: none;
+}
+
+/* Folders and prototypes stack in one list, so the icon carries the difference
+   — the same pair the writing view's tree uses. */
+.rowFolder {
+  color: var(--dsw-alias-state-warn-label);
+}
+
+.rowFile {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.rowActive .rowFile {
+  color: inherit;
 }
 
 .up {
@@ -89,10 +136,11 @@
 
 .iconButton {
   display: inline-flex;
+  flex: none;
   align-items: center;
-  padding: 3px;
+  padding: 4px;
   border: 0;
-  border-radius: 5px;
+  border-radius: 6px;
   background: transparent;
   color: var(--dsw-alias-label-tertiary);
   cursor: pointer;
@@ -112,9 +160,11 @@
 
 .stageHeader {
   display: flex;
+  flex: none;
   align-items: center;
-  gap: 8px;
-  padding: 6px 10px;
+  gap: 10px;
+  min-height: 42px;
+  padding: 0 10px 0 12px;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
@@ -122,61 +172,116 @@
    that looks like the host's own UI, and the sandbox does not address that. */
 .badge {
   flex: none;
-  padding: 2px 6px;
-  border-radius: 4px;
+  padding: 2px 8px;
+  border-radius: 999px;
   background: var(--dsw-alias-state-warn-tertiary);
   color: var(--dsw-alias-state-warn-label);
   font-size: 11px;
+  line-height: 17px;
+  white-space: nowrap;
 }
 
 .stagePath {
+  display: flex;
   flex: 1;
+  align-items: baseline;
+  gap: 1px;
+  min-width: 0;
   overflow: hidden;
-  color: var(--dsw-alias-label-secondary);
   font-size: 12px;
-  text-overflow: ellipsis;
   white-space: nowrap;
+}
+
+/* The name is what identifies the prototype; the directory only says where it
+   sits, so it recedes instead of competing at the same weight. */
+.stageDir {
+  overflow: hidden;
+  color: var(--dsw-alias-label-caption);
+  text-overflow: ellipsis;
+}
+
+.stageName {
+  flex: none;
+  color: var(--dsw-alias-label-primary);
+  font-weight: 500;
+}
+
+.widthSwitch {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  height: 28px;
+  padding: 2px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-module-platform);
+}
+
+.widthSwitch button {
+  height: 24px;
+  padding: 0 9px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  font: inherit;
+  font-size: 12px;
+  cursor: pointer;
+}
+
+.widthSwitch button:hover,
+.widthSwitch button[aria-pressed='true'] {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+  color: var(--dsw-alias-label-primary);
+}
+
+.widthSwitch button[aria-pressed='true'] {
+  color: var(--dsw-alias-state-business-primary);
 }
 
 /* Grid, not centered flex: a flex item centered on both axes shrinks to its
    content, and an empty frame has none — the preview collapsed to a sliver.
-   Grid stretches its only child, so the frame fills the stage. */
+   Grid stretches its only child, so the frame fills the stage; a narrower
+   viewport caps the frame's width and `justify-items` centers what is left. */
 .frameWrap {
   display: grid;
   flex: 1;
+  justify-items: center;
   min-height: 0;
-  padding: 10px;
+  padding: 12px;
+  background: var(--dsw-alias-bg-module-platform);
 }
 
+/* The stage sits a step below the frame so a prototype with a white page still
+   reads as a document ON something, rather than as the panel itself. */
 .frame {
   display: block;
   width: 100%;
   height: 100%;
   border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
+  border-radius: 10px;
   background: #fff;
+  box-shadow: var(--dsw-shadow-lv2);
 }
 
-.hint {
-  display: flex;
-  align-items: center;
-  align-self: center;
-  justify-self: center;
-  gap: 6px;
-  margin: 0;
-  padding: 8px 6px;
-  color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-}
-
+.hint,
 .error {
   display: flex;
   align-items: center;
   align-self: center;
   justify-self: center;
-  gap: 6px;
+  gap: 8px;
+  max-width: 44ch;
   margin: 0;
-  padding: 8px 6px;
-  color: var(--dsw-alias-state-error-primary);
+  padding: 10px 12px;
   font-size: 12px;
+  line-height: 1.6;
+}
+
+.hint {
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.error {
+  color: var(--dsw-alias-state-error-primary);
 }
