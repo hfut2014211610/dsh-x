@@ -1,6 +1,6 @@
 # dsh-x 插件开发指南
 
-本文沉淀在 DeepSeek Harness fork（DSH-X）上开发个人插件的完整方法，来自 `dsh-x-model-tuning`、`dsh-x-model-hub`、`dsh-x-ui-model-hub` 三个插件的实战经验。所有个性化代码放 `personal/`（上游永不新增该顶层目录，fork 合并永远 fast-forward）。
+本文沉淀在 DeepSeek Harness fork（DSH-X）上开发插件的方法，案例来自 `dsh-x-model-tuning`、`dsh-x-model-hub`、`dsh-x-ui-model-hub`。个人插件放在 `personal/`；已经进入产品默认组合的 Model Hub 位于 `packages/llm/model-hub` 与 `packages/client/ui-model-hub`，遵循正式 workspace 包约定。
 
 ## 1. 两类插件与加载方式
 
@@ -9,7 +9,7 @@
 | 形态 | cordis 插件（`apply(ctx)`） | cordis 插件 + 预构建浏览器 bundle |
 | 装载 | `dsh plugin --profile web add <绝对路径>` | 同左，但另有硬性发现规则 |
 | 构建 | 无需构建（tsx 源码直载） | 必须 `tsdown` 产出 `lib/client.js` |
-| 例子 | dsh-x-model-tuning、dsh-x-model-hub | dsh-x-ui-model-hub |
+| 例子 | dsh-x-model-tuning；正式包 `model-hub` | 正式包 `ui-model-hub` |
 
 **关键约束**：client module 由宿主按**包名**从 profile 目录（`~/.dsh/profiles/web`）的 node_modules 解析 `dsh.client` 声明，所以 UI 插件必须 install 进 profile 并以包名挂载；file:// 路径挂载的插件不会被发现为 client module。host 插件两种挂法都行，但**统一用包名挂载**——插件清单页的显示名从 cordis 行的 `name` 派生（去 scope、剥 `dsh-` 前缀），file:// 路径会原样上屏。
 
@@ -188,7 +188,7 @@ export function apply(ctx: ClientContext): void {
 
 - `curl http://127.0.0.1:13080/plugins/@personal%2Fdsh-x-ui-<name>/client.js` → 200
 - 首页 HTML 的 `__DSH_BOOT__` 含本条目；服务启动日志无 AggregateError
-- bundle 冒烟测试：stub `window.__ModuleLoader__` + require 表执行产物，驱动 `apply()` 断言插槽注册（见 `dsh-x-ui-model-hub/tests/bundle.spec.ts`）
+- bundle 冒烟测试：stub `window.__ModuleLoader__` + require 表执行产物，驱动 `apply()` 断言插槽注册（见 `packages/client/ui-model-hub/tests/bundle.client.spec.ts`）
 
 ## 5. 测试
 
@@ -208,7 +208,7 @@ pnpm exec vitest run --config personal/plugins/dsh-x-<name>/vitest.config.ts
 - **会话日志**：`node --import tsx/esm personal/scripts/dump-session.ts <session.jsonl.zstd> [事件类型]`——`.zstd` 是分帧拼接格式，Node 内置解压只读首帧。
 - **组合树**：`pnpm dsh --profile web --dump-config` 看插件行是否真在树里。
 - **RPC 直探**：`curl -X POST http://127.0.0.1:13080/api/<ns>/<method> -d '{"type":"client-request","rpcId":"<uuid>","method":"<ns>/<method>","payload":{"args":{}}}'`（HTTP 路径是 channel/endpoint 两段）。
-- **一次性 LLM 调用（探活/小任务）**：直接 `for await (const chunk of ctx.llm.stream(options))`——失败不抛出，落在终态 `finish` chunk（`reason.kind === 'error'|'aborted'` 带 `failure.code/message`）；用 `createUserMessage`（`@deepseek-ai/dsh-llm`）组消息，`AbortSignal.timeout` 限时。参考 dsh-x-model-hub 的 `probeRoutes` 与官方 session-title-llm。
+- **一次性 LLM 调用（探活/小任务）**：直接 `for await (const chunk of ctx.llm.stream(options))`——失败不抛出，落在终态 `finish` chunk（`reason.kind === 'error'|'aborted'` 带 `failure.code/message`）；用 `createUserMessage`（`@deepseek-ai/dsh-llm`）组消息，`AbortSignal.timeout` 限时。参考 `packages/llm/model-hub` 的 `probeRoutes` 与官方 session-title-llm。
 - **读 pi-ai 内置 catalog**（厂商预设数据源）：`@deepseek-ai/dsh-llm-pi-ai/src/catalog.ts`（包 exports 有 `./src/*`，tsconfig.base.json 的 paths 加一条 `"@deepseek-ai/dsh-llm-pi-ai/src/*"` 映射即可类型解析）。模型条目带 `thinkingLevelMap`（精确的档位映射，别自己猜）。手写路由只能声明 openai-completions/openai-responses/anthropic-messages 三种协议——catalog 里说其他协议的厂商（如 google-generative-ai）要改指其 OpenAI 兼容端点。
 - **探针日志**：host 插件里临时 `console.error('[probe] ...')`，重启 web 看 `/tmp` 日志——比猜快。用完即删。
 - **headless 验证请求面**：`pnpm dsh --profile headless "<task>"` + dump-session 查 `request/header`。
@@ -219,7 +219,7 @@ pnpm exec vitest run --config personal/plugins/dsh-x-<name>/vitest.config.ts
 - lefthook 安装器留下 stale 锁 `.git/dsh-lefthook-install.lock` 时，`pnpm dsh web` 这类脚本会在依赖自检的 postinstall 阶段直接挂掉（报 lock 路径）——删掉该文件再跑。
 - pnpm 要全局装一份（`npm i -g pnpm@11.7.0`）：pnpm 11 运行脚本前会做依赖检查并 spawn 裸 `pnpm`。
 - Windows 上 file:// 挂载插件路径必须写 `file:///D:/...` URL 形式（ESM import 不认盘符路径）。
-- UI 包要严格 tsc 检查：root node_modules 没有 react——给插件 `node_modules` 建 junction 指到 `packages/client/ui-primitives/node_modules` 的 `react`/`react-dom`/`@types/*`（参见 dsh-x-ui-model-hub/tsconfig.check.json 的姿势，css-module 的 Record 索引要关 `noUncheckedIndexedAccess`）。
+- UI 包要严格 tsc 检查。正式 workspace 包参考 `packages/client/ui-model-hub/tsconfig.json`；独立个人包必须自行提供 React 类型依赖，不能依赖根目录的偶然解析。
 
 ## 8. 新插件落地检查清单
 

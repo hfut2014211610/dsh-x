@@ -1,0 +1,39 @@
+{
+  "extends": "../../../tsconfig.base.json",
+  "compilerOptions": {
+    "rootDir": "src",
+    "outDir": "lib/types"
+  },
+  "include": [
+    "src"
+  ],
+  "references": [
+    {
+      "path": "../../../vendor/cordis"
+    },
+    {
+      "path": "../../../vendor/schemastery"
+    },
+    {
+      "path": "../../core/agent"
+    },
+    {
+      "path": "../../credentials/credentials"
+    },
+    {
+      "path": "../llm"
+    },
+    {
+      "path": "../llm-pi-ai"
+    },
+    {
+      "path": "../../settings/settings"
+    },
+    {
+      "path": "../../typert/protocol"
+    },
+    {
+      "path": "../../runtime-diagnostics/invariants"
+    }
+  ]
+}
