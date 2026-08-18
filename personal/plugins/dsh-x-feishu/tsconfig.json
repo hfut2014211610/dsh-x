@@ -6,7 +6,19 @@
     "composite": false,
     "incremental": false,
     "types": ["node"],
-    "allowImportingTsExtensions": true
+    "allowImportingTsExtensions": true,
+    "disableSourceOfProjectReferenceRedirect": true
   },
-  "include": ["src/**/*.ts", "bridge/**/*.ts", "tests/**/*.ts"]
+  "include": ["src/**/*.ts", "bridge/**/*.ts", "tests/**/*.ts"],
+  "references": [
+    { "path": "../../../vendor/cordis" },
+    { "path": "../../../vendor/schemastery" },
+    { "path": "../../../packages/core/agent" },
+    { "path": "../../../packages/core/agent-default-model" },
+    { "path": "../../../packages/preset/agent-presets" },
+    { "path": "../../../packages/llm/llm" },
+    { "path": "../../../packages/core/session" },
+    { "path": "../../../packages/interaction/user-approval" },
+    { "path": "../../../packages/storage/storage-domain" }
+  ]
 }

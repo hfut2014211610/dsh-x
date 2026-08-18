@@ -12,7 +12,7 @@
 
 import { spawn } from 'node:child_process'
 import type { ChildProcessByStdio } from 'node:child_process'
-import type { Readable } from 'node:stream'
+import type { Readable, Writable } from 'node:stream'
 import { larkCliInvocation } from './cli.ts'
 
 /** 重启退避的上下界。 */
@@ -33,7 +33,7 @@ export interface ConsumerHandlers {
  * 一个 event key 的常驻消费者。
  */
 export class EventConsumer {
-  private child: ChildProcessByStdio<null, Readable, Readable> | undefined
+  private child: ChildProcessByStdio<Writable, Readable, Readable> | undefined
   private stdoutBuffer = ''
   private stderrBuffer = ''
   private restartMs = RESTART_MIN_MS
@@ -59,7 +59,7 @@ export class EventConsumer {
       ? larkCliInvocation(args)
       : { file: this.command, args }
     const child = spawn(invocation.file, [...invocation.args], {
-      stdio: ['ignore', 'pipe', 'pipe'],
+      stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
     })
     this.child = child
@@ -76,7 +76,7 @@ export class EventConsumer {
     this.stopped = true
     if (this.restartTimer !== undefined) clearTimeout(this.restartTimer)
     this.restartTimer = undefined
-    this.child?.kill()
+    this.child?.stdin.end()
     this.child = undefined
   }
 
