@@ -488,9 +488,14 @@ describe('the shipped Web composition', () => {
 
       // The policy section is what the version guard cannot enforce: recovery
       // from a stale write, and stopping before two threads restyle one element.
+      // The policy carries what no tool contract states: recovery from a stale
+      // write, stopping before two threads restyle one element, and that a
+      // thread outlives the turn that started it — a file read before the
+      // settlement notice says nothing about how that thread will end.
       const policy = assembly.sections.find(section => section.name === 'ued:policy')?.text ?? ''
       expect(policy).toContain('DOCUMENT_STALE_VERSION')
       expect(policy).toContain('at most 4 threads active')
+      expect(policy).toContain('settlement notice')
     } finally {
       await handle.dispose()
     }

@@ -1,12 +1,14 @@
-# Agent Note: UED B 阶段实测——迭代闭环是断的
+# Agent Note: UED B 阶段实测——改不动自己刚写的东西
 
 Status: proposed
 
 对 [`ued` 预设](../implemented/2026-08-18-ued-mode-preset.md) 做的第一次真实模型会话，用来验证 B 阶段五条验收标准里除工具目录以外的四条。结论是其中三条不成立，且原因不是模型行为或 policy 措辞，是 `packages/writing/tool-documents` 的三个代码缺陷。
 
-**缺陷 1 与 2 已修复**（见文内各自的"修复"段），并由第二次真实会话验证：4 次 `document_edit`、0 次 stale、产物真的被改动（`border-radius: 999px` 落地），会话里出现"产物"行与可点击的文件 chip。
+**缺陷 1 与 2 已修复**（见文内各自的"修复"段），并由第二次真实会话验证：4 次 `document_edit`、0 次 stale、产物真的被改动（`border-radius: 999px` 真的写进去了），会话里出现"产物"行与可点击的文件 chip。
 
-修复后按建议顺序做的**多屏重测又挖出缺陷 4**：一个畸形 locator 会静默把整份文档覆盖成替换文本，`isError: false` 且版本守卫看不见。已修复。**缺陷 3 仍未处理**，是 C 阶段的决策项。
+修复后按建议顺序做的**多屏重测又挖出缺陷 4**：一个畸形 locator 会静默把整份文档覆盖成替换文本，`isError: false` 且版本守卫看不见。已修复。
+
+再往后又跑了两轮，**B 阶段五条验收标准现在全部验过**（含构造出来的真并发冲突与策略 2 恢复）。**缺陷 3 仍未处理**，是 C 阶段的决策项。
 
 ## 实测条件
 
@@ -45,11 +47,11 @@ render: (_args, value) => [{ type: 'text', text: value.content }]
 
 这个缺陷**同样命中 `writing` 预设**——两个预设用的是同一套工具，写作模式的任何"读了再改"同样走不通。
 
-**修复（已落地）**：`document_read` 的渲染改为「`path` / `version` /（仅在裁剪时）`truncated` + 空行 + 正文」。`truncated` 一并带出是因为读到截断内容却按行号编辑是同一类隐患。`document_create` 的渲染也补上它自己写入产生的 version，与 `document_edit` 早已有的 `Updated to version …` 对称——这样紧随创建的第一次编辑不必再读一遍。
+**已改**：`document_read` 的渲染改为「`path` / `version` /（仅在裁剪时）`truncated` + 空行 + 正文」。`truncated` 一并带出是因为读到截断内容却按行号编辑是同一类隐患。`document_create` 的渲染也补上它自己写入产生的 version，与 `document_edit` 早已有的 `Updated to version …` 对称——这样紧随创建的第一次编辑不必再读一遍。
 
 **实测复验**：同样的"建原型 → 改按钮圆角"序列，4 次 `document_edit`、**0 次 stale**，`login.html` 真的被改动（`border-radius: 999px` 出现两处）。
 
-两点副产物观察（非缺陷，但影响手感）：version 的实际形态是 `dev:ino:size:mtimeNs:ctimeNs` 这样的长串，模型在一次调用里把它误当成 `path` 传了（序列仍然收敛）。另外，`code` 格式文档只支持按行定位（`heading`/`block` 直接 `DOCUMENT_LOCATOR_UNSUPPORTED`），没有字符串锚定的编辑方式，所以复验回合里模型反复 `document_search` 找 `.btn {`、`border-radius: var(--radius)` 再回去数行号——单次修改的往返次数明显高于 `str_replace_editor` 那种按字符串替换的工具。这是 `documents` 接缝的固有形态，不是缺陷，但它是"迭代为主"这个产品形态的真实成本。
+两点副产物观察（非缺陷，但影响手感）：version 的实际形态是 `dev:ino:size:mtimeNs:ctimeNs` 这样的长串，模型在一次调用里把它误当成 `path` 传了（后面自己纠正过来了）。另外，`code` 格式文档只支持按行定位（`heading`/`block` 直接 `DOCUMENT_LOCATOR_UNSUPPORTED`），没有字符串锚定的编辑方式，所以复验回合里模型反复 `document_search` 找 `.btn {`、`border-radius: var(--radius)` 再回去数行号——单次修改的往返次数明显高于 `str_replace_editor` 那种按字符串替换的工具。这是 `documents` 接缝的固有形态，不是缺陷，但它是"迭代为主"这个产品形态的真实成本。
 
 ## 缺陷 2：文档产物不产生 deliverables chip
 
@@ -59,7 +61,7 @@ render: (_args, value) => [{ type: 'text', text: value.content }]
 
 设计笔记复用矩阵里"产物打开 | `ui-deliverables` | 成功写文件自动成为聊天里的可点击 chip"这一条不成立。
 
-**修复（已落地）**：识别读的是**调用视图**（`presentCall`），不是 `presentationMeta`——`turn-deliverables.ts` 取的是 `ToolResultNode['callView']`。因此给两个工具加 `presentCall`：`document_create` 用 `card: 'diff'` 对空做差（内容就在 args 里，与 `str_replace_editor` 的 create 同形），`document_edit` 用 `card: 'generic'` + `kind: 'edit'`（定位编辑在调用时没有原内容，`oldText: null` 的 diff 会谎称"新建或覆盖"），两者都带 `locations`。
+**已改**：识别读的是**调用视图**（`presentCall`），不是 `presentationMeta`——`turn-deliverables.ts` 取的是 `ToolResultNode['callView']`。因此给两个工具加 `presentCall`：`document_create` 用 `card: 'diff'` 对空做差（内容就在 args 里，与 `str_replace_editor` 的 create 同形），`document_edit` 用 `card: 'generic'` + `kind: 'edit'`（定位编辑在调用时没有原内容，`oldText: null` 的 diff 会谎称"新建或覆盖"），两者都带 `locations`。
 
 **实测复验**：创建回合的会话里出现「产物」行与 `打开 .ued-verify/login.html` 的 chip，收尾正文里的文件名也变成了可点击链接。
 
@@ -77,10 +79,12 @@ render: (_args, value) => [{ type: 'text', text: value.content }]
 
 - **委派成立**：两次 `subagent` 调用（标签 `蓝色主按钮变体` / `绿色主按钮变体`），主会话 154 秒返回，未阻塞。
 - **可见面确认是 `ui-subagent` 而非 `ui-jobs`**：会话头出现 `2 个子代理，正在运行`；子会话结束时收到服务方的落定通知（`subagent-settled … finished and will do no further work unless you send it more`）。这实测确认了[实施笔记](../implemented/2026-08-18-ued-mode-preset.md)对设计笔记的那处订正。
-- **`send_message` 是真的续投通道**：一个子线程声称创建了文件却没落盘，父会话读到 `document not found` 后用 `send_message` 把纠正指令推给**已存在的**那个线程，而不是另起一个。
-- **策略 1 被自发选中**：模型没有让两个线程去改同一个 `login.html`，而是各自产出 `login-blue.html` / `login-green.html` 变体。因此**验收标准第 5 条（跨线程改同一元素先回主会话确认）没有被触发**——模型用更优的做法绕开了冲突本身。policy 的优先级排序按预期工作，但"确认"分支仍未被观测到。
+- **`send_message` 是真的续投通道**：父会话以为一个子线程没写出文件（其实是查早了，见下），用 `send_message` 把纠正指令推给**已存在的**那个线程，而不是另起一个。发错了内容，但通道本身走通了。
+- **策略 1 被自发选中**：模型没有让两个线程去改同一个 `login.html`，而是各自产出 `login-blue.html` / `login-green.html` 变体。所以这一轮**没能触发**验收标准第 5 条（跨线程改同一元素先回主会话确认）——模型用更优的做法绕开了冲突本身。第三次会话堵死这个逃生口之后才验到，见下文。
 
-**唯一没交付的**：`login-blue.html` 落盘（19 544 字节，主按钮 `#2563eb`），`login-green.html` 直到回合结束仍不存在。子线程声称创建却未真正调用工具，父会话检测到了并已发出纠正，但回合先结束了。这属于子会话可靠性，与缺陷 1 无关，需要单独复现。
+**看起来只交付了一半，实际是父会话查早了**（后续查证纠正）。回合结束时只有 `login-blue.html`（19 544 字节，主按钮 `#2563eb`），`login-green.html` 不在。当时判断是子线程声称创建却没真正写入——错了。查子会话日志 `96da81fa-…`，它确实调了 `document_create`，唯一那次报错是**父会话**的 `document_read` 撞上 `document not found`。文件后来写成了，19 544 字节，绿色 `#059669` / `#10b981` 都对，时间戳比父会话那一轮结束还晚，甚至晚于我手工删掉整个目录（目录被子线程重建了）。
+
+真正的问题是 policy 少了一句：**子线程在父会话回合结束后还在干活**，父会话却去立刻读文件核对，读到"文件不存在"就当成失败，还用 `send_message` 重发了一遍已经在做的事。落定通知才是判断结束的依据，读文件不是。已在 policy 的并发段补上这一条。
 
 ## 第三次会话：多屏重测，以及缺陷 4
 
@@ -90,7 +94,9 @@ render: (_args, value) => [{ type: 'text', text: value.content }]
 
 **"回主会话确认"分支触发了。** 第三条指令堵死了模型上次用的逃生口（禁止变体文件），它没有各改各的，而是回到主会话列出方案并写"所以先请你定夺……你倾向哪个方案？"，还主动说明上一轮两个圆角线程仍在运行、与颜色改动同在 `.btn` 规则块内。**验收标准第 5 条至此实测成立**——用的是普通回复而非 `ask_user_question`（该工具本就不在预设里）。
 
-**策略 2 仍未触发。** 第二条指令让两个线程并发改同一文件的不同元素，两处改动都落地（按钮 `4px`、输入框 `16px`），**0 次 `DOCUMENT_STALE_VERSION`**——两个子会话的读-改窗口在实际时序下没有重叠。这说明真冲突比设计时假设的稀有，但也意味着策略 2 的恢复路径至今没有被真实执行过一次。
+**当时以为策略 2 没触发，其实是我看错了地方。** 第二条指令让两个线程并发改同一文件的不同元素，按钮 `4px` 和输入框 `16px` 两处改动都在，父会话的记录里一次 `DOCUMENT_STALE_VERSION` 都没有。但**冲突发生在子会话里，父会话根本看不见**。翻子会话日志 `0aa17287-…`：3 次读、3 次改、撞上 stale，然后重读、再改、成功。策略 2 那时就已经跑过了。
+
+**这条方法上的教训要记住**：并发冲突只在子会话的日志里，`personal/scripts/dump-session.ts` 是唯一能看到的地方，光看父会话的 transcript 会得出相反结论。
 
 ### 缺陷 4（严重）：畸形 locator 静默覆盖整份文档
 
@@ -114,9 +120,25 @@ locator.end > lines.length     // undefined > 552       → false
 
 工具 schema 也拦不住：`locator` 声明为 `additionalProperties: true` 且不要求 `unit`/`start`/`end`，因为不同单位携带的字段不同。AGENTS.md 把"模型/工具 JSON"明确列为必须校验的边界，而这里没有校验。
 
-**修复（已落地）**：在越界检查之前先按整数校验 `start`/`end`，不合格以 `DOCUMENT_LOCATOR_UNSUPPORTED` 拒绝，错误文案顺带告诉模型没有字符串锚定的 locator。回归测试覆盖三种畸形形态（缺 `end`、只给 `find`、非整数），并断言文档内容未被改动；去掉守卫该测试即红（已验证）。
+**已改**：在越界检查之前先按整数校验 `start`/`end`，不合格以 `DOCUMENT_LOCATOR_UNSUPPORTED` 拒绝，错误文案顺带告诉模型没有字符串锚定的 locator。回归测试覆盖三种畸形形态（缺 `end`、只给 `find`、非整数），并断言文档内容未被改动；去掉守卫该测试即红（已验证）。
 
 这个缺陷同样命中 `writing` 预设，而且**写作场景下更危险**——一篇长文被一次"看起来成功"的编辑清空，比一个可以重新生成的原型损失大得多。
+
+## 第四次会话：把冲突构造出来
+
+自然时序下两个线程很少真撞上，所以这一次直接构造：一条指令要两个线程同时改 `.ued-race/login.html`，线程 A 把 6 个元素的 `border-radius` 逐个改成 `2px`，线程 B 把同样 6 个元素的 border 颜色逐个改成 `#ff0000`，每一处都要单独发一次 `document_edit`，不许合并。读-改窗口重叠成了必然。
+
+子会话 `3de0fbc9-…` 的调用顺序就是策略 2 的完整路径：
+
+```
+document_read → document_edit → stale document version
+document_read → document_edit → Updated to version …    ← 重读后重新施加，成功
+document_read → document_edit → Updated to version …
+```
+
+**最终文件里两个线程的改动都在**：`border-radius: 2px` 3 处、`#ff0000` 6 处，一处都没丢。这正是验收标准原话要求的"最终内容包含两次修改而非丢失其一"。
+
+有一点值得注意：文件在 09:14 时只有线程 A 的改动，09:16 才有线程 B 的。子线程写盘的时间跨度比父会话那一轮长得多，查早了同样会得出错误结论——和前面 `login-green.html` 是同一个坑。
 
 | B 阶段验收 | 结果 |
 |---|---|
@@ -124,18 +146,18 @@ locator.end > lines.length     // undefined > 552       → false
 | 出自包含 HTML | ✅ 实测通过，551 行零外部引用 |
 | 产物成为 deliverables chip 点开可渲染 | ✅ 缺陷 2 修复后实测通过（chip 经 Host opener 打开，`.html` 落到默认浏览器）。应用**内**渲染仍缺，那是缺陷 3 / C 阶段 |
 | 连续三条指令主会话不阻塞、可见可取消 | ✅ 委派、非阻塞、会话头 `2 个子代理，正在运行`、落定通知、`send_message` 续投全部实测成立（可见面是 `ui-subagent` 不是 `ui-jobs`） |
-| 并发写同一文件时落后者重读重做 | ⚠️ **仍未触发**。多屏重测里两个线程并发改同一文件的不同元素，两处改动都落地、0 次 stale——读-改窗口在实际时序下不重叠。策略 2 的恢复路径至今没被真实执行过 |
+| 并发写同一文件时落后者重读重做 | ✅ 构造出真冲突后完整跑通：撞 stale → 重读 → 重新施加 → 成功，最终文件里两个线程的改动都在 |
 | 跨线程改同一元素先回主会话确认 | ✅ 多屏重测第三条指令堵死变体逃生口后触发：模型回主会话列方案并明确请用户定夺 |
 | 按产物分线程（策略 1） | ✅ 建三屏一次派出三个 `subagent`，会话头 `3 个子代理，正在运行`，主会话 106 秒返回 |
 
 ## 建议顺序
 
-1. ~~修缺陷 1~~ ✅ 已落地并实测复验。`writing` 预设同样受益。
-2. ~~修缺陷 2~~ ✅ 已落地并实测复验。
+1. ~~修缺陷 1~~ ✅ 已改，并跑真实会话复验过。`writing` 预设同样受益。
+2. ~~修缺陷 2~~ ✅ 已改，并跑真实会话复验过。
 3. ~~多屏任务重测~~ ✅ 已完成。策略 1 与"回主会话确认"分支都实测成立；**策略 2 仍未触发**，真冲突比设计假设稀有。重测本身挖出了缺陷 4。
-4. ~~修缺陷 4~~ ✅ 已落地并做了去守卫即红的回归验证。
-5. **策略 2 仍需一次构造性验证**：自然时序下两个线程的读-改窗口不重叠，要触发它得人为拉长其中一个线程的间隔（例如让一个线程先读、等另一个写完再改）。这条恢复路径没被执行过一次，就还是纸面策略。
-6. **复现"子线程声称创建却未落盘"**（第二次会话的 `login-green.html`）。这一条**不是**缺陷 4——那次文件根本不存在，不是被覆盖。仍未定性。
+4. ~~修缺陷 4~~ ✅ 已改，回归测试去掉守卫就变红。
+5. ~~策略 2 的构造性验证~~ ✅ 已完成，见"第四次会话"。**B 阶段五条验收标准至此全部验过。**
+6. ~~复现"子线程声称创建却未落盘"~~ ✅ 已查明，不是缺陷：文件写成了，只是晚于父会话那一轮。父会话读早了。已给 policy 补上"落定通知到达前不要读文件核对"。
 7. 缺陷 3 与 C 阶段一起决策。
 
 修复顺序上 1 是硬前置：在它之前重测任何东西都会卡在同一处。缺陷 4 则说明**光靠单测抓不住这类问题**——它要真实模型在真实任务里去够一个不存在的能力，才会撞出那条路径。

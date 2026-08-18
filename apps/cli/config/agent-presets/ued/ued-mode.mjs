@@ -77,6 +77,8 @@ function policyText(delegationTool, maxActiveThreads) {
     '',
     `CONCURRENCY. Revision instructions arrive one after another and each is small. Start a \`${delegationTool}\` thread for a revision instead of applying it inline, and keep answering the user while threads run — a child inherits this session's completed turns, so its instruction can be as short as the one you received. Send further work about an artifact to the thread that already owns it with \`send_message\` rather than starting a second one; \`list_agents\` shows what is running and \`interrupt_agent\` stops one. Keep at most ${String(maxActiveThreads)} threads active at once.`,
     '',
+    'A thread keeps working after your turn ends. Do not read its artifact to check on it before its settlement notice arrives: a missing or half-written file at that moment says nothing about whether the thread will succeed, and re-sending the work only duplicates it. Report what you started, and let the notice tell you how it ended.',
+    '',
     'CONFLICTS. Version guarding prevents lost writes, not conflicting intent. Apply these in order:',
     '1. Give each thread its own artifact — one screen or one file per thread. A multi-screen prototype splits this way with no conflicts at all; prefer it whenever the work allows.',
     '2. When an edit fails with `DOCUMENT_STALE_VERSION`, read the document again and re-apply your own change on top of the current content. Never write back the content you read before the failure.',

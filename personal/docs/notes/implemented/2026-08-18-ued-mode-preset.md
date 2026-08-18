@@ -2,7 +2,7 @@
 
 Status: implemented
 
-落地 [UED 模式设计笔记](../proposed/2026-08-18-ued-mode.md) 的 B 阶段。该笔记留在 `proposed/`，因为它同时提出了尚未落地的 C 阶段预览视图；本笔记记录 B 阶段实际落地的组合与三处偏离提案的判断。
+这是 [UED 模式设计笔记](../proposed/2026-08-18-ued-mode.md) 里 B 阶段做出来的结果。那篇笔记还留在 `proposed/`，因为它同时提了 C 阶段的预览视图，那部分还没做；本笔记记录 B 阶段实际做成的组合，以及三处跟提案不一样的判断。
 
 ## 问题
 
@@ -10,12 +10,18 @@ dsh 没有面向 UI 设计的模式。设计工作的形态是"迭代为主、�
 
 ## 决策
 
-新增第六个内置预设 `apps/cli/config/agent-presets/ued/`（选择器名"UED 模式"，order 6）。它不发明中间表示，也不写客户端代码——产物就是工作区里的自包含 HTML 文件，`documents-local` 的 `formatOf()` 无白名单，`.html` 落入 `'code'` 分支，因此写作模式已在用的版本守卫 `document_*` 接缝原样承载原型，写成功的文件同样成为聊天里可点开的 deliverables chip。
+新增第六个内置预设 `apps/cli/config/agent-presets/ued/`（选择器名"UED 模式"，order 6）。它不发明中间表示，也不写客户端代码，产物就是工作区里的自包含 HTML 文件。`documents-local` 的 `formatOf()` 没有白名单，`.html` 归到 `'code'` 一类，所以写作模式已经在用的那套带版本守卫的 `document_*` 接口，原样就能承载原型。
 
 组合共四段，只有 policy section 是新代码：
 
 - **`persona`** —— 设计人格，替换部署默认。
-- **`ued-mode`**（`./ued-mode.mjs`，本预设唯一新代码）—— 注册 `ued:policy` 提示段（order 90，与 `writing:policy` 同位）。内容分四块：产物形态（单文件自包含 HTML、一屏一文件、无构建步骤、无外部资源）、编辑规则（只经 `document_edit` + 前次 `document_read` 的版本）、并发规则（每条改动起一个线程，`send_message` 续投同一产物的后续工作，`list_agents` 查看、`interrupt_agent` 取消，同时活跃线程数封顶）、冲突策略（按产物分线程 → 撞 `DOCUMENT_STALE_VERSION` 后重读重做 → 主线程串行落盘）。`delegationTool` 与 `maxActiveThreads` 是必填 config，缺失或类型不符在挂载时报错——线程数是随部署变化的选择，不能是插件里的 `DEFAULT_*` 常量。
+- **`ued-mode`**（`./ued-mode.mjs`，本预设唯一的新代码）—— 注册 `ued:policy` 提示段，order 90，跟 `writing:policy` 同一位置。内容分四块：
+  - 产物形态：单文件自包含 HTML，一屏一文件，不用构建，不引外部资源。
+  - 编辑规则：只能用 `document_edit`，版本取自上一次 `document_read`。
+  - 并发规则：每条改动起一个线程；同一产物的后续工作用 `send_message` 投给已有线程；`list_agents` 看、`interrupt_agent` 停；同时活跃的线程数有上限。
+  - 冲突策略：先按产物分线程，撞上 `DOCUMENT_STALE_VERSION` 就重读重做，都不行才由主线程串行写。
+
+  `delegationTool` 和 `maxActiveThreads` 必须填，缺了或类型不对在挂载时就报错。线程数上限是随部署变的选择，不能写成插件里的 `DEFAULT_*` 常量。
 - **`tool-documents`** —— 复用，五个 `document_*` 工具。
 - **委派三件套** —— `tool-subagent-control`（`send_message` / `interrupt_agent`）、`tool-subagent-control/list-agents`（`list_agents`）、以及一个 `provider: fork`、`backgroundMode: continuable`、`toolName: subagent` 的 `tool-subagent` 实例。
 
@@ -55,6 +61,6 @@ dsh 没有面向 UI 设计的模式。设计工作的形态是"迭代为主、�
 | 风险 | 现状 |
 |---|---|
 | 语义冲突静默覆盖 | 版本守卫覆盖不到，只能靠 policy 强制"按产物分线程"优先、跨线程改同一元素先回主会话确认。这是本模式已知的、无运行时兜底的盲区 |
-| `delegationTool` 与 `toolName` 漂移 | 两处交叉注释加一条 e2e 断言；没有机械门禁能把它们绑死 |
+| `delegationTool` 与 `toolName` 漂移 | 两处交叉注释加一条 e2e 断言；没有自动检查能把这两处绑死 |
 | continuable fork 牺牲请求前缀复用 | 有意为之（见上）；代价是每个设计线程的首个请求不复用父会话的 KV cache |
 | C 阶段 iframe 沙箱逃逸 | 未开始。提案要求单独评审，不与功能一起赶工 |
