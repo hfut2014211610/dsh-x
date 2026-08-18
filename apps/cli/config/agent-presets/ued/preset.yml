@@ -1,0 +1,3 @@
+name: UED 模式
+description: 面向 UI 原型设计的 Agent：产出自包含 HTML，把短指令改动分线程并发迭代，只提供 document_* 与委派工具。
+order: 6

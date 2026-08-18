@@ -7,3 +7,4 @@
   - menuitem "Minimal mode Two-tool coding agent with persistent bash and str_replace_editor."
   - menuitem "Creator mode Built for creating custom agent presets, with all Standard mode capabilities plus runtime inspection, plugin experiments, and preset-authoring guidance."
   - menuitem "写作模式 面向文档编写与修订的写作 Agent，只提供 document_* 文档工具。"
+  - menuitem "UED 模式 面向 UI 原型设计的 Agent：产出自包含 HTML，把短指令改动分线程并发迭代，只提供 document_* 与委派工具。"

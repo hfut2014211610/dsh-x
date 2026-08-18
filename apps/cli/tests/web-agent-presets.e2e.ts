@@ -199,7 +199,7 @@ describe('the shipped Web composition', () => {
     const listed = await ctx.agentPresets.list()
 
     expect(listed.map(preset => preset.id).sort()).toEqual([
-      'anchored-standard', 'code', 'cordis', 'minimal', 'standard',
+      'anchored-standard', 'code', 'cordis', 'minimal', 'standard', 'ued', 'writing',
     ])
     expect(listed.every(preset => preset.trust === 'system')).toBe(true)
     expect(ctx.agentPresets.defaultId).toBe('standard')
@@ -458,6 +458,41 @@ describe('the shipped Web composition', () => {
     } finally {
       await native.dispose()
       await coded.dispose()
+    }
+  })
+
+  it('composes `ued` from the document tools plus one continuable fork route', async () => {
+    const handle = await ctx.agents.create({
+      sessionId: SessionId('preset-ued'),
+      setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'ued').then(() => undefined),
+    })
+    try {
+      // The EXACT catalog: this preset's product claim is that a design session
+      // carries artifact editing and delegation and NOTHING a coding agent
+      // carries, so a coding row leaking back into it is the regression worth
+      // failing on. `interrupt_agent`/`send_message` come from the control row
+      // and `list_agents` from its sibling — the three that make a design thread
+      // addressable after it starts.
+      const assembly = await ctx.systemPrompt.assemble({ scope: handle.agent })
+      expect(assembly.tools.map(tool => tool.name).sort()).toEqual([
+        'document_create', 'document_edit', 'document_outline', 'document_read',
+        'document_search', 'interrupt_agent', 'list_agents', 'send_message', 'subagent',
+      ])
+
+      // The delegation route is the FORK provider under the plain `subagent`
+      // name, which is what lets a revision instruction stay a fragment: the
+      // child is seeded with this session's completed turns. A spawn route
+      // would mount cleanly here and quietly need every instruction restated.
+      const delegation = assembly.tools.find(tool => tool.name === 'subagent')
+      expect(delegation?.description).toContain('inherits this conversation')
+
+      // The policy section is what the version guard cannot enforce: recovery
+      // from a stale write, and stopping before two threads restyle one element.
+      const policy = assembly.sections.find(section => section.name === 'ued:policy')?.text ?? ''
+      expect(policy).toContain('DOCUMENT_STALE_VERSION')
+      expect(policy).toContain('at most 4 threads active')
+    } finally {
+      await handle.dispose()
     }
   })
 

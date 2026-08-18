@@ -1,0 +1,94 @@
+# The `ued` agent preset: UI prototype design, iterated concurrently.
+#
+# The product form this composes for is iteration, not generation: the first
+# prototype is a small share of the work and everything after it is a stream of
+# short revision instructions. Each one runs in its own continuable child so the
+# main session never blocks on it, which is why this preset carries the
+# delegation tools that `writing` does not.
+#
+# The artifact is a self-contained HTML file and nothing else — no schema, no
+# renderer, no client code. `documents-local` classifies `.html` as `code`, so
+# the same version-guarded `document_*` seam the writing preset uses carries
+# prototypes unchanged, and a successful write becomes a deliverable chip the
+# Host opener resolves in a browser.
+#
+# This file is an AGENT-PLANE composition. It contributes the persona, the UED
+# policy section, the document tools, and the delegation tools. The `documents`
+# service, the `subagents` registry, and the `fork` provider are host-plane rows
+# in the web bundle; a preset may not own any of them.
+#
+# A service row here MUST sit inside a group carrying an `isolate` realm.
+# Without one it publishes into the root realm, where it is process-global —
+# another preset publishing the same name collides, and a host reader would
+# resolve one preset's instance for every session; `dsh-agent-presets` rejects
+# that at mount. No row below provides a service, so none needs a realm.
+#
+# Design note: personal/docs/notes/proposed/2026-08-18-ued-mode.md
+
+# ── identity ────────────────────────────────────────────────────────────────
+
+# The preset's own persona, shadowing the deployment default for this agent.
+# `{{model}}` and `{{cwd}}` resolve from the agent's own route and workspace.
+- id: persona
+  name: '@deepseek-ai/dsh-persona'
+  config:
+    text: >-
+      You are a UI/UX design assistant powered by the {{model}} model. Your working directory is {{cwd}}.
+      You produce and revise self-contained HTML prototypes with the document_* tools, and run revisions
+      as concurrent design threads so the conversation stays responsive.
+
+# The concurrency and conflict policy. `delegationTool` must name the
+# `tool-subagent` row below: the policy tells the model which tool starts a
+# design thread, and a renamed instance would leave it naming one that is not in
+# the catalog.
+- id: ued-mode
+  name: ./ued-mode.mjs
+  config:
+    delegationTool: subagent
+    maxActiveThreads: 4
+
+# ── artifacts ───────────────────────────────────────────────────────────────
+
+# The `documents` service and its local provider stay in the HOST composition:
+# the Gateway serves the document domain as Remote endpoints for the browser's
+# workspace browser and preview, so a per-session realm here would answer
+# `service-unavailable` for every one of those calls. What this preset chooses
+# is whether its agent can read and write documents at all.
+- id: tool-documents
+  name: '@deepseek-ai/dsh-tool-documents'
+
+# ── delegation ──────────────────────────────────────────────────────────────
+
+# The `subagents` registry and the `fork` backend live in the HOST composition:
+# the registry is a process singleton whose cross-session queries the api-proxy
+# serves to the browser, and a provider name may only be registered once. This
+# preset contributes the delegation TOOLS, which resolve that host registry.
+#
+# `tool-subagent-report` is host-plane for the same reason as the registry: it
+# registers a CONTINUABLE SETUP on that singleton rather than a tool this agent
+# calls, and the setup list is not scope-aware.
+- id: tool-subagent-control
+  name: '@deepseek-ai/dsh-tool-subagent-control'
+
+- id: tool-subagent-list-agents
+  name: '@deepseek-ai/dsh-tool-subagent-control/list-agents'
+
+# `fork`, not `spawn`: a design thread's instruction is a fragment ("round the
+# corners", "this spacing is tight") that only means something against the
+# design context already in this session, and a forked child is seeded with the
+# parent's COMPLETED turns — cut at the last `turn/end`, so no half-finished
+# turn crosses. A spawned child would need every instruction restated in full.
+#
+# `continuable`, not the base bundle's one-shot fork: one-shot exists to keep a
+# fork child's request prefix byte-identical to its parent's, and that KV-cache
+# reuse is worth less here than a child that stays addressable by
+# `send_message` for the next instruction about the same artifact.
+#
+# The instance is named `subagent` because it is the only delegation route this
+# preset exposes; `ued-mode`'s `delegationTool` must be kept equal to it.
+- id: tool-subagent
+  name: '@deepseek-ai/dsh-tool-subagent'
+  config:
+    provider: fork
+    toolName: subagent
+    backgroundMode: continuable
