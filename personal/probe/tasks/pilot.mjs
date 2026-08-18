@@ -34,7 +34,7 @@
  */
 import { execFileSync, spawnSync } from 'node:child_process'
 import { cpSync, existsSync, mkdirSync, readFileSync, readdirSync, rmSync, writeFileSync } from 'node:fs'
-import { dirname, join, resolve } from 'node:path'
+import { dirname, join, resolve, sep } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -150,8 +150,23 @@ function linkPackageModules() {
   console.log(`linked ${String(linked)} package-local node_modules`)
 }
 
-/** Return the worktree to the committed state, keeping the two grafted trees. */
+/**
+ * Return the worktree to the committed state, keeping the two grafted trees.
+ *
+ * `git clean` is destructive and this function is the only thing here that
+ * runs it, so it refuses to run anywhere except the worktree it created. The
+ * checks are deliberately paranoid: an untracked tree has no backup, and this
+ * harness sits next to `personal/`, which is exactly that.
+ */
 function reset() {
+  const top = (run('git', ['rev-parse', '--show-toplevel'], { cwd: WT }).stdout ?? '').trim()
+  const normalize = (value) => value.split(sep).join('/').toLowerCase().replace(/\/+$/, '')
+  if (normalize(top) !== normalize(WT)) {
+    throw new Error(`reset(): refusing to clean — expected the worktree at ${WT}, got "${top}"`)
+  }
+  if (normalize(top) === normalize(REPO)) {
+    throw new Error('reset(): refusing to clean the main checkout')
+  }
   execFileSync('git', ['checkout', '--', '.'], { cwd: WT })
   execFileSync('git', ['clean', '-fd', '-e', 'node_modules', '-e', 'personal'], { cwd: WT })
   rmSync(join(WT, 'personal/probe/tests'), { recursive: true, force: true })
