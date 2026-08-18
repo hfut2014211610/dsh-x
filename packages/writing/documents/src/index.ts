@@ -51,13 +51,13 @@ export abstract class Documents extends TypertRemoteService {
    * @returns the resolved content with format, current version, and truncation flag.
    */
   @Remote('read')
-  async read(request: {
+  read(request: {
     sessionId: SessionId
     path: string
     locator?: DocumentLocator
   }): Promise<DocumentReadResult> {
     void request
-    throw new Error('documents.read is not implemented by this service definition')
+    return Promise.reject(new Error('documents.read is not implemented by this service definition'))
   }
 
   /**
@@ -66,12 +66,12 @@ export abstract class Documents extends TypertRemoteService {
    * @returns the outline entries with format and current version.
    */
   @Remote('outline')
-  async outline(request: {
+  outline(request: {
     sessionId: SessionId
     path: string
   }): Promise<DocumentOutlineResult> {
     void request
-    throw new Error('documents.outline is not implemented by this service definition')
+    return Promise.reject(new Error('documents.outline is not implemented by this service definition'))
   }
 
   /**
@@ -80,13 +80,13 @@ export abstract class Documents extends TypertRemoteService {
    * @returns the search hits, with a warning when the scan stopped early.
    */
   @Remote('search')
-  async search(request: {
+  search(request: {
     sessionId: SessionId
     query: string
     limit?: number
   }): Promise<DocumentSearchResult> {
     void request
-    throw new Error('documents.search is not implemented by this service definition')
+    return Promise.reject(new Error('documents.search is not implemented by this service definition'))
   }
 
   /**
@@ -95,13 +95,13 @@ export abstract class Documents extends TypertRemoteService {
    * @returns the created path and its first version.
    */
   @Remote('create')
-  async create(request: {
+  create(request: {
     sessionId: SessionId
     path: string
     content: string
   }): Promise<{ path: string; version: string }> {
     void request
-    throw new Error('documents.create is not implemented by this service definition')
+    return Promise.reject(new Error('documents.create is not implemented by this service definition'))
   }
 
   /**
@@ -110,14 +110,14 @@ export abstract class Documents extends TypertRemoteService {
    * @returns the document's new version.
    */
   @Remote('apply')
-  async apply(request: {
+  apply(request: {
     sessionId: SessionId
     path: string
     baseVersion: string
     edit: DocumentEdit
   }): Promise<{ version: string }> {
     void request
-    throw new Error('documents.apply is not implemented by this service definition')
+    return Promise.reject(new Error('documents.apply is not implemented by this service definition'))
   }
 }
 

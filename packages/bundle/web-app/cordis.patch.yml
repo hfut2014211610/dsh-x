@@ -92,6 +92,11 @@
     - id: usage-stats
       name: '@deepseek-ai/dsh-usage-stats'
 
+    # Model-centered authoring compiles provider/model entries into the
+    # stock pi-ai settings namespace and owns ordered cross-route failover.
+    - id: model-hub
+      name: '@deepseek-ai/dsh-model-hub'
+
     # Resolve bind host, SSH launch, and display once at boot, then mount the
     # matching dual-face directory picker. Mount -native or -browse directly in
     # an overlay to pin the interaction.
@@ -199,6 +204,9 @@
 
     - id: ui-settings-models
       name: '@deepseek-ai/dsh-client-ui-settings-models'
+
+    - id: ui-model-hub
+      name: '@deepseek-ai/dsh-client-ui-model-hub'
 
     - id: ui-settings-usage
       name: '@deepseek-ai/dsh-client-ui-settings-usage'

@@ -11,17 +11,15 @@
 ## 内容
 
 - `plugins/dsh-x-model-tuning/` — 每模型采样默认值插件（temperature/maxTokens/stop/reasoningEffort + `/model-tuning` 命令）。加载方式与配置参考见该目录 README 与 `cordis.patch.yml`。
-- `plugins/dsh-x-model-hub/` — 模型中心配置层：供应商与模型分开声明、按模型配协议、同一模型多供应商按序降级（failover）、主流厂商预设（pi-ai catalog 派生）与模型探活。编译成官方 llm-pi-ai 路由。
-- `plugins/dsh-x-ui-model-hub/` — 模型中心的可视化设置页（Settings → 模型中心）。client module，需构建（`tsdown`）并经 `dsh plugin add` 安装进 profile。
+- 模型中心已经进入正式 workspace：宿主包见 [`packages/llm/model-hub/`](../packages/llm/model-hub/README.zh.md)，设置页见 [`packages/client/ui-model-hub/`](../packages/client/ui-model-hub/README.zh.md)，Web bundle 默认注册，无需从本目录安装。
 - `scripts/dump-session.ts` — 会话日志查看工具（`.jsonl.zstd` 分帧解压，可按事件类型过滤）。
 - `docs/plugin-guide.md` — **插件开发指南**：两类插件的创建/注册/页面新增全流程、schemastery 与加载机制的坑、调试工具箱。写新插件前必读。
 - `docs/postmortem-2026-08-15-model-hub-probe.md` — **探活连环报错复盘**：compat 透传致编译整段被拒、Anthropic SDK 双 /v1、网关流式崩溃分类学，及"curl 对照/抓包/最小复现/文档-注册表比对"调试方法论与探活结果速查表。
 - `model-config.example.yaml` — `settings.yaml` 片段模板：官方段（协议/上下文/思考）、hub 段（供应商+模型分离）、tuning 段（采样默认值）。
 
-## 加载方式分两类
+## 加载方式
 
-- **主机插件**（tuning、hub）：file:// 绝对路径挂载，零构建，改完重启即生效。
-- **UI 插件**（ui-model-hub）：client module 发现规则要求从 profile 的 node_modules 按包名解析，所以必须 ① `tsdown` 构建出 `lib/client.js` ② `dsh plugin --profile web add <绝对路径>` 安装（包内 `dsh.bundle` 声明会自动挂载）。
+`dsh-x-model-tuning` 仍以 file:// 绝对路径挂载，零构建，改完重启即生效。模型中心属于正式 Web 组合，由 workspace 构建和发布流程负责。
 
 ## 环境
 
@@ -39,9 +37,6 @@ export PATH="/c/Users/60410/AppData/Local/Temp/node-v22.19.0-win-x64:$PATH"
 git fetch upstream && git merge upstream/master   # fast-forward
 pnpm install && pnpm run build                    # 若依赖或 API 有变
 pnpm exec vitest run --config personal/plugins/dsh-x-model-tuning/vitest.config.ts
-pnpm exec vitest run --config personal/plugins/dsh-x-model-hub/vitest.config.ts
-cd personal/plugins/dsh-x-ui-model-hub && pnpm exec tsdown && cd ../../..   # UI 包重建（若官方 client 平台包有变）
-pnpm exec vitest run --config personal/plugins/dsh-x-ui-model-hub/vitest.config.ts
 ```
 
 preview 期上游可能有破坏性变更；若插件失效，先看 `docs/user/develop/` 与相关包 README 的变更，再调整插件。

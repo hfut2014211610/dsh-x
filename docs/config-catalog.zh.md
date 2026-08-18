@@ -1317,6 +1317,103 @@ export interface Config {
 
 来源：[`packages/feedback/message-feedback/src/index.ts:49`](../packages/feedback/message-feedback/src/index.ts)
 
+<a id="deepseek-aidsh-model-hub"></a>
+
+## `@deepseek-ai/dsh-model-hub`
+
+```ts config-catalog
+/** Plugin configuration: providers, models, and internal bookkeeping. */
+export interface Config {
+  /** Suppliers keyed by provider id. */
+  providers?: Record<string, HubProvider>
+  /** Models keyed by model id; one id is declarable once across all providers. */
+  models?: Record<string, HubModel>
+  /**
+   * Route keys this plugin generated into the `llm-pi-ai` user layer, recorded
+   * after each successful reconcile so stale routes can be retracted without
+   * ever touching hand-written routes. Written by the plugin, not by users.
+   */
+  _routes?: string[]
+}
+
+/** One supplier of models: endpoint, credential reference, and per-route defaults. */
+export interface HubProvider {
+  /** Vendor preset key this entry was created from (the page's model-preset filter); free-form, never compiled. */
+  preset?: string
+  /** Name shown by configuration surfaces; defaults to the provider key. */
+  displayName?: string
+  /** Endpoint shared by every model this provider serves. */
+  baseURL: string
+  /**
+   * Per-protocol endpoint override. Path conventions differ by SDK: the OpenAI
+   * protocols use the baseURL as a prefix (`{baseURL}/chat/completions`), while
+   * anthropic-messages goes through the Anthropic SDK, which appends
+   * `/v1/messages` itself — a gateway that serves OpenAI traffic under `/v1`
+   * therefore needs its anthropic endpoint WITHOUT that suffix (e.g. baseURL
+   * `.../v1` plus `endpoints: { anthropic-messages: ... }` on the bare root),
+   * or every anthropic request 404s on the doubled `/v1/v1/messages`.
+   */
+  endpoints?: Record<string, string>
+  /** Credential reference (environment-variable name), resolved per request by the stock adapter. */
+  apiKeyEnv?: string
+  /** Provider request headers; Harness attribution wins reserved names. */
+  headers?: Record<string, string>
+  /** Reasoning-dispatch switches, the route-level default for every generated model. */
+  compat?: PiAiCompatProfile
+  /** Modalities for models neither their entry nor a catalog describes. */
+  defaultInput?: string[]
+  /** Context capacity for unsized models (stock default 262,144). */
+  defaultContextWindow?: number
+  /** Output capability for unsized models (stock default 32,768). */
+  defaultMaxTokens?: number
+}
+
+/** One model declaration: who serves it, which wire protocol it speaks, and its capacities. */
+export interface HubModel {
+  /** Key into {@link Config.providers}; the primary supplier of this model. */
+  provider: string
+  /** Wire protocol this model speaks on its primary provider; one of the stock adapter's `supportedProtocols()`. */
+  api: string
+  /**
+   * Ordered fallback suppliers tried after the primary route's own retry
+   * budget is exhausted (see the `agent/request-error` listener in index.ts).
+   * Each entry places this model on that provider's route too, so it stays
+   * individually selectable there.
+   */
+  fallbacks?: HubModelFallback[]
+  /** Display name; defaults to the model id. */
+  name?: string
+  /** Context capacity in tokens. */
+  contextWindow?: number
+  /** Output capability in tokens; also becomes the route's configured per-request default. */
+  maxTokens?: number
+  /** Request modalities; absence inherits catalog/route fallback. */
+  input?: string[]
+  /** Selectable thinking levels (key = level, value = wire spelling), or `false` for non-reasoning. */
+  reasoningEfforts?: Record<string, string | null> | false
+  /** Per-model reasoning-dispatch override over the provider's. */
+  compat?: PiAiCompatProfile
+}
+
+/** Reasoning-dispatch compat switches, mirroring the stock profile shape. */
+export interface PiAiCompatProfile {
+  /** Wire dialect for thinking parameters; validated by the stock adapter at write time. */
+  thinkingFormat?: string
+  /** Whether the endpoint accepts a reasoning-effort parameter. */
+  supportsReasoningEffort?: boolean
+}
+
+/** One additional supplier a model may fall back to: provider key plus the wire protocol spoken there. */
+export interface HubModelFallback {
+  /** Key into {@link Config.providers}. */
+  provider: string
+  /** Wire protocol this model speaks on that provider; one of the stock adapter's `supportedProtocols()`. */
+  api: string
+}
+```
+
+来源：[`packages/llm/model-hub/src/compile.ts:109`](../packages/llm/model-hub/src/compile.ts)
+
 <a id="deepseek-aidsh-permission-presets"></a>
 
 ## `@deepseek-ai/dsh-permission-presets`
@@ -3067,6 +3164,7 @@ export interface Config {
 - `@deepseek-ai/dsh-client-ui-jobs`（[`packages/client/ui-jobs/src/index.ts`](../packages/client/ui-jobs/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-layout`（[`packages/client/ui-layout/src/index.ts`](../packages/client/ui-layout/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-message-feedback`（[`packages/client/ui-message-feedback/src/index.ts`](../packages/client/ui-message-feedback/src/index.ts)）
+- `@deepseek-ai/dsh-client-ui-model-hub`（[`packages/client/ui-model-hub/src/index.ts`](../packages/client/ui-model-hub/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-model-selection`（[`packages/client/ui-model-selection/src/index.ts`](../packages/client/ui-model-selection/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-permission-presets`（[`packages/client/ui-permission-presets/src/index.ts`](../packages/client/ui-permission-presets/src/index.ts)）
 - `@deepseek-ai/dsh-client-ui-plan`（[`packages/client/ui-plan/src/index.ts`](../packages/client/ui-plan/src/index.ts)）
