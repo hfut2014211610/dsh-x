@@ -16,6 +16,7 @@
 | **锚定条件测量工装与近距离引导行** — 相位契约检查、按观测条件分组的全量会话对比、受控 2×2 付费重放；`session-guide` 行默认关闭 | `personal/probe/`、`apps/cli/config/agent-presets/anchored-standard/session-guide.mjs` | [笔记](notes/implemented/2026-08-18-anchor-probe-and-session-guide.md) |
 | **`str_replace_editor` view 越界收敛** — 越界终行收敛而非报错 | `packages/` 编辑器工具 | [笔记](notes/implemented/2026-08-17-editor-view-range-clamp.md) |
 | **UED 模式 B 阶段** — 内置 `ued` preset：设计人格 + 并发/冲突 policy section + 复用 `document_*` 与委派三件套（fork + continuable），产物为自包含 HTML；选择器中英双语（顺带补上 `writing` 与 `anchored-standard` 的缺失条目） | `apps/cli/config/agent-presets/ued/`、`packages/client/ui-agent-preset/` | [笔记](notes/implemented/2026-08-18-ued-mode-preset.md) |
+| **UED 模式 C 阶段** — 设计视图：原型列表 + 沙箱 iframe 预览，`documents/changed` 去抖刷新；隔离由双向单测与 web e2e 双重断言 | `packages/client/ui-ued/` | [笔记](notes/implemented/2026-08-18-ued-preview-view.md) |
 | **个人插件层** — 模型中心（供应商/模型分离、按模型协议、多供应商降级、厂商预设与探活）、每模型采样默认值、模型中心设置页 | `personal/plugins/dsh-x-{model-hub,model-tuning,ui-model-hub}/` | [插件指南](guides/plugin-guide.md)、[探活复盘](archive/postmortem-2026-08-15-model-hub-probe.md) |
 
 ## 待安排
@@ -63,9 +64,11 @@
 - **缺陷 4（严重）**：模型想要不存在的字符串锚定替换，编出 `{find, unit:'line'}` 但没有 `start`/`end`。`applyTextEdit` 的越界检查对 `undefined` 全为假，偏移量算成整份文档，于是 **21 931 字节的页面被 168 字节替换文本静默覆盖，`isError: false`，版本守卫也看不见**。写作模式下更危险，长文会被一次"看起来成功"的编辑清空。
 - **policy 少一句**：子线程在父会话回合结束后还在干活，父会话却立刻读文件核对，读到"不存在"当成失败，还重发了一遍。已补上"落定通知到达前不要读文件核对"。
 
-**缺陷 3 仍未处理**：`ui-writing` 的视图只对 `writing` 开，`ued` 会话在应用内没有工作区视图。跟 C 阶段一起决定。
+**C 阶段已做完**（见[实施笔记](notes/implemented/2026-08-18-ued-preview-view.md)）：`packages/client/ui-ued/`，一个 `conversation.view` 标签页，左边列原型、右边沙箱 iframe 渲染，`documents/changed` 带 400ms 尾沿去抖触发刷新。实机验证：iframe 属性恰好是 `allow-scripts`，框内 CSP meta 到位，原型的内联脚本与交互正常。落地位置偏离提案——放 `packages/client/` 而不是 `personal/plugins/`，因为发行流程只打 `packages/*/*` 和 `apps/*`，放个人插件层的话安装包里不会有这个视图。
 
-**C 阶段待安排**：预览视图 `dsh-x-ui-ued`，经 `conversation.view` 注册，iframe 渲染，`documents/changed` 触发刷新。[安全评审已完成](notes/proposed/2026-08-18-ued-preview-iframe-security.md)。结论有两条要点。一是方向：现在原型是在用户默认浏览器里以 `file://` 裸跑，沙箱 iframe 是**降低**风险而不是引入风险。二是归纳出的五条硬规则里，只有一条错了会全盘失守而且完全看不出来——`allow-scripts` 绝不能和 `allow-same-origin` 同列——所以它必须由白名单加黑名单双向断言的单测兜住，不能靠人工评审。规则 1 和规则 4 已在本机 Chromium 上实测过。
+[安全评审](notes/proposed/2026-08-18-ued-preview-iframe-security.md)的两条要点都成立。一是方向：在此之前原型是在用户默认浏览器里以 `file://` 裸跑，沙箱 iframe 是**降低**风险而不是引入风险。二是五条硬规则里只有一条错了会全盘失守而且完全看不出来——`allow-scripts` 绝不能和 `allow-same-origin` 同列——它由单测的白名单加黑名单双向断言兜住，web e2e 里再断言一次装配后的真实属性。规则 1 和规则 4 已在本机 Chromium 上实测过。
+
+**缺陷 3 随 C 阶段消解**：`ued` 会话现在有自己的视图，不需要放宽 `ui-writing` 的门。
 
 ### 锚定收益的受控证据
 

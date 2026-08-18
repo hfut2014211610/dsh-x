@@ -1,0 +1,36 @@
+- banner:
+  - navigation "Session hierarchy":
+    - button "workspace" [disabled]
+  - button "Design mode":
+    - img
+    - text: Design mode
+    - img
+  - button "Session log":
+    - text: Session log
+    - img
+- main:
+  - complementary "Prototypes":
+    - text: Prototypes
+    - button "Refresh":
+      - img
+    - text: /
+    - button ".agents":
+      - img
+      - text: .agents
+    - button "prototype.html" [pressed]:
+      - img
+      - text: prototype.html
+  - region "Prototype preview":
+    - text: Preview — sandboxed, no network prototype.html
+    - button "Reload":
+      - img
+    - iframe
+- complementary "Assistant"
+- textbox "Message the agent"
+- button "Commands":
+  - img
+- 'button "Access mode, current: Workspace Write"'
+- button "Select model, current DeepSeek-V4-Flash":
+  - text: DeepSeek-V4-Flash
+  - img
+- button "Send message" [disabled]

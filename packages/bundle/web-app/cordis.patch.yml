@@ -287,6 +287,9 @@
     - id: ui-writing
       name: '@deepseek-ai/dsh-client-ui-writing'
 
+    - id: ui-ued
+      name: '@deepseek-ai/dsh-client-ui-ued'
+
 # ── the agent plane moves behind agent presets ─────────────────────────────
 #
 # Every row below composes what ONE agent contributes to the host registries:

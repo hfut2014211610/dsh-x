@@ -1,0 +1,179 @@
+/* `width: 100%` is load-bearing: the view mounts as a flex item beside the
+   companion panel, where a grid child sizes to its tracks and left the stage a
+   sliver of the space it was given. */
+.root {
+  display: grid;
+  grid-template-columns: 240px minmax(0, 1fr);
+  width: 100%;
+  height: 100%;
+  min-height: 0;
+  background: var(--dsw-alias-bg-base);
+  font-family: var(--dsw-font-family);
+}
+
+.files {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-height: 0;
+  padding: 8px;
+  overflow-y: auto;
+  border-right: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-module-platform);
+  /* The rail scrolls on an elevated surface, where the l1 thumb differs from
+     the l2 one only in the dark palette — invisible in review. */
+  --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
+  --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
+}
+
+.filesHeader {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  padding: 2px 4px 6px;
+}
+
+.filesTitle {
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  font-weight: 600;
+}
+
+.crumb {
+  padding: 2px 6px 6px;
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row {
+  display: flex;
+  align-items: center;
+  gap: 6px;
+  width: 100%;
+  padding: 5px 6px;
+  overflow: hidden;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-primary);
+  font-family: inherit;
+  font-size: 12px;
+  text-align: left;
+  cursor: pointer;
+}
+
+.row > span {
+  overflow: hidden;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.row:hover {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+.rowActive {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+  color: var(--dsw-alias-state-business-primary);
+}
+
+.up {
+  transform: rotate(180deg);
+}
+
+.iconButton {
+  display: inline-flex;
+  align-items: center;
+  padding: 3px;
+  border: 0;
+  border-radius: 5px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.iconButton:hover {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+  color: var(--dsw-alias-label-primary);
+}
+
+.stage {
+  display: flex;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+}
+
+.stageHeader {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 10px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+}
+
+/* The frame is deliberately never chrome-less: a prototype can draw something
+   that looks like the host's own UI, and the sandbox does not address that. */
+.badge {
+  flex: none;
+  padding: 2px 6px;
+  border-radius: 4px;
+  background: var(--dsw-alias-state-warn-tertiary);
+  color: var(--dsw-alias-state-warn-label);
+  font-size: 11px;
+}
+
+.stagePath {
+  flex: 1;
+  overflow: hidden;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+/* Grid, not centered flex: a flex item centered on both axes shrinks to its
+   content, and an empty frame has none — the preview collapsed to a sliver.
+   Grid stretches its only child, so the frame fills the stage. */
+.frameWrap {
+  display: grid;
+  flex: 1;
+  min-height: 0;
+  padding: 10px;
+}
+
+.frame {
+  display: block;
+  width: 100%;
+  height: 100%;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 8px;
+  background: #fff;
+}
+
+.hint {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  justify-self: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 6px;
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+}
+
+.error {
+  display: flex;
+  align-items: center;
+  align-self: center;
+  justify-self: center;
+  gap: 6px;
+  margin: 0;
+  padding: 8px 6px;
+  color: var(--dsw-alias-state-error-primary);
+  font-size: 12px;
+}

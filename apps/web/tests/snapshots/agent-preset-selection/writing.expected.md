@@ -40,6 +40,10 @@
           - button "outline-navigation.md":
             - img
             - text: outline-navigation.md
+        - treeitem "prototype.html":
+          - button "prototype.html":
+            - img
+            - text: prototype.html
   - text: Writing /
   - strong: No document open
   - img

@@ -31,6 +31,7 @@ const HERO_EXPECTED = join(SNAPSHOT_DIR, 'hero.expected.md')
 const MENU_EXPECTED = join(SNAPSHOT_DIR, 'menu.expected.md')
 const WRITING_EXPECTED = join(SNAPSHOT_DIR, 'writing.expected.md')
 const WRITING_OUTLINE_EXPECTED = join(SNAPSHOT_DIR, 'writing-outline.expected.md')
+const UED_EXPECTED = join(SNAPSHOT_DIR, 'ued.expected.md')
 const HEADER_EXPECTED = join(SNAPSHOT_DIR, 'header.expected.md')
 /** The shipped roster, beside the composition that names it. */
 const SHIPPED_PRESETS = fileURLToPath(new URL('../../cli/config/agent-presets', import.meta.url))
@@ -39,6 +40,7 @@ const SEED_ID = 'agent-preset-selection-web-e2e'
 /** A project skill only a preset that mounts `skill-filesystem` can discover. */
 const SKILL_NAME = 'preset-catalog-demo'
 const OUTLINE_DOCUMENT = 'outline-navigation.md'
+const PROTOTYPE_DOCUMENT = 'prototype.html'
 
 /**
  * Seed one project skill under the connected workspace.
@@ -77,6 +79,16 @@ async function seedOutlineDocument(workspaceCwd: string): Promise<void> {
     '## Final target',
     '',
     'The outline must reveal this heading.',
+    '',
+  ].join('\n'))
+}
+
+/** Seed one self-contained prototype for the design view to render. */
+async function seedPrototype(workspaceCwd: string): Promise<void> {
+  await writeFile(join(workspaceCwd, 'workspace', PROTOTYPE_DOCUMENT), [
+    '<!doctype html>',
+    '<html lang="en"><head><title>Prototype</title></head>',
+    '<body><h1>Sign in</h1><script>document.title = "ran"</script></body></html>',
     '',
   ].join('\n'))
 }
@@ -204,6 +216,7 @@ describe('web e2e: agent-preset selection', () => {
     await seedSubagent(scaffold, seededId)
     await seedWorkspaceSkill(scaffold.workspaceCwd)
     await seedOutlineDocument(scaffold.workspaceCwd)
+    await seedPrototype(scaffold.workspaceCwd)
     browser = await chromium.launch()
     page = await newEnglishPage(browser)
     tripwire = watchConsole(page)
@@ -342,6 +355,35 @@ describe('web e2e: agent-preset selection', () => {
     expect(await page.locator('[data-writing-view]').count()).toBe(0)
     expect(await page.locator('[data-phase="hero"]').count()).toBe(1)
   })
+
+  it('renders a prototype in a frame the host is fenced off from', async () => {
+    onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-ued'))
+    await page.getByRole('button', { name: 'Standard mode' }).click()
+    await page.getByRole('menuitem', { name: /Design mode/ }).click()
+    await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('ued')
+
+    await page.getByRole('complementary', { name: 'Prototypes' }).waitFor({ timeout: 15_000 })
+    await page.getByRole('button', { name: PROTOTYPE_DOCUMENT, exact: true }).click()
+    const frame = page.locator('iframe[srcdoc]')
+    await frame.waitFor({ timeout: 15_000 })
+
+    // The isolation asserted where it actually ships. Its failure is silent —
+    // the preview renders identically with the boundary gone — so the grant is
+    // pinned exactly, and the policy is checked to sit after the doctype, since
+    // a meta ahead of it would drop the prototype into quirks mode.
+    expect(await frame.getAttribute('sandbox')).toBe('allow-scripts')
+    const srcdoc = await frame.getAttribute('srcdoc') ?? ''
+    expect(srcdoc).toContain("default-src 'none'")
+    expect(srcdoc).toContain("connect-src 'none'")
+    expect(srcdoc.toLowerCase().indexOf('<!doctype')).toBe(0)
+
+    const snapshot = await captureStableAria(page, '[data-phase="active"]', scaffold.workspaceCwd)
+    await compareOrRefreshGolden(UED_EXPECTED, snapshot, MODE)
+
+    await page.getByRole('button', { name: 'Design mode' }).click()
+    await page.getByRole('menuitem', { name: /^Standard mode/ }).first().click()
+    await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('standard')
+  }, 90_000)
 
   it('labels a resumed session with the preset it was created under', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-header'))

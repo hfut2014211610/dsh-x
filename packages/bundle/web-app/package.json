@@ -107,7 +107,8 @@
     "commander": "^15.0.0",
     "@deepseek-ai/dsh-documents": "workspace:^",
     "@deepseek-ai/dsh-documents-local": "workspace:^",
-    "@deepseek-ai/dsh-client-ui-writing": "workspace:^"
+    "@deepseek-ai/dsh-client-ui-writing": "workspace:^",
+    "@deepseek-ai/dsh-client-ui-ued": "workspace:^"
   },
   "peerDependencies": {
     "@deepseek-ai/cordis-plugin-loader": "workspace:^",
