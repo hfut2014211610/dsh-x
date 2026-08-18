@@ -9,6 +9,8 @@ export type AgentPresetSettingsKey =
   | 'presetCodeName' | 'presetCodeDescription'
   | 'presetMinimalName' | 'presetMinimalDescription'
   | 'presetCordisName' | 'presetCordisDescription'
+  | 'presetWritingName' | 'presetWritingDescription'
+  | 'presetUedName' | 'presetUedDescription'
   | 'duplicate' | 'duplicateUnavailable' | 'delete' | 'presetId' | 'presetIdPlaceholder' | 'copyOf'
   | 'displayName' | 'displayNamePlaceholder'
   | 'inUse' | 'noDescription' | 'builtInGroup' | 'customGroup'
@@ -50,6 +52,12 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   presetCordisName: 'Creator mode',
   presetCordisDescription:
     'Built for creating custom agent presets, with all Standard mode capabilities plus runtime inspection, plugin experiments, and preset-authoring guidance.',
+  presetWritingName: 'Writing mode',
+  presetWritingDescription:
+    'Document drafting and revision agent, offering the document_* tools only.',
+  presetUedName: 'Design mode',
+  presetUedDescription:
+    'UI prototyping agent whose artifact is self-contained HTML, running each revision as a concurrent design thread; the document_* and delegation tools only.',
   duplicate: 'Duplicate',
   duplicateUnavailable: 'This deployment has no writable preset directory',
   delete: 'Delete',
@@ -112,6 +120,10 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   presetMinimalDescription: '仅提供持久 bash 与 str_replace_editor 的双工具编码 Agent。',
   presetCordisName: '创造模式',
   presetCordisDescription: '用于创建自定义 Agent preset：具备标准模式的全部能力，并提供运行时检查、插件实验和 preset 创作指导。',
+  presetWritingName: '写作模式',
+  presetWritingDescription: '面向文档编写与修订的写作 Agent，只提供 document_* 文档工具。',
+  presetUedName: 'UED 模式',
+  presetUedDescription: '面向 UI 原型设计的 Agent：产出自包含 HTML，把短指令改动分线程并发迭代，只提供 document_* 与委派工具。',
   duplicate: '复制',
   duplicateUnavailable: '此部署未配置可写的预设目录',
   delete: '删除',
@@ -178,6 +190,8 @@ const BUILT_IN_PRESET_KEYS: Readonly<Partial<Record<string, PresetLocaleKeys>>> 
   code: { name: 'presetCodeName', description: 'presetCodeDescription' },
   minimal: { name: 'presetMinimalName', description: 'presetMinimalDescription' },
   cordis: { name: 'presetCordisName', description: 'presetCordisDescription' },
+  writing: { name: 'presetWritingName', description: 'presetWritingDescription' },
+  ued: { name: 'presetUedName', description: 'presetUedDescription' },
 }
 
 /**

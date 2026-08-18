@@ -6,5 +6,5 @@
   - menuitem "Code mode All Standard mode capabilities, with tools exposed through the Code Mode SDK so the model can combine multi-step operations in one TypeScript program."
   - menuitem "Minimal mode Two-tool coding agent with persistent bash and str_replace_editor."
   - menuitem "Creator mode Built for creating custom agent presets, with all Standard mode capabilities plus runtime inspection, plugin experiments, and preset-authoring guidance."
-  - menuitem "写作模式 面向文档编写与修订的写作 Agent，只提供 document_* 文档工具。"
-  - menuitem "UED 模式 面向 UI 原型设计的 Agent：产出自包含 HTML，把短指令改动分线程并发迭代，只提供 document_* 与委派工具。"
+  - menuitem "Writing mode Document drafting and revision agent, offering the document_* tools only."
+  - menuitem "Design mode UI prototyping agent whose artifact is self-contained HTML, running each revision as a concurrent design thread; the document_* and delegation tools only."

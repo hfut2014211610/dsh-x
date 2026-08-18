@@ -295,7 +295,7 @@ describe('web e2e: agent-preset selection', () => {
   it('enters the writing workspace immediately and restores the Hero on exit', async () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-writing'))
     await page.getByRole('button', { name: 'Standard mode' }).click()
-    await page.getByRole('menuitem', { name: /写作模式/ }).click()
+    await page.getByRole('menuitem', { name: /Writing mode/ }).click()
     await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('writing')
 
     const writingTree = page.getByRole('tree', { name: 'Workspace document tree' })
@@ -335,7 +335,7 @@ describe('web e2e: agent-preset selection', () => {
 
     // The blank-session selector moves into the active header, so entering a
     // preferred workspace never strands the user without a way back.
-    await page.getByRole('button', { name: '写作模式' }).click()
+    await page.getByRole('button', { name: 'Writing mode' }).click()
     await page.getByRole('menuitem', { name: /^Standard mode/ }).first().click()
     await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('standard')
     await page.getByText('Into the Unknown').waitFor({ timeout: 15_000 })

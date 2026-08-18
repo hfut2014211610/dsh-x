@@ -31,7 +31,9 @@ dsh 没有面向 UI 设计的模式。设计工作的形态是"迭代为主、�
 
 **并发的可见与取消不在 `ui-jobs`。** 提案的复用矩阵把它记成 `ctx.jobs` + `ui-jobs`，与实际不符：`tool-subagent` 只在**一次性后台**路由里调 `jobs.start()`，continuable 路由走 `ctx.subagents.startContinuable()` 并直接返回 `{ kind: 'continuable', subagentId }`，不注册任何 job。因此 `ui-jobs` 不会列出设计线程。真正的挂载点是 `ui-subagent`：它向 `conversation.session.header.actions` 贡献可展开的子会话目录树，逐行显示 `running`/`inactive`、用量与时长，选中即进入子会话 transcript；运行中的 continuable 子会话由其 composer 的 Stop 经 `subagent.interrupt` 取消。模型侧对应 `list_agents` 与 `interrupt_agent`。本预设因此不挂 `tool-jobs`——它不产生任何 job。
 
-**未 vendor 设计系统。** 提案的 B 阶段还包括从 Open Design vendor 3–5 个设计系统作为 skills。本次未做：那是把约 260 KB 第三方 Apache-2.0 内容连同 LICENSE、NOTICE 与来源 commit 一并落进本仓库的决定，与预设本身可分离，且 B 阶段的五条验收标准无一依赖它。落地路径已确认可行：`cordis` 预设把自己的 skill 根写成 `customSkillDirs: [!!js "…fileURLToPath(new URL('skills/', baseUrl))"]`——`baseUrl` 在预设的 `!!js` 求值环境里就是预设自己的目录，因此 skill 根随目录携带。照此在 `ued/skills/` 下放置 `SKILL.md` 形式的设计系统，再补 `skill-filesystem`（加 `includeDefaultRoots: false`，使设计会话只看到设计规范而非工程 skills）与 `tool-skill` 两行即可。空的 skill 根加加载工具等于白付目录注入的 token，所以机制与内容作为一个整体一起落地，而不是先挂空壳。
+**不引入 Open Design，也不 vendor 设计系统。** 提案的 B 阶段还包括从 [Open Design](https://github.com/nexu-io/open-design) vendor 3–5 个设计系统作为 skills，并把"先跑一遍它的 MCP 路线"列为先决动作。两者都已决定不做——本 fork 暂不引入第三方设计工具，也不把第三方内容纳入仓库：那意味着约 260 KB Apache-2.0 内容连同 LICENSE、NOTICE 与来源 commit 入库，以及此后长期的上游漂移人工同步。提案里与之相关的两项风险（许可混用、上游漂移）随该决定一并消解。
+
+代价是本预设不携带任何成文设计规范，设计判断依赖模型自身的知识。若日后需要，接入点已验证可行且不依赖任何第三方：`cordis` 预设把自己的 skill 根写成 `customSkillDirs: [!!js "…fileURLToPath(new URL('skills/', baseUrl))"]`——`baseUrl` 在预设的 `!!js` 求值环境里就是预设自己的目录，因此 skill 根随目录携带。自撰的 `SKILL.md` 放进 `ued/skills/`，再补 `skill-filesystem`（加 `includeDefaultRoots: false`，使设计会话只看到设计规范而非工程 skills）与 `tool-skill` 两行即可。空的 skill 根加加载工具等于白付目录注入的 token，所以现在不挂空壳。
 
 ## 备选方案
 

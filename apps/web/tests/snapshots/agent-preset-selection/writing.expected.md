@@ -1,9 +1,9 @@
 - banner:
   - navigation "Session hierarchy":
     - button "workspace" [disabled]
-  - button "写作模式":
+  - button "Writing mode":
     - img
-    - text: 写作模式
+    - text: Writing mode
     - img
   - button "Session log":
     - text: Session log
