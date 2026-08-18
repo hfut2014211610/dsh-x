@@ -1,0 +1,37 @@
+- dialog "设置":
+  - navigation:
+    - text: 设置
+    - button "通用设置":
+      - img
+      - text: 通用设置
+    - button "模型":
+      - img
+      - text: 模型
+    - button "插件":
+      - img
+      - text: 插件
+    - button "模型中心":
+      - img
+      - text: 模型中心
+    - button "Agent 预设":
+      - img
+      - text: Agent 预设
+    - button "用量":
+      - img
+      - text: 用量
+  - button "打开配置文件"
+  - button "关闭":
+    - img
+    - text: 关闭
+  - paragraph: 供应商与模型分开配置，每个模型自己指定协议。保存即编译为官方路由生效，无需重启。
+  - heading "供应商" [level=3]
+  - button "导入现有配置"
+  - button "新增供应商":
+    - img
+    - text: 新增供应商
+  - paragraph: 暂无内容。
+  - heading "模型" [level=3]
+  - button "新增模型":
+    - img
+    - text: 新增模型
+  - paragraph: 暂无内容。

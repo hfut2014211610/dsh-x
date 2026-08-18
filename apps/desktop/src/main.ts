@@ -90,12 +90,12 @@ async function connect(): Promise<void> {
       const runtime = await ensureBundledRuntime({
         archivePath: join(process.resourcesPath, 'dsh-runtime.zip'),
         targetDir: join(app.getPath('userData'), 'dsh-runtime'),
-        exists: async path => existsSync(path),
+        exists: path => Promise.resolve(existsSync(path)),
         readFile: path => readFile(path),
         removeDir: async (path) => { await rm(path, { recursive: true, force: true }) },
         makeDir: async (path) => { await mkdir(path, { recursive: true }) },
         writeFile: async (path, contents) => { await writeFile(path, contents, 'utf8') },
-        extract: async (archive, dir) => {
+        extract: (archive, dir) => {
           const run = (command: string, args: readonly string[]): void => {
             // A cold Windows machine extracts the bundled runtime's tens of
             // thousands of small files under real-time antivirus scanning;
@@ -103,7 +103,7 @@ async function connect(): Promise<void> {
             // alive indefinitely.
             const result = spawnSync(command, args, { encoding: 'utf8', timeout: 900_000 })
             if (result.status !== 0) {
-              throw new Error(`${command} exited ${String(result.status)}: ${String(result.stderr).slice(0, 300)}`)
+              throw new Error(`${command} exited ${String(result.status)}: ${result.stderr.slice(0, 300)}`)
             }
           }
           // bsdtar reads zip archives. On Windows, resolve the SYSTEM bsdtar by
@@ -118,6 +118,7 @@ async function connect(): Promise<void> {
             log(`tar extraction unavailable (${tarError instanceof Error ? tarError.message : String(tarError)}); trying unzip`)
             run('unzip', ['-q', archive, '-d', dir])
           }
+          return Promise.resolve()
         },
       })
       if (runtime !== undefined) {
