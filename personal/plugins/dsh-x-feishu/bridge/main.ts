@@ -35,10 +35,13 @@ import {
 } from '../src/lark-events.ts'
 import { EventConsumer } from './consumer.ts'
 import { approvalCard, messageIdOf, patchCard, progressCard, replyMessage, sendMessage, resolveBotOpenId } from './lark.ts'
+import { defaultEventRelayEndpoint, encodeEventRelayFrame } from './relay.ts'
 
 /** 桥接配置。 */
 interface BridgeConfig {
   readonly endpoint: string
+  /** 其他本机 Agent 只读订阅原始飞书事件的端点。 */
+  readonly eventEndpoint: string
   readonly policy: AccessPolicy
   /** 机器人 open_id；留空则启动时向飞书问一次。 */
   readonly botOpenId: string
@@ -52,6 +55,7 @@ const CONFIG_PATH = join(homedir(), '.dsh-x-feishu', 'config.json')
 
 const DEFAULT_CONFIG: BridgeConfig = {
   endpoint: defaultEndpoint(),
+  eventEndpoint: defaultEventRelayEndpoint(),
   policy: DEFAULT_POLICY,
   botOpenId: '',
   probeOrigin: 'http://127.0.0.1:13080',
@@ -96,6 +100,8 @@ class Bridge {
   private client: Socket | undefined
   private decoder = new FrameDecoder()
   private server: Server | undefined
+  private eventServer: Server | undefined
+  private readonly eventClients = new Set<Socket>()
   private readonly dedup = new MessageDedup()
   /** 插件给的 cardId → 飞书 message_id。 */
   private readonly cards = new Map<string, string>()
@@ -122,6 +128,11 @@ class Bridge {
     this.server.on('error', (error: Error) => { log(`socket 服务端出错：${error.message}`) })
     this.server.listen(this.config.endpoint, () => {
       log(`在 ${this.config.endpoint} 上等 dsh 插件连进来`)
+    })
+    this.eventServer = createServer((socket) => { this.attachEventClient(socket) })
+    this.eventServer.on('error', (error: Error) => { log(`事件 relay 出错：${error.message}`) })
+    this.eventServer.listen(this.config.eventEndpoint, () => {
+      log(`在 ${this.config.eventEndpoint} 上广播飞书事件`)
     })
 
     const handlers = {
@@ -165,12 +176,30 @@ class Bridge {
     return this.client !== undefined && !this.client.destroyed
   }
 
+  private attachEventClient(socket: Socket): void {
+    this.eventClients.add(socket)
+    socket.on('error', () => {})
+    socket.on('close', () => {
+      this.eventClients.delete(socket)
+      log('事件 relay 客户端断开')
+    })
+    log('事件 relay 客户端连上')
+  }
+
+  private relayEvent(event: unknown): void {
+    const frame = encodeEventRelayFrame(event)
+    for (const socket of this.eventClients) {
+      if (!socket.destroyed) socket.write(frame)
+    }
+  }
+
   private send(frame: unknown): void {
     if (!this.dshOnline) return
     this.client?.write(encodeFrame(frame))
   }
 
   private async onMessageEvent(event: LarkMessageEvent): Promise<void> {
+    this.relayEvent(event)
     const verdict = admit(event, this.config.policy, this.botOpenId)
     if (!verdict.ok) {
       // 不够格的消息根本不该穿过 socket 进到 dsh 里去建会话。
@@ -197,6 +226,7 @@ class Bridge {
   }
 
   private onCardActionEvent(event: LarkCardActionEvent): void {
+    this.relayEvent(event)
     const chatId = event.chat_id ?? ''
     const messageId = event.message_id ?? ''
     if (messageId === '') return

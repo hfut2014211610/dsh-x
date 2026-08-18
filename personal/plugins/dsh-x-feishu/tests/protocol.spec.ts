@@ -1,5 +1,6 @@
 import { describe, expect, it } from 'vitest'
 import { FrameDecoder, PROTOCOL_VERSION, defaultEndpoint, encodeFrame } from '../src/protocol.ts'
+import { EVENT_RELAY_VERSION, defaultEventRelayEndpoint, encodeEventRelayFrame } from '../bridge/relay.ts'
 
 describe('encodeFrame', () => {
   it('一帧一行', () => {
@@ -42,5 +43,18 @@ describe('defaultEndpoint', () => {
     const endpoint = defaultEndpoint()
     expect(endpoint.length).toBeGreaterThan(0)
     if (process.platform === 'win32') expect(endpoint.startsWith('\\\\.\\pipe\\')).toBe(true)
+  })
+})
+
+describe('event relay', () => {
+  it('给其他 Agent 一个独立的本地端点', () => {
+    const endpoint = defaultEventRelayEndpoint()
+    expect(endpoint.length).toBeGreaterThan(0)
+    expect(endpoint).not.toBe(defaultEndpoint())
+  })
+
+  it('只广播一行带版本的原始事件', () => {
+    expect(encodeEventRelayFrame({ type: 'im.message.receive_v1', message_id: 'om_1' }))
+      .toBe(`{"v":${EVENT_RELAY_VERSION},"kind":"lark-event","event":{"type":"im.message.receive_v1","message_id":"om_1"}}\n`)
   })
 })
