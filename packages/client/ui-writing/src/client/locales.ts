@@ -7,7 +7,7 @@ export const NS = 'ui-writing'
 export type WritingKey =
   | 'view.writing' | 'assistant.title'
   | 'tools.label' | 'tools.document' | 'tools.outline' | 'tools.search'
-  | 'panel.document' | 'panel.outline' | 'panel.search'
+  | 'panel.document' | 'panel.outline' | 'panel.search' | 'panel.resize'
   | 'document.path' | 'document.pathPlaceholder' | 'document.untitled'
   | 'tree.label' | 'tree.heading' | 'tree.loading' | 'tree.empty' | 'tree.error' | 'tree.truncated' | 'tree.refresh'
   | 'outline.empty' | 'search.input' | 'search.placeholder' | 'search.empty'
@@ -37,6 +37,7 @@ export const zh: Record<WritingKey, string> = {
   'panel.document': '打开文档',
   'panel.outline': '文档大纲',
   'panel.search': '搜索工作区',
+  'panel.resize': '调整面板宽度',
   'document.path': '工作区相对路径',
   'document.pathPlaceholder': 'docs/subsystems/writing.md',
   'document.untitled': '未打开文档',
@@ -88,6 +89,7 @@ export const en: Record<WritingKey, string> = {
   'panel.document': 'Open document',
   'panel.outline': 'Document outline',
   'panel.search': 'Search workspace',
+  'panel.resize': 'Resize the panel',
   'document.path': 'Workspace-relative path',
   'document.pathPlaceholder': 'docs/subsystems/writing.md',
   'document.untitled': 'No document open',

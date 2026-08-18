@@ -20,6 +20,7 @@
     - button "prototype.html" [pressed]:
       - img
       - text: prototype.html
+  - separator "Resize the prototype list"
   - region "Prototype preview":
     - text: Preview — sandboxed, no network prototype.html
     - button "Reload":

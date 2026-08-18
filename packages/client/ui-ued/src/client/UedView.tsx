@@ -9,6 +9,7 @@ import {
   IconLoadingOutline16,
   IconRefreshOutline16,
   IconWarningOutline16,
+  ResizeHandle,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
   DocumentChange,
@@ -22,6 +23,11 @@ import css from './UedView.module.css'
 
 /** Trailing window for `documents/changed`, so a burst of thread writes repaints once. */
 const REFRESH_DEBOUNCE_MS = 400
+
+/** Prototype-rail width bounds, in pixels: enough for a nested path, never half the stage. */
+const RAIL_DEFAULT = 240
+const RAIL_MIN = 160
+const RAIL_MAX = 520
 
 type Listing = {
   readonly status: 'loading' | 'ready' | 'error'
@@ -61,6 +67,7 @@ export function UedView({
   subscribeChanged,
   translate: t,
 }: ConvViewProps & Partial<UedViewInjected>): React.ReactElement {
+  const [railWidth, setRailWidth] = useState(RAIL_DEFAULT)
   const [directory, setDirectory] = useState('')
   const [listing, setListing] = useState<Listing>({ status: 'loading', entries: [] })
   const [selected, setSelected] = useState<string | undefined>(undefined)
@@ -123,7 +130,7 @@ export function UedView({
   const prototypes = listing.entries.filter(entry => entry.kind === 'file' && isPreviewable(entry.name))
 
   return (
-    <div className={css.root}>
+    <div className={css.root} style={{ gridTemplateColumns: `${String(railWidth)}px auto minmax(0, 1fr)` }}>
       <aside className={css.files} aria-label={label('files.label')}>
         <header className={css.filesHeader}>
           <span className={css.filesTitle}>{label('files.label')}</span>
@@ -178,6 +185,14 @@ export function UedView({
           <p className={css.hint}>{label('files.empty')}</p>
         )}
       </aside>
+
+      <ResizeHandle
+        width={railWidth}
+        min={RAIL_MIN}
+        max={RAIL_MAX}
+        onResize={setRailWidth}
+        label={label('files.resize')}
+      />
 
       <section className={css.stage} aria-label={label('preview.label')}>
         <header className={css.stageHeader}>

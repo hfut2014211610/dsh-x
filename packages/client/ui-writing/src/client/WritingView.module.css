@@ -55,7 +55,9 @@
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 
   display: flex;
-  flex: 0 0 268px;
+  /* The basis is a style prop so the separator beside it can move the edge;
+     grow and shrink stay at 0 so the editor absorbs everything else. */
+  flex: 0 0 auto;
   flex-direction: column;
   min-width: 0;
   min-height: 0;

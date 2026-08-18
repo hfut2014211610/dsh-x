@@ -18,6 +18,7 @@ import {
   IconSearchOutline16,
   IconWarningOutline16,
   MarkdownText,
+  ResizeHandle,
   Tooltip,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
@@ -41,6 +42,11 @@ type DirectoryState = {
   readonly error?: string
 }
 type TextSelection = { readonly start: number; readonly end: number }
+
+/** Tool-panel width bounds, in pixels: a readable tree, never half the editor. */
+const PANEL_DEFAULT = 268
+const PANEL_MIN = 180
+const PANEL_MAX = 560
 
 const TEXTAREA_MIRROR_PROPERTIES = [
   'box-sizing',
@@ -289,6 +295,7 @@ export function WritingView({
 }: ConvViewProps & WritingViewInjected) {
   const initialPath = new URL(window.location.href).searchParams.get('path') ?? ''
   const [panel, setPanel] = useState<Panel | null>(initialPath === '' ? 'document' : null)
+  const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT)
   const [pathInput, setPathInput] = useState(initialPath)
   const [currentPath, setCurrentPath] = useState('')
   const [draft, setDraft] = useState('')
@@ -491,7 +498,7 @@ export function WritingView({
       </nav>
 
       {panel !== null && (
-        <aside className={css.toolPanel} aria-label={t(`panel.${panel}`)}>
+        <aside className={css.toolPanel} style={{ flexBasis: panelWidth }} aria-label={t(`panel.${panel}`)}>
           <header className={css.panelHeader}>
             <strong>{t(`panel.${panel}`)}</strong>
             <button type="button" className={css.iconButton} aria-label={t('action.close')} onClick={() => { setPanel(null) }}>
@@ -578,6 +585,15 @@ export function WritingView({
             </>
           )}
         </aside>
+      )}
+      {panel !== null && (
+        <ResizeHandle
+          width={panelWidth}
+          min={PANEL_MIN}
+          max={PANEL_MAX}
+          onResize={setPanelWidth}
+          label={t('panel.resize')}
+        />
       )}
 
       <section className={css.editorShell}>

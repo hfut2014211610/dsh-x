@@ -6,7 +6,7 @@ export const NS = 'ui-ued'
 /** The UED dictionary key set. */
 export type UedKey =
   | 'view.ued' | 'assistant.title'
-  | 'files.label' | 'files.loading' | 'files.empty' | 'files.error' | 'files.refresh' | 'files.up'
+  | 'files.label' | 'files.loading' | 'files.empty' | 'files.error' | 'files.refresh' | 'files.up' | 'files.resize'
   | 'preview.label' | 'preview.none' | 'preview.loading' | 'preview.error'
   | 'preview.open' | 'preview.reload' | 'preview.badge'
 
@@ -27,6 +27,7 @@ export const en: Record<UedKey, string> = {
   'files.error': 'Could not list the workspace.',
   'files.refresh': 'Refresh',
   'files.up': 'Up one level',
+  'files.resize': 'Resize the prototype list',
   'preview.label': 'Prototype preview',
   'preview.none': 'Pick a prototype on the left to preview it.',
   'preview.loading': 'Loading the prototype…',
@@ -46,6 +47,7 @@ export const zh: Record<UedKey, string> = {
   'files.error': '读不到工作区目录。',
   'files.refresh': '刷新',
   'files.up': '上一级',
+  'files.resize': '调整原型列表宽度',
   'preview.label': '原型预览',
   'preview.none': '在左边选一个原型来预览。',
   'preview.loading': '正在加载原型…',

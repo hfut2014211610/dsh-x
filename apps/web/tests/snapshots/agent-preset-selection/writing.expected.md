@@ -44,6 +44,7 @@
           - button "prototype.html":
             - img
             - text: prototype.html
+  - separator "Resize the panel"
   - text: Writing /
   - strong: No document open
   - img
