@@ -16,6 +16,7 @@
 
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
+import { larkCliInvocation } from './cli.ts'
 
 const run = promisify(execFile)
 
@@ -75,7 +76,11 @@ export async function larkApi(
   if (body !== undefined) args.push('--data', JSON.stringify(body))
   if (query !== undefined) args.push('--params', JSON.stringify(query))
   try {
-    const { stdout } = await run('lark-cli', args, { timeout: CALL_TIMEOUT_MS, maxBuffer: 8 * 1024 * 1024 })
+    const invocation = larkCliInvocation(args)
+    const { stdout } = await run(invocation.file, [...invocation.args], {
+      timeout: CALL_TIMEOUT_MS,
+      maxBuffer: 8 * 1024 * 1024,
+    })
     const parsed: unknown = stdout.trim() === '' ? {} : JSON.parse(stdout)
     const record = recordOf(parsed)
     if (format === 'ndjson') {

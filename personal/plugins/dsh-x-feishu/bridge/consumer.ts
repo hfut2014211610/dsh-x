@@ -13,6 +13,7 @@
 import { spawn } from 'node:child_process'
 import type { ChildProcessByStdio } from 'node:child_process'
 import type { Readable } from 'node:stream'
+import { larkCliInvocation } from './cli.ts'
 
 /** 重启退避的上下界。 */
 const RESTART_MIN_MS = 1_000
@@ -47,13 +48,17 @@ export class EventConsumer {
   constructor(
     private readonly eventKey: string,
     private readonly handlers: ConsumerHandlers,
-    private readonly command = 'lark-cli',
+    private readonly command?: string,
   ) {}
 
   /** 起消费者；子进程退出会自动重启，直到 {@link stop}。 */
   start(): void {
     if (this.stopped || this.child !== undefined) return
-    const child = spawn(this.command, ['event', 'consume', this.eventKey, '--as', 'bot'], {
+    const args = ['event', 'consume', this.eventKey, '--as', 'bot']
+    const invocation = this.command === undefined
+      ? larkCliInvocation(args)
+      : { file: this.command, args }
+    const child = spawn(invocation.file, [...invocation.args], {
       stdio: ['ignore', 'pipe', 'pipe'],
       windowsHide: true,
     })
