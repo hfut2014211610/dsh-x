@@ -19,6 +19,7 @@ import type { QueueAction, QueueItemId } from './contract/queue.ts'
 import type { ComposerBlocks } from './input/blocks.ts'
 import type { DraftAttachmentId, SessionInputResolver } from './input/contract.ts'
 import type { InputSubmitMode } from './contract/composer-submission.ts'
+import type { ViewCompanion } from './contract/views.ts'
 
 /**
  * The outward conversation face (`ctx.conversation`): the scope-addressed
@@ -64,6 +65,15 @@ export interface IConversation {
    * @returns disposer that removes this resolver.
    */
   declarePreferredView(resolver: (sessionId: SessionId) => string | null): () => void
+  /**
+   * Declare a secondary conversation view rendered beside an active view.
+   * Resolvers run in registration order; the first non-null result wins.
+   * @param resolver - returns the companion entry and localized panel label, or null.
+   * @returns disposer that removes this resolver.
+   */
+  declareCompanionView(
+    resolver: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null,
+  ): () => void
 }
 
 /** Create one browser-only draft descriptor; only its id enters input state. */
@@ -115,16 +125,25 @@ export class ConversationController extends Service implements IConversation {
    * factories close over).
    */
   private readonly declarePreferredViewImpl: (resolver: (sessionId: SessionId) => string | null) => () => void
+  private readonly declareCompanionViewImpl: (
+    resolver: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null,
+  ) => () => void
 
   constructor(ctx: Context, config: {
     input: SessionInputResolver
     blocks: ComposerBlocks
     preferredViews: { declare: (resolver: (sessionId: SessionId) => string | null) => () => void }
+    companionViews: {
+      declare: (
+        resolver: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null,
+      ) => () => void
+    }
   }) {
     super(ctx, 'conversation')
     this.input = config.input
     this.blocks = config.blocks
     this.declarePreferredViewImpl = config.preferredViews.declare
+    this.declareCompanionViewImpl = config.companionViews.declare
     ctx.effect(() => () => {
       this.disposed = true
       for (const url of this.createdImageUrls) revokePreview(url)
@@ -137,6 +156,12 @@ export class ConversationController extends Service implements IConversation {
 
   declarePreferredView(resolver: (sessionId: SessionId) => string | null): () => void {
     return this.declarePreferredViewImpl(resolver)
+  }
+
+  declareCompanionView(
+    resolver: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null,
+  ): () => void {
+    return this.declareCompanionViewImpl(resolver)
   }
 
   /**

@@ -13,6 +13,19 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 
 type DocumentFormat = 'text' | 'markdown' | 'code' | 'docx' | 'xlsx'
 
+type DocumentDirectoryEntry = {
+  name: string
+  path: string
+  kind: 'directory' | 'file'
+  format?: DocumentFormat
+}
+
+type DocumentDirectoryListing = {
+  path: string
+  entries: readonly DocumentDirectoryEntry[]
+  truncated: boolean
+}
+
 type DocumentLocator =
   | { unit: 'line'; start: number; end: number }
   | { unit: 'paragraph'; start: number; end: number }
@@ -44,6 +57,7 @@ type DocumentChange = {
 
 `ctx.documents` 是文档能力 seam。
 
+- `list({ sessionId, path? })` — 列出工作区相对目录的一个层级，供文档浏览器使用。
 - `read({ sessionId, path, locator? })` — 读取整个文档或定位后的切片。
 - `outline({ sessionId, path })` — 返回标题/块/工作表结构。
 - `search({ sessionId, query, limit? })` — 工作区内容搜索。
@@ -67,6 +81,13 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 Document service (`ctx.documents`) shared by host providers and consumers.
 
 ```ts cordis-catalog
+/**
+ * List one workspace-relative directory level for a document browser.
+ * @param request - session and optional workspace-relative directory path; an absent path lists the root.
+ * @returns direct child directories and files, with a truncation marker.
+ */
+@Remote('list') list(request: { sessionId: SessionId path?: string }): Promise<DocumentDirectoryListing>
+
 /**
  * Resolve and read a whole document or a located slice.
  * @param request - session, document path, and optional locator slice.
@@ -105,7 +126,7 @@ Document service (`ctx.documents`) shared by host providers and consumers.
 
 Types: [SessionId](core.md)
 
-Source: [`packages/writing/documents/src/index.ts:28`](../../packages/writing/documents/src/index.ts)
+Source: [`packages/writing/documents/src/index.ts:29`](../../packages/writing/documents/src/index.ts)
 
 <a id="documents-events"></a>
 
@@ -126,7 +147,7 @@ A document mutation committed through the documents service.
 'documents/changed'(change: DocumentChange): void
 ```
 
-Source: [`packages/writing/documents/src/types.ts:90`](../../packages/writing/documents/src/types.ts)
+Source: [`packages/writing/documents/src/types.ts:107`](../../packages/writing/documents/src/types.ts)
 <!-- END GENERATED cordis-surface -->
 
 ## 模型面
@@ -143,4 +164,6 @@ Source: [`packages/writing/documents/src/types.ts:90`](../../packages/writing/do
 
 ## 浏览器 UI
 
-`dsh-client-ui-writing` 注册一个 id 为 `writing` 的 `conversation.view` 条目，并为 `agentPreset` 为 `writing` 的会话声明默认视图；用户显式选择的 tab 仍然优先。完整编辑器、树/大纲侧栏、搜索浮窗和 `@doc` 引用源正在实现中。结构化 `.docx`/`.xlsx` 文件支持提取文本的读取、大纲、搜索和基础文本替换往返。
+`dsh-client-ui-writing` 注册 `writing` `conversation.view`，为 `agentPreset` 为 `writing` 的会话声明该默认视图，并把 Chat 声明为它的伴随视图。`ui-conversation` 同时渲染活跃视图与伴随视图，隐藏互斥 tab 栏，并把既有 Chat 消息流与 composer 放在伴随栏；普通会话仍使用单视图布局。
+
+写作视图包含专注的源码编辑区，以及文件、大纲和工作区搜索面板。文件面板打开时调用 `documents.list` 加载工作区根目录，展开目录时读取子级，并在用户切换文档时保留目录树。Markdown 文档默认进入渲染预览；预览与编辑共用实时草稿，切换模式不会保存或丢弃修改。手工保存使用最近一次读取返回的版本调用 `documents.apply`。编辑器没有未保存内容时，`documents/changed` 事件会重新载入状态；本地文本已修改时，该事件显示冲突提示并保留草稿。`@doc` 输入源把当前工作区相对路径插入普通 composer。结构化 `.docx`/`.xlsx` 文件支持提取文本的读取、大纲、搜索和基础文本替换往返。

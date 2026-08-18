@@ -49,6 +49,23 @@ export interface DocumentReadResult {
   readonly truncated: boolean
 }
 
+/** One direct child in a workspace-relative document directory. */
+export interface DocumentDirectoryEntry {
+  readonly name: string
+  readonly path: string
+  readonly kind: 'directory' | 'file'
+  /** Present for file entries; directories have no document format. */
+  readonly format?: DocumentFormat
+}
+
+/** One lazily listed workspace-relative directory level. */
+export interface DocumentDirectoryListing {
+  readonly path: string
+  readonly entries: readonly DocumentDirectoryEntry[]
+  /** True when the provider omitted entries beyond its configured per-level cap. */
+  readonly truncated: boolean
+}
+
 /** One outline entry. */
 export interface DocumentOutlineEntry {
   readonly id: string

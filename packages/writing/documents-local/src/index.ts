@@ -10,6 +10,8 @@ import z from '@deepseek-ai/schemastery'
 import { Documents, DocumentError } from '@deepseek-ai/dsh-documents'
 import type {
   DocumentEdit,
+  DocumentDirectoryEntry,
+  DocumentDirectoryListing,
   DocumentFormat,
   DocumentLocator,
   DocumentOutlineEntry,
@@ -31,11 +33,14 @@ export interface Config {
   maxOutlineItems?: number
   /** File cap for one search's directory scan. */
   maxSearchFiles?: number
+  /** Entry cap for one directory level returned to document browsers. */
+  maxBrowseEntries?: number
 }
 
 const DEFAULT_MAX_READ_CHARS = 200_000
 const DEFAULT_MAX_OUTLINE_ITEMS = 1_000
 const DEFAULT_MAX_SEARCH_FILES = 50_000
+const DEFAULT_MAX_BROWSE_ENTRIES = 2_000
 const MAX_STRUCTURED_BYTES = 50 * 1024 * 1024
 
 /** Config after defaults are applied; every limit is a concrete number. */
@@ -44,6 +49,7 @@ export interface ResolvedConfig {
   maxReadChars: number
   maxOutlineItems: number
   maxSearchFiles: number
+  maxBrowseEntries: number
 }
 
 function resolveConfig(config: Config): ResolvedConfig {
@@ -52,7 +58,25 @@ function resolveConfig(config: Config): ResolvedConfig {
     maxReadChars: config.maxReadChars ?? DEFAULT_MAX_READ_CHARS,
     maxOutlineItems: config.maxOutlineItems ?? DEFAULT_MAX_OUTLINE_ITEMS,
     maxSearchFiles: config.maxSearchFiles ?? DEFAULT_MAX_SEARCH_FILES,
+    maxBrowseEntries: config.maxBrowseEntries ?? DEFAULT_MAX_BROWSE_ENTRIES,
   }
+}
+
+function normalizeDirectoryPath(path: string | undefined): string {
+  const value = path?.trim() ?? ''
+  if (value === '' || value === '.') return ''
+  if (/^(?:[\\/]|[A-Za-z]:[\\/])/.test(value)) {
+    throw new DocumentError(`directory path must be workspace-relative: ${value}`, 'DOCUMENT_INVALID_PATH')
+  }
+  const segments = value.split(/[\\/]+/).filter(segment => segment !== '' && segment !== '.')
+  if (segments.includes('..')) {
+    throw new DocumentError(`directory path escapes workspace: ${value}`, 'DOCUMENT_INVALID_PATH')
+  }
+  return segments.join('/')
+}
+
+function childDocumentPath(parent: string, name: string): string {
+  return parent === '' ? name : `${parent}/${name}`
 }
 
 function stripXml(value: string): string {
@@ -140,11 +164,14 @@ async function applyStructuredEdit(ctx: Context, target: FsTarget, format: 'docx
 
 /** Local-filesystem provider for `ctx.documents`, bounded by its configured root. */
 export class DocumentsLocal extends Documents {
+  static inject = ['fs']
+
   static Config: z<Config> = z.object({
     root: z.string().required(),
     maxReadChars: z.number().default(DEFAULT_MAX_READ_CHARS),
     maxOutlineItems: z.number().default(DEFAULT_MAX_OUTLINE_ITEMS),
     maxSearchFiles: z.number().default(DEFAULT_MAX_SEARCH_FILES),
+    maxBrowseEntries: z.number().default(DEFAULT_MAX_BROWSE_ENTRIES),
   })
 
   private readonly resolved: ResolvedConfig
@@ -173,6 +200,37 @@ export class DocumentsLocal extends Documents {
       throw new DocumentError(`path escapes workspace: ${path}`, 'DOCUMENT_INVALID_PATH')
     }
     return target
+  }
+
+  override async list(request: { sessionId: SessionId; path?: string }): Promise<DocumentDirectoryListing> {
+    const path = normalizeDirectoryPath(request.path)
+    const root = await this.resolveWorkspaceTarget()
+    const target = path === '' ? root : await this.resolveDocument(path)
+    const info = await this.ctx.fs.stat(target)
+    if (info === undefined) throw new DocumentError(`directory not found: ${path}`, 'DOCUMENT_NOT_FOUND')
+    if (info.type !== 'directory') throw new DocumentError(`not a directory: ${path}`, 'DOCUMENT_INVALID_PATH')
+    const listed = await this.ctx.fs.listDir(target)
+    const directories: DocumentDirectoryEntry[] = []
+    const files: DocumentDirectoryEntry[] = []
+    for (const entry of listed) {
+      if (!this.ctx.fs.contains(root, entry.target)) continue
+      if (entry.type === 'directory') {
+        directories.push({ name: entry.name, path: childDocumentPath(path, entry.name), kind: 'directory' })
+      } else if (entry.type === 'file') {
+        files.push({
+          name: entry.name,
+          path: childDocumentPath(path, entry.name),
+          kind: 'file',
+          format: this.formatOf(entry.name),
+        })
+      }
+    }
+    const entries = [...directories, ...files]
+    return {
+      path,
+      entries: entries.slice(0, this.resolved.maxBrowseEntries),
+      truncated: entries.length > this.resolved.maxBrowseEntries,
+    }
   }
 
   override async read(request: { sessionId: SessionId; path: string; locator?: DocumentLocator }): Promise<DocumentReadResult> {

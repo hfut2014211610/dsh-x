@@ -489,6 +489,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   TypertSchemaFilter: 'invariants.md',
   TypertSchemaRecord: 'invariants.md',
   DocumentChange: 'writing.md',
+  DocumentDirectoryListing: 'writing.md',
   DocumentEdit: 'writing.md',
   DocumentLocator: 'writing.md',
   DocumentOutlineResult: 'writing.md',

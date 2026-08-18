@@ -13,6 +13,19 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 
 type DocumentFormat = 'text' | 'markdown' | 'code' | 'docx' | 'xlsx'
 
+type DocumentDirectoryEntry = {
+  name: string
+  path: string
+  kind: 'directory' | 'file'
+  format?: DocumentFormat
+}
+
+type DocumentDirectoryListing = {
+  path: string
+  entries: readonly DocumentDirectoryEntry[]
+  truncated: boolean
+}
+
 type DocumentLocator =
   | { unit: 'line'; start: number; end: number }
   | { unit: 'paragraph'; start: number; end: number }
@@ -44,6 +57,7 @@ type DocumentChange = {
 
 `ctx.documents` is the document capability seam.
 
+- `list({ sessionId, path? })` — list one workspace-relative directory level for document browsing.
 - `read({ sessionId, path, locator? })` — read a whole document or located slice.
 - `outline({ sessionId, path })` — return headings/blocks/sheets.
 - `search({ sessionId, query, limit? })` — workspace content search.
@@ -67,6 +81,13 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 Document service (`ctx.documents`) shared by host providers and consumers.
 
 ```ts cordis-catalog
+/**
+ * List one workspace-relative directory level for a document browser.
+ * @param request - session and optional workspace-relative directory path; an absent path lists the root.
+ * @returns direct child directories and files, with a truncation marker.
+ */
+@Remote('list') list(request: { sessionId: SessionId path?: string }): Promise<DocumentDirectoryListing>
+
 /**
  * Resolve and read a whole document or a located slice.
  * @param request - session, document path, and optional locator slice.
@@ -105,7 +126,7 @@ Document service (`ctx.documents`) shared by host providers and consumers.
 
 Types: [SessionId](core.md)
 
-Source: [`packages/writing/documents/src/index.ts:28`](../../packages/writing/documents/src/index.ts)
+Source: [`packages/writing/documents/src/index.ts:29`](../../packages/writing/documents/src/index.ts)
 
 <a id="documents-events"></a>
 
@@ -126,7 +147,7 @@ A document mutation committed through the documents service.
 'documents/changed'(change: DocumentChange): void
 ```
 
-Source: [`packages/writing/documents/src/types.ts:90`](../../packages/writing/documents/src/types.ts)
+Source: [`packages/writing/documents/src/types.ts:107`](../../packages/writing/documents/src/types.ts)
 <!-- END GENERATED cordis-surface -->
 
 ## Model plane
@@ -143,4 +164,6 @@ All document modifications must go through `document_edit` with a version return
 
 ## Browser UI
 
-`dsh-client-ui-writing` registers one `conversation.view` entry with id `writing`. It declares a preferred view for sessions whose `agentPreset` is `writing`; an explicit user tab selection still wins. The full editor, tree/outline rail, search overlay, and `@doc` reference source are under active implementation. Structured `.docx`/`.xlsx` files support extracted-text read, outline, search, and basic text replacement round-trips.
+`dsh-client-ui-writing` registers the `writing` `conversation.view`, declares it as the preferred view for sessions whose `agentPreset` is `writing`, and declares Chat as its companion view. `ui-conversation` renders the active view and companion together, hides the mutually exclusive tab strip, and positions its existing Chat transcript and composer in the companion column; ordinary sessions keep the single-view layout.
+
+The writing view contains a focused source editor with file, outline, and workspace-search panels. The file panel calls `documents.list` for the workspace root when it opens, loads child directories on expansion, and preserves the tree while the user switches documents. Markdown documents open in a rendered preview that shares the editor's live draft, so switching modes does not save or discard changes. Manual saves call `documents.apply` with the version from the last read. A `documents/changed` event reloads clean editor state; if local text is dirty, the event produces a conflict notice and preserves the draft. The `@doc` input source inserts the current workspace-relative path into the ordinary composer. Structured `.docx`/`.xlsx` files support extracted-text read, outline, search, and basic text replacement round-trips.

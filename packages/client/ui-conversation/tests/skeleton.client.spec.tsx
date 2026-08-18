@@ -99,6 +99,8 @@ function mount(
     composerBlock?: { reason: string }
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
+    /** Optional secondary view declaration for an active view. */
+    companion?: (sessionId: SessionId, activeViewId: string) => { id: string; label: string } | null
   } = {},
 ) {
   const root = sid('root')
@@ -135,6 +137,7 @@ function mount(
     subscribe: () => () => {},
     version: () => 1,
     preferred: () => null,
+    companion: options.companion ?? (() => null),
   }
   /** Owner share handed to the two composer tool-row seats, per render. */
   const seatOwners: { key: string; owner: unknown }[] = []
@@ -439,6 +442,26 @@ describe('ConversationRoot resident composer', () => {
     act(() => { b.chat.actions.setView('trajectory') })
     expect(b.view.getByTestId('view-trajectory')).toBeTruthy()
     expect(b.view.getByRole('textbox')).toBeTruthy()
+  })
+
+  it('renders a declared companion beside the active view and removes the tab switch', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      viewTabs: [
+        { id: 'chat', label: 'Chat' },
+        { id: 'writing', label: 'Writing' },
+      ],
+      companion: (_sessionId, activeViewId) => activeViewId === 'writing'
+        ? { id: 'chat', label: 'Assistant' }
+        : null,
+    })
+    act(() => { b.chat.actions.setView('writing') })
+
+    expect(b.view.getByTestId('view-writing')).toBeTruthy()
+    expect(b.view.getByTestId('view-chat')).toBeTruthy()
+    expect(b.view.getByRole('complementary', { name: 'Assistant' })).toBeTruthy()
+    expect(b.view.queryByRole('tab')).toBeNull()
+    expect(b.view.container.querySelector('[data-conversation-companion-layout]')).toBeTruthy()
+    expect(b.view.container.querySelector('[data-composer-seat]')).toBeTruthy()
   })
 
   it('keeps the Chat fallback selected by id when a view is inserted before it', () => {

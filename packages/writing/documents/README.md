@@ -6,6 +6,7 @@ Document capability seam for writing mode. This package owns the shared locator/
 
 ## Service API (`ctx.documents`)
 
+- `list({ sessionId, path? })` — list one workspace-relative directory level for document browsing.
 - `read({ sessionId, path, locator? })` — read a whole document or located slice.
 - `outline({ sessionId, path })` — return headings/blocks/sheets.
 - `search({ sessionId, query, limit? })` — workspace content search.

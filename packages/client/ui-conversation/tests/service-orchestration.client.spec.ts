@@ -19,6 +19,8 @@ async function bench(readAttachment?: SessionFace['readAttachment']) {
   const updateQueue = vi.fn(() => Promise.resolve({ ok: true as const, value: { accepted: true as const } }))
   const cancel = vi.fn(() => Promise.resolve({ ok: true as const, value: { accepted: true as const } }))
   const loadOlder = vi.fn(() => Promise.resolve())
+  const declarePreferred = vi.fn(() => () => {})
+  const declareCompanion = vi.fn(() => () => {})
   await runtime.sessions.add({
     id: 's1',
     session: { prompt, updateQueue, cancel, loadOlder, ...(readAttachment === undefined ? {} : { readAttachment }) },
@@ -29,16 +31,33 @@ async function bench(readAttachment?: SessionFace['readAttachment']) {
   const fiber = runtime.ctx.plugin(ConversationController, {
     input: hub,
     blocks: new ComposerBlockRegistry(),
-    preferredViews: { declare: () => () => {} },
+    preferredViews: { declare: declarePreferred },
+    companionViews: { declare: declareCompanion },
   })
   await fiber.await()
   const root = runtime.ctx.get('conversation') as ConversationController
   const scoped = runtime.sessions.scope('s1')!.get('conversation') as ConversationController
   const shell = hub.shellFor(runtime.sessions.binding('s1')!)
-  return { runtime, fiber, root, scoped, hub, shell, prompt, updateQueue, cancel, loadOlder }
+  return {
+    runtime, fiber, root, scoped, hub, shell, prompt, updateQueue, cancel, loadOlder,
+    declarePreferred, declareCompanion,
+  }
 }
 
 describe('ConversationController', () => {
+  it('publishes preferred and companion view declarations through its service face', async () => {
+    const b = await bench()
+    const preferred = () => 'writing'
+    const companion = () => ({ id: 'chat', label: 'Assistant' })
+    const disposePreferred = b.root.declarePreferredView(preferred)
+    const disposeCompanion = b.root.declareCompanionView(companion)
+    expect(b.declarePreferred).toHaveBeenCalledWith(preferred)
+    expect(b.declareCompanion).toHaveBeenCalledWith(companion)
+    disposePreferred()
+    disposeCompanion()
+    await b.runtime.dispose()
+  })
+
   it('routes operations through the public Session binding', async () => {
     const b = await bench()
     await b.scoped.send('hello')
@@ -142,6 +161,7 @@ describe('ConversationController', () => {
       input: new InputHub(bare, makeTranslate(zh, {})),
       blocks: new ComposerBlockRegistry(),
       preferredViews: { declare: () => () => {} },
+      companionViews: { declare: () => () => {} },
     }).await()
     const orphan = bare.get('conversation') as ConversationController
     await expect(orphan.send('x')).rejects.toThrow(/sessions service unavailable/)

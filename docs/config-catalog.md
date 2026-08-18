@@ -571,6 +571,8 @@ Source: [`packages/credentials/credentials-local/src/index.ts:55`](../packages/c
 
 ## `@deepseek-ai/dsh-documents-local`
 
+Requires: `fs`
+
 ```ts config-catalog
 /** Configuration for the local documents provider. */
 export interface Config {
@@ -582,10 +584,12 @@ export interface Config {
   maxOutlineItems?: number
   /** File cap for one search's directory scan. */
   maxSearchFiles?: number
+  /** Entry cap for one directory level returned to document browsers. */
+  maxBrowseEntries?: number
 }
 ```
 
-Source: [`packages/writing/documents-local/src/index.ts:25`](../packages/writing/documents-local/src/index.ts)
+Source: [`packages/writing/documents-local/src/index.ts:27`](../packages/writing/documents-local/src/index.ts)
 
 <a id="deepseek-aidsh-e2b"></a>
 

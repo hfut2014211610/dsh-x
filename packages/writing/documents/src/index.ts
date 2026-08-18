@@ -8,6 +8,7 @@ import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type { SessionId } from '@deepseek-ai/dsh-session'
 import type {
   DocumentEdit,
+  DocumentDirectoryListing,
   DocumentLocator,
   DocumentOutlineResult,
   DocumentReadResult,
@@ -28,6 +29,20 @@ declare module '@deepseek-ai/cordis' {
 export abstract class Documents extends TypertRemoteService {
   constructor(ctx: Context) {
     super(ctx, 'documents')
+  }
+
+  /**
+   * List one workspace-relative directory level for a document browser.
+   * @param request - session and optional workspace-relative directory path; an absent path lists the root.
+   * @returns direct child directories and files, with a truncation marker.
+   */
+  @Remote('list')
+  list(request: {
+    sessionId: SessionId
+    path?: string
+  }): Promise<DocumentDirectoryListing> {
+    void request
+    return Promise.reject(new Error('documents.list is not implemented by this service definition'))
   }
 
   /**

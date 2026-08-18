@@ -13,6 +13,12 @@ export interface SelectionTarget { turnSeq: number; stepSeq?: number; callId?: C
 export interface ViewTab { id: string; label: string }
 
 /**
+ * One secondary view rendered beside the active view. The declaring plugin
+ * owns when the companion applies and supplies its localized panel label.
+ */
+export interface ViewCompanion { id: string; label: string }
+
+/**
  * Per-session state shared by conversation, chat-view, and details slots.
  * Unknown persisted view ids fall back to the stable Chat view.
  */

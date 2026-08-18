@@ -544,6 +544,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Document service (`ctx.documents`) shared by host providers and consumers.',
     methods: [
       {
+        signature: '@Remote(\'list\') list(request: { sessionId: SessionId path?: string }): Promise<DocumentDirectoryListing>',
+        description: 'List one workspace-relative directory level for a document browser.',
+        parameters: [{ name: 'request', description: 'session and optional workspace-relative directory path; an absent path lists the root.' }],
+        returns: 'direct child directories and files, with a truncation marker.',
+      },
+      {
         signature: '@Remote(\'read\') async read(request: { sessionId: SessionId path: string locator?: DocumentLocator }): Promise<DocumentReadResult>',
         description: 'Resolve and read a whole document or a located slice.',
         parameters: [{ name: 'request', description: 'session, document path, and optional locator slice.' }],
@@ -2997,6 +3003,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'DocumentChange',
     declaration: 'export interface DocumentChange {\n    readonly sessionId: SessionId;\n    readonly path: string;\n    readonly baseVersion: string;\n    readonly version: string;\n    readonly patches: DocumentPatch[] | null;\n}',
+  },
+  {
+    name: 'DocumentDirectoryEntry',
+    declaration: 'export interface DocumentDirectoryEntry {\n    readonly name: string;\n    readonly path: string;\n    readonly kind: \'directory\' | \'file\';\n    readonly format?: DocumentFormat;\n}',
+  },
+  {
+    name: 'DocumentDirectoryListing',
+    declaration: 'export interface DocumentDirectoryListing {\n    readonly path: string;\n    readonly entries: readonly DocumentDirectoryEntry[];\n    readonly truncated: boolean;\n}',
   },
   {
     name: 'DocumentEdit',

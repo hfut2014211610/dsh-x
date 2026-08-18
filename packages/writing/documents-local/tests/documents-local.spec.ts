@@ -2,7 +2,7 @@
  * Tests for the local documents provider through a real ctx.fs local backend.
  */
 
-import { afterEach, beforeEach, describe, expect, it } from 'vitest'
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { mkdtemp, rm, writeFile, mkdir } from 'node:fs/promises'
 import JSZip from 'jszip'
 import { tmpdir } from 'node:os'
@@ -35,6 +35,61 @@ afterEach(async () => {
 })
 
 describe('documents-local', () => {
+  it('lists the workspace root and nested directories for lazy document browsing', async () => {
+    await mkdir(join(dir, 'notes'))
+    await writeFile(join(dir, 'notes', 'guide.md'), '# Guide')
+    await writeFile(join(dir, 'README.md'), '# Readme')
+
+    const root = await documents.list({ sessionId: SID })
+    expect(root).toEqual({
+      path: '',
+      entries: [
+        { name: 'notes', path: 'notes', kind: 'directory' },
+        { name: 'README.md', path: 'README.md', kind: 'file', format: 'markdown' },
+      ],
+      truncated: false,
+    })
+    await expect(documents.list({ sessionId: SID, path: '.' })).resolves.toEqual(root)
+    await expect(documents.list({ sessionId: SID, path: 'notes/.' })).resolves.toMatchObject({
+      path: 'notes',
+      entries: [{ name: 'guide.md', path: 'notes/guide.md', kind: 'file', format: 'markdown' }],
+    })
+  })
+
+  it('rejects invalid directory browse targets', async () => {
+    await writeFile(join(dir, 'file.md'), '# File')
+    await expect(documents.list({ sessionId: SID, path: '../outside' }))
+      .rejects.toMatchObject({ code: 'DOCUMENT_INVALID_PATH' })
+    await expect(documents.list({ sessionId: SID, path: '/outside' }))
+      .rejects.toMatchObject({ code: 'DOCUMENT_INVALID_PATH' })
+    await expect(documents.list({ sessionId: SID, path: 'C:\\outside' }))
+      .rejects.toMatchObject({ code: 'DOCUMENT_INVALID_PATH' })
+    await expect(documents.list({ sessionId: SID, path: 'missing' }))
+      .rejects.toMatchObject({ code: 'DOCUMENT_NOT_FOUND' })
+    await expect(documents.list({ sessionId: SID, path: 'file.md' }))
+      .rejects.toMatchObject({ code: 'DOCUMENT_INVALID_PATH' })
+  })
+
+  it('bounds directory listings and omits entries outside the workspace', async () => {
+    await docsFiber.dispose()
+    docsFiber = await ctx.plugin(DocumentsLocal, { root: dir, maxBrowseEntries: 1 })
+    documents = ctx.documents as DocumentsLocal
+    await mkdir(join(dir, 'notes'))
+    await writeFile(join(dir, 'hidden.md'), '# Hidden')
+    const contains = ctx.fs.contains.bind(ctx.fs)
+    vi.spyOn(ctx.fs, 'contains').mockImplementation((root, target) => (
+      !target.displayPath.endsWith('hidden.md') && contains(root, target)
+    ))
+    const listed = await documents.list({ sessionId: SID })
+    expect(listed.entries).toEqual([{ name: 'notes', path: 'notes', kind: 'directory' }])
+    expect(listed.truncated).toBe(false)
+
+    await writeFile(join(dir, 'visible.md'), '# Visible')
+    const bounded = await documents.list({ sessionId: SID })
+    expect(bounded.entries).toHaveLength(1)
+    expect(bounded.truncated).toBe(true)
+  })
+
   it('reads a text document with its version', async () => {
     await writeFile(join(dir, 'a.md'), '# Hello\n\nWorld')
     const result = await documents.read({ sessionId: SID, path: 'a.md' })

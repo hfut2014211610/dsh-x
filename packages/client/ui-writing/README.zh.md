@@ -2,16 +2,19 @@
 
 [English](README.md) | 中文
 
-浏览器写作模式插件。它注册 `writing` 的 `conversation.view` 条目，并为 `agentPreset` 为 `writing` 的会话声明默认视图。
+浏览器写作模式插件。它注册 `writing` 的 `conversation.view` 条目，为 `agentPreset` 为 `writing` 的会话声明默认视图，并通过会话伴随视图扩展把现有 Chat 视图和 composer 放在编辑器旁边。
+
+编辑器提供专注的文本编辑区，以及文件、大纲和工作区搜索面板。文件面板自动加载工作区根目录，展开目录时按需读取子级，并在切换文件时保持目录树打开。Markdown 文档默认使用渲染预览，并可切换回源码编辑，未保存草稿不会丢失。手工保存使用最近一次读取返回的文档版本。编辑器没有未保存内容时，`documents/changed` 事件会重新载入文档；存在未保存内容时，编辑器保留草稿并显示冲突提示，不会替换用户文本。
 
 ## Model Experience
 
-None, as the browser-side writing plugin only registers a view tab; nothing here reaches a model request.
+无，因为本包只把当前文档的工作区相对路径插入普通浏览器 composer 草稿；任何由此产生的模型可见用户消息都由 conversation 包负责。
 
 #### KV Cache effect
 
-No direct invalidation; the named consumer owns any request-prefix changes.
+无；本包不组装或发送 provider 请求。
 
 ## Known Limitations and Deferred Work
 
-- **编辑器目前是 Phase 1 textarea 外壳** — CodeMirror、树/大纲侧栏、搜索浮窗和 `@doc` 引用源尚未实现。
+- **源码编辑能力为纯文本** — Markdown 已提供渲染预览，但所见即所得 Markdown、Word 与电子表格编辑仍需要格式专用浏览器编辑器；本包当前展示结构化格式的提取文本。
+- **保存需要显式触发** — 当前没有防抖自动保存；版本守卫会阻止过期的手工保存覆盖更新后的文档。

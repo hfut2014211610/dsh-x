@@ -10,7 +10,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-ui-layout/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
-import type { ViewTab } from './contract/views.ts'
+import type { ViewCompanion, ViewTab } from './contract/views.ts'
 import type {
   ApprovalWait, ChatNodeTurnDataInjected, ChatScrollPosition, ChatViewInjected, ComposerBarInjected,
   ComposerChainProps, ConversationInjected, ConversationSessionHeaderInjected, ConversationSessionInjected,
@@ -157,6 +157,18 @@ export function apply(ctx: Context): void {
       return () => { preferredViewResolvers.delete(resolver) }
     },
   }
+  const companionViewResolvers = new Set<(
+    sessionId: SessionId,
+    activeViewId: string,
+  ) => ViewCompanion | null>()
+  const companionViews = {
+    declare: (
+      resolver: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null,
+    ): () => void => {
+      companionViewResolvers.add(resolver)
+      return () => { companionViewResolvers.delete(resolver) }
+    },
+  }
   const viewTabs = (): ViewTab[] => {
     const tabs: ViewTab[] = []
     for (const entry of slots.entries('conversation.view')) {
@@ -174,6 +186,13 @@ export function apply(ctx: Context): void {
       for (const resolver of preferredViewResolvers) {
         const id = resolver(sessionId)
         if (id !== null) return id
+      }
+      return null
+    },
+    companion: (sessionId: SessionId, activeViewId: string): ViewCompanion | null => {
+      for (const resolver of companionViewResolvers) {
+        const companion = resolver(sessionId, activeViewId)
+        if (companion !== null) return companion
       }
       return null
     },
@@ -446,7 +465,12 @@ export function apply(ctx: Context): void {
   // registers itself as `conversation` and lives on its own child fiber.
   // Presentation registrants depend directly on their slot declarations;
   // this service remains only where conversation actions are required.
-  ctx.plugin(ConversationController, { input: inputHub, blocks: composerBlocks, preferredViews })
+  ctx.plugin(ConversationController, {
+    input: inputHub,
+    blocks: composerBlocks,
+    preferredViews,
+    companionViews,
+  })
 
   // The plan strip rides the input dock above the queue rows (same posture).
   ctx.plugin(todoDockEntry)

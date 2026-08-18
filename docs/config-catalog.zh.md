@@ -573,6 +573,8 @@ export interface Config {
 
 ## `@deepseek-ai/dsh-documents-local`
 
+Requires: `fs`
+
 ```ts config-catalog
 /** Configuration for the local documents provider. */
 export interface Config {
@@ -584,10 +586,12 @@ export interface Config {
   maxOutlineItems?: number
   /** File cap for one search's directory scan. */
   maxSearchFiles?: number
+  /** Entry cap for one directory level returned to document browsers. */
+  maxBrowseEntries?: number
 }
 ```
 
-来源：[`packages/writing/documents-local/src/index.ts:25`](../packages/writing/documents-local/src/index.ts)
+来源：[`packages/writing/documents-local/src/index.ts:27`](../packages/writing/documents-local/src/index.ts)
 
 <a id="deepseek-aidsh-e2b"></a>
 

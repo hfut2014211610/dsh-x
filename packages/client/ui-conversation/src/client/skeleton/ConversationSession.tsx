@@ -70,6 +70,10 @@ export function ConversationSessionHeader({
   const tabs = views.list()
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId, views.preferred(sessionId))
+  const companion = active === undefined ? null : views.companion(sessionId, active.id)
+  const hasCompanion = companion !== null
+    && companion.id !== active?.id
+    && tabs.some(tab => tab.id === companion.id)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
@@ -111,7 +115,7 @@ export function ConversationSessionHeader({
               {renderSlot('conversation.session.header.utilities', {})}
             </div>
           </div>
-          {tabs.length > 1 && (
+          {tabs.length > 1 && !hasCompanion && (
             <div className={css.tabs} role="tablist">
               {tabs.map(viewTab => (
                 <button
@@ -147,6 +151,12 @@ export function ConversationSession({
   const tabs = views.list()
   const selectedId = useStore(s => s.view)
   const active = resolveActiveView(tabs, selectedId, views.preferred(sessionId))
+  const declaredCompanion = active === undefined ? null : views.companion(sessionId, active.id)
+  const companion = declaredCompanion !== null
+    && declaredCompanion.id !== active?.id
+    && tabs.some(tab => tab.id === declaredCompanion.id)
+    ? declaredCompanion
+    : null
   const composerPhase = useSession(s => s.composerPhase)
   const blank = useSession(s => s.blank)
   const inputState = useInput(s => s)
@@ -167,12 +177,28 @@ export function ConversationSession({
   }, [releaseSessionImages, sessionId])
 
   if (blank && composerPhase === 'blank') return null
+  const owner = {
+    inspect,
+    onInspectDone: () => { actions.setInspect(null) },
+  }
+  if (companion === null) {
+    return (
+      <div className={css.viewArea}>
+        {active !== undefined && renderSlot('conversation.view', owner, { only: active.id })}
+      </div>
+    )
+  }
   return (
-    <div className={css.viewArea}>
-      {active !== undefined && renderSlot('conversation.view', {
-        inspect,
-        onInspectDone: () => { actions.setInspect(null) },
-      }, { only: active.id })}
+    <div className={clsx(css.viewArea, css.companionViewArea)} data-conversation-companion-layout="">
+      <main className={css.primaryView}>
+        {active !== undefined && renderSlot('conversation.view', owner, { only: active.id })}
+      </main>
+      <aside className={css.companionPanel} data-conversation-companion="" aria-label={companion.label}>
+        <header className={css.companionHeader}>{companion.label}</header>
+        <div className={css.companionBody}>
+          {renderSlot('conversation.view', owner, { only: companion.id })}
+        </div>
+      </aside>
     </div>
   )
 }

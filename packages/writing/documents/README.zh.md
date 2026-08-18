@@ -6,6 +6,7 @@
 
 ## 服务 API（`ctx.documents`）
 
+- `list({ sessionId, path? })` — 列出工作区相对目录的一个层级，供文档浏览器使用。
 - `read({ sessionId, path, locator? })` — 读取整个文档或定位后的切片。
 - `outline({ sessionId, path })` — 返回标题/块/工作表结构。
 - `search({ sessionId, query, limit? })` — 工作区内容搜索。

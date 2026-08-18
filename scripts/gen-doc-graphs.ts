@@ -112,7 +112,7 @@ const SERVICE_ROLES: ServiceRole[] = [
     mode: 'seam',
     implementations: ['documents-local'],
     consumers: ['tool-documents'],
-    note: 'read/outline/search/create plus version-guarded apply; the provider emits documents/changed so browser UIs follow committed mutations through the generated remote.',
+    note: 'list/read/outline/search/create plus version-guarded apply; the provider emits documents/changed so browser UIs follow committed mutations through the generated remote.',
   },
   {
     key: 'llm',

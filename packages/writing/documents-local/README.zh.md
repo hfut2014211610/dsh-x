@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-面向写作模式的本地 workspace 文档 provider。它基于 `ctx.fs` 实现 `ctx.documents`，强制 workspace 包含检查，支持文本/Markdown/代码读取、简单大纲提取、内容搜索、新建和带版本守卫的编辑。
+面向写作模式的本地 workspace 文档 provider。它基于 `ctx.fs` 实现 `ctx.documents`，强制 workspace 包含检查，支持有界目录浏览、文本/Markdown/代码读取、简单大纲提取、内容搜索、新建和带版本守卫的编辑。
 
 ## 配置
 
@@ -12,6 +12,7 @@
 | `maxReadChars` | `200000` | `read` 返回的最大字符数，超出截断。 |
 | `maxOutlineItems` | `1000` | `outline` 返回的最大大纲条目数。 |
 | `maxSearchFiles` | `50000` | 一次 `search` 扫描的最大文件数。 |
+| `maxBrowseEntries` | `2000` | 一次 `list` 返回的最大直接子级数量。 |
 
 ## Model Experience
 

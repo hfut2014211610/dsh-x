@@ -20,7 +20,7 @@ import type {
 import type { createChatStore } from '../stores.ts'
 import type { ComposerSubmitGesture, InputSubmitMode } from './composer-submission.ts'
 import type { ChatNode, ChatNodeKind } from './chat-nodes.ts'
-import type { CallId, SelectionTarget, ViewTab } from './views.ts'
+import type { CallId, SelectionTarget, ViewCompanion, ViewTab } from './views.ts'
 
 /** Browser-owned image that has not crossed the durable host boundary. */
 export interface ComposerAttachment {
@@ -432,6 +432,7 @@ export interface ConversationSessionInjected {
     subscribe: (fn: () => void) => () => void
     version: () => number
     preferred: (sessionId: SessionId) => string | null
+    companion: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null
   }
   /** Release historical image URLs when this rendered session scope unmounts. */
   releaseSessionImages: (sessionId: SessionId) => void
@@ -447,6 +448,7 @@ export interface ConversationSessionHeaderInjected {
     subscribe: (fn: () => void) => () => void
     version: () => number
     preferred: (sessionId: SessionId) => string | null
+    companion: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null
   }
   /** Select a real Session through the runtime navigation owner. */
   open: (sessionId: SessionId) => void

@@ -23,6 +23,7 @@
   --dsh-composer-card-max-width: calc(var(--dsh-chat-content-width) + 32px);
   --dsh-composer-side-clearance: 16px;
   --dsh-composer-dock-inset: 8px;
+  --dsh-companion-width: clamp(320px, 32%, 384px);
 }
 
 .header {
@@ -184,6 +185,50 @@
   min-height: 0;
 }
 
+.companionViewArea {
+  flex: 1 1 0;
+  flex-direction: row;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.primaryView {
+  display: flex;
+  flex: 1 1 auto;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.companionPanel {
+  display: flex;
+  flex: 0 0 var(--dsh-companion-width);
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  border-left: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-base);
+}
+
+.companionHeader {
+  display: flex;
+  flex: none;
+  align-items: center;
+  min-height: 52px;
+  padding: 0 20px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-primary);
+  font-size: 16px;
+  font-weight: 600;
+}
+
+.companionBody {
+  display: flex;
+  flex: 1 1 auto;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* Composer context stack (Figma 9:937): standalone dock cards share one
    rhythm above the input card. */
 .composerStack {
@@ -304,6 +349,40 @@
   right: var(--dsh-scrollbar-width);
   bottom: 0;
   left: 0;
+}
+
+/* A companion view owns its transcript scroller while the resident composer
+   remains one shared instance positioned inside the companion column. */
+.scrollBody:has([data-conversation-companion-layout]) {
+  position: relative;
+  overflow: hidden;
+  scrollbar-gutter: auto;
+}
+
+.scrollBody:has([data-conversation-companion-layout]) > :global([data-slot='conversation.session']) > .viewArea {
+  flex: 1 1 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.scrollBody:has([data-conversation-companion-layout]) > .composerSeat {
+  position: absolute;
+  right: var(--dsh-scrollbar-width);
+  bottom: 0;
+  left: auto;
+  z-index: 7;
+  width: calc(var(--dsh-companion-width) - var(--dsh-scrollbar-width));
+  background: linear-gradient(
+    180deg,
+    color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0,
+    var(--dsw-alias-bg-base) 36px
+  );
+}
+
+@media (max-width: 1100px) {
+  .root {
+    --dsh-companion-width: 320px;
+  }
 }
 
 /* Hero phase: the composer stack (hero chrome + workspace row + card) is

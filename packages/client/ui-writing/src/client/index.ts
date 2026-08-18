@@ -11,11 +11,14 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the generated Remote API and ctx.remote merge.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { ClientSessionContext, InputTriggerServiceContract, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
+import type { DocumentChange } from '@deepseek-ai/dsh-documents/types'
 import { WritingView, type WritingViewInjected } from './WritingView.tsx'
 import { en, NS, zh } from './locales.ts'
 
 /** Required services: the conversation slot, conversation service, sessions, remote, and locale. */
-export const inject = ['slots', 'conversation', 'sessions', 'remote', 'inputTriggers', 'locale']
+export const inject = [
+  'slots', 'conversation', 'sessions', 'remote', 'remote.documents', 'inputTriggers', 'locale',
+]
 
 /**
  * Client plugin body: register the writing view tab, declare it as the
@@ -26,17 +29,23 @@ export const inject = ['slots', 'conversation', 'sessions', 'remote', 'inputTrig
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-writing: dictionaries')
   const t = ctx.locale.bind(NS)
-  const changedListeners = new Map<SessionId, Set<() => void>>()
+  const changedListeners = new Map<SessionId, Set<(change: DocumentChange) => void>>()
   let lastPath = ''
   ctx.remote.$on('documents/changed', (change) => {
     const listeners = changedListeners.get(change.sessionId)
     if (listeners === undefined) return
-    for (const listener of [...listeners]) listener()
+    for (const listener of [...listeners]) listener(change)
   })
-  ctx.conversation.declarePreferredView((sessionId: SessionId) => {
+  ctx.effect(() => ctx.conversation.declarePreferredView((sessionId: SessionId) => {
     const summary = ctx.sessions.list.getSnapshot().byId[sessionId]
     return summary?.agentPreset === 'writing' ? 'writing' : null
-  })
+  }), 'ui-writing: preferred view')
+  ctx.effect(() => ctx.conversation.declareCompanionView((sessionId, activeViewId) => {
+    const summary = ctx.sessions.list.getSnapshot().byId[sessionId]
+    return summary?.agentPreset === 'writing' && activeViewId === 'writing'
+      ? { id: 'chat', label: t('assistant.title') }
+      : null
+  }), 'ui-writing: assistant companion')
 
   const docSource: InputTriggerSource = {
     trigger: '@',
@@ -63,6 +72,10 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => inputTriggers.registerSource(docSource), 'ui-writing: @doc source')
 
   const documentsFor = (sessionId: SessionId): WritingViewInjected => ({
+    list: async (path) => {
+      const result = await ctx.remote.documents.list({ sessionId, ...(path === undefined ? {} : { path }) })
+      return result.ok ? result.value : { error: result.error.message }
+    },
     load: async (path) => {
       const result = await ctx.remote.documents.read({ sessionId, path })
       if (result.ok) lastPath = path
@@ -102,6 +115,7 @@ export function apply(ctx: ClientContext): void {
         if (listeners.size === 0) changedListeners.delete(sessionId)
       }
     },
+    translate: t,
   })
 
   ctx.slots.inject('conversation.view', () => ctx.slots.register({

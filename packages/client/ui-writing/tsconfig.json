@@ -10,6 +10,7 @@
     { "path": "../locale" },
     { "path": "../runtime" },
     { "path": "../ui-conversation" },
+    { "path": "../ui-primitives" },
     { "path": "../ui-slots" },
     { "path": "../../writing/documents" },
     { "path": "../../runtime-diagnostics/invariants" }
