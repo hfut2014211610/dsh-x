@@ -162,7 +162,7 @@ async function applyStructuredEdit(ctx: Context, target: FsTarget, format: 'docx
 
 /** Local-filesystem provider for `ctx.documents`, bounded by each calling session's workspace. */
 export class DocumentsLocal extends Documents {
-  static inject = ['fs', 'sessions', 'sandboxPolicy']
+  static inject = ['fs', 'sessions']
 
   static Config: z<Config> = z.object({
     maxReadChars: z.number().default(DEFAULT_MAX_READ_CHARS),
@@ -211,9 +211,15 @@ export class DocumentsLocal extends Documents {
    * @param sessionId - the calling session.
    * @returns the resolved mode and workspace root for this call.
    */
-  private policyFor(sessionId: SessionId): SandboxExecutionPolicy {
+  private policyFor(sessionId: SessionId): SandboxExecutionPolicy | undefined {
+    // Optional rather than injected: the fence lives in `fs-sandbox`, which
+    // hard-requires this service itself, so a composition without the policy
+    // has no fence for the write to satisfy. Requiring it here would instead
+    // strand every documents consumer that mounts a plain filesystem.
+    const policy = this.ctx.get('sandboxPolicy')
+    if (policy === undefined) return undefined
     const session = this.ctx.sessions.get(sessionId)
-    return this.ctx.sandboxPolicy.resolve(session === undefined ? {} : { session })
+    return policy.resolve(session === undefined ? {} : { session })
   }
 
   private async resolveWorkspaceTarget(sessionId: SessionId): Promise<FsTarget> {

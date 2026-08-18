@@ -201,6 +201,23 @@ describe('documents-local', () => {
     }
   })
 
+  // A composition with a plain filesystem and no policy service: there is no
+  // fence for a write to satisfy, so the call carries none rather than
+  // stranding the provider on a service that deployment never mounts.
+  it('writes without a policy when the deployment mounts no sandbox', async () => {
+    await docsFiber.dispose()
+    await policyFiber.dispose()
+    docsFiber = await ctx.plugin(DocumentsLocal, {})
+    documents = ctx.documents as DocumentsLocal
+    const writeText = vi.spyOn(ctx.fs, 'writeText')
+
+    await documents.create({ sessionId: SID, path: 'nopolicy.txt', content: 'hello' })
+    expect(writeText.mock.calls.at(-1)?.[4]).toBeUndefined()
+    await expect(documents.read({ sessionId: SID, path: 'nopolicy.txt' }))
+      .resolves.toMatchObject({ content: 'hello' })
+    policyFiber = await ctx.plugin(SandboxPolicyService, { mode: 'danger-full-access', workspaceRoot: dir })
+  })
+
   it('applies a version-guarded line replace', async () => {
     await writeFile(join(dir, 'edit.txt'), 'one\ntwo\nthree')
     const before = await documents.read({ sessionId: SID, path: 'edit.txt' })
