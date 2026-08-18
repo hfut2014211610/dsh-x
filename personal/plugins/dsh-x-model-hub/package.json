@@ -1,0 +1,21 @@
+{
+  "name": "@personal/dsh-x-model-hub",
+  "version": "0.1.0",
+  "private": true,
+  "type": "module",
+  "description": "Model-centered authoring layer for DeepSeek Harness: providers and models configured separately, per-model wire protocol, compiled into stock llm-pi-ai routes.",
+  "main": "./src/index.ts",
+  "exports": {
+    ".": "./src/index.ts",
+    "./package.json": "./package.json"
+  },
+  "dsh": {
+    "bundle": {
+      "patch": "./cordis.patch.yml"
+    }
+  },
+  "comment": "Installed into the profile with `dsh plugin --profile web add <abs path>` (link: dep + auto-mount via the dsh.bundle declaration). Imports resolve through the repo-root tsconfig paths under the tsx source launch; tests use vite-tsconfig-paths.",
+  "scripts": {
+    "test": "vitest run --config personal/plugins/dsh-x-model-hub/vitest.config.ts"
+  }
+}

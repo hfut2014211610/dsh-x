@@ -1,0 +1,8 @@
+# 自挂载 bundle patch：`dsh plugin --profile <name> add <本包绝对路径>` 安装后按此声明自动挂载。
+# 以包名引用（插件清单页按包名派生显示名，file:// 路径会原样上屏）。
+#
+# config 段是插件的组合基座（base）；用户层 settings.yaml 的 dsh-x-model-hub: 段按 key 合并覆盖。
+# 空配置 = 休眠（reconcile 会把账本里上次生成的路由全部回收，不写任何新路由）。
+- insert:
+    - id: dsh-x-model-hub
+      name: '@personal/dsh-x-model-hub'
