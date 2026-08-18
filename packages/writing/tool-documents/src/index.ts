@@ -4,7 +4,7 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
-import { defineTool } from '@deepseek-ai/dsh-tools'
+import { defineTool, type ToolCallView } from '@deepseek-ai/dsh-tools'
 import type { DocumentEdit, DocumentLocator } from '@deepseek-ai/dsh-documents'
 import type {} from '@deepseek-ai/dsh-documents'
 import type {} from '@deepseek-ai/dsh-system-prompt'
@@ -12,6 +12,25 @@ import type { SessionId } from '@deepseek-ai/dsh-session'
 
 export const name = 'tool-documents'
 export const inject = ['tools', 'documents', 'systemPrompt']
+
+/**
+ * Render one read result as the model sees it: a small header, a blank line,
+ * then the content.
+ *
+ * The header exists because `render` IS the model-facing tool result — the
+ * validated `output.schema` value never reaches the model — so a body-only
+ * projection drops the version that `document_edit`'s `base_version` has no
+ * other source for, leaving the guarded edit path unusable. `truncated` is
+ * carried for the same reason: line locators addressed against a clipped body
+ * would target the wrong lines of the whole document.
+ * @param value - the read result returned by `ctx.documents.read`.
+ * @returns the model-facing text.
+ */
+function formatReadResult(value: { path: string; version: string; content: string; truncated: boolean }): string {
+  const header = [`path: ${value.path}`, `version: ${value.version}`]
+  if (value.truncated) header.push('truncated: true')
+  return `${header.join('\n')}\n\n${value.content}`
+}
 
 function sessionIdOf(exec: { agent?: { session: { id: SessionId } } }): SessionId {
   if (exec.agent === undefined) throw new Error('document tools require an agent-scoped execution')
@@ -102,7 +121,7 @@ export function apply(ctx: Context): void {
           truncated: { type: 'boolean', required: true },
         },
       },
-      render: (_args, value) => [{ type: 'text', text: value.content }],
+      render: (_args, value) => [{ type: 'text', text: formatReadResult(value) }],
     },
     isConcurrencySafe: () => true,
     async execute(args, exec) {
@@ -172,11 +191,26 @@ export function apply(ctx: Context): void {
           version: { type: 'string', required: true },
         },
       },
-      render: (_args, value) => [{ type: 'text', text: `Created ${value.path}` }],
+      // The resulting version is reported for the same reason `document_edit`
+      // reports it: a mutation's own result is the cheapest source for the next
+      // `base_version`, and without it the model must re-read what it just wrote.
+      render: (_args, value) => [{ type: 'text', text: `Created ${value.path} (version ${value.version})` }],
     },
     isConcurrencySafe: () => false,
     async execute(args, exec) {
       return ctx.documents.create({ sessionId: sessionIdOf(exec), path: args.path, content: args.content })
+    },
+    // A create has its full content in the args, so the call presents as a diff
+    // against nothing — the shape `str_replace_editor`'s create uses. The
+    // `locations` are what makes the written file a deliverable: `ui-deliverables`
+    // recognizes a mutation by render intent, never by tool name.
+    presentCall(args): ToolCallView {
+      return {
+        card: 'diff',
+        title: `document_create ${args.path}`,
+        diffs: [{ path: args.path, oldText: null, newText: args.content }],
+        locations: [{ path: args.path }],
+      }
     },
   }))
 
@@ -217,6 +251,18 @@ export function apply(ctx: Context): void {
         baseVersion: args.base_version,
         edit: args.edit as unknown as DocumentEdit,
       })
+    },
+    // A generic `edit` card rather than a diff: a located edit carries only its
+    // replacement text in the args, and a `DiffCallView` with `oldText: null`
+    // states "new file or overwrite", which this is not. `locations` still makes
+    // the edited file a deliverable — that is what the render intent decides.
+    presentCall(args): ToolCallView {
+      return {
+        card: 'generic',
+        title: `document_edit ${args.path}`,
+        kind: 'edit',
+        locations: [{ path: args.path }],
+      }
     },
   }))
 }

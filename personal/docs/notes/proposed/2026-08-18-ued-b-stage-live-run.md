@@ -2,7 +2,9 @@
 
 Status: proposed
 
-对 [`ued` 预设](../implemented/2026-08-18-ued-mode-preset.md) 做的第一次真实模型会话，用来验证 B 阶段五条验收标准里除工具目录以外的四条。结论是其中三条不成立，且原因不是模型行为或 policy 措辞，是 `packages/writing/tool-documents` 的三个代码缺陷。**在这些缺陷修好之前，C 阶段没有意义**——预览面板会一直预览同一份从未被改动过的初稿。
+对 [`ued` 预设](../implemented/2026-08-18-ued-mode-preset.md) 做的第一次真实模型会话，用来验证 B 阶段五条验收标准里除工具目录以外的四条。结论是其中三条不成立，且原因不是模型行为或 policy 措辞，是 `packages/writing/tool-documents` 的三个代码缺陷。
+
+**缺陷 1 与 2 已修复**（见文内各自的"修复"段），并由第二次真实会话验证：4 次 `document_edit`、0 次 stale、产物真的被改动（`border-radius: 999px` 落地），会话里出现"产物"行与可点击的文件 chip。**缺陷 3 仍未处理**，是 C 阶段的决策项。
 
 ## 实测条件
 
@@ -41,12 +43,11 @@ render: (_args, value) => [{ type: 'text', text: value.content }]
 
 这个缺陷**同样命中 `writing` 预设**——两个预设用的是同一套工具，写作模式的任何"读了再改"同样走不通。
 
-**修复**：把 version 放进渲染文本。同时 `truncated` 今天也到不了模型面前，读到截断内容却按行号编辑是另一个隐患，一并带出：
+**修复（已落地）**：`document_read` 的渲染改为「`path` / `version` /（仅在裁剪时）`truncated` + 空行 + 正文」。`truncated` 一并带出是因为读到截断内容却按行号编辑是同一类隐患。`document_create` 的渲染也补上它自己写入产生的 version，与 `document_edit` 早已有的 `Updated to version …` 对称——这样紧随创建的第一次编辑不必再读一遍。
 
-```ts
-render: (_args, value) => [{ type: 'text', text:
-  `path: ${value.path}\nversion: ${value.version}${value.truncated ? '\ntruncated: true' : ''}\n\n${value.content}` }]
-```
+**实测复验**：同样的"建原型 → 改按钮圆角"序列，4 次 `document_edit`、**0 次 stale**，`login.html` 真的被改动（`border-radius: 999px` 出现两处）。
+
+两点副产物观察（非缺陷，但影响手感）：version 的实际形态是 `dev:ino:size:mtimeNs:ctimeNs` 这样的长串，模型在一次调用里把它误当成 `path` 传了（序列仍然收敛）。另外，`code` 格式文档只支持按行定位（`heading`/`block` 直接 `DOCUMENT_LOCATOR_UNSUPPORTED`），没有字符串锚定的编辑方式，所以复验回合里模型反复 `document_search` 找 `.btn {`、`border-radius: var(--radius)` 再回去数行号——单次修改的往返次数明显高于 `str_replace_editor` 那种按字符串替换的工具。这是 `documents` 接缝的固有形态，不是缺陷，但它是"迭代为主"这个产品形态的真实成本。
 
 ## 缺陷 2：文档产物不产生 deliverables chip
 
@@ -56,7 +57,9 @@ render: (_args, value) => [{ type: 'text', text:
 
 设计笔记复用矩阵里"产物打开 | `ui-deliverables` | 成功写文件自动成为聊天里的可点击 chip"这一条不成立。
 
-**修复**：照 `packages/fs/tool-fs/src/edit.ts:153-156` 的写法，给 `document_create` / `document_edit` 加 `presentationMeta`，返回 `card: 'generic'`、`kind: 'edit'`、`locations: [{ path: args.path }]`。
+**修复（已落地）**：识别读的是**调用视图**（`presentCall`），不是 `presentationMeta`——`turn-deliverables.ts` 取的是 `ToolResultNode['callView']`。因此给两个工具加 `presentCall`：`document_create` 用 `card: 'diff'` 对空做差（内容就在 args 里，与 `str_replace_editor` 的 create 同形），`document_edit` 用 `card: 'generic'` + `kind: 'edit'`（定位编辑在调用时没有原内容，`oldText: null` 的 diff 会谎称"新建或覆盖"），两者都带 `locations`。
+
+**实测复验**：创建回合的会话里出现「产物」行与 `打开 .ued-verify/login.html` 的 chip，收尾正文里的文件名也变成了可点击链接。
 
 ## 缺陷 3：`ued` 会话没有任何工作区视图
 
@@ -83,15 +86,15 @@ render: (_args, value) => [{ type: 'text', text:
 |---|---|
 | 工具集只含 `document_*` 与委派三件套 | ✅ 已由 `web-agent-presets.e2e.ts` 断言 |
 | 出自包含 HTML | ✅ 实测通过，551 行零外部引用 |
-| 产物成为 deliverables chip 点开可渲染 | ❌ 缺陷 2 + 缺陷 3 |
+| 产物成为 deliverables chip 点开可渲染 | ✅ 缺陷 2 修复后实测通过（chip 经 Host opener 打开，`.html` 落到默认浏览器）。应用**内**渲染仍缺，那是缺陷 3 / C 阶段 |
 | 连续三条指令主会话不阻塞、可见可取消 | ✅ 委派、非阻塞、会话头 `2 个子代理，正在运行`、落定通知、`send_message` 续投全部实测成立（可见面是 `ui-subagent` 不是 `ui-jobs`） |
-| 并发写同一文件时落后者重读重做 | ❌ 缺陷 1：连**无并发**的顺序读-改都撞 `DOCUMENT_STALE_VERSION` |
+| 并发写同一文件时落后者重读重做 | ⚠️ 缺陷 1 修复后顺序编辑已通（0 次 stale），但**真并发下的策略 2 仍未验证**——需要多屏任务重测 |
 | 跨线程改同一元素先回主会话确认 | ⚠️ 未触发——模型自发按策略 1 拆成两个变体文件，绕开了冲突。排序符合预期，但"确认"分支仍未被观测 |
 
 ## 建议顺序
 
-1. 修缺陷 1（一行 `render`，`tool-documents`）。这是唯一阻断项，且 `writing` 预设同样受益。
-2. 修缺陷 2（两个 `presentationMeta`）。
+1. ~~修缺陷 1~~ ✅ 已落地并实测复验。`writing` 预设同样受益。
+2. ~~修缺陷 2~~ ✅ 已落地并实测复验。
 3. 用多屏原型任务重测：验证策略 2（撞版本后重读重做）在真并发下成立，并制造一次真正无法拆分的同元素修改，看"回主会话确认"分支是否触发。
 4. 复现一次"子线程声称创建却未落盘"，判断是模型问题还是 fork 子会话的工具执行问题。
 5. 缺陷 3 与 C 阶段一起决策。

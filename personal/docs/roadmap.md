@@ -46,9 +46,9 @@
 
 **Open Design 相关事项已作废**（2026-08-18 决定）：不引入第三方设计工具，不 vendor 第三方设计系统，也不再走"先跑一遍其 MCP 路线"这个先决动作。代价是预设不携带成文设计规范，设计判断依赖模型自身知识；接入点（预设内 skill 根，`baseUrl` 推导，机制已由 `cordis` 预设验证）保留给日后自撰内容。
 
-**B 阶段实测结论**（见[实测笔记](notes/proposed/2026-08-18-ued-b-stage-live-run.md)）：真实会话验出**迭代闭环是断的**。`document_read` 的 `render` 只输出 `content`，从不把 `version` 交给模型，而 `document_edit` 的 `base_version` 只能来自它——三轮修改指令约 60 次工具调用，成功编辑零次，模型最后去读 harness 源码反推 version 格式。该缺陷同样命中 `writing` 预设。另有两处：文档工具未声明 `presentationMeta`，所以产物不生成 deliverables chip；`ui-writing` 硬门在 `writing`，所以 `ued` 会话没有任何工作区视图。**并发那一组全部成立**：委派、非阻塞、会话头子代理目录、落定通知、`send_message` 续投均实测通过。修复顺序见笔记。
+**B 阶段实测与修复**（见[实测笔记](notes/proposed/2026-08-18-ued-b-stage-live-run.md)）：第一次真实会话验出**迭代闭环是断的**——`document_read` 的 `render` 只输出 `content`，从不把 `version` 交给模型，而 `document_edit` 的 `base_version` 只能来自它；三轮修改指令约 60 次工具调用、成功编辑零次，模型最后去读 harness 源码反推 version 格式。该缺陷同样命中 `writing` 预设。**已修复**（`document_read` 渲染 `path`/`version`/`truncated`，`document_create` 报告自身写入的 version），并由第二次会话复验：0 次 stale、产物真的被改动。**同时修复**：给 `document_create`/`document_edit` 加 `presentCall` 的 `locations`——`ui-deliverables` 按渲染意图而非工具名识别产出文件，此前文档产物永远不生成 chip；复验会话里"产物"行与可点击 chip 已出现。**并发那一组全部成立**：委派、非阻塞、会话头子代理目录、落定通知、`send_message` 续投均实测通过。**仍未处理**：`ui-writing` 硬门在 `writing`，`ued` 会话没有应用内工作区视图（缺陷 3，与 C 阶段一起决策）。
 
-**C 阶段待安排**：预览视图 `dsh-x-ui-ued`，经 `conversation.view` 注册，iframe 渲染 + `documents/changed` 驱动刷新。[安全评审已完成](notes/proposed/2026-08-18-ued-preview-iframe-security.md)：结论是沙箱 iframe 相对现状（原型在用户默认浏览器里 `file://` 裸跑）是**降风险**，落地收敛为五条硬规则，其中"`allow-scripts` 永不与 `allow-same-origin` 同列"是唯一失效即全盘失守且完全静默的一条，必须由双向断言的单测兜底。**前置**：三处缺陷修好前不启动 C——预览面板会一直预览同一份从未被改动过的初稿。
+**C 阶段待安排**：预览视图 `dsh-x-ui-ued`，经 `conversation.view` 注册，iframe 渲染 + `documents/changed` 驱动刷新。[安全评审已完成](notes/proposed/2026-08-18-ued-preview-iframe-security.md)：结论是沙箱 iframe 相对现状（原型在用户默认浏览器里 `file://` 裸跑）是**降风险**，落地收敛为五条硬规则，其中"`allow-scripts` 永不与 `allow-same-origin` 同列"是唯一失效即全盘失守且完全静默的一条，必须由双向断言的单测兜底。**前置**：阻断性的两处已修复，迭代闭环通了；启动 C 之前还差一次多屏任务重测（真并发下的策略 2 与"回主会话确认"分支）。
 
 ### 锚定收益的受控证据
 
@@ -68,12 +68,14 @@
 |---|---|---|
 | 受控三杠杆分离 | ✅ 已完成，结果在 `personal/probe/results/` | 三条杠杆各自有分离的数字 |
 | 长程漂移 | ✅ 已完成 | 锚定组按位置分桶无单调下滑 |
-| **大样本复核**（做减法之前的门禁） | 待做 | n≥10、≥3 个任务、中英各半，复核单元 B 与单元 E。n=3 单任务不足以据此拆预设机制 |
-| **修正 `agent.cordis.yml` 头部因果说明** | 待做，便宜 | 头部仍称工具目录是关键杠杆，与本机数据相反；留着会让后人优化错地方 |
+| **产出级测量**（真正的门禁，[提案](notes/proposed/2026-08-18-anchor-outcome-study.md)） | 待批准 | 6 个可自动判定的任务 × 两条件；先跑 T1+T6 的 4 会话先导。**这是唯一能支撑"拆或不拆"的证据类型** |
+| 修正 `agent.cordis.yml` 头部因果说明 | ✅ 已完成 | 头部现在并列"继承说法"与"本机实测"，两处上游数字就地标注未复现 |
+| 相位契约脱离手抄常量 | ✅ 已完成 | `lib/phases.ts` 直接读预设 yml；改预设立刻改变契约期望，已验证 |
+| ~~指纹侧大样本复核~~ | **降级** | 精确化的是代理指标而非决策依据；产出级测量出结果前不做 |
 | 压缩边界重锚 | **从未验证** | 语料里没有任何会话触发过压缩，契约里 `compaction-reanchor` 永远是 `skip`。需要构造一个足够长的会话 |
 | `session-guide` A/B | 待做，优先级已下调 | 其前提（长会话稀释）在本机找不到证据；但指纹不覆盖目标遵从度，所以不是已被证伪 |
 
-减法必须等大样本：n=3、单任务、单语言的证据可以推翻一个说法，不足以拆掉一套正在工作的机制。
+减法必须等产出级证据。n=3、单任务、单语言的指纹数据可以推翻一个**说法**（上游的因果解释确实被推翻了），但拆掉一套正在工作的机制需要知道拆了之后活会不会变差——而这一点，整个指纹语料一个字都没说。
 
 ## 状态订正待办
 
