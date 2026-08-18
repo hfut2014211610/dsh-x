@@ -17,6 +17,7 @@
 | **`str_replace_editor` view 越界收敛** — 越界终行收敛而非报错 | `packages/` 编辑器工具 | [笔记](notes/implemented/2026-08-17-editor-view-range-clamp.md) |
 | **UED 模式 B 阶段** — 内置 `ued` preset：设计人格 + 并发/冲突 policy section + 复用 `document_*` 与委派三件套（fork + continuable），产物为自包含 HTML；选择器中英双语（顺带补上 `writing` 与 `anchored-standard` 的缺失条目） | `apps/cli/config/agent-presets/ued/`、`packages/client/ui-agent-preset/` | [笔记](notes/implemented/2026-08-18-ued-mode-preset.md) |
 | **UED 模式 C 阶段** — 设计视图：原型列表 + 沙箱 iframe 预览，`documents/changed` 去抖刷新；隔离由双向单测与 web e2e 双重断言 | `packages/client/ui-ued/` | [笔记](notes/implemented/2026-08-18-ued-preview-view.md) |
+| **连接器设置页** — 设置里新增"连接器"导航项，列出能从外部接进 dsh 的应用渠道并自带飞书卡片；没装的渠道照样列出并给出安装命令；`settings.connector.item` 是下一个渠道自己挂卡片的位置 | `packages/client/ui-settings-connectors/` | [笔记](notes/implemented/2026-08-18-connectors-settings-page.md) |
 | **个人插件层** — 模型中心（供应商/模型分离、按模型协议、多供应商降级、厂商预设与探活）、每模型采样默认值、模型中心设置页 | `personal/plugins/dsh-x-{model-hub,model-tuning,ui-model-hub}/` | [插件指南](guides/plugin-guide.md)、[探活复盘](archive/postmortem-2026-08-15-model-hub-probe.md) |
 
 ## 待安排
@@ -74,6 +75,8 @@
 
 **两个视图的边栏可调宽**：`ui-primitives` 新增 `ResizeHandle`（指针捕获、移动合并到一帧、方向键、`role="separator"` 带实时 `aria-valuenow`），设计视图的原型栏与写作视图的工具面板共用。宽度存在视图状态里，卸载后回到默认。没有跟应用外框那个分隔条合并——那个是覆盖层定位且与外框列求解耦合。
 
+**视觉一轮**（见[连接器笔记](notes/implemented/2026-08-18-connectors-settings-page.md)末节）：设计视图加了预览宽度切换（自适应 / 桌面 / 平板 / 手机），左栏表头 sticky 并与舞台表头对齐，选中行加竖条，舞台底色下沉一层让白底原型不再跟面板糊在一起；写作视图当前文档行加同样的竖条，字数统计改等宽数字，选中高亮换品牌色调。
+
 ### 锚定收益的受控证据
 
 [笔记](notes/implemented/2026-08-18-anchor-probe-and-session-guide.md)已把 `anchored-standard` 的轨迹收益推进到**有本机受控证据**，并把预设的三条杠杆全部分开测了（本地网关 `x-models`，三个模型 × 两协议，共 108 次请求）：
@@ -92,7 +95,7 @@
 |---|---|---|
 | 受控三杠杆分离 | ✅ 已完成，结果在 `personal/probe/results/` | 三条杠杆各自有分离的数字 |
 | 长程漂移 | ✅ 已完成 | 锚定组按位置分桶无单调下滑 |
-| **产出级测量**（[提案](notes/proposed/2026-08-18-anchor-outcome-study.md)） | 实验台已验，任务集要重做 | 先导 6 个会话跑完：worktree 隔离、双条件、自动判分、契约验证端到端通，锚定臂契约 3/3 过，轨迹差异也复现了。但 T1 两条臂结果完全一样，T6 同一条件两次跑出相反结果——同条件方差压过条件间差异。下一批要 n≥5、任务进到 100 步以上、规格写死到没法半途收工 |
+| **产出级测量**（[提案](notes/proposed/2026-08-18-anchor-outcome-study.md)） | 首个结果已出，但任务饱和 | L1（三处跨包回归、15 个失败测试）两条臂各 3 次**全部 PASS**，产出无差异；同批会话轨迹指纹仍完全分开（we-only 71.8% 对 0%）。结论只能到"锚定不会把活干砸"，不能到"锚定没用"——双方都撞天花板的任务没有分辨力。真正的矛盾是：能自动判分的任务往往两种条件都能过，能分辨的任务往往判分要靠人 |
 | 修正 `agent.cordis.yml` 头部因果说明 | ✅ 已完成 | 头部现在并列"继承说法"与"本机实测"，两处上游数字就地标注未复现 |
 | 相位契约脱离手抄常量 | ✅ 已完成 | `lib/phases.ts` 直接读预设 yml；改预设立刻改变契约期望，已验证 |
 | ~~指纹侧大样本复核~~ | **降级** | 精确化的是代理指标而非决策依据；产出级测量出结果前不做 |

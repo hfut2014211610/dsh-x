@@ -214,6 +214,10 @@
     - id: ui-settings-plugin-inventory
       name: '@deepseek-ai/dsh-client-ui-settings-plugin-inventory'
 
+    # Connectors: one page per app channel that reaches dsh from outside.
+    - id: ui-settings-connectors
+      name: '@deepseek-ai/dsh-client-ui-settings-connectors'
+
     - id: ui-conversation
       name: '@deepseek-ai/dsh-client-ui-conversation'
 
