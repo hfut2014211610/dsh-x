@@ -8,12 +8,13 @@ export type WritingKey =
   | 'view.writing' | 'assistant.title'
   | 'tools.label' | 'tools.document' | 'tools.outline' | 'tools.search'
   | 'panel.document' | 'panel.outline' | 'panel.search' | 'panel.resize'
-  | 'document.path' | 'document.pathPlaceholder' | 'document.untitled'
+  | 'document.untitled'
+  | 'filter.label' | 'filter.placeholder' | 'filter.clear' | 'filter.empty'
   | 'tree.label' | 'tree.heading' | 'tree.loading' | 'tree.empty' | 'tree.error' | 'tree.truncated' | 'tree.refresh'
   | 'outline.empty' | 'search.input' | 'search.placeholder' | 'search.empty'
   | 'editor.label' | 'editor.placeholder' | 'conflict.message'
   | 'mode.label' | 'mode.edit' | 'mode.preview' | 'preview.label'
-  | 'action.close' | 'action.open' | 'action.reload' | 'action.retry' | 'action.newWindow'
+  | 'action.close' | 'action.reload' | 'action.retry' | 'action.newWindow'
   | 'action.save' | 'action.saving' | 'action.copy' | 'action.copied'
   | 'status.idle' | 'status.loading' | 'status.dirty' | 'status.saving'
   | 'status.saved' | 'status.external' | 'status.conflict' | 'status.error'
@@ -38,9 +39,11 @@ export const zh: Record<WritingKey, string> = {
   'panel.outline': '文档大纲',
   'panel.search': '搜索工作区',
   'panel.resize': '调整面板宽度',
-  'document.path': '工作区相对路径',
-  'document.pathPlaceholder': 'docs/subsystems/writing.md',
   'document.untitled': '未打开文档',
+  'filter.label': '过滤文件',
+  'filter.placeholder': '输入名称过滤，回车打开',
+  'filter.clear': '清除过滤',
+  'filter.empty': '已展开的目录里没有匹配项。',
   'tree.label': '工作区文档目录',
   'tree.heading': '工作区文件',
   'tree.loading': '正在加载目录…',
@@ -62,7 +65,6 @@ export const zh: Record<WritingKey, string> = {
   'action.close': '关闭',
   'action.copy': '复制',
   'action.copied': '已复制',
-  'action.open': '打开文档',
   'action.reload': '重新载入',
   'action.retry': '重试',
   'action.newWindow': '在新窗口打开',
@@ -92,9 +94,11 @@ export const en: Record<WritingKey, string> = {
   'panel.outline': 'Document outline',
   'panel.search': 'Search workspace',
   'panel.resize': 'Resize the panel',
-  'document.path': 'Workspace-relative path',
-  'document.pathPlaceholder': 'docs/subsystems/writing.md',
   'document.untitled': 'No document open',
+  'filter.label': 'Filter files',
+  'filter.placeholder': 'Filter by name; Enter opens',
+  'filter.clear': 'Clear the filter',
+  'filter.empty': 'Nothing in the expanded folders matches.',
   'tree.label': 'Workspace document tree',
   'tree.heading': 'Workspace files',
   'tree.loading': 'Loading directory…',
@@ -116,7 +120,6 @@ export const en: Record<WritingKey, string> = {
   'action.close': 'Close',
   'action.copy': 'Copy',
   'action.copied': 'Copied',
-  'action.open': 'Open document',
   'action.reload': 'Reload',
   'action.retry': 'Retry',
   'action.newWindow': 'Open in new window',

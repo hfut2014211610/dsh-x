@@ -81,7 +81,103 @@ afterEach(() => {
   window.history.replaceState({}, '', '/')
 })
 
+/**
+ * Type a path into the tree filter and submit it.
+ *
+ * The sidebar's top field filters the loaded tree; submitting it opens the one
+ * remaining match, or — as here, where the path names a file the fixture tree
+ * never listed — the text itself. That fallback is what keeps a path outside
+ * the loaded tree reachable at all.
+ */
+function openByPath(view: ReturnType<typeof render>, path: string): void {
+  const field = view.getByLabelText(zh['filter.label'])
+  fireEvent.change(field, { target: { value: path } })
+  const form = field.closest('form')
+  if (form === null) throw new Error('the filter field is not inside a form')
+  fireEvent.submit(form)
+}
+
+/** Set the filter text without submitting it. */
+function filterBy(view: ReturnType<typeof render>, text: string): void {
+  fireEvent.change(view.getByLabelText(zh['filter.label']), { target: { value: text } })
+}
+
+/** Expand `docs` and wait for its listing, so the filter has it to work on. */
+async function expandDocs(view: ReturnType<typeof render>): Promise<void> {
+  fireEvent.click(await view.findByRole('button', { name: 'docs' }))
+  await view.findByRole('button', { name: 'plan.md' })
+}
+
+
 describe('WritingView', () => {
+  // The sidebar's top field used to take a path and open it. As a filter it
+  // answers the far more common question — where is that file — without
+  // making someone click through folders to ask it.
+  it('filters the tree to the files whose names match', async () => {
+    const b = setup()
+    await b.view.findByRole('button', { name: 'README.md' })
+
+    filterBy(b.view, 'readme')
+    expect(b.view.getByRole('button', { name: 'README.md' })).toBeTruthy()
+    expect(b.view.queryByRole('button', { name: 'docs' })).toBeNull()
+
+    // Clearing puts the whole tree back.
+    fireEvent.click(b.view.getByRole('button', { name: zh['filter.clear'] }))
+    expect(b.view.getByRole('button', { name: 'docs' })).toBeTruthy()
+  })
+
+  // A folder that matches IS the answer, so its contents are not also a
+  // question: filtering them would hide the very files the match points at.
+  it('keeps a matched directory whole, children unfiltered', async () => {
+    const b = setup()
+    await expandDocs(b.view)
+
+    filterBy(b.view, 'docs')
+    expect(b.view.getByRole('button', { name: 'docs' })).toBeTruthy()
+    expect(b.view.getByRole('button', { name: 'plan.md' })).toBeTruthy()
+    expect(b.view.getByRole('button', { name: 'result.md' })).toBeTruthy()
+    expect(b.view.queryByRole('button', { name: 'README.md' })).toBeNull()
+  })
+
+  // A folder kept only because a match sits under it is not itself the answer,
+  // so it opens: leaving it shut would filter the tree down to a closed door.
+  it('opens a folder it kept only to show a match inside it', async () => {
+    const b = setup()
+    await expandDocs(b.view)
+    // Collapse it again, so the reveal is the filter's doing and not the click's.
+    fireEvent.click(b.view.getByRole('button', { name: 'docs' }))
+    expect(b.view.queryByRole('button', { name: 'plan.md' })).toBeNull()
+
+    filterBy(b.view, 'result')
+    expect(b.view.getByRole('button', { name: 'docs' })).toBeTruthy()
+    expect(b.view.getByRole('button', { name: 'result.md' })).toBeTruthy()
+    expect(b.view.queryByRole('button', { name: 'plan.md' })).toBeNull()
+    expect(b.view.queryByRole('button', { name: 'README.md' })).toBeNull()
+  })
+
+  // The filter only sees loaded directories, so "no match" has to say which
+  // tree it searched — otherwise it reads as "this file does not exist".
+  it('says what it searched when a filter matches nothing', async () => {
+    const b = setup()
+    await b.view.findByRole('button', { name: 'README.md' })
+
+    filterBy(b.view, 'nothing-by-this-name')
+    expect(b.view.getByText(zh['filter.empty'])).toBeTruthy()
+  })
+
+  // One match is unambiguous, so submitting opens it rather than the raw text.
+  it('opens the single remaining match on submit', async () => {
+    const b = setup()
+    await expandDocs(b.view)
+    b.load.mockClear()
+
+    const field = b.view.getByLabelText(zh['filter.label'])
+    fireEvent.change(field, { target: { value: 'plan' } })
+    fireEvent.submit(field.closest('form')!)
+
+    await waitFor(() => { expect(b.load).toHaveBeenCalledWith('docs/plan.md') })
+  })
+
   it('loads the workspace tree automatically and keeps it open for quick document switching', async () => {
     const b = setup()
     await waitFor(() => { expect(b.list).toHaveBeenCalledWith(undefined) })
@@ -129,8 +225,7 @@ describe('WritingView', () => {
   // Pulling the editor off what they chose would be worse than not following.
   it('stops following once the person opens a document themselves', async () => {
     const b = setup()
-    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'docs/plan.md' } })
-    fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
+    openByPath(b.view, 'docs/plan.md')
     await b.view.findByLabelText('文档预览')
     b.load.mockClear()
 
@@ -160,8 +255,7 @@ describe('WritingView', () => {
       content: 'export const answer = 42\n',
       truncated: false,
     })
-    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'src/index.ts' } })
-    fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
+    openByPath(b.view, 'src/index.ts')
 
     const reader = await b.view.findByLabelText('文档预览')
     expect(reader.textContent).toContain('export const answer = 42')
@@ -182,8 +276,7 @@ describe('WritingView', () => {
       content: '第一段\n\n第二段',
       truncated: false,
     })
-    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'docs/spec.docx' } })
-    fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
+    openByPath(b.view, 'docs/spec.docx')
 
     const reader = await b.view.findByLabelText('文档预览')
     expect(reader.textContent).toContain('第一段')
@@ -201,8 +294,7 @@ describe('WritingView', () => {
       content: 'just words',
       truncated: false,
     })
-    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'notes.txt' } })
-    fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
+    openByPath(b.view, 'notes.txt')
 
     const editor = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
     expect(editor.value).toBe('just words')
@@ -211,8 +303,7 @@ describe('WritingView', () => {
 
   it('opens, edits, saves, and protects a dirty draft from an external change', async () => {
     const b = setup()
-    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'docs/plan.md' } })
-    fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
+    openByPath(b.view, 'docs/plan.md')
 
     const preview = await b.view.findByLabelText('文档预览')
     expect(preview.textContent).toContain('初始内容')
@@ -306,8 +397,7 @@ describe('WritingView', () => {
   it('surfaces document read failures without replacing the editor', async () => {
     const b = setup()
     b.load.mockResolvedValueOnce({ error: 'document unavailable' })
-    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'docs/missing.md' } })
-    fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
+    openByPath(b.view, 'docs/missing.md')
     expect((await b.view.findByRole('alert')).textContent).toContain('document unavailable')
     expect(b.view.getByText('操作失败')).toBeTruthy()
     await waitFor(() => { expect(b.list).toHaveBeenCalledWith('docs') })

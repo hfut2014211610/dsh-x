@@ -1,6 +1,6 @@
 /** Focused document editor used by writing sessions. */
 
-import { useCallback, useEffect, useRef, useState } from 'react'
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, ReactNode } from 'react'
 import type { ConvViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
@@ -118,11 +118,69 @@ export interface WritingViewInjected {
   translate: (key: WritingKey) => string
 }
 
+/** Which rows a live tree filter keeps, and which branches it opens for them. */
+interface TreeFilter {
+  /** Paths whose row still renders. */
+  readonly kept: ReadonlySet<string>
+  /** Directories to render open because the match is below them, not on them. */
+  readonly revealed: ReadonlySet<string>
+  /** Kept file paths, in tree order: one of them is a quick-open target. */
+  readonly files: readonly string[]
+}
+
+/**
+ * Decide which loaded tree rows survive one filter query.
+ *
+ * A directory whose own name matches keeps its whole subtree, unfiltered: the
+ * folder is the hit, and hiding the files inside it would answer a question
+ * nobody asked. A directory that does not match survives only to carry a match
+ * below it, and is opened so that match actually reaches the screen.
+ *
+ * Only loaded directories take part. An unexpanded one has nothing on screen to
+ * filter, and reading the workspace to find out would mean walking it on every
+ * keystroke.
+ * @param query - the raw filter text.
+ * @param directories - the tree as far as it has been loaded.
+ * @returns the filter, or undefined when the query is blank and nothing hides.
+ */
+function buildTreeFilter(
+  query: string, directories: ReadonlyMap<string, DirectoryState>,
+): TreeFilter | undefined {
+  const needle = query.trim().toLowerCase()
+  if (needle === '') return undefined
+  const kept = new Set<string>()
+  const revealed = new Set<string>()
+  const files: string[] = []
+  const walk = (path: string, unfiltered: boolean): boolean => {
+    let matched = false
+    for (const entry of directories.get(path)?.entries ?? []) {
+      const self = entry.name.toLowerCase().includes(needle)
+      if (entry.kind !== 'directory') {
+        if (!self && !unfiltered) continue
+        kept.add(entry.path)
+        files.push(entry.path)
+        matched = true
+        continue
+      }
+      const below = walk(entry.path, unfiltered || self)
+      if (below && !self) revealed.add(entry.path)
+      if (self || below || unfiltered) {
+        kept.add(entry.path)
+        matched = true
+      }
+    }
+    return matched
+  }
+  walk('', false)
+  return { kept, revealed, files }
+}
+
 function DirectoryBranch({
   path,
   directories,
   expanded,
   currentPath,
+  filter,
   loadDirectory,
   toggleDirectory,
   openDocument,
@@ -132,6 +190,7 @@ function DirectoryBranch({
   directories: ReadonlyMap<string, DirectoryState>
   expanded: ReadonlySet<string>
   currentPath: string
+  filter: TreeFilter | undefined
   loadDirectory: (path: string) => void
   toggleDirectory: (entry: DocumentDirectoryEntry) => void
   openDocument: (path: string) => void
@@ -139,11 +198,14 @@ function DirectoryBranch({
 }) {
   const state = directories.get(path)
   const root = path === ''
+  const entries = filter === undefined
+    ? state?.entries
+    : state?.entries.filter(entry => filter.kept.has(entry.path))
   return (
     <ul className={root ? css.treeRoot : css.treeGroup} role={root ? 'tree' : 'group'} aria-label={root ? t('tree.label') : undefined}>
-      {state?.entries.map((entry) => {
+      {entries?.map((entry) => {
         const directory = entry.kind === 'directory'
-        const open = directory && expanded.has(entry.path)
+        const open = directory && (expanded.has(entry.path) || filter?.revealed.has(entry.path) === true)
         return (
           <li
             key={entry.path}
@@ -176,6 +238,7 @@ function DirectoryBranch({
                 directories={directories}
                 expanded={expanded}
                 currentPath={currentPath}
+                filter={filter}
                 loadDirectory={loadDirectory}
                 toggleDirectory={toggleDirectory}
                 openDocument={openDocument}
@@ -197,8 +260,13 @@ function DirectoryBranch({
           <button type="button" onClick={() => { loadDirectory(path) }}>{t('action.retry')}</button>
         </li>
       )}
-      {state?.status === 'ready' && state.entries.length === 0 && (
-        <li className={css.treeMessage} role="none">{t('tree.empty')}</li>
+      {state?.status === 'ready' && entries?.length === 0 && (
+        // Only the root can be emptied BY the filter: a branch survives it
+        // only by holding a match, or by sitting inside a matched folder where
+        // nothing is filtered at all. So anywhere else, empty means empty.
+        <li className={css.treeMessage} role="none">
+          {filter !== undefined && root ? t('filter.empty') : t('tree.empty')}
+        </li>
       )}
       {state?.truncated && <li className={css.treeMessage} role="none">{t('tree.truncated')}</li>}
     </ul>
@@ -349,6 +417,7 @@ export function WritingView({
   const [expandedDirectories, setExpandedDirectories] = useState<ReadonlySet<string>>(() => new Set(['']))
   const [format, setFormat] = useState<DocumentFormat>('text')
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
+  const treeFilter = useMemo(() => buildTreeFilter(pathInput, directories), [pathInput, directories])
   const markdown = format === 'markdown'
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const previewRef = useRef<HTMLElement>(null)
@@ -417,7 +486,6 @@ export function WritingView({
     }
     void loadDirectory(parentDirectory(normalizedPath))
     setCurrentPath(normalizedPath)
-    setPathInput(normalizedPath)
     setDraft(result.content)
     setSavedContent(result.content)
     setVersion(result.version)
@@ -576,25 +644,46 @@ export function WritingView({
           {panel === 'document' && (
             <>
               <form
-                className={css.documentForm}
+                className={css.filterBar}
                 onSubmit={(event) => {
                   event.preventDefault()
                   following.current = false
-                  void loadDocument(pathInput)
+                  // One match is unambiguous, so Enter opens it. With none or
+                  // several, the text is taken as the path it looks like —
+                  // which is also how a path outside the loaded tree is still
+                  // reachable, since a filter can only see what is loaded.
+                  const only = treeFilter?.files.length === 1 ? treeFilter.files[0] : undefined
+                  void loadDocument(only ?? pathInput)
                 }}
               >
-                <label htmlFor={`writing-path-${sessionId}`}>{t('document.path')}</label>
-                <input
-                  id={`writing-path-${sessionId}`}
-                  value={pathInput}
-                  onChange={(event) => { setPathInput(event.target.value) }}
-                  placeholder={t('document.pathPlaceholder')}
-                  autoComplete="off"
-                />
-                <button type="submit" className={css.primaryButton} disabled={pathInput.trim() === ''}>
-                  <IconFolderOpenOutline16 />
-                  {t('action.open')}
-                </button>
+                <div className={css.searchInput}>
+                  <IconSearchOutline16 />
+                  <input
+                    id={`writing-path-${sessionId}`}
+                    aria-label={t('filter.label')}
+                    value={pathInput}
+                    onChange={(event) => { setPathInput(event.target.value) }}
+                    onKeyDown={(event) => {
+                      if (event.key !== 'Escape' || pathInput === '') return
+                      // Esc belongs to the filter before it belongs to the
+                      // panel: clearing is what a reader means by it here.
+                      event.stopPropagation()
+                      setPathInput('')
+                    }}
+                    placeholder={t('filter.placeholder')}
+                    autoComplete="off"
+                  />
+                  {pathInput !== '' && (
+                    <button
+                      type="button"
+                      className={css.filterClear}
+                      aria-label={t('filter.clear')}
+                      onClick={() => { setPathInput('') }}
+                    >
+                      <IconCloseOutline16 />
+                    </button>
+                  )}
+                </div>
               </form>
               <section className={css.treeSection} aria-labelledby={`writing-tree-${sessionId}`}>
                 <div className={css.treeHeader}>
@@ -611,6 +700,7 @@ export function WritingView({
                     directories={directories}
                     expanded={expandedDirectories}
                     currentPath={currentPath}
+                    filter={treeFilter}
                     loadDirectory={(path) => { void loadDirectory(path) }}
                     toggleDirectory={toggleDirectory}
                     openDocument={(path) => { following.current = false; void loadDocument(path, 'tree') }}

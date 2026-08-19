@@ -76,7 +76,7 @@
   font-size: 14px;
 }
 
-.documentForm,
+.filterBar,
 .searchForm {
   display: flex;
   flex: none;
@@ -85,17 +85,11 @@
   padding: 16px;
 }
 
-.documentForm {
+.filterBar {
   padding-bottom: 14px;
   border-bottom: 1px solid var(--dsw-alias-border-l2);
 }
 
-.documentForm label {
-  color: var(--dsw-alias-label-secondary);
-  font-size: 12px;
-}
-
-.documentForm input,
 .searchInput {
   box-sizing: border-box;
   width: 100%;
@@ -107,16 +101,27 @@
   outline: none;
 }
 
-.documentForm input {
-  padding: 0 10px;
-}
-
-.documentForm input:focus,
 .searchInput:focus-within {
   border-color: var(--dsw-alias-state-business-primary);
 }
 
-.primaryButton,
+/* Only present while the filter holds text, so it takes the row's own height
+   rather than reserving a seat that is empty most of the time. */
+.filterClear {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  padding: 0;
+  border: 0;
+  color: var(--dsw-alias-label-caption);
+  background: none;
+  cursor: pointer;
+}
+
+.filterClear:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
 .saveButton {
   display: inline-flex;
   align-items: center;
@@ -133,7 +138,6 @@
   cursor: pointer;
 }
 
-.primaryButton:disabled,
 .saveButton:disabled {
   cursor: default;
   opacity: 0.42;
