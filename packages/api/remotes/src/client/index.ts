@@ -5,6 +5,7 @@ import commandsRemote from '@deepseek-ai/dsh-commands/remote'
 import documentsRemote from '@deepseek-ai/dsh-documents/remote'
 import goalsRemote from '@deepseek-ai/dsh-goal/remote'
 import dynamicRemote from '@deepseek-ai/dsh-cordis-host-runner/remote'
+import pluginControlRemote from '@deepseek-ai/dsh-host-plugin-control/remote'
 import pluginInventoryRemote from '@deepseek-ai/dsh-host-plugin-inventory/remote'
 import messageFeedbackRemote from '@deepseek-ai/dsh-message-feedback/remote'
 import type { TypertClientRemote } from '@deepseek-ai/dsh-typert-protocol'
@@ -109,7 +110,7 @@ export async function apply(ctx: Context): Promise<() => Promise<void>> {
   const disposers: Array<() => Promise<void>> = []
   try {
     for (const contribution of [
-      commandsRemote, documentsRemote, goalsRemote, dynamicRemote, pluginInventoryRemote, messageFeedbackRemote,
+      commandsRemote, documentsRemote, goalsRemote, dynamicRemote, pluginInventoryRemote, pluginControlRemote, messageFeedbackRemote,
     ]) {
       disposers.push(await ctx.remote.$mount(contribution))
     }

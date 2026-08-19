@@ -107,6 +107,13 @@
     - id: plugin-inventory
       name: '@deepseek-ai/dsh-host-plugin-inventory'
 
+    # The write half: enabling and disabling a configured entry from settings.
+    # Mounted beside the projection rather than inside it, because reading the
+    # tree and rewriting it are different authorities and a deployment may want
+    # only the first.
+    - id: plugin-control
+      name: '@deepseek-ai/dsh-host-plugin-control'
+
     # The API gateway: the transport-agnostic dispatch face every client shape
     # shares. The base layer's agent-default-model service owns the default model.
     - id: api-gateway
