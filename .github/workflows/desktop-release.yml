@@ -131,7 +131,10 @@ jobs:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.inputs.release-tag }}
         shell: bash
-        run: gh release upload "$RELEASE_TAG" apps/desktop/release/*.exe --clobber
+        # latest.yml rides along: it is the channel file the shell reads to
+        # verify a download's checksum, and an installer published without it
+        # updates unverified.
+        run: gh release upload "$RELEASE_TAG" apps/desktop/release/*.exe apps/desktop/release/latest.yml --clobber
 
   macos:
     runs-on: macos-latest
@@ -211,7 +214,7 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
           RELEASE_TAG: ${{ github.event.inputs.release-tag }}
-        run: gh release upload "$RELEASE_TAG" apps/desktop/release/*.dmg --clobber
+        run: gh release upload "$RELEASE_TAG" apps/desktop/release/*.dmg apps/desktop/release/latest-mac.yml --clobber
 
   linux:
     if: false # Follows the same zip-based flow as Windows/macOS; enable when the Linux target ships.

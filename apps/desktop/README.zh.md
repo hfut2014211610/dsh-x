@@ -8,13 +8,31 @@
 
 每次启动按经过校验的发现链解析运行时，顺序为：已在部署默认 web origin（本部署为 `http://127.0.0.1:13080`；可用 `DSH_DESKTOP_PROBE_ORIGIN` 覆盖）上服务的实例（经 `host.describe` 探测识别）、`PATH` 上的 `dsh`（经 `--version` 校验）、npx 缓存（`~/.npm/_npx`、`%LOCALAPPDATA%\npm-cache\_npx`）、以及安装包 `extraResources` 内置的运行时。磁盘来源必须出示 `@deepseek-ai/dsh` 自己的 package 清单才能启动；已在服务的实例只附着，绝不拉起或杀死。所选来源与版本显示在加载页上。
 
+**安装版完全跳过「已在服务的实例」这一档。** 不是自己拉起的运行时就不该由自己停掉，附着上去意味着用户退出应用后还留着一个在跑的服务——安装版一律自己持有运行时。源码检出下仍默认探测，那里终端里留着一个 `dsh web` 正是要的效果；显式设置 `DSH_DESKTOP_PROBE_ORIGIN` 在两个方向上都优先。
+
 被拉起的运行时一律执行 `web --host 127.0.0.1 --port 0`；就绪判据依次是 stdout 上的 `dsh web:` URL 行、index 返回 HTTP 200、`host.describe` 回显——三者齐备后窗口才展示 web UI。
 
 ## 窗口与进程生命周期
 
-渲染进程关闭 `nodeIntegration`、开启 `contextIsolation` 与 Chromium 沙箱；新窗口与跨源导航交给系统浏览器。关窗隐藏到托盘、运行时继续服务 agent 工作；退出时杀死拉起的进程树（Windows `taskkill /T`，POSIX 进程组信号），不留孤儿。运行时意外退出会自动重启一次；第二次退出则停在加载页，显示运行时日志尾部与重试按钮。每用户单实例（单实例锁）。
+渲染进程关闭 `nodeIntegration`、开启 `contextIsolation` 与 Chromium 沙箱；新窗口与跨源导航交给系统浏览器。关窗隐藏到托盘、运行时继续服务 agent 工作；退出时杀死拉起的进程树（Windows `taskkill /T`，POSIX 进程组信号），不留孤儿。每用户单实例（单实例锁）。
+
+两类故障按同一件事处理，因为对使用者来说结果一样——应用用不了了：运行时退出，和运行时不再应答。后者必须主动去问：事件循环卡死或写操作挂住时，进程还活着、socket 还接受连接，而界面上每一个请求都悬着；所以已连接的运行时会被同一个 `host.describe` 握手周期性探测，连续多次没应答就和退出一样报故障。单次没应答从不算故障——笔记本从睡眠恢复就会丢一次。
+
+故障由滚动预算而不是终身计数来应对（`src/restart-policy.ts`）：十分钟内允许三次重启，退避 0 秒 → 5 秒 → 30 秒；超出窗口的故障被遗忘，所以一小时挂一次的运行时永远会重启，每次启动都挂的则停在加载页并附上日志尾部。重试按钮恢复完整预算——用户按下它这件事本身是窗口不掌握的信息，也许他刚腾出了那个一直被占的端口。
+
+壳被直接杀掉时（任务管理器、崩溃、断电）根本不会走退出路径，它拉起的运行时会继续服务而没有任何东西再去停它。因此每次启动都记下自己持有的 pid 与 origin，并在拉起任何东西之前把这条记录读回来（`src/owned-runtime.ts`）。只有在记录的 pid 仍然存活**并且**那个 origin 上仍有 dsh 应答时才会执行杀进程：单凭 pid 不构成身份，杀掉一个被复用的 pid 就是杀掉一个本壳从未启动过的进程。
 
 内置运行时以单一归档（`resources/dsh-runtime.zip`）随包分发，壳在首启时把它解压到自己的 userData（`src/bundled-runtime.ts`）——因为这个 electron-builder 构建会整体剥离资源拷贝中的 `node_modules`；解压出的树直接跑在 Electron 二进制上（`ELECTRON_RUN_AS_NODE` 加 `--expose-internals`，供 web profile 的 HMR 行使用），安装后的应用不需要系统 Node.js。`PATH` 与 npx 来源服务于本就装有 Node 的开发机。
+
+## 升级
+
+托盘提供 **Check for updates…**，另外在连接成功二十秒后跑一次无人值守检查——放在窗口已经可用之后，绝不放在启动过程中，那会和运行时抢同一条刚建立的网络。检查没发现新版就什么都不说；只有真的有可用更新才会打断用户。
+
+这里没有用 electron-updater，原因在打好的包里看得见：`electron-builder.yml` 写了显式的 `files` 列表，asar 里只有 `lib/`、preload 和加载页，完全没有 `node_modules`——在这里加一个运行时依赖，它根本不会出现在安装后的应用里。第二个原因是 macOS：原地应用更新需要已签名的应用，而本 fork 的 macOS 构建没有签名。
+
+替代它的是 `src/updater.ts`：用 GitHub API 的 JSON 拿发布列表（所以「发现更新」这一步不需要 YAML 解析器）、从 tag 的任意位置读版本号而不是认死 `v` 前缀（本仓库的发布工具打的是 `dsh-v0.3.1`，恰好是标准 tag 解析器读不出来的形状）、同扩展名下优先选安装器而不是便携版、下载后用 electron-builder 本来就会生成在安装包旁边的 `latest*.yml` 里的 `sha512` 校验。校验不通过是拒绝安装而不是给个警告——下一步就要把这个文件交给操作系统执行。发布时没带 channel 文件的版本会在未校验的情况下下载，并在日志里说明是哪一种情况。安装器只在运行时已经停掉之后、作为退出路径的最后一步启动，因为它要替换的正是本进程正在使用的文件。
+
+[electron-builder.yml](electron-builder.yml) 里的 `publish` 显式写明了本 fork：默认值是从 package 清单的 `repository` 推断的，那指向上游，会让每一个安装后的应用去查一个从来不含这些构建的发布通道。
 
 ## 数据
 

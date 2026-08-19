@@ -1,4 +1,4 @@
-import { describe, expect, it } from 'vitest'
+import { describe, expect, it, vi } from 'vitest'
 import { DEFAULT_PROBE_ORIGIN, discoverRuntime, parseVersionOutput, type DiscoveryDeps } from '../src/discovery.ts'
 
 /** Deps recording every probed path; respond tables decide each probe's answer. */
@@ -37,6 +37,23 @@ describe('discoverRuntime', () => {
     const outcome = await discoverRuntime(makeDeps({ fetchImpl: (async () => describeResponse()) }))
     expect(outcome.candidate).toEqual({ source: 'serving-instance', origin: DEFAULT_PROBE_ORIGIN, version: '0.9.0' })
     expect(outcome.trail[0]).toContain('serving-instance')
+  })
+
+  // An installed app disables the source outright rather than relying on the
+  // probe missing: a runtime this shell did not spawn is one it must not stop,
+  // and attaching to whatever happens to hold the port would leave a server
+  // running after the user quits the app.
+  it('never attaches when the probe origin is disabled, even with an instance serving there', async () => {
+    const fetchImpl = vi.fn(async () => describeResponse())
+    const outcome = await discoverRuntime(makeDeps({
+      probeOrigin: '',
+      fetchImpl: fetchImpl as unknown as typeof fetch,
+      execFile: async () => ({ stdout: '1.4.2', code: 0 }),
+    }))
+
+    expect(fetchImpl).not.toHaveBeenCalled()
+    expect(outcome.candidate).toEqual({ source: 'path', spawn: { command: 'dsh', args: [] }, version: '1.4.2' })
+    expect(outcome.trail[0]).toContain('disabled')
   })
 
   it('validates the PATH runtime through --version', async () => {

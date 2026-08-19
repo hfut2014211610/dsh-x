@@ -9,17 +9,26 @@
  */
 
 import { spawnSync } from 'node:child_process'
-import { existsSync } from 'node:fs'
+import { existsSync, rmSync } from 'node:fs'
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { app, BrowserWindow, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
+import { createHash } from 'node:crypto'
+import { Readable } from 'node:stream'
+import { pipeline } from 'node:stream/promises'
+import { createReadStream, createWriteStream } from 'node:fs'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
 import { ensureBundledRuntime } from './bundled-runtime.ts'
 import { DEFAULT_PROBE_ORIGIN, discoverRuntime } from './discovery.ts'
-import { spawnRuntimeProcess } from './process-tree.ts'
+import { DEFAULT_HEALTH_OPTIONS, startHealthWatch } from './health.ts'
+import { reapOwnedRuntime, type OwnedRuntimeRecord } from './owned-runtime.ts'
+import { killProcessTree, spawnRuntimeProcess } from './process-tree.ts'
+import { createRestartPolicy } from './restart-policy.ts'
+import { describeOrigin } from './rpc-probe.ts'
 import { startSidecar, type SidecarHandle } from './sidecar.ts'
 import { createShellState, type ShellSnapshot } from './shell-state.ts'
+import { checkForUpdate, downloadUpdate, type UpdaterDeps, type UpdateFeed } from './updater.ts'
 
 /** Directory holding this compiled entry (package `lib/`); assets sit beside it. */
 const HERE = dirname(fileURLToPath(import.meta.url))
@@ -34,18 +43,36 @@ const STATE_CHANNEL = 'dsh-desktop-shell:state'
 /** IPC channel carrying retry requests from the loading screen. */
 const RETRY_CHANNEL = 'dsh-desktop-shell:retry'
 
+/**
+ * Where in-app updates come from. This fork publishes its own installers, and
+ * the electron-builder default would infer the UPSTREAM repository from the
+ * package manifest, pointing every update check at releases that never carry
+ * this fork's builds.
+ */
+const UPDATE_REPOSITORY = 'hfut2014211610/dsh-x'
+/** How long after a connection the unattended update check waits. */
+const UPDATE_CHECK_DELAY_MS = 20_000
+
 /** Readiness deadlines: URL line, then HTTP 200 plus the handshake. */
 const URL_TIMEOUT_MS = 120_000
 const READY_TIMEOUT_MS = 30_000
 const POLL_INTERVAL_MS = 250
 
-/** One automatic restart after an unexpected runtime exit; then the user retries. */
-let restartsUsed = 0
+/** Answers every runtime fault: restart with backoff, or stop and show why. */
+const restartPolicy = createRestartPolicy()
 let connectToken = 0
 let quitting = false
 let mainWindow: BrowserWindow | undefined
 let tray: Tray | undefined
 let sidecar: SidecarHandle | undefined
+/** Stops the liveness watch over the connected runtime; replaced per connect. */
+let stopHealthWatch: (() => void) | undefined
+/** Pending restart timer, so a quit or a manual retry can cancel the wait. */
+let restartTimer: NodeJS.Timeout | undefined
+/** Guards against two update checks overlapping (launch timer plus tray click). */
+let updateInFlight = false
+/** A verified installer waiting for the quit that will run it. */
+let pendingInstaller: string | undefined
 /** Origin the connected runtime serves; every other navigation leaves the app. */
 let servedOrigin: string | undefined
 /** The loading screen's own file URL, the one file navigation the window allows. */
@@ -73,11 +100,78 @@ function log(line: string): void {
   state.log(line)
 }
 
+/** Where this launch notes the runtime it owns, for the next launch to reap. */
+function ownedRuntimePath(): string {
+  return join(app.getPath('userData'), 'owned-runtime.json')
+}
+
+/** Note the runtime this launch owns; a failure to write only costs a reap. */
+async function recordOwnedRuntime(record: OwnedRuntimeRecord): Promise<void> {
+  try {
+    await writeFile(ownedRuntimePath(), JSON.stringify(record), 'utf8')
+  } catch (error) {
+    log(`could not record the owned runtime: ${error instanceof Error ? error.message : String(error)}`)
+  }
+}
+
+/** Drop the note; an absent file is the expected case, not a failure. */
+async function clearOwnedRuntime(): Promise<void> {
+  await rm(ownedRuntimePath(), { force: true }).catch(() => {})
+}
+
+/**
+ * Stop the runtime a previous launch owned but never got to kill — the shell
+ * itself was killed, so its quit path never ran. Runs before discovery so the
+ * orphan cannot still be holding the resources the new runtime wants.
+ */
+async function reapPreviousRuntime(): Promise<void> {
+  const line = await reapOwnedRuntime({
+    readRecord: async () => {
+      try {
+        const parsed: unknown = JSON.parse(await readFile(ownedRuntimePath(), 'utf8'))
+        if (typeof parsed !== 'object' || parsed === null) return undefined
+        const { pid, origin } = parsed as Record<string, unknown>
+        if (typeof pid !== 'number' || !Number.isInteger(pid) || pid <= 0) return undefined
+        if (typeof origin !== 'string' || origin === '') return undefined
+        return { pid, origin }
+      } catch {
+        return undefined
+      }
+    },
+    clearRecord: clearOwnedRuntime,
+    describes: async origin => await describeOrigin(origin, fetch, () => crypto.randomUUID(), 2_000) !== undefined,
+    alive: (pid) => {
+      try {
+        // Signal 0 delivers nothing and throws ESRCH for a pid nobody owns.
+        process.kill(pid, 0)
+        return true
+      } catch {
+        return false
+      }
+    },
+    killTree: (pid) => {
+      killProcessTree(pid, {
+        platform: process.platform,
+        taskkill: (args) => { spawnSync('taskkill', args) },
+        signalProcess: (target, signal) => { process.kill(target, signal) },
+      })
+    },
+  })
+  if (line !== undefined) log(line)
+}
+
 async function connect(): Promise<void> {
   const token = connectToken + 1
   connectToken = token
+  if (restartTimer !== undefined) {
+    clearTimeout(restartTimer)
+    restartTimer = undefined
+  }
+  stopHealthWatch?.()
+  stopHealthWatch = undefined
   sidecar?.kill()
   sidecar = undefined
+  await clearOwnedRuntime()
 
   // Materialize the bundled runtime before discovery can select it. A
   // shipping failure degrades loudly (trail + failed screen) rather than
@@ -168,7 +262,12 @@ async function connect(): Promise<void> {
     // row requires it, and the CLI's own respawn does not reach an
     // electron-as-node child. PATH `dsh` manages its own flags.
     runtimeLauncher: { command: process.execPath, args: ['--expose-internals'], env: { ELECTRON_RUN_AS_NODE: '1' } },
-    probeOrigin: process.env.DSH_DESKTOP_PROBE_ORIGIN ?? DEFAULT_PROBE_ORIGIN,
+    // An installed app never attaches: a runtime it did not spawn is one it
+    // must not stop, and quitting would leave a server running behind the
+    // user's back. An explicit override still wins in both directions — it is
+    // how the packaged smoke forces the spawn path and how a developer points
+    // the shell at a specific instance.
+    probeOrigin: process.env.DSH_DESKTOP_PROBE_ORIGIN ?? (app.isPackaged ? '' : DEFAULT_PROBE_ORIGIN),
     randomUuid: () => crypto.randomUUID(),
   })
   for (const line of outcome.trail) log(line)
@@ -209,10 +308,33 @@ async function connect(): Promise<void> {
   // or reconnection dies on purpose.
   const current = handle
   handle.onExit((code) => {
-    if (current === sidecar) void onRuntimeExit(code)
+    if (current === sidecar) void onRuntimeFault(`the runtime exited (code ${String(code)})`)
   })
+  if (handle.owned && handle.pid !== undefined) {
+    await recordOwnedRuntime({ pid: handle.pid, origin: servedOrigin })
+  }
+  // A runtime can stop answering without exiting, and only a probe sees that.
+  // Attached instances are excluded: this shell neither owns nor restarts one.
+  if (handle.owned) {
+    const origin = servedOrigin
+    stopHealthWatch = startHealthWatch(
+      {
+        probe: async () => await describeOrigin(origin, fetch, () => crypto.randomUUID(), 2_000) !== undefined,
+        setTimer: (fn, ms) => setTimeout(fn, ms),
+        clearTimer: (timer) => { clearTimeout(timer as NodeJS.Timeout) },
+      },
+      DEFAULT_HEALTH_OPTIONS,
+      (reason) => {
+        if (current === sidecar) void onRuntimeFault(reason)
+      },
+    )
+  }
   state.ready(handle.url)
   log(`connected: ${handle.url}`)
+  // After the window is useful, never before it: a check that runs during boot
+  // competes with the runtime for the same cold network and delays the thing
+  // the user actually opened the app for.
+  setTimeout(() => { void checkUpdates(false) }, UPDATE_CHECK_DELAY_MS).unref()
   const window = mainWindow
   if (window !== undefined && !window.isDestroyed()) {
     try {
@@ -231,16 +353,153 @@ async function connect(): Promise<void> {
   }
 }
 
-async function onRuntimeExit(code: number | null): Promise<void> {
+/**
+ * Answer one runtime fault — an exit, or a runtime that stopped answering.
+ *
+ * Both faults get the same treatment because they mean the same thing to the
+ * user: the app stopped working. The policy decides whether this one is worth
+ * another attempt and how long to wait, and a fault that spends the budget
+ * stops on the failed screen with its reason, where the retry button resets
+ * the policy and starts the budget over.
+ * @param detail - what went wrong, in the user's terms.
+ */
+async function onRuntimeFault(detail: string): Promise<void> {
   if (quitting) return
-  log(`runtime exited unexpectedly (code ${String(code)})`)
-  if (restartsUsed < 1) {
-    restartsUsed += 1
-    log('restarting the runtime once')
+  stopHealthWatch?.()
+  stopHealthWatch = undefined
+  log(detail)
+  const decision = restartPolicy.onFault(Date.now())
+  if (!decision.restart) {
+    // The dead runtime is no longer ours to reap on the next launch, and the
+    // shell is still running, so nothing else will clear the note.
+    await clearOwnedRuntime()
+    state.phase('failed', `${detail}. ${decision.reason}. Retry to reconnect.`)
+    return
+  }
+  log(decision.reason)
+  if (decision.delayMs === 0) {
     await connect()
     return
   }
-  state.phase('failed', `The dsh runtime exited (code ${String(code)}). Retry to reconnect.`)
+  state.phase('launching', `retrying in ${String(Math.round(decision.delayMs / 1000))}s`)
+  restartTimer = setTimeout(() => {
+    restartTimer = undefined
+    void connect()
+  }, decision.delayMs)
+}
+
+/** Repository, running version, and platform for one update check. */
+function updateFeed(): UpdateFeed {
+  return { repository: UPDATE_REPOSITORY, currentVersion: app.getVersion(), platform: process.platform }
+}
+
+/** Real collaborators for the updater: HTTP, a streamed download, and a hash. */
+function updaterDeps(): UpdaterDeps {
+  return {
+    fetchImpl: fetch,
+    downloadDir: app.getPath('userData'),
+    download: async (url, targetPath, onProgress) => {
+      const response = await fetch(url, { redirect: 'follow' })
+      if (!response.ok || response.body === null) {
+        throw new Error(`downloading the update answered ${String(response.status)}`)
+      }
+      const total = Number(response.headers.get('content-length') ?? 0)
+      let received = 0
+      const body = Readable.fromWeb(response.body as Parameters<typeof Readable.fromWeb>[0])
+      body.on('data', (chunk: Buffer) => {
+        received += chunk.length
+        onProgress(received, total)
+      })
+      await pipeline(body, createWriteStream(targetPath))
+      return received
+    },
+    sha512: async (path) => {
+      const hash = createHash('sha512')
+      await pipeline(createReadStream(path), hash)
+      // electron-builder records the digest base64-encoded, not as hex.
+      return hash.digest('base64')
+    },
+  }
+}
+
+/**
+ * Check for a newer build and, with the user's consent, fetch and stage it.
+ *
+ * Runs unattended shortly after a connection and on demand from the tray. An
+ * unattended check that finds nothing says nothing: the only outcomes that
+ * interrupt anyone are an available update and, when the user asked, the
+ * answer to what they asked.
+ * @param announce - whether to report "no update" and failures in a dialog.
+ */
+async function checkUpdates(announce: boolean): Promise<void> {
+  if (updateInFlight) return
+  if (!app.isPackaged) {
+    if (announce) {
+      await dialog.showMessageBox({
+        type: 'info',
+        message: 'Updates apply to installed builds',
+        detail: 'This window is running from a source checkout, which updates through git rather than through the installer.',
+      })
+    }
+    return
+  }
+  updateInFlight = true
+  try {
+    const feed = updateFeed()
+    const deps = updaterDeps()
+    const found = await checkForUpdate(feed, deps)
+    log(`update check: ${found.detail}`)
+    if (found.status !== 'available') {
+      if (announce) {
+        await dialog.showMessageBox({
+          type: found.status === 'current' ? 'info' : 'warning',
+          message: found.status === 'current' ? 'DeepSeek Harness is up to date' : 'Could not check for updates',
+          detail: found.detail,
+        })
+      }
+      return
+    }
+    const offer = await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['Download', 'Later'],
+      defaultId: 0,
+      cancelId: 1,
+      message: `DeepSeek Harness ${found.version} is available`,
+      detail: `You are running ${feed.currentVersion}. The update downloads in the background and installs when you quit.`,
+    })
+    if (offer.response !== 0) return
+    log(`downloading update ${found.version}`)
+    let lastReported = 0
+    const staged = await downloadUpdate(found, feed, deps, (received, total) => {
+      // One line per decile: the download is tens of megabytes and the log is
+      // a bounded ring the loading screen renders.
+      const percent = total === 0 ? 0 : Math.floor((received / total) * 10) * 10
+      if (percent > lastReported) {
+        lastReported = percent
+        log(`update download: ${String(percent)}%`)
+      }
+    })
+    log(staged.detail)
+    pendingInstaller = staged.path
+    const install = await dialog.showMessageBox({
+      type: 'info',
+      buttons: ['Restart and install', 'Install on quit'],
+      defaultId: 0,
+      cancelId: 1,
+      message: `DeepSeek Harness ${staged.version} is ready to install`,
+      detail: 'The installer replaces this app in place and reopens it.',
+    })
+    if (install.response === 0) quit()
+  } catch (error) {
+    const detail = error instanceof Error ? error.message : String(error)
+    log(`update failed: ${detail}`)
+    pendingInstaller = undefined
+    if (announce) {
+      await dialog.showMessageBox({ type: 'error', message: 'The update could not be installed', detail })
+    }
+  } finally {
+    updateInFlight = false
+  }
 }
 
 function createWindow(): void {
@@ -278,7 +537,9 @@ function createTray(): void {
   tray.setToolTip('DeepSeek Harness')
   tray.setContextMenu(Menu.buildFromTemplate([
     { label: 'Show', click: () => { showWindow() } },
+    { label: 'Check for updates…', click: () => { void checkUpdates(true) } },
     { type: 'separator' },
+    { label: `Version ${app.getVersion()}`, enabled: false },
     { label: 'Quit', click: () => { quit() } },
   ]))
   tray.on('click', () => { showWindow() })
@@ -293,7 +554,30 @@ function showWindow(): void {
 
 function quit(): void {
   quitting = true
+  if (restartTimer !== undefined) {
+    clearTimeout(restartTimer)
+    restartTimer = undefined
+  }
+  stopHealthWatch?.()
+  stopHealthWatch = undefined
   sidecar?.kill()
+  // Synchronous on purpose: `before-quit` gives no chance to await, and a note
+  // left behind would make the next launch hunt a pid this quit already killed.
+  try {
+    rmSync(ownedRuntimePath(), { force: true })
+  } catch {
+    // A note we cannot delete costs one harmless reap attempt next launch.
+  }
+  // Last, and only once the runtime is down: the installer replaces files this
+  // process is running from, so it must not start while the app still holds
+  // them. `openPath` hands it to the shell and returns; the quit below is what
+  // releases the app for it to replace.
+  if (pendingInstaller !== undefined) {
+    const installer = pendingInstaller
+    pendingInstaller = undefined
+    log(`launching the installer: ${installer}`)
+    void shell.openPath(installer)
+  }
   app.quit()
 }
 
@@ -312,17 +596,17 @@ app.on('web-contents-created', (_event, contents) => {
 })
 
 ipcMain.on(RETRY_CHANNEL, () => {
-  restartsUsed = 0
+  // A person asking for a retry is new information the rolling window does not
+  // have: they may have freed the port or fixed the install the loop was
+  // failing on, so the budget starts over rather than staying spent.
+  restartPolicy.reset()
   void connect()
 })
 
 app.on('second-instance', () => { showWindow() })
 app.on('activate', () => { showWindow() })
 
-app.on('before-quit', () => {
-  quitting = true
-  sidecar?.kill()
-})
+app.on('before-quit', () => { quit() })
 
 app.whenReady().then(() => {
   if (!app.requestSingleInstanceLock()) {
@@ -331,7 +615,7 @@ app.whenReady().then(() => {
   }
   createWindow()
   createTray()
-  void connect()
+  void reapPreviousRuntime().then(connect)
 }).catch((error: unknown) => {
   console.error('[dsh-desktop-shell] boot failed:', error)
   app.exit(1)

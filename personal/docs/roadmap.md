@@ -2,7 +2,7 @@
 
 本 fork 已完成需求与待安排设计的单一视图。每项指向 [`notes/`](README.md#目录结构) 下的设计笔记；笔记是决策与验收标准的权威来源，本文只做索引与状态。
 
-最后整理：2026-08-18。
+最后整理：2026-08-19。
 
 ## 已完成
 
@@ -10,6 +10,7 @@
 |---|---|---|
 | **桌面 sidecar 壳（Stage A）** — `dsh --profile web` 之上的 Electron 窗口，四来源运行时发现、三信号就绪门控、托盘驻留、单实例锁、进程树拆除 | `apps/desktop/` | [笔记](notes/implemented/2026-08-15-desktop-sidecar-shell.md) |
 | **桌面 packed runtime 与安装包发布** — 安装包内嵌由该 release tag 自身构建的运行时，首启解压到 userData，校验和门控 | `scripts/release/`、`apps/desktop/electron-builder.yml` | [笔记](notes/implemented/2026-08-17-desktop-packed-runtime.md) |
+| **桌面生命周期归属与应用内升级** — 安装版不再附着外部实例、退出即关停；跨启动回收孤儿运行时（pid + origin 双证据）；退出与「活着但不应答」按同一故障处理，滚动窗口重启预算；自建升级链路（GitHub API 发现、tag 任意位置读版本、sha512 校验、退出时装） | `apps/desktop/` | [笔记](notes/implemented/2026-08-19-desktop-lifecycle-and-updates.md) |
 | **写作模式** — `documents` 能力族、文档工具、`writing` preset、浏览器写作 UI | `packages/writing/{documents,documents-local,tool-documents,writing-mode}`、`packages/client/ui-writing/`、`apps/cli/config/agent-presets/writing/` | [笔记](notes/proposed/2026-08-17-writing-mode.md) ⚠️ 状态待订正 |
 | **用量统计** — 每请求模型 token 用量折叠为会话投影、`/usage` 报告命令、设置页模型用量面板 | 跨 `packages/`，Web 设置面 | [笔记](notes/implemented/2026-08-14-usage-stats-session-projection-and-command.md) |
 | **anchored-standard 预设** — 请求 #1 锚定 Minimal 双工具零注入条件，首次durable 回复或工具调用后提升为按需解锁的常驻工具集；相位由 durable 会话事件推导，压缩边界重入受控相位 | `apps/cli/config/agent-presets/anchored-standard/` | [笔记](notes/implemented/2026-08-17-anchored-standard-preset.md) |
@@ -24,7 +25,9 @@
 
 ### 桌面 Stage B — 从 sidecar 壳到嵌入式桌面表面
 
-[两阶段提案](notes/proposed/2026-08-15-desktop-runtime-surface.md) 定义方向，[可执行计划](notes/proposed/2026-08-18-desktop-stage-b-executable-plan.md) 拆成六个可独立落地的阶段。**当前进度：零**——作为门禁的 embedded-host spike 尚未运行。
+[两阶段提案](notes/proposed/2026-08-15-desktop-runtime-surface.md) 定义方向，[可执行计划](notes/proposed/2026-08-18-desktop-stage-b-executable-plan.md) 拆成六个可独立落地的阶段。**Phase 0–5 当前进度：零**——作为门禁的 embedded-host spike 尚未运行，运行时仍是 sidecar 形态、仍绑一个回环端口。
+
+Phase 6（发布加固）中属于升级义务的那一半已经落地，见上方[桌面生命周期与升级笔记](notes/implemented/2026-08-19-desktop-lifecycle-and-updates.md)；该阶段剩下的是 Linux 产物与 macOS 公证。
 
 | 阶段 | 目标 | 退出条件 |
 |---|---|---|

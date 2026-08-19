@@ -9,12 +9,19 @@
  */
 
 import { describeOrigin } from './rpc-probe.ts'
+import { compareVersions } from './version.ts'
 
 /**
  * The loopback origin the serving-instance source probes: this deployment's
  * default `dsh web` port (the home-level webserver patch may override the
  * shipped 3080, for example to 13080). A miss costs one refused connection —
  * the chain then spawns its own runtime on an OS-assigned port.
+ *
+ * An installed app does not probe at all (see `probeOrigin` on
+ * {@link DiscoveryDeps}): attaching would hand it a runtime it may not stop,
+ * and a desktop app that leaves a server running after the user quits it is
+ * not one the user is in control of. Probing stays the development default,
+ * where a `dsh web` left running in a terminal is the point.
  */
 export const DEFAULT_PROBE_ORIGIN = 'http://127.0.0.1:13080'
 
@@ -54,7 +61,12 @@ export interface DiscoveryDeps {
   bundledRoot: string
   /** Launcher that runs dsh entry scripts (system node, or Electron as node). */
   runtimeLauncher: RuntimeSpawn
-  /** Origin the serving-instance source probes (the deployment's default port). */
+  /**
+   * Origin the serving-instance source probes (the deployment's default port).
+   * An empty string disables the source outright, as `bundledRoot` does for
+   * the bundled one, so the chain can only select a runtime this shell spawns
+   * and therefore owns.
+   */
   probeOrigin: string
   randomUuid: () => string
 }
@@ -63,23 +75,6 @@ export interface DiscoveryDeps {
 export interface DiscoveryOutcome {
   candidate?: RuntimeCandidate
   trail: readonly string[]
-}
-
-/** Loose semver compare: numeric segments, then prerelease strings, higher wins. */
-function compareVersions(a: string, b: string): number {
-  const split = (version: string): { nums: number[]; rest: string } => {
-    const [core, rest = ''] = version.split(/[-+]/)
-    const nums = (core ?? '').split('.').map(part => Number.parseInt(part, 10))
-    return { nums: nums.some(part => Number.isNaN(part)) ? [] : nums, rest }
-  }
-  const left = split(a)
-  const right = split(b)
-  if (left.nums.length === 0 || right.nums.length === 0) return left.nums.length === 0 ? -1 : 1
-  for (let index = 0; index < Math.max(left.nums.length, right.nums.length); index += 1) {
-    const delta = (left.nums[index] ?? 0) - (right.nums[index] ?? 0)
-    if (delta !== 0) return delta
-  }
-  return left.rest < right.rest ? -1 : left.rest > right.rest ? 1 : 0
 }
 
 /**
@@ -119,12 +114,16 @@ function runtimeSpawn(deps: DiscoveryDeps, root: string): RuntimeSpawn {
 export async function discoverRuntime(deps: DiscoveryDeps): Promise<DiscoveryOutcome> {
   const trail: string[] = []
 
-  const serving = await describeOrigin(deps.probeOrigin, deps.fetchImpl, deps.randomUuid, 2_000)
-  if (serving !== undefined) {
-    trail.push(`serving-instance: ${deps.probeOrigin} (dsh ${serving.version})`)
-    return { candidate: { source: 'serving-instance', origin: deps.probeOrigin, version: serving.version }, trail }
+  if (deps.probeOrigin === '') {
+    trail.push('serving-instance: disabled — this shell only runs a runtime it owns')
+  } else {
+    const serving = await describeOrigin(deps.probeOrigin, deps.fetchImpl, deps.randomUuid, 2_000)
+    if (serving !== undefined) {
+      trail.push(`serving-instance: ${deps.probeOrigin} (dsh ${serving.version})`)
+      return { candidate: { source: 'serving-instance', origin: deps.probeOrigin, version: serving.version }, trail }
+    }
+    trail.push(`serving-instance: no dsh answers on ${deps.probeOrigin}`)
   }
-  trail.push(`serving-instance: no dsh answers on ${deps.probeOrigin}`)
 
   try {
     const { stdout, code } = await deps.execFile('dsh', ['--version'])

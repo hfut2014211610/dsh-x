@@ -4,6 +4,16 @@
 # packaging attempt without it fails loud on the missing extraResources path.
 appId: com.deepseek.harness
 productName: DeepSeek Harness
+# Where the in-app update check looks. Without this electron-builder infers the
+# target from the package manifest's `repository`, which is UPSTREAM — every
+# installed app would then check releases that never carry this fork's builds.
+# It also decides where the `latest*.yml` channel file the shell verifies
+# downloads against is written; the release workflow uploads it beside the
+# installers.
+publish:
+  provider: github
+  owner: hfut2014211610
+  repo: dsh-x
 directories:
   output: release
   buildResources: build
