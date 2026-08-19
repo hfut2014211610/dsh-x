@@ -76,7 +76,7 @@ describe('ConnectorPresenceController', () => {
 
   // A refused switch may still have landed, so the card shows what the tree
   // reports rather than the state that was asked for.
-  it('shows the tree, not the request, when a switch is refused', async () => {
+  it('shows the tree, not the request, when the host is unreachable', async () => {
     const b = bench({
       list: async () => tree(true),
       setEnabled: async () => { throw new Error('refused') },
@@ -85,6 +85,39 @@ describe('ConnectorPresenceController', () => {
 
     await b.controller.setEnabled(false)
     expect(b.state()).toEqual({ presence: 'enabled', busy: false, failed: true })
+  })
+
+  // The host answering "it would not start, here is why" is a different thing
+  // from the host not answering, and only one of them names something to fix.
+  it('keeps the refusal the plugin itself gave, so the page can show it', async () => {
+    const b = bench({
+      list: async () => tree(false),
+      setEnabled: async () => ({ found: true, failure: 'the channel could not reach its bridge' }),
+    })
+    await b.controller.refresh()
+
+    await b.controller.setEnabled(true)
+    expect(b.state()).toEqual({
+      presence: 'disabled',
+      busy: false,
+      failed: true,
+      reason: 'the channel could not reach its bridge',
+    })
+  })
+
+  it('drops a stale refusal once a later read succeeds', async () => {
+    let broken = true
+    const b = bench({
+      list: async () => tree(!broken),
+      setEnabled: async () => broken ? { found: true, failure: 'bridge unreachable' } : { found: true },
+    })
+    await b.controller.refresh()
+    await b.controller.setEnabled(true)
+    expect(b.state().reason).toBe('bridge unreachable')
+
+    broken = false
+    await b.controller.refresh()
+    expect(b.state()).toEqual({ presence: 'enabled', busy: false, failed: false })
   })
 
   it('refuses a second switch while one is in flight', async () => {

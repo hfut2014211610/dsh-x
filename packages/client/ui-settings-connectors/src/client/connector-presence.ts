@@ -32,14 +32,24 @@ export interface ConnectorPresenceState {
   busy: boolean
   /** The last read or switch failed. */
   failed: boolean
+  /**
+   * Why the plugin refused to start, when it said. A channel that cannot reach
+   * what it bridges to throws from its own startup, and that sentence is the
+   * only thing on the page that tells someone what to go fix.
+   */
+  reason?: string
 }
 
 /** The plugin-tree calls a connector card needs. */
 export interface ConnectorPluginFace {
   /** Read the configured plugin entries. */
   list: () => Promise<PluginInventorySnapshot>
-  /** Switch one entry on or off, and report whether the entry was still there. */
-  setEnabled: (entryId: PluginEntryId, enabled: boolean) => Promise<{ found: boolean }>
+  /**
+   * Switch one entry on or off. `failure` carries the plugin's own refusal
+   * when it would not start; the call itself only rejects when the host is
+   * unreachable.
+   */
+  setEnabled: (entryId: PluginEntryId, enabled: boolean) => Promise<{ found: boolean; failure?: string }>
 }
 
 /**
@@ -82,6 +92,7 @@ export class ConnectorPresenceController {
       this.store.update((state) => {
         state.presence = entry === undefined ? 'missing' : entry.enabled ? 'enabled' : 'disabled'
         state.failed = false
+        delete state.reason
       })
     } catch {
       if (generation !== this.generation) return
@@ -106,9 +117,11 @@ export class ConnectorPresenceController {
       state.busy = true
       state.failed = false
     })
+    let failure: string | undefined
     let failed = false
     try {
-      await this.plugins.setEnabled(entryId, enabled)
+      failure = (await this.plugins.setEnabled(entryId, enabled)).failure
+      failed = failure !== undefined
     } catch {
       failed = true
     }
@@ -116,6 +129,10 @@ export class ConnectorPresenceController {
     // The re-read runs either way: a failed switch may still have taken, and a
     // successful one is only believed once the tree says so.
     await this.refresh()
-    if (failed) this.store.update((state) => { state.failed = true })
+    if (!failed) return
+    this.store.update((state) => {
+      state.failed = true
+      if (failure !== undefined) state.reason = failure
+    })
   }
 }

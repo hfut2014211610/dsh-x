@@ -145,6 +145,12 @@
   opacity: 0.45;
 }
 
+.reason {
+  font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
+  font-size: 11px;
+  overflow-wrap: anywhere;
+}
+
 .absent,
 .readOnly {
   margin: 12px 0 4px;

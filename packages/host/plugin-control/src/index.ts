@@ -52,10 +52,33 @@ export class PluginControlGateway extends TypertRemoteService {
   async setEnabled(request: { entryId: PluginEntryId; enabled: boolean }): Promise<PluginControlOutcome> {
     const entry = [...this.ctx.loader.entries()].find(candidate => candidate.id === request.entryId)
     if (entry === undefined) return { found: false, enabled: false }
-    // `disabled` is the Loader's own field, and its absence means enabled;
-    // writing the negation keeps that vocabulary rather than inventing one.
-    await this.ctx.loader.update(entry.id, { ...entry.options, disabled: !request.enabled })
+    try {
+      // `disabled` is the Loader's own field, and its absence means enabled;
+      // writing the negation keeps that vocabulary rather than inventing one.
+      await this.ctx.loader.update(entry.id, { ...entry.options, disabled: !request.enabled })
+    } catch (error: unknown) {
+      // Switching an entry on runs its apply, and a plugin that cannot reach
+      // what it needs throws from there. That is an answer, not a broken
+      // request: the Loader leaves the entry disabled, so report the state it
+      // is actually in and why, rather than failing the call and leaving the
+      // caller to guess whether anything happened.
+      return {
+        found: true,
+        enabled: this.isEnabled(request.entryId),
+        failure: error instanceof Error ? error.message : String(error),
+      }
+    }
     return { found: true, enabled: request.enabled }
+  }
+
+  /**
+   * Whether the tree currently holds that entry as enabled.
+   * @param entryId - the entry to read.
+   * @returns its enablement now; false once the entry is gone.
+   */
+  private isEnabled(entryId: PluginEntryId): boolean {
+    const entry = [...this.ctx.loader.entries()].find(candidate => candidate.id === entryId)
+    return entry !== undefined && entry.options.disabled !== true
   }
 }
 

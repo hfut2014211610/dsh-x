@@ -94,6 +94,47 @@ describe('PluginControlGateway', () => {
       .toEqual({ found: false, enabled: false })
   })
 
+  // What a supervisor would need. A channel plugin that loses what it bridges
+  // to throws from apply, and the whole recovery story rests on off-then-on
+  // actually re-running it — otherwise a "restart" control offers nothing.
+  it('reports a refusal to start, then revives the entry once it can', async () => {
+    const ctx = new Context()
+    contexts.push(ctx)
+    await ctx.plugin(Loader)
+    let failing = false
+    let applied = 0
+    ctx.loader.builtins.flaky = () => {
+      applied += 1
+      if (failing) throw new Error('the channel could not reach its bridge')
+    }
+    await ctx.loader.create({ name: 'cordis:flaky' })
+    await ctx.plugin(PluginControlGateway)
+    const control = ctx.get('pluginControl') as PluginControlGateway
+    const entry = () => {
+      const found = [...ctx.loader.entries()].find(candidate => candidate.options.name === 'cordis:flaky')
+      if (found === undefined) throw new Error('the fixture entry vanished')
+      return found
+    }
+    const id = entry().id as PluginEntryId
+    expect(applied).toBe(1)
+
+    // It breaks, and the next start does not take. The call still answers:
+    // the entry is there, it is off, and here is why.
+    failing = true
+    await control.setEnabled({ entryId: id, enabled: false })
+    const refused = await control.setEnabled({ entryId: id, enabled: true })
+    expect(refused).toMatchObject({ found: true, enabled: false })
+    expect(refused.failure).toContain('could not reach its bridge')
+    expect(entry().fiber).toBeUndefined()
+
+    // Whatever it needed comes back; the same gesture brings the plugin back.
+    failing = false
+    expect(await control.setEnabled({ entryId: id, enabled: true }))
+      .toEqual({ found: true, enabled: true })
+    expect(applied).toBe(3)
+    expect(entry().fiber).not.toBeUndefined()
+  })
+
   // The Loader owns the profile as well as the tree, so the change has to be
   // in the configuration it would write back — not only in the live fiber.
   it('writes the change into the entry configuration, not just the fiber', async () => {

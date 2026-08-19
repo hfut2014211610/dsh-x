@@ -66,7 +66,10 @@ export function apply(ctx: ClientContext): void {
     setEnabled: async (entryId, enabled) => {
       const result = await ctx.remote.pluginControl.setEnabled({ entryId, enabled })
       if (!result.ok) throw new Error(`pluginControl.setEnabled failed: ${result.error.code}: ${result.error.message}`)
-      return { found: result.value.found }
+      return {
+        found: result.value.found,
+        ...result.value.failure === undefined ? {} : { failure: result.value.failure },
+      }
     },
   }
   const feishu = new FeishuCardController(ctx.settingsScope.bind({ namespace: FEISHU_NS }), plugins)

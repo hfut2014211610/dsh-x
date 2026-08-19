@@ -115,7 +115,19 @@ export function ConnectorCard(props: ConnectorCardProps) {
                     />
                   </div>
                   <p className={css.hint}>{t('power.hint')}</p>
-                  {presence.failed ? <p className={css.failed} role="status">{t('power.failed')}</p> : null}
+                  {presence.failed
+                    ? (
+                      <p className={css.failed} role="status">
+                        {t('power.failed')}
+                        {/* The plugin's own words. A channel that cannot reach
+                            its bridge says so here, and that sentence is the
+                            only thing on the page naming what to go fix. */}
+                        {presence.reason === undefined
+                          ? null
+                          : <><br /><code className={css.reason}>{presence.reason}</code></>}
+                      </p>
+                    )
+                    : null}
                   {/* A disabled plugin serves no settings namespace, so there
                       is nothing to render controls from — and saying so beats
                       a form that cannot be filled in. */}
