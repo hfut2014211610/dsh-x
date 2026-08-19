@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-documents",
   "description": "Document capability seam for writing mode: locator/edit vocabulary, versioned mutation service, and documents/changed event declaration",
-  "version": "0.3.3",
+  "version": "0.1.0-rc.7",
   "publishConfig": {
     "access": "public"
   },

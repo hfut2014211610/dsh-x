@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-documents-local",
   "description": "Local workspace document provider for writing mode over ctx.fs",
-  "version": "0.3.3",
+  "version": "0.1.0-rc.7",
   "publishConfig": {
     "access": "public"
   },

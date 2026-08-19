@@ -4,6 +4,21 @@
 # packaging attempt without it fails loud on the missing extraResources path.
 appId: com.deepseek.harness
 productName: DeepSeek Harness
+# The fork's version lives HERE and nowhere else.
+#
+# Every package manifest in the tree carries upstream's version verbatim, which
+# is what keeps an upstream release from conflicting with this fork: a version
+# this fork never edits is one git can fast-forward. The last merge produced 227
+# conflicts and 221 of them were this one field, in 221 manifests, for no reason
+# other than that the fork had renumbered them.
+#
+# So the fork identity rides the one file upstream will never have. The suffix
+# names the upstream release this build is cut from, then the fork's own serial:
+# `<upstream version>-x.<fork serial>`. electron-builder merges this into the
+# packaged manifest, so it is what `app.getVersion()` reports, what the
+# installer filenames carry, and what the update check compares.
+extraMetadata:
+  version: 0.1.0-rc.7-x.0.4
 # Where the in-app update check looks. Without this electron-builder infers the
 # target from the package manifest's `repository`, which is UPSTREAM — every
 # installed app would then check releases that never carry this fork's builds.
