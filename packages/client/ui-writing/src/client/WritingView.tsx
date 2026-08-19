@@ -17,6 +17,7 @@ import {
   IconRefreshOutline16,
   IconSearchOutline16,
   IconWarningOutline16,
+  CodeBlock,
   MarkdownText,
   ResizeHandle,
   Tooltip,
@@ -24,6 +25,7 @@ import {
 import type {
   DocumentChange,
   DocumentDirectoryEntry,
+  DocumentFormat,
   DocumentDirectoryListing,
   DocumentOutlineEntry,
   DocumentReadResult,
@@ -31,6 +33,43 @@ import type {
 } from '@deepseek-ai/dsh-documents/types'
 import type { WritingKey } from './locales.ts'
 import css from './WritingView.module.css'
+
+/**
+ * Grammar hints by extension, for the reading view of a code document.
+ *
+ * Deliberately a small table rather than a guess from the extension itself:
+ * an unknown hint renders as plain text, which is the same thing the reader
+ * had before, so the cost of a miss is nothing and the cost of a wrong guess
+ * is code coloured as the wrong language.
+ */
+const CODE_LANGUAGES: Readonly<Record<string, string>> = {
+  bash: 'bash', c: 'c', cjs: 'javascript', cpp: 'cpp', cs: 'csharp', css: 'css', go: 'go',
+  h: 'c', hpp: 'cpp', htm: 'html', html: 'html', java: 'java', js: 'javascript', json: 'json',
+  jsonc: 'json', jsx: 'jsx', kt: 'kotlin', less: 'less', lua: 'lua', mjs: 'javascript',
+  mts: 'typescript', php: 'php', ps1: 'powershell', py: 'python', rb: 'ruby', rs: 'rust',
+  scss: 'scss', sh: 'bash', sql: 'sql', swift: 'swift', toml: 'toml', ts: 'typescript',
+  tsx: 'tsx', vue: 'vue', xml: 'xml', yaml: 'yaml', yml: 'yaml', zsh: 'bash',
+}
+
+/** The grammar hint for one path, or undefined when the table has none. */
+function codeLanguage(path: string): string | undefined {
+  const extension = path.slice(path.lastIndexOf('.') + 1).toLowerCase()
+  return extension === '' ? undefined : CODE_LANGUAGES[extension]
+}
+
+/**
+ * Whether this format has something better to show than an editable copy of
+ * its own source.
+ *
+ * `text` does not: a plain text file read as prose is the same characters in
+ * the same order, and the editor already shows those. Everything else does —
+ * markdown renders, code colours, and an extracted Word or Excel document is
+ * not source at all but text pulled out of a zip, which nobody should be
+ * looking at through a textarea.
+ */
+function hasReadingView(format: DocumentFormat): boolean {
+  return format !== 'text'
+}
 
 type Panel = 'document' | 'outline' | 'search'
 type ViewMode = 'edit' | 'preview'
@@ -308,8 +347,9 @@ export function WritingView({
   const [hits, setHits] = useState<readonly DocumentSearchHit[]>([])
   const [directories, setDirectories] = useState<ReadonlyMap<string, DirectoryState>>(() => new Map())
   const [expandedDirectories, setExpandedDirectories] = useState<ReadonlySet<string>>(() => new Set(['']))
-  const [markdown, setMarkdown] = useState(false)
+  const [format, setFormat] = useState<DocumentFormat>('text')
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
+  const markdown = format === 'markdown'
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const previewRef = useRef<HTMLElement>(null)
   const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null)
@@ -381,9 +421,12 @@ export function WritingView({
     setDraft(result.content)
     setSavedContent(result.content)
     setVersion(result.version)
-    const nextMarkdown = result.format === 'markdown'
-    setMarkdown(nextMarkdown)
-    if (normalizedPath !== currentPathRef.current) setViewMode(nextMarkdown ? 'preview' : 'edit')
+    setFormat(result.format)
+    // Opening a document is a reading act far more often than an editing one,
+    // so every format that HAS a reading view opens in it. The exception is a
+    // format with nothing better to show than its own source, which is what an
+    // editor already is.
+    if (normalizedPath !== currentPathRef.current) setViewMode(hasReadingView(result.format) ? 'preview' : 'edit')
     setEntries(await outline(normalizedPath))
     setStatus(source === 'external' ? 'external' : 'saved')
     if (source === 'manual') setPanel(null)
@@ -635,7 +678,7 @@ export function WritingView({
             <strong title={currentPath || undefined}>{title}</strong>
           </div>
           <div className={css.editorActions}>
-            {markdown && (
+            {hasReadingView(format) && (
               <div className={css.modeSwitch} role="group" aria-label={t('mode.label')}>
                 <button
                   type="button"
@@ -702,10 +745,29 @@ export function WritingView({
         )}
 
         <div className={css.paper}>
-          {markdown && viewMode === 'preview'
+          {hasReadingView(format) && viewMode === 'preview'
             ? (
-              <article ref={previewRef} className={css.preview} aria-label={t('preview.label')}>
-                <MarkdownText text={draft} />
+              <article
+                ref={previewRef}
+                className={format === 'code' ? css.codeReader : css.preview}
+                aria-label={t('preview.label')}
+              >
+                {format === 'markdown' && <MarkdownText text={draft} />}
+                {format === 'code' && (
+                  <CodeBlock
+                    code={draft}
+                    lang={codeLanguage(currentPath)}
+                    copyLabel={t('action.copy')}
+                    copiedLabel={t('action.copied')}
+                  />
+                )}
+                {/* Word and Excel arrive already extracted from their zip, so
+                    the reading view is that text laid out as prose — the
+                    editor's own view of it is the same characters with none of
+                    the reading affordances. */}
+                {(format === 'docx' || format === 'xlsx') && (
+                  <div className={css.extracted}>{draft}</div>
+                )}
               </article>
             )
             : (

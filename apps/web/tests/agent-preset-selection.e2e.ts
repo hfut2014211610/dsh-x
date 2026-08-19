@@ -318,7 +318,7 @@ describe('web e2e: agent-preset selection', () => {
     await compareOrRefreshGolden(WRITING_EXPECTED, snapshot, MODE)
 
     await page.getByRole('button', { name: OUTLINE_DOCUMENT, exact: true }).click()
-    const preview = page.getByRole('article', { name: 'Markdown preview' })
+    const preview = page.getByRole('article', { name: 'Document preview' })
     await preview.waitFor({ timeout: 15_000 })
     await page.getByRole('button', { name: 'Outline', exact: true }).click()
     await page.getByRole('button', { name: /Final target/ }).click()

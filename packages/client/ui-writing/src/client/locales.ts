@@ -14,7 +14,7 @@ export type WritingKey =
   | 'editor.label' | 'editor.placeholder' | 'conflict.message'
   | 'mode.label' | 'mode.edit' | 'mode.preview' | 'preview.label'
   | 'action.close' | 'action.open' | 'action.reload' | 'action.retry' | 'action.newWindow'
-  | 'action.save' | 'action.saving'
+  | 'action.save' | 'action.saving' | 'action.copy' | 'action.copied'
   | 'status.idle' | 'status.loading' | 'status.dirty' | 'status.saving'
   | 'status.saved' | 'status.external' | 'status.conflict' | 'status.error'
   | 'footer.characters' | 'footer.autosave'
@@ -57,9 +57,11 @@ export const zh: Record<WritingKey, string> = {
   'mode.label': '文档显示模式',
   'mode.edit': '编辑',
   'mode.preview': '预览',
-  'preview.label': 'Markdown 预览',
+  'preview.label': '文档预览',
   'conflict.message': '文档已被模型或其他窗口修改。当前草稿尚未覆盖，可重新载入最新版本。',
   'action.close': '关闭',
+  'action.copy': '复制',
+  'action.copied': '已复制',
   'action.open': '打开文档',
   'action.reload': '重新载入',
   'action.retry': '重试',
@@ -109,9 +111,11 @@ export const en: Record<WritingKey, string> = {
   'mode.label': 'Document display mode',
   'mode.edit': 'Edit',
   'mode.preview': 'Preview',
-  'preview.label': 'Markdown preview',
+  'preview.label': 'Document preview',
   'conflict.message': 'The document changed in the assistant or another window. Your draft is preserved; reload to use the latest version.',
   'action.close': 'Close',
+  'action.copy': 'Copy',
+  'action.copied': 'Copied',
   'action.open': 'Open document',
   'action.reload': 'Reload',
   'action.retry': 'Retry',

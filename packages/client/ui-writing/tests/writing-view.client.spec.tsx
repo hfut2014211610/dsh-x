@@ -131,7 +131,7 @@ describe('WritingView', () => {
     const b = setup()
     fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'docs/plan.md' } })
     fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
-    await b.view.findByLabelText('Markdown 预览')
+    await b.view.findByLabelText('文档预览')
     b.load.mockClear()
 
     act(() => {
@@ -144,8 +144,69 @@ describe('WritingView', () => {
       } as unknown as DocumentChange)
     })
 
-    await waitFor(() => { expect(b.view.getByLabelText('Markdown 预览')).toBeTruthy() })
+    await waitFor(() => { expect(b.view.getByLabelText('文档预览')).toBeTruthy() })
     expect(b.load).not.toHaveBeenCalled()
+  })
+
+  // Reading is what opening a document usually is, and until now only markdown
+  // got a reading view: a source file landed in a textarea, and a Word file
+  // landed there as text pulled out of a zip.
+  it('opens a code file in a reading view, and keeps the editor one click away', async () => {
+    const b = setup()
+    b.load.mockResolvedValueOnce({
+      path: 'src/index.ts',
+      format: 'code',
+      version: 'v1',
+      content: 'export const answer = 42\n',
+      truncated: false,
+    })
+    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'src/index.ts' } })
+    fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
+
+    const reader = await b.view.findByLabelText('文档预览')
+    expect(reader.textContent).toContain('export const answer = 42')
+    // Highlighted, not dumped: the grammar hint comes from the extension.
+    expect(reader.querySelector('pre')).toBeTruthy()
+
+    fireEvent.click(b.view.getByRole('button', { name: '编辑' }))
+    const editor = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
+    expect(editor.value).toContain('export const answer = 42')
+  })
+
+  it('reads an extracted Word document as prose rather than through the editor', async () => {
+    const b = setup()
+    b.load.mockResolvedValueOnce({
+      path: 'docs/spec.docx',
+      format: 'docx',
+      version: 'v1',
+      content: '第一段\n\n第二段',
+      truncated: false,
+    })
+    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'docs/spec.docx' } })
+    fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
+
+    const reader = await b.view.findByLabelText('文档预览')
+    expect(reader.textContent).toContain('第一段')
+    expect(reader.textContent).toContain('第二段')
+  })
+
+  // A plain text file has nothing to render that the editor does not already
+  // show, so it opens in the editor and offers no mode switch at all.
+  it('leaves a plain text file in the editor with no reading mode offered', async () => {
+    const b = setup()
+    b.load.mockResolvedValueOnce({
+      path: 'notes.txt',
+      format: 'text',
+      version: 'v1',
+      content: 'just words',
+      truncated: false,
+    })
+    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'notes.txt' } })
+    fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
+
+    const editor = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
+    expect(editor.value).toBe('just words')
+    expect(b.view.queryByRole('group', { name: '视图模式' })).toBeNull()
   })
 
   it('opens, edits, saves, and protects a dirty draft from an external change', async () => {
@@ -153,7 +214,7 @@ describe('WritingView', () => {
     fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'docs/plan.md' } })
     fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
 
-    const preview = await b.view.findByLabelText('Markdown 预览')
+    const preview = await b.view.findByLabelText('文档预览')
     expect(preview.textContent).toContain('初始内容')
     fireEvent.click(b.view.getByRole('button', { name: '编辑' }))
     let editor = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
@@ -161,7 +222,7 @@ describe('WritingView', () => {
     fireEvent.change(editor, { target: { value: '# 简介\n\n手工修改' } })
     expect(b.view.getByText('有未保存修改')).toBeTruthy()
     fireEvent.click(b.view.getByRole('button', { name: '预览' }))
-    expect(b.view.getByLabelText('Markdown 预览').textContent).toContain('手工修改')
+    expect(b.view.getByLabelText('文档预览').textContent).toContain('手工修改')
     fireEvent.click(b.view.getByRole('button', { name: '编辑' }))
     editor = b.view.getByLabelText('文档编辑器') as HTMLTextAreaElement
     fireEvent.click(b.view.getByRole('button', { name: '保存' }))
@@ -214,7 +275,7 @@ describe('WritingView', () => {
     await waitFor(() => { expect(b.load).toHaveBeenCalledWith('docs/result.md') })
 
     fireEvent.click(b.view.getByRole('button', { name: '大纲' }))
-    const preview = b.view.getByLabelText('Markdown 预览')
+    const preview = b.view.getByLabelText('文档预览')
     const headings = preview.querySelectorAll('h1, h2, h3, h4, h5, h6')
     Object.defineProperties(preview, {
       clientHeight: { configurable: true, value: 400 },
@@ -226,7 +287,7 @@ describe('WritingView', () => {
     secondHeading.getBoundingClientRect = vi.fn(() => ({ top: 900 } as DOMRect))
     const outlineButtons = b.view.getAllByRole('button', { name: /简介/ })
     fireEvent.click(outlineButtons[1]!)
-    expect(b.view.getByLabelText('Markdown 预览')).toBe(preview)
+    expect(b.view.getByLabelText('文档预览')).toBe(preview)
     expect(preview.scrollTop).toBe(776)
 
     fireEvent.click(b.view.getByRole('button', { name: '编辑' }))
