@@ -145,17 +145,63 @@ function escapeXml(value: string): string {
     .replace(/"/g, '&quot;')
 }
 
+/** The paragraph body shared by a created and an edited Word document. */
+function wordBody(lines: readonly string[]): string {
+  const body = lines.map(line => `<w:p><w:r><w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r></w:p>`).join('')
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}</w:body></w:document>`
+}
+
+/** The shared-string table shared by a created and an edited workbook. */
+function sharedStringTable(lines: readonly string[]): string {
+  const items = lines.map(line => `<si><t xml:space="preserve">${escapeXml(line)}</t></si>`).join('')
+  return `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${String(lines.length)}" uniqueCount="${String(lines.length)}">${items}</sst>`
+}
+
+/**
+ * Build a Word or Excel file from plain text.
+ *
+ * Creating one of these used to write the text straight into a file with the
+ * extension on it, which is not a document at all — Word refuses to open it,
+ * and a model asked for a `.docx` works around the refusal by emitting HTML
+ * under that name instead. The parts below are the minimum OOXML package each
+ * format is: a content-type map, a root relationship naming the main part, and
+ * the part itself. Everything further — styles, themes, settings — is optional,
+ * and both applications supply their own defaults for it.
+ *
+ * The line is the unit in both, because it is the only structure plain text
+ * carries: a paragraph per line in Word, a row per line in Excel.
+ * @param format - which of the two packages to build.
+ * @param content - the document text.
+ * @returns the complete file, ready to write.
+ */
+async function buildStructuredDocument(format: 'docx' | 'xlsx', content: string): Promise<Buffer> {
+  const lines = content.split(/\r?\n/)
+  const zip = new JSZip()
+  if (format === 'docx') {
+    zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/word/document.xml" ContentType="application/vnd.openxmlformats-officedocument.wordprocessingml.document.main+xml"/></Types>')
+    zip.file('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="word/document.xml"/></Relationships>')
+    zip.file('word/document.xml', wordBody(lines))
+    return await zip.generateAsync({ type: 'nodebuffer' })
+  }
+  // One column, one row per line, every cell an index into the shared table:
+  // the sheet must carry those indices or the strings are written and never
+  // referenced by anything.
+  const rows = lines.map((_line, index) => `<row r="${String(index + 1)}"><c r="A${String(index + 1)}" t="s"><v>${String(index)}</v></c></row>`).join('')
+  zip.file('[Content_Types].xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Types xmlns="http://schemas.openxmlformats.org/package/2006/content-types"><Default Extension="rels" ContentType="application/vnd.openxmlformats-package.relationships+xml"/><Default Extension="xml" ContentType="application/xml"/><Override PartName="/xl/workbook.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sheet.main+xml"/><Override PartName="/xl/worksheets/sheet1.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.worksheet+xml"/><Override PartName="/xl/sharedStrings.xml" ContentType="application/vnd.openxmlformats-officedocument.spreadsheetml.sharedStrings+xml"/></Types>')
+  zip.file('_rels/.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/officeDocument" Target="xl/workbook.xml"/></Relationships>')
+  zip.file('xl/workbook.xml', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><workbook xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" xmlns:r="http://schemas.openxmlformats.org/officeDocument/2006/relationships"><sheets><sheet name="Sheet1" sheetId="1" r:id="rId1"/></sheets></workbook>')
+  zip.file('xl/_rels/workbook.xml.rels', '<?xml version="1.0" encoding="UTF-8" standalone="yes"?><Relationships xmlns="http://schemas.openxmlformats.org/package/2006/relationships"><Relationship Id="rId1" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/worksheet" Target="worksheets/sheet1.xml"/><Relationship Id="rId2" Type="http://schemas.openxmlformats.org/officeDocument/2006/relationships/sharedStrings" Target="sharedStrings.xml"/></Relationships>')
+  zip.file('xl/worksheets/sheet1.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><worksheet xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main"><sheetData>${rows}</sheetData></worksheet>`)
+  zip.file('xl/sharedStrings.xml', sharedStringTable(lines))
+  return await zip.generateAsync({ type: 'nodebuffer' })
+}
+
 async function applyStructuredEdit(ctx: Context, target: FsTarget, format: 'docx' | 'xlsx', content: string): Promise<void> {
   const bytes = await ctx.fs.readBytes(target, undefined, MAX_STRUCTURED_BYTES)
   const zip = await JSZip.loadAsync(bytes)
   const lines = content.split(/\r?\n/)
-  if (format === 'docx') {
-    const body = lines.map(line => `<w:p><w:r><w:t xml:space="preserve">${escapeXml(line)}</w:t></w:r></w:p>`).join('')
-    zip.file('word/document.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><w:document xmlns:w="http://schemas.openxmlformats.org/wordprocessingml/2006/main"><w:body>${body}</w:body></w:document>`)
-  } else {
-    const items = lines.map(line => `<si><t xml:space="preserve">${escapeXml(line)}</t></si>`).join('')
-    zip.file('xl/sharedStrings.xml', `<?xml version="1.0" encoding="UTF-8" standalone="yes"?><sst xmlns="http://schemas.openxmlformats.org/spreadsheetml/2006/main" count="${lines.length}" uniqueCount="${lines.length}">${items}</sst>`)
-  }
+  if (format === 'docx') zip.file('word/document.xml', wordBody(lines))
+  else zip.file('xl/sharedStrings.xml', sharedStringTable(lines))
   const buffer = await zip.generateAsync({ type: 'nodebuffer' })
   await fsWriteFile(ctx.fs.processPath(target), buffer)
 }
@@ -341,9 +387,20 @@ export class DocumentsLocal extends Documents {
 
   override async create(request: { sessionId: SessionId; path: string; content: string }): Promise<{ path: string; version: string }> {
     const target = await this.resolveDocument(request.sessionId, request.path)
+    const format = this.formatOf(request.path)
+    // The text write happens first even for the packaged formats, and not only
+    // to reserve the name: it is the call that crosses the sandbox fence and
+    // refuses a path outside the workspace. The bytes then land on a path that
+    // has already been proven writable, the same way the edit path writes them.
     const outcome = await this.ctx.fs.writeText(target, request.content, { kind: 'createIfAbsent' }, undefined, this.policyFor(request.sessionId))
-    this.ctx.emit('documents/changed', { sessionId: request.sessionId, path: request.path, baseVersion: '', version: String(outcome.version), patches: null })
-    return { path: request.path, version: String(outcome.version) }
+    let version = String(outcome.version)
+    if (format === 'docx' || format === 'xlsx') {
+      await fsWriteFile(this.ctx.fs.processPath(target), await buildStructuredDocument(format, request.content))
+      const after = await this.ctx.fs.stat(target)
+      version = String(after?.version ?? outcome.version)
+    }
+    this.ctx.emit('documents/changed', { sessionId: request.sessionId, path: request.path, baseVersion: '', version, patches: null })
+    return { path: request.path, version }
   }
 
   override async apply(request: { sessionId: SessionId; path: string; baseVersion: string; edit: DocumentEdit }):

@@ -3,7 +3,7 @@
  */
 
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
-import { mkdtemp, realpath, rm, writeFile, mkdir } from 'node:fs/promises'
+import { mkdtemp, readFile, realpath, rm, writeFile, mkdir } from 'node:fs/promises'
 import JSZip from 'jszip'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -47,6 +47,57 @@ afterEach(async () => {
 })
 
 describe('documents-local', () => {
+  // Creating a `.docx` used to write the text into a file with that extension
+  // on it, which Word refuses to open — so a model asked for a Word document
+  // would emit HTML under the name instead and call it done. The assertion is
+  // that the bytes are a real OOXML package: a zip whose parts a reader can
+  // find by the relationships the format defines.
+  it('creates a Word document a reader can actually open', async () => {
+    await documents.create({ sessionId: SID, path: 'spec.docx', content: '第一段\n\n第二段 & <标记>' })
+
+    const zip = await JSZip.loadAsync(await readFile(join(dir, 'spec.docx')))
+    const types = await zip.file('[Content_Types].xml')?.async('string') ?? ''
+    const rels = await zip.file('_rels/.rels')?.async('string') ?? ''
+    const body = await zip.file('word/document.xml')?.async('string') ?? ''
+
+    expect(types).toContain('wordprocessingml.document.main+xml')
+    expect(rels).toContain('word/document.xml')
+    // One paragraph per line, and the text escaped rather than injected.
+    expect(body.match(/<w:p>/g)).toHaveLength(3)
+    expect(body).toContain('第一段')
+    expect(body).toContain('&amp; &lt;标记&gt;')
+
+    // And the provider reads its own output back as the same text.
+    const read = await documents.read({ sessionId: SID, path: 'spec.docx' })
+    expect(read.format).toBe('docx')
+    expect(read.content).toContain('第一段')
+    expect(read.content).toContain('第二段')
+  })
+
+  // The workbook needs one part more than Word does: strings live in a shared
+  // table and the sheet has to reference them by index, or the text is present
+  // in the file and shown by nothing.
+  it('creates a workbook whose sheet references the strings it stores', async () => {
+    await documents.create({ sessionId: SID, path: 'data.xlsx', content: 'alpha\nbeta' })
+
+    const zip = await JSZip.loadAsync(await readFile(join(dir, 'data.xlsx')))
+    const sheet = await zip.file('xl/worksheets/sheet1.xml')?.async('string') ?? ''
+    const strings = await zip.file('xl/sharedStrings.xml')?.async('string') ?? ''
+    const workbookRels = await zip.file('xl/_rels/workbook.xml.rels')?.async('string') ?? ''
+
+    expect(workbookRels).toContain('worksheets/sheet1.xml')
+    expect(workbookRels).toContain('sharedStrings.xml')
+    expect(strings).toContain('alpha')
+    expect(sheet).toContain('<c r="A1" t="s"><v>0</v></c>')
+    expect(sheet).toContain('<c r="A2" t="s"><v>1</v></c>')
+  })
+
+  // A plain document must not be dressed up as a package.
+  it('leaves an ordinary document as plain text', async () => {
+    await documents.create({ sessionId: SID, path: 'notes.md', content: '# Title' })
+    expect(await readFile(join(dir, 'notes.md'), 'utf8')).toBe('# Title')
+  })
+
   it('lists the workspace root and nested directories for lazy document browsing', async () => {
     await mkdir(join(dir, 'notes'))
     await writeFile(join(dir, 'notes', 'guide.md'), '# Guide')
