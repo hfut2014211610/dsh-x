@@ -72,6 +72,43 @@ describe('sha512FromChannel', () => {
     expect(sha512FromChannel(CHANNEL, 'something-else.exe')).toBeUndefined()
     expect(sha512FromChannel('', 'DeepSeek Harness 0.4.0.exe')).toBeUndefined()
   })
+
+  // The three names the same installer carries, taken from real artifacts:
+  // electron-builder writes spaces on disk, records hyphens in the channel
+  // file, and GitHub serves dots because it rejects spaces in asset names.
+  // Comparing any two verbatim never matches, and the cost of the miss is a
+  // download that reports itself as having no checksum to verify against —
+  // silently unverified rather than loudly refused.
+  it('matches the same installer across the disk, channel, and GitHub name forms', () => {
+    const channel = [
+      'version: 0.3.2',
+      'files:',
+      '  - url: DeepSeek-Harness-Setup-0.3.2.exe',
+      '    sha512: c2V0dXA=',
+      '  - url: DeepSeek-Harness-0.3.2.exe',
+      '    sha512: cG9ydGFibGU=',
+      'path: DeepSeek-Harness-Setup-0.3.2.exe',
+    ].join('\n')
+
+    // As GitHub serves it.
+    expect(sha512FromChannel(channel, 'DeepSeek.Harness.Setup.0.3.2.exe')).toBe('c2V0dXA=')
+    expect(sha512FromChannel(channel, 'DeepSeek.Harness.0.3.2.exe')).toBe('cG9ydGFibGU=')
+    // As it sits on disk.
+    expect(sha512FromChannel(channel, 'DeepSeek Harness Setup 0.3.2.exe')).toBe('c2V0dXA=')
+    expect(sha512FromChannel(channel, 'DeepSeek Harness 0.3.2.exe')).toBe('cG9ydGFibGU=')
+  })
+
+  // Collapsing separators must not collapse the words: the installer and the
+  // portable build differ by `Setup`, and confusing them would verify a
+  // download against another file's checksum.
+  it('still tells the installer apart from the portable build', () => {
+    const channel = [
+      'files:',
+      '  - url: DeepSeek-Harness-0.3.2.exe',
+      '    sha512: cG9ydGFibGU=',
+    ].join('\n')
+    expect(sha512FromChannel(channel, 'DeepSeek.Harness.Setup.0.3.2.exe')).toBeUndefined()
+  })
 })
 
 describe('checkForUpdate', () => {

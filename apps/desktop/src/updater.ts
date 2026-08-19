@@ -88,6 +88,28 @@ export function versionFromTag(tag: string): string | undefined {
 }
 
 /**
+ * Reduce an artifact file name to the form both sides of the comparison agree
+ * on.
+ *
+ * The same installer carries three different names on its way to a user. On
+ * disk electron-builder writes `DeepSeek Harness Setup 0.3.2.exe` with spaces;
+ * the channel file records it as `DeepSeek-Harness-Setup-0.3.2.exe` with
+ * hyphens; and GitHub, which rejects spaces in asset names, serves it as
+ * `DeepSeek.Harness.Setup.0.3.2.exe` with dots. Comparing any two of those
+ * verbatim never matches, and a silent miss here costs a download that reports
+ * itself as having no checksum to verify against.
+ *
+ * Collapsing the separators keeps the words, which is what actually
+ * distinguishes the artifacts: the installer and the portable build differ by
+ * `Setup`, not by punctuation.
+ * @param name - a file name in any of the three forms.
+ * @returns the comparable form.
+ */
+function comparableName(name: string): string {
+  return name.toLowerCase().replace(/[\s._-]+/g, '-')
+}
+
+/**
  * Pull one file's SHA-512 out of an electron-builder channel file.
  *
  * A narrow reader rather than a YAML dependency: the document is generated
@@ -96,17 +118,24 @@ export function versionFromTag(tag: string): string | undefined {
  * artifact), and a checksum that fails to parse must read as absent rather
  * than as a wrong answer.
  * @param channel - verbatim `latest.yml` contents.
- * @param assetName - the installer file name to match.
+ * @param assetName - the installer file name to match, in any published form.
  * @returns the recorded base64 SHA-512, or undefined when the file is not listed.
  */
 export function sha512FromChannel(channel: string, assetName: string): string | undefined {
+  const wanted = comparableName(assetName)
   const lines = channel.split(/\r?\n/)
   let matched = false
   for (const line of lines) {
     const url = /^\s*-?\s*url:\s*(\S+)\s*$/.exec(line)
     if (url !== null) {
-      // The url field is percent-encoded for spaces; the asset name is not.
-      matched = decodeURIComponent(url[1] ?? '') === assetName
+      // The url field percent-encodes anything the name needs escaped.
+      let decoded = url[1] ?? ''
+      try {
+        decoded = decodeURIComponent(decoded)
+      } catch {
+        // A name that is not valid percent-encoding is compared as written.
+      }
+      matched = comparableName(decoded) === wanted
       continue
     }
     const sha = /^\s*sha512:\s*(\S+)\s*$/.exec(line)
