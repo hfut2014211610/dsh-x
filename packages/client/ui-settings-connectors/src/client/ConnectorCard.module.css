@@ -75,7 +75,7 @@
   white-space: nowrap;
 }
 
-.state[data-state='ready'] {
+.state[data-state='enabled'] {
   background: var(--dsw-alias-state-warn-tertiary);
   color: var(--dsw-alias-state-warn-label);
 }
@@ -113,6 +113,36 @@
   margin: 0 16px;
   padding-bottom: 8px;
   border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+/* The channel's own switch, above its settings: whether it runs at all is a
+   different question from how it behaves, and it is the one asked first. */
+.power {
+  display: flex;
+  align-items: center;
+  justify-content: space-between;
+  gap: 12px;
+  margin-top: 12px;
+}
+
+.powerLabel {
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.powerSwitch {
+  flex: none;
+  width: 34px;
+  height: 20px;
+  margin: 0;
+  accent-color: var(--dsw-alias-state-business-primary);
+  cursor: pointer;
+}
+
+.powerSwitch:disabled {
+  cursor: default;
+  opacity: 0.45;
 }
 
 .absent,

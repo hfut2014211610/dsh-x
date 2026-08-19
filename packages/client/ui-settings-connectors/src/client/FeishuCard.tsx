@@ -35,6 +35,9 @@ export function FeishuCard(props: FeishuCardProps) {
       summaryKey="feishu.summary"
       absentKey="feishu.absent"
       state={state}
+      presence={state.plugin}
+      onReadPresence={props.readPresence}
+      onSetEnabled={props.setEnabled}
       onSave={props.save}
       onDiscard={props.discard}
     >

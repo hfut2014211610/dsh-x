@@ -15,6 +15,7 @@ import { FeishuCard } from '../src/client/FeishuCard.tsx'
 import type { FeishuCardProps } from '../src/client/FeishuCard.tsx'
 import type { FeishuCardState } from '../src/client/feishu-card-controller.ts'
 import type { ConnectorFieldState, ConnectorFormState } from '../src/client/connector-form.ts'
+import type { ConnectorPresenceState } from '../src/client/connector-presence.ts'
 import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -31,6 +32,9 @@ const settled: ConnectorFormState = {
   failed: false,
 }
 
+/** Presence the card tests default to: the plugin is there and running. */
+const running: ConnectorPresenceState = { presence: 'enabled', busy: false, failed: false }
+
 /** One control's state, defaulting to an inherited value. */
 function field(text: string, rest: Partial<ConnectorFieldState> = {}): ConnectorFieldState {
   return { text, overridden: false, invalid: false, ...rest }
@@ -45,7 +49,16 @@ function renderSection(cardCount: number) {
   render(<ConnectorsSection {...props} />)
 }
 
-function renderCard(state: Partial<ConnectorFormState>, actions: { save?: () => void; discard?: () => void } = {}) {
+function renderCard(
+  state: Partial<ConnectorFormState>,
+  actions: {
+    save?: () => void
+    discard?: () => void
+    presence?: Partial<ConnectorPresenceState>
+    readPresence?: () => void
+    setEnabled?: (enabled: boolean) => void
+  } = {},
+) {
   render(
     <ConnectorCard
       t={t}
@@ -53,6 +66,9 @@ function renderCard(state: Partial<ConnectorFormState>, actions: { save?: () => 
       summaryKey="feishu.summary"
       absentKey="feishu.absent"
       state={{ ...settled, ...state }}
+      presence={{ ...running, ...actions.presence }}
+      onReadPresence={actions.readPresence ?? vi.fn()}
+      onSetEnabled={actions.setEnabled ?? vi.fn()}
       onSave={actions.save ?? vi.fn()}
       onDiscard={actions.discard ?? vi.fn()}
     >
@@ -113,19 +129,67 @@ describe('ConnectorCard', () => {
   })
 
   it('keeps an uninstalled channel listed, with how to install it and no controls', () => {
-    renderCard({ status: 'absent', writable: false })
+    renderCard({ status: 'absent', writable: false }, { presence: { presence: 'missing' } })
 
-    expect(screen.getByText(zh['state.off'])).toBeTruthy()
+    expect(screen.getByText(zh['state.missing'])).toBeTruthy()
     open()
     expect(screen.getByText(zh['feishu.absent'])).toBeTruthy()
     expect(screen.queryByText('控件')).toBeNull()
     expect(screen.queryByRole('button', { name: zh.save })).toBeNull()
+    // Nothing to switch, so no switch: the install line is the whole answer.
+    expect(screen.queryByRole('switch')).toBeNull()
   })
 
   it('says it is still checking before the first host view', () => {
-    renderCard({ status: 'loading' })
+    renderCard({ status: 'loading' }, { presence: { presence: 'unknown' } })
 
     expect(screen.getByText(zh['state.loading'])).toBeTruthy()
+  })
+
+  // The point of the switch. An installed-but-off channel used to be
+  // indistinguishable from an absent one, so the card sent people to the
+  // command line for something they already had.
+  it('separates a switched-off channel from one that was never installed', () => {
+    renderCard({ status: 'absent', writable: false }, { presence: { presence: 'disabled' } })
+
+    expect(screen.getByText(zh['state.off'])).toBeTruthy()
+    open()
+    expect(screen.queryByText(zh['feishu.absent'])).toBeNull()
+    expect(screen.getByText(zh['power.offNoSettings'])).toBeTruthy()
+    expect(screen.getByRole<HTMLInputElement>('switch').checked).toBe(false)
+  })
+
+  it('reads the plugin tree when the card is first opened, not on mount', () => {
+    const readPresence = vi.fn()
+    renderCard({}, { readPresence })
+    expect(readPresence).not.toHaveBeenCalled()
+
+    open()
+    expect(readPresence).toHaveBeenCalledTimes(1)
+  })
+
+  it('switches the channel off and locks the control while it is in flight', () => {
+    const setEnabled = vi.fn()
+    renderCard({}, { setEnabled })
+    open()
+
+    const control = screen.getByRole<HTMLInputElement>('switch')
+    expect(control.checked).toBe(true)
+    fireEvent.click(control)
+    expect(setEnabled).toHaveBeenLastCalledWith(false)
+
+    cleanup()
+    renderCard({}, { presence: { busy: true } })
+    open()
+    expect(screen.getByRole<HTMLInputElement>('switch').disabled).toBe(true)
+  })
+
+  it('reports a refused switch beside the state the tree actually holds', () => {
+    renderCard({}, { presence: { presence: 'enabled', failed: true } })
+    open()
+
+    expect(screen.getByText(zh['power.failed'])).toBeTruthy()
+    expect(screen.getByRole<HTMLInputElement>('switch').checked).toBe(true)
   })
 
   it('marks a collapsed card that holds unsaved edits', () => {
@@ -151,6 +215,9 @@ describe('ConnectorCard', () => {
         summaryKey="feishu.summary"
         absentKey="feishu.absent"
         state={settled}
+        presence={running}
+        onReadPresence={vi.fn()}
+        onSetEnabled={vi.fn()}
         onSave={save}
         onDiscard={vi.fn()}
       >
@@ -167,6 +234,9 @@ describe('ConnectorCard', () => {
         summaryKey="feishu.summary"
         absentKey="feishu.absent"
         state={{ ...settled, dirty: true }}
+        presence={running}
+        onReadPresence={vi.fn()}
+        onSetEnabled={vi.fn()}
         onSave={save}
         onDiscard={vi.fn()}
       >
@@ -272,6 +342,7 @@ describe('ChoiceField', () => {
 describe('FeishuCard', () => {
   const state: FeishuCardState = {
     ...settled,
+    plugin: running,
     presetId: field('ued'),
     density: field('standard'),
     flushMs: field('2500'),
@@ -286,6 +357,8 @@ describe('FeishuCard', () => {
       useFeishuCard: (selector: (value: FeishuCardState) => unknown) => selector(state),
       edit,
       resetField: vi.fn(),
+      readPresence: vi.fn(),
+      setEnabled: vi.fn(),
       save: vi.fn(),
       discard: vi.fn(),
     } as unknown as FeishuCardProps
@@ -318,6 +391,8 @@ describe('FeishuCard', () => {
       useFeishuCard: (selector: (value: FeishuCardState) => unknown) => selector({ ...state, ...overridden }),
       edit: vi.fn(),
       resetField,
+      readPresence: vi.fn(),
+      setEnabled: vi.fn(),
       save: vi.fn(),
       discard: vi.fn(),
     } as unknown as FeishuCardProps

@@ -25,6 +25,7 @@ import { ConnectorsSection } from './ConnectorsSection.tsx'
 import type { ConnectorsSectionInjected } from './ConnectorsSection.tsx'
 import { FeishuCard } from './FeishuCard.tsx'
 import { FEISHU_NS, FeishuCardController } from './feishu-card-controller.ts'
+import type { ConnectorPluginFace } from './connector-presence.ts'
 import { en, zh, NS } from './locales.ts'
 
 export type { ConnectorsSectionInjected, ConnectorsSectionProps } from './ConnectorsSection.tsx'
@@ -35,10 +36,17 @@ export type {
   ConnectorActions, ConnectorFieldSpec, ConnectorFieldState, ConnectorFormState, FieldWrite,
 } from './connector-form.ts'
 export type { SettingsConnectorItemOwnerProps } from './slot-contract.ts'
+export type {
+  ConnectorPluginFace, ConnectorPresence, ConnectorPresenceState,
+} from './connector-presence.ts'
+export { ConnectorPresenceController } from './connector-presence.ts'
 export type { ConnectorsKey } from './locales.ts'
 
 /** Required services (cordis fiber inject); the slot registration waits on the declaration via `slots.inject()`. */
-export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope']
+export const inject = [
+  'slots', 'locale', 'connection', 'remote', 'settingsScope',
+  'remote.pluginInventory', 'remote.pluginControl',
+]
 
 /**
  * Register the Connectors section and the one channel this package ships.
@@ -47,7 +55,21 @@ export const inject = ['slots', 'locale', 'connection', 'remote', 'settingsScope
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-connectors: copy dictionaries')
   const t = ctx.locale.bind(NS)
-  const feishu = new FeishuCardController(ctx.settingsScope.bind({ namespace: FEISHU_NS }))
+  // A failed call is the controller's to interpret, so the face throws rather
+  // than folding an error into a shape that reads like an empty tree.
+  const plugins: ConnectorPluginFace = {
+    list: async () => {
+      const result = await ctx.remote.pluginInventory.list()
+      if (!result.ok) throw new Error(`pluginInventory.list failed: ${result.error.code}: ${result.error.message}`)
+      return result.value
+    },
+    setEnabled: async (entryId, enabled) => {
+      const result = await ctx.remote.pluginControl.setEnabled({ entryId, enabled })
+      if (!result.ok) throw new Error(`pluginControl.setEnabled failed: ${result.error.code}: ${result.error.message}`)
+      return { found: result.value.found }
+    },
+  }
+  const feishu = new FeishuCardController(ctx.settingsScope.bind({ namespace: FEISHU_NS }), plugins)
 
   // Between Plugins (15) and Model Hub (20): a connector is configuration of
   // the deployment, so it belongs with the plugin pages rather than beside

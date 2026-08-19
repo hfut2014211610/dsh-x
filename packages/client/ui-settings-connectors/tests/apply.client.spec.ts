@@ -29,7 +29,13 @@ async function bench() {
     api: { settings: { describe: describeSettings } },
   } as never)
   await ctx.plugin(SettingsScopeBinder).await()
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, describeSettings }
+  // The card's switch reads the plugin tree and writes it; both namespaces are
+  // separate services, so a fiber that declares them waits for both.
+  const listPlugins = vi.fn(() => Promise.resolve({ ok: true, value: { entries: [] } }))
+  const setEnabled = vi.fn(() => Promise.resolve({ ok: true, value: { found: true, enabled: true } }))
+  ctx.provide('remote.pluginInventory', { list: listPlugins } as never)
+  ctx.provide('remote.pluginControl', { setEnabled } as never)
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, describeSettings, listPlugins, setEnabled }
 }
 
 function declareRoot(slots: SlotRegistry): () => void {
@@ -41,7 +47,10 @@ function declareRoot(slots: SlotRegistry): () => void {
 
 describe('ui-settings-connectors apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection', 'remote', 'settingsScope'])
+    expect(inject).toEqual([
+      'slots', 'locale', 'connection', 'remote', 'settingsScope',
+      'remote.pluginInventory', 'remote.pluginControl',
+    ])
   })
 
   it('registers one Connectors section and declares the card seat', async () => {

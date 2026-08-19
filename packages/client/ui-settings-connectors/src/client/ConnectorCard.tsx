@@ -11,9 +11,10 @@
  * no namespace to write, and a disabled form would only invite the attempt.
  */
 
-import { useId, useState, type ReactNode } from 'react'
+import { useEffect, useId, useState, type ReactNode } from 'react'
 import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConnectorFieldState, ConnectorFormState } from './connector-form.ts'
+import type { ConnectorPresenceState } from './connector-presence.ts'
 import type { ConnectorsKey } from './locales.ts'
 import css from './ConnectorCard.module.css'
 
@@ -29,6 +30,12 @@ export interface ConnectorCardProps {
   absentKey: ConnectorsKey
   /** The card's form state: what the host serves, and what a save would do. */
   state: ConnectorFormState
+  /** Where the channel's plugin stands in the profile, and whether it is switching. */
+  presence: ConnectorPresenceState
+  /** Read the plugin tree; the card calls this when it is first opened. */
+  onReadPresence: () => void
+  /** Switch the channel's plugin on or off. */
+  onSetEnabled: (enabled: boolean) => void
   /** Write every staged edit. */
   onSave: () => void
   /** Drop every staged edit. */
@@ -37,11 +44,18 @@ export interface ConnectorCardProps {
   children: ReactNode
 }
 
-/** Pill copy for each form status. */
-const STATE_KEY: Record<ConnectorFormState['status'], ConnectorsKey> = {
-  loading: 'state.loading',
-  ready: 'state.on',
-  absent: 'state.off',
+/**
+ * Pill copy for each presence.
+ *
+ * The pill reports the plugin, not the settings namespace: a channel switched
+ * off still HAS a configuration, and calling that "not installed" is what sent
+ * people to the command line for a switch they already had.
+ */
+const PRESENCE_KEY: Record<ConnectorPresenceState['presence'], ConnectorsKey> = {
+  unknown: 'state.loading',
+  missing: 'state.missing',
+  disabled: 'state.off',
+  enabled: 'state.on',
 }
 
 /**
@@ -51,9 +65,17 @@ const STATE_KEY: Record<ConnectorFormState['status'], ConnectorsKey> = {
  */
 export function ConnectorCard(props: ConnectorCardProps) {
   const [open, setOpen] = useState(false)
-  const { state, t } = props
+  const { state, presence, t } = props
   const name = t(props.nameKey)
   const blocked = !state.dirty || state.invalid || state.saving
+  const switchId = useId()
+  // Read the tree the first time the card is opened rather than on mount: a
+  // page listing every channel would otherwise ask the host once per card for
+  // an answer nobody has looked at yet.
+  const { onReadPresence } = props
+  useEffect(() => {
+    if (open) onReadPresence()
+  }, [open, onReadPresence])
   return (
     <li className={open ? `${css.card} ${css.cardOpen}` : css.card}>
       <button
@@ -66,7 +88,7 @@ export function ConnectorCard(props: ConnectorCardProps) {
         <span className={css.headText}>
           <span className={css.nameRow}>
             <span className={css.name}>{name}</span>
-            <span className={css.state} data-state={state.status}>{t(STATE_KEY[state.status])}</span>
+            <span className={css.state} data-state={presence.presence}>{t(PRESENCE_KEY[presence.presence])}</span>
           </span>
           <span className={css.summary}>{t(props.summaryKey)}</span>
         </span>
@@ -76,26 +98,49 @@ export function ConnectorCard(props: ConnectorCardProps) {
       {open
         ? (
           <div className={css.body}>
-            {state.status === 'absent'
+            {presence.presence === 'missing'
               ? <p className={css.absent} role="status">{t(props.absentKey)}</p>
               : (
                 <>
-                  {state.writable ? null : <p className={css.readOnly} role="status">{t('readOnly')}</p>}
-                  {props.children}
-                  <div className={css.footer}>
-                    {state.failed ? <p className={css.failed} role="status">{t('saveFailed')}</p> : null}
-                    <button
-                      type="button"
-                      className={css.discard}
-                      disabled={!state.dirty || state.saving}
-                      onClick={props.onDiscard}
-                    >
-                      {t('discard')}
-                    </button>
-                    <button type="button" className={css.save} disabled={blocked} onClick={props.onSave}>
-                      {t(state.saving ? 'saving' : 'save')}
-                    </button>
+                  <div className={css.power}>
+                    <label className={css.powerLabel} htmlFor={switchId}>{t('power.label')}</label>
+                    <input
+                      id={switchId}
+                      className={css.powerSwitch}
+                      type="checkbox"
+                      role="switch"
+                      checked={presence.presence === 'enabled'}
+                      disabled={presence.presence === 'unknown' || presence.busy}
+                      onChange={(event) => { props.onSetEnabled(event.target.checked) }}
+                    />
                   </div>
+                  <p className={css.hint}>{t('power.hint')}</p>
+                  {presence.failed ? <p className={css.failed} role="status">{t('power.failed')}</p> : null}
+                  {/* A disabled plugin serves no settings namespace, so there
+                      is nothing to render controls from — and saying so beats
+                      a form that cannot be filled in. */}
+                  {state.status === 'absent'
+                    ? <p className={css.absent} role="status">{t('power.offNoSettings')}</p>
+                    : (
+                      <>
+                        {state.writable ? null : <p className={css.readOnly} role="status">{t('readOnly')}</p>}
+                        {props.children}
+                        <div className={css.footer}>
+                          {state.failed ? <p className={css.failed} role="status">{t('saveFailed')}</p> : null}
+                          <button
+                            type="button"
+                            className={css.discard}
+                            disabled={!state.dirty || state.saving}
+                            onClick={props.onDiscard}
+                          >
+                            {t('discard')}
+                          </button>
+                          <button type="button" className={css.save} disabled={blocked} onClick={props.onSave}>
+                            {t(state.saving ? 'saving' : 'save')}
+                          </button>
+                        </div>
+                      </>
+                    )}
                 </>
               )}
           </div>
