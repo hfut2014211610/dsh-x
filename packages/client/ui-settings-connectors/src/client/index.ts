@@ -26,6 +26,7 @@ import type { ConnectorsSectionInjected } from './ConnectorsSection.tsx'
 import { FeishuCard } from './FeishuCard.tsx'
 import { FEISHU_NS, FeishuCardController } from './feishu-card-controller.ts'
 import type { ConnectorPluginFace } from './connector-presence.ts'
+import type { AuthRpc } from './feishu-auth-controller.ts'
 import { en, zh, NS } from './locales.ts'
 
 export type { ConnectorsSectionInjected, ConnectorsSectionProps } from './ConnectorsSection.tsx'
@@ -39,6 +40,11 @@ export type { SettingsConnectorItemOwnerProps } from './slot-contract.ts'
 export type {
   ConnectorPluginFace, ConnectorPresence, ConnectorPresenceState,
 } from './connector-presence.ts'
+export type {
+  AuthRpc, AuthRpcResult, AuthStatusView, AuthUserView, FeishuAuthState,
+} from './feishu-auth-controller.ts'
+export { FeishuAuthController } from './feishu-auth-controller.ts'
+export type { FeishuAuthPanelProps } from './FeishuAuthPanel.tsx'
 export { ConnectorPresenceController } from './connector-presence.ts'
 export type { ConnectorsKey } from './locales.ts'
 
@@ -72,7 +78,10 @@ export function apply(ctx: ClientContext): void {
       }
     },
   }
-  const feishu = new FeishuCardController(ctx.settingsScope.bind({ namespace: FEISHU_NS }), plugins)
+  // `feishuAuth/*` 是渠道插件自己挂的 gateway，没有生成出来的 remote 门面，所以
+  // 走连接上的裸 RPC 通道——跟模型中心那一页拿 `modelHub/*` 是同一条路。
+  const rpc = (ctx.get('connection') as unknown as { rpc: AuthRpc }).rpc
+  const feishu = new FeishuCardController(ctx.settingsScope.bind({ namespace: FEISHU_NS }), plugins, rpc)
 
   // Between Plugins (15) and Model Hub (20): a connector is configuration of
   // the deployment, so it belongs with the plugin pages rather than beside

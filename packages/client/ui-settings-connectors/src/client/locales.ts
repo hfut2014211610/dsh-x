@@ -11,6 +11,12 @@ export type ConnectorsKey =
   | 'state.on' | 'state.off' | 'state.missing' | 'state.loading'
   | 'power.label' | 'power.hint' | 'power.failed'
   | 'power.offNoSettings' | 'power.noSettings'
+  | 'auth.heading' | 'auth.loading' | 'auth.reload' | 'auth.absent'
+  | 'auth.app' | 'auth.bot' | 'auth.botHint' | 'auth.user' | 'auth.userNone'
+  | 'auth.scopes' | 'auth.expires' | 'auth.refreshExpires'
+  | 'auth.domains' | 'auth.domainsHint' | 'auth.scan' | 'auth.scanning'
+  | 'auth.qrHint' | 'auth.openLink' | 'auth.cancel' | 'auth.granted'
+  | 'auth.logout' | 'auth.logoutHint'
   | 'feishu.name' | 'feishu.summary' | 'feishu.absent'
   | 'feishu.presetId.label' | 'feishu.presetId.hint'
   | 'feishu.density.label' | 'feishu.density.hint'
@@ -52,6 +58,28 @@ export const en: Record<ConnectorsKey, string> = {
   'power.failed': 'The host did not take the switch. The state above is what the plugin tree reports now.',
   'power.offNoSettings': 'Switched off, so it serves no settings to edit. Switch it on to see its controls.',
   'power.noSettings': 'Running, but it registers no settings namespace, so there is nothing here to edit. How it behaves is fixed by however it was composed.',
+  'auth.heading': 'Sign-in and permissions',
+  'auth.loading': 'Reading the sign-in state…',
+  'auth.reload': 'Read again',
+  'auth.absent': 'lark-cli is not on this machine. The channel talks to Feishu through it, and so does this page — install it with npm i -g @larksuite/cli, then run lark-cli config init once to bind an app.',
+  'auth.app': 'App',
+  'auth.bot': 'Bot identity',
+  'auth.botHint': 'A bot’s permissions are granted in the Feishu developer console, never by scanning. Scanning authorizes you, not it.',
+  'auth.user': 'Your identity',
+  'auth.userNone': 'Nobody has scanned yet.',
+  'auth.scopes': 'granted permissions',
+  'auth.expires': 'Session expires',
+  'auth.refreshExpires': 'Sign in again by',
+  'auth.domains': 'Permissions to grant this time',
+  'auth.domainsHint': 'Grants accumulate: clearing a box does not take back a permission already given. Revoking is done in Feishu’s authorization manager.',
+  'auth.scan': 'Scan to authorize',
+  'auth.scanning': 'Fetching the code…',
+  'auth.qrHint': 'Scan this with Feishu, or open the link below. This page continues on its own once you are done.',
+  'auth.openLink': 'Open the authorization link',
+  'auth.cancel': 'Cancel',
+  'auth.granted': 'Authorized.',
+  'auth.logout': 'Sign out on this machine',
+  'auth.logoutHint': 'Clears the token here only. What you granted the app in Feishu stays granted; take it back in Feishu’s authorization manager.',
   'feishu.name': 'Feishu',
   'feishu.summary': 'One line in a DM starts work; an @ in a group picks it up. Progress rides a card that updates in stages.',
   'feishu.absent': 'Not in this deployment. Add it with dsh plugin --profile web add <plugin directory> — this fork keeps it at personal/plugins/dsh-x-feishu, which the packaged app does not carry. Credentials stay with the bridge process; nothing on this page touches them.',
@@ -96,6 +124,28 @@ export const zh: Record<ConnectorsKey, string> = {
   'power.failed': '宿主没收下这次开关。上面显示的是插件树现在的状态。',
   'power.offNoSettings': '停用状态下它不提供任何配置项。启用后才能看到它的设置。',
   'power.noSettings': '正在运行，但它没有注册配置命名空间，所以这里没有可改的东西。它怎么干活由挂载时的组合决定。',
+  'auth.heading': '登录与权限',
+  'auth.loading': '正在读登录态…',
+  'auth.reload': '重新读',
+  'auth.absent': '这台机器上没有 lark-cli。渠道和这一页都靠它跟飞书说话——用 npm i -g @larksuite/cli 装上，再跑一次 lark-cli config init 绑定应用。',
+  'auth.app': '应用',
+  'auth.bot': '机器人身份',
+  'auth.botHint': '机器人的权限在飞书开发者后台开通，扫码给不了它——扫码授权的是你，不是它。',
+  'auth.user': '你的身份',
+  'auth.userNone': '还没有人扫码授权。',
+  'auth.scopes': '项已授权',
+  'auth.expires': '登录态到期',
+  'auth.refreshExpires': '需在此前重新登录',
+  'auth.domains': '这次要开通的权限',
+  'auth.domainsHint': '授权是累加的：取消勾选不会收回已经给过的权限，要收回得去飞书的授权管理页。',
+  'auth.scan': '扫码授权',
+  'auth.scanning': '正在取二维码…',
+  'auth.qrHint': '用飞书扫这张码，或者打开下面的链接。扫完这一页会自己往下走。',
+  'auth.openLink': '打开授权链接',
+  'auth.cancel': '取消',
+  'auth.granted': '授权成功。',
+  'auth.logout': '退出本机登录',
+  'auth.logoutHint': '只清这台机器上的登录态。你在飞书那边给应用的授权还在，要收回得去飞书的授权管理页。',
   'feishu.name': '飞书',
   'feishu.summary': '单聊发一句话就干活，群里 @ 一下就接活，过程在一张分阶段更新的卡片上。',
   'feishu.absent': '这个部署里没有。用 dsh plugin --profile web add <插件目录> 挂进来——本 fork 放在 personal/plugins/dsh-x-feishu，安装包里不带。凭证在桥接进程手里，这一页碰不到。',

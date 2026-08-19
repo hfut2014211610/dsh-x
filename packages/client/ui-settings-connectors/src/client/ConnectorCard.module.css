@@ -145,6 +145,111 @@
   opacity: 0.45;
 }
 
+/* 登录与权限：卡片里自成一段，用一条分隔线跟上面的配置项分开。 */
+.auth {
+  display: flex;
+  flex-direction: column;
+  gap: 6px;
+  margin-top: 16px;
+  padding-top: 14px;
+  border-top: 1px solid var(--dsw-alias-border-l2);
+}
+
+.authHeading {
+  margin: 0 0 2px;
+  color: var(--dsw-alias-label-primary);
+  font-size: 13px;
+  font-weight: 500;
+}
+
+.authRow {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  font-size: 12px;
+  line-height: 1.6;
+}
+
+.authLabel {
+  flex: 0 0 96px;
+  color: var(--dsw-alias-label-tertiary);
+}
+
+.authValue {
+  min-width: 0;
+  color: var(--dsw-alias-label-secondary);
+  overflow-wrap: anywhere;
+}
+
+.authCount {
+  color: var(--dsw-alias-label-primary);
+  font-weight: 600;
+}
+
+.authDomains {
+  display: flex;
+  align-items: baseline;
+  gap: 10px;
+  margin-top: 8px;
+  font-size: 12px;
+}
+
+.authChips {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 6px 10px;
+  min-width: 0;
+}
+
+.authChip {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  color: var(--dsw-alias-label-secondary);
+  cursor: pointer;
+}
+
+/* 二维码那一块居中，因为它是这一刻唯一要做的事。 */
+.authChallenge {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+  margin-top: 12px;
+  padding: 14px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  text-align: center;
+}
+
+.authQr {
+  width: 180px;
+  height: 180px;
+  /* 二维码要黑白分明才扫得动，深色主题下别给它调色。 */
+  background: #fff;
+  border-radius: 6px;
+  image-rendering: pixelated;
+}
+
+.authLink {
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 12px;
+  overflow-wrap: anywhere;
+}
+
+.authGranted {
+  margin: 0;
+  color: var(--dsw-alias-state-business-primary);
+  font-size: 12px;
+}
+
+.authActions {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 8px;
+  margin-top: 10px;
+}
+
 .reason {
   font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace;
   font-size: 11px;

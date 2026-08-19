@@ -16,6 +16,7 @@ import type { FeishuCardProps } from '../src/client/FeishuCard.tsx'
 import type { FeishuCardState } from '../src/client/feishu-card-controller.ts'
 import type { ConnectorFieldState, ConnectorFormState } from '../src/client/connector-form.ts'
 import type { ConnectorPresenceState } from '../src/client/connector-presence.ts'
+import type { FeishuAuthState } from '../src/client/feishu-auth-controller.ts'
 import { zh } from '../src/client/locales.ts'
 
 afterEach(cleanup)
@@ -30,6 +31,21 @@ const settled: ConnectorFormState = {
   invalid: false,
   saving: false,
   failed: false,
+}
+
+/** Sign-in state the card tests default to: read, signed in, nothing in flight. */
+const signedIn: FeishuAuthState = {
+  phase: 'ready',
+  status: {
+    installed: true,
+    appId: 'cli_test',
+    bot: { status: 'ready', available: true, message: '' },
+    user: { status: 'ready', available: true, message: '', userName: '测试用户', scopes: ['im:message'] },
+  },
+  domains: ['im', 'docs'],
+  selected: ['im'],
+  busy: false,
+  granted: false,
 }
 
 /** Presence the card tests default to: the plugin is there and running. */
@@ -355,6 +371,7 @@ describe('FeishuCard', () => {
   const state: FeishuCardState = {
     ...settled,
     plugin: running,
+    auth: signedIn,
     presetId: field('ued'),
     density: field('standard'),
     flushMs: field('2500'),
@@ -371,6 +388,11 @@ describe('FeishuCard', () => {
       resetField: vi.fn(),
       readPresence: vi.fn(),
       setEnabled: vi.fn(),
+      readAuth: vi.fn(),
+      selectDomain: vi.fn(),
+      beginAuth: vi.fn(),
+      cancelAuth: vi.fn(),
+      logout: vi.fn(),
       save: vi.fn(),
       discard: vi.fn(),
     } as unknown as FeishuCardProps
@@ -405,6 +427,11 @@ describe('FeishuCard', () => {
       resetField,
       readPresence: vi.fn(),
       setEnabled: vi.fn(),
+      readAuth: vi.fn(),
+      selectDomain: vi.fn(),
+      beginAuth: vi.fn(),
+      cancelAuth: vi.fn(),
+      logout: vi.fn(),
       save: vi.fn(),
       discard: vi.fn(),
     } as unknown as FeishuCardProps

@@ -4,6 +4,10 @@
  * 与 `auth.ts` 分开，是因为那一层只跟 lark-cli 打交道、可以脱开 cordis 单测；
  * 这一层只负责把它摆到 `feishuAuth/*` 上。
  *
+ * 参数**一个一个具名地收**，不收一个 `request` 对象。这个包没有 typert 生成
+ * 的描述符（personal 插件跑的是源码），网关只能从函数签名本身认参数名，一个
+ * `request: { domains }` 到了线上就变成"多了个 domains 字段"。
+ *
  * @module @personal/dsh-x-feishu/src/auth-gateway
  */
 
@@ -57,12 +61,12 @@ export class FeishuAuthGateway extends TypertRemoteService {
 
   /**
    * 发起一次扫码授权。
-   * @param request - 这次要开通的业务域。
+   * @param domains - 这次要开通的业务域。
    * @returns 链接与二维码，或失败原因。
    */
   @Remote('begin')
-  begin(request: { domains: readonly string[] }): Promise<AuthProgress> {
-    return this.auth.begin(request.domains)
+  begin(domains: readonly string[]): Promise<AuthProgress> {
+    return this.auth.begin(domains)
   }
 
   /**

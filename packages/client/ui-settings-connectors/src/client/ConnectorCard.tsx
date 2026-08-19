@@ -34,6 +34,8 @@ export interface ConnectorCardProps {
   presence: ConnectorPresenceState
   /** Read the plugin tree; the card calls this when it is first opened. */
   onReadPresence: () => void
+  /** Anything else the channel wants read when its card is opened. */
+  onOpen?: () => void
   /** Switch the channel's plugin on or off. */
   onSetEnabled: (enabled: boolean) => void
   /** Write every staged edit. */
@@ -42,6 +44,12 @@ export interface ConnectorCardProps {
   onDiscard: () => void
   /** The channel's controls, rendered only while its namespace is served. */
   children: ReactNode
+  /**
+   * Sign-in and permissions, when the channel has any. It sits below the
+   * settings and outside their save: authorizing is not an edit waiting to be
+   * written, it happens the moment it is asked for.
+   */
+  auth?: ReactNode
 }
 
 /**
@@ -72,10 +80,12 @@ export function ConnectorCard(props: ConnectorCardProps) {
   // Read the tree the first time the card is opened rather than on mount: a
   // page listing every channel would otherwise ask the host once per card for
   // an answer nobody has looked at yet.
-  const { onReadPresence } = props
+  const { onReadPresence, onOpen } = props
   useEffect(() => {
-    if (open) onReadPresence()
-  }, [open, onReadPresence])
+    if (!open) return
+    onReadPresence()
+    onOpen?.()
+  }, [open, onReadPresence, onOpen])
   return (
     <li className={open ? `${css.card} ${css.cardOpen}` : css.card}>
       <button
@@ -159,6 +169,7 @@ export function ConnectorCard(props: ConnectorCardProps) {
                         </div>
                       </>
                     )}
+                  {props.auth}
                 </>
               )}
           </div>

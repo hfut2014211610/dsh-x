@@ -9,6 +9,7 @@ import {
   ConnectorPresenceController,
   type ConnectorPluginFace, type ConnectorPresenceState,
 } from './connector-presence.ts'
+import { FeishuAuthController, type AuthRpc, type FeishuAuthState } from './feishu-auth-controller.ts'
 
 /**
  * Namespace of the Feishu channel plugin. Spelled here rather than imported:
@@ -46,6 +47,8 @@ export interface FeishuSettings {
 export interface FeishuCardState extends ConnectorFormState {
   /** Where the channel's plugin stands in the profile. */
   plugin: ConnectorPresenceState
+  /** Sign-in state, the QR in flight, and what a scan would grant. */
+  auth: FeishuAuthState
   /** Agent preset field. */
   presetId: ConnectorFieldState
   /** Card density field. */
@@ -68,19 +71,31 @@ export interface FeishuCardFace extends ConnectorActions {
   readPresence: () => void
   /** Switch the channel's plugin on or off. */
   setEnabled: (enabled: boolean) => void
+  /** Read the sign-in state and the grantable domains. */
+  readAuth: () => void
+  /** Check or clear one permission domain for the next scan. */
+  selectDomain: (domain: string, wanted: boolean) => void
+  /** Start a scan-to-authorize. */
+  beginAuth: () => void
+  /** Abandon the scan in flight. */
+  cancelAuth: () => void
+  /** Sign out on this machine. */
+  logout: () => void
 }
 
 /** Bridges the `dsh-x-feishu` scope onto the Feishu card's staged form. */
 export class FeishuCardController {
   private readonly form: ConnectorForm<FeishuSettings>
   private readonly presence: ConnectorPresenceController
+  private readonly auth: FeishuAuthController
   private readonly store: SnapshotStore<FeishuCardState>
 
   /**
    * @param scope - the bound settings scope for the `dsh-x-feishu` namespace.
    * @param plugins - the plugin-tree calls the card's switch runs on.
+   * @param rpc - the connection's raw RPC channel, where `feishuAuth/*` lives.
    */
-  constructor(scope: SettingsScope<FeishuSettings>, plugins: ConnectorPluginFace) {
+  constructor(scope: SettingsScope<FeishuSettings>, plugins: ConnectorPluginFace, rpc: AuthRpc) {
     this.form = new ConnectorForm(scope, [
       textField('presetId'),
       choiceField('density', FEISHU_DENSITIES),
@@ -89,16 +104,19 @@ export class FeishuCardController {
       textField('endpoint'),
     ])
     this.presence = new ConnectorPresenceController(FEISHU_MODULE, plugins)
+    this.auth = new FeishuAuthController(rpc)
     this.store = this.form.bind(() => this.projection())
     // Switching the plugin changes the pill, the switch, and whether there are
     // controls at all, so the card republishes on either source.
     this.presence.store.subscribe(() => { this.store.set(this.projection()) })
+    this.auth.store.subscribe(() => { this.store.set(this.projection()) })
   }
 
   private projection(): FeishuCardState {
     return {
       ...this.form.state(),
       plugin: this.presence.store.getSnapshot(),
+      auth: this.auth.store.getSnapshot(),
       presetId: this.form.field('presetId'),
       density: this.form.field('density'),
       flushMs: this.form.field('flushMs'),
@@ -116,6 +134,11 @@ export class FeishuCardController {
       hooks: { feishuCard: this.store },
       readPresence: () => { void this.presence.refresh() },
       setEnabled: (enabled) => { void this.presence.setEnabled(enabled) },
+      readAuth: () => { void this.auth.load() },
+      selectDomain: (domain, wanted) => { this.auth.select(domain, wanted) },
+      beginAuth: () => { void this.auth.begin() },
+      cancelAuth: () => { void this.auth.cancel() },
+      logout: () => { void this.auth.logout() },
       ...this.form.actions(),
     }
   }

@@ -24,9 +24,12 @@ async function bench() {
   // forwarded host events reach it through the same `$dispatch` handoff the
   // connection sink makes.
   new TestRemote(ctx)
+  // 卡片的扫码那一段走连接上的裸 RPC 通道，所以 bench 里要有一条。
+  const rpcCall = vi.fn(() => Promise.resolve({ ok: true, value: {} }))
   ctx.provide('connection', {
     isLoopback: true,
     api: { settings: { describe: describeSettings } },
+    rpc: { call: rpcCall },
   } as never)
   await ctx.plugin(SettingsScopeBinder).await()
   // The card's switch reads the plugin tree and writes it; both namespaces are
@@ -35,7 +38,7 @@ async function bench() {
   const setEnabled = vi.fn(() => Promise.resolve({ ok: true, value: { found: true, enabled: true } }))
   ctx.provide('remote.pluginInventory', { list: listPlugins } as never)
   ctx.provide('remote.pluginControl', { setEnabled } as never)
-  return { ctx, slots: ctx.get('slots') as SlotRegistry, describeSettings, listPlugins, setEnabled }
+  return { ctx, slots: ctx.get('slots') as SlotRegistry, describeSettings, listPlugins, setEnabled, rpcCall }
 }
 
 function declareRoot(slots: SlotRegistry): () => void {

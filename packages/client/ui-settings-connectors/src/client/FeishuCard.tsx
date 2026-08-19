@@ -2,6 +2,7 @@
 
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { ChoiceField, ConnectorCard, ValueField } from './ConnectorCard.tsx'
+import { FeishuAuthPanel } from './FeishuAuthPanel.tsx'
 import type { FeishuCardFace } from './feishu-card-controller.ts'
 import type { ConnectorsKey } from './locales.ts'
 import type {} from './slot-contract.ts'
@@ -37,9 +38,21 @@ export function FeishuCard(props: FeishuCardProps) {
       state={state}
       presence={state.plugin}
       onReadPresence={props.readPresence}
+      onOpen={props.readAuth}
       onSetEnabled={props.setEnabled}
       onSave={props.save}
       onDiscard={props.discard}
+      auth={(
+        <FeishuAuthPanel
+          t={t}
+          state={state.auth}
+          onSelect={props.selectDomain}
+          onBegin={props.beginAuth}
+          onCancel={props.cancelAuth}
+          onLogout={props.logout}
+          onReload={props.readAuth}
+        />
+      )}
     >
       <ValueField
         t={t}
