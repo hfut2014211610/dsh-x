@@ -57,6 +57,7 @@
   - textbox "Document editor":
     - /placeholder: Open a document from the left, or start writing here.
   - text: 0 characters Version protection on
+- separator "Resize the assistant column"
 - complementary "Assistant"
 - textbox "Message the agent"
 - button "Commands":

@@ -346,6 +346,29 @@ describe('web e2e: agent-preset selection', () => {
       return element.value.slice(element.selectionStart, element.selectionEnd)
     })).toBe('Final target')
 
+    // The assistant column starts at whatever the CSS default resolves to for
+    // this viewport and the separator owns it from there. Only a real browser
+    // proves that chain: the starting width is a measurement of a laid-out
+    // panel, and the gesture reads its travel against the column that sits
+    // AFTER the handle, so dragging toward the editor is what widens it.
+    const assistant = page.getByRole('complementary', { name: 'Assistant' })
+    const separator = page.getByRole('separator', { name: 'Resize the assistant column' })
+    const beforeWidth = (await assistant.boundingBox())?.width ?? 0
+    expect(beforeWidth).toBeGreaterThan(0)
+    const grip = await separator.boundingBox()
+    if (grip === null) throw new Error('the assistant separator rendered without a box to drag')
+    const gripY = grip.y + grip.height / 2
+    await page.mouse.move(grip.x + grip.width / 2, gripY)
+    await page.mouse.down()
+    await page.mouse.move(grip.x + grip.width / 2 - 120, gripY, { steps: 8 })
+    await page.mouse.up()
+    // Bounded rather than exact: the starting width is a fractional layout
+    // measurement that the drag range rounds, so the assertion pins the
+    // direction and the travel, not a pixel.
+    await expect.poll(async () => (await assistant.boundingBox())?.width ?? 0)
+      .toBeGreaterThan(beforeWidth + 100)
+    expect((await assistant.boundingBox())?.width ?? 0).toBeLessThan(beforeWidth + 140)
+
     // The blank-session selector moves into the active header, so entering a
     // preferred workspace never strands the user without a way back.
     await page.getByRole('button', { name: 'Writing mode' }).click()

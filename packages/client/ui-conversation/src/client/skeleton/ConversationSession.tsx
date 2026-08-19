@@ -1,7 +1,8 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
-import { useEffect, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
+import { ResizeHandle } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId, SessionListState, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
 import type {
   ConversationSessionHeaderSlotProps, ConversationSessionSlotProps,
@@ -21,6 +22,21 @@ interface Breadcrumb {
 }
 
 const DEFAULT_VIEW_ID = 'chat'
+
+/**
+ * Companion column drag bounds, in pixels. The floor keeps the composer card
+ * and its tool row on one line; the ceiling keeps the primary view — an editor
+ * or a prototype stage — the wider half of the split. Between them the column
+ * starts at whatever `--dsh-companion-width` resolves to for this viewport,
+ * measured once the panel has been laid out.
+ */
+const COMPANION_MIN = 320
+const COMPANION_MAX = 720
+
+/** Clamp a measured or dragged companion width into its drag range. */
+function clampCompanion(px: number): number {
+  return Math.min(COMPANION_MAX, Math.max(COMPANION_MIN, Math.round(px)))
+}
 
 /** Resolve by id; a live preferred view temporarily overrides the persisted tab. */
 function resolveActiveView(
@@ -147,7 +163,7 @@ export function ConversationSessionHeader({
  */
 export function ConversationSession({
   sessionId, useSession, useSessions, useInput, inputActions, useStore, actions,
-  renderSlot, views, bindDraftMirror, releaseSessionImages,
+  renderSlot, views, bindDraftMirror, releaseSessionImages, t,
 }: ConversationSessionProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
@@ -167,6 +183,15 @@ export function ConversationSession({
   const storedDraft = useStore(s => s.draft)
   // `?? null`: persisted snapshots from before the inspect field rehydrate without it.
   const inspect = useStore(s => s.inspect ?? null)
+  // null until the panel has been laid out once: the CSS default is a viewport
+  // expression, so the first drag has to start from what it actually resolved
+  // to rather than from a number this component picked.
+  const [companionWidth, setCompanionWidth] = useState<number | null>(null)
+  const measureCompanion = useCallback((node: HTMLElement | null) => {
+    if (node === null) return
+    const measured = clampCompanion(node.getBoundingClientRect().width)
+    setCompanionWidth(current => current ?? measured)
+  }, [])
 
   useEffect(() => {
     if (inputState.draft === '' && storedDraft !== '') inputActions.setDraft(storedDraft)
@@ -197,7 +222,23 @@ export function ConversationSession({
       <main className={css.primaryView}>
         {active !== undefined && renderSlot('conversation.view', owner, { only: active.id })}
       </main>
-      <aside className={css.companionPanel} data-conversation-companion="" aria-label={companion.label}>
+      <ResizeHandle
+        width={companionWidth ?? COMPANION_MIN}
+        min={COMPANION_MIN}
+        max={COMPANION_MAX}
+        side="right"
+        onResize={setCompanionWidth}
+        label={t('companion.resize')}
+      />
+      <aside
+        ref={measureCompanion}
+        className={css.companionPanel}
+        // Before the first measurement the CSS default owns the width; after
+        // it, the drag preference does.
+        style={companionWidth === null ? undefined : { flexBasis: `${String(companionWidth)}px` }}
+        data-conversation-companion=""
+        aria-label={companion.label}
+      >
         <header className={css.companionHeader}>{companion.label}</header>
         <div className={css.companionBody}>
           {renderSlot('conversation.view', owner, { only: companion.id })}

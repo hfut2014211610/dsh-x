@@ -32,6 +32,7 @@
     - button "Reload":
       - img
     - iframe
+- separator "Resize the assistant column"
 - complementary "Assistant"
 - textbox "Message the agent"
 - button "Commands":

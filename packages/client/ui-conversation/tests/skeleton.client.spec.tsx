@@ -189,6 +189,7 @@ function mount(
           views={views}
           releaseSessionImages={vi.fn()}
           bindDraftMirror={write => wiring.bindMirror(write)}
+          t={t}
         />
       )
     }
@@ -476,6 +477,35 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.queryByRole('tab')).toBeNull()
     expect(b.view.container.querySelector('[data-conversation-companion-layout]')).toBeTruthy()
     expect(b.view.container.querySelector('[data-composer-seat]')).toBeTruthy()
+  })
+
+  // The companion column is the assistant beside an editor or a prototype
+  // stage, so how much room it takes is the user's call, not a constant. Its
+  // starting width is whatever the CSS default resolved to (jsdom lays nothing
+  // out, so that measurement floors at the drag minimum); from there the
+  // separator owns it, and dragging toward the primary view widens it.
+  it('lets the companion column be resized from the separator between the two', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      viewTabs: [
+        { id: 'chat', label: 'Chat' },
+        { id: 'writing', label: 'Writing' },
+      ],
+      companion: (_sessionId, activeViewId) => activeViewId === 'writing'
+        ? { id: 'chat', label: 'Assistant' }
+        : null,
+    })
+    act(() => { b.chat.actions.setView('writing') })
+
+    const panel = b.view.getByRole('complementary', { name: 'Assistant' })
+    const handle = b.view.getByRole('separator', { name: '调整助手对话栏宽度' })
+    expect(panel.style.flexBasis).toBe('320px')
+    expect(handle.getAttribute('aria-valuenow')).toBe('320')
+
+    act(() => { fireEvent.keyDown(handle, { key: 'ArrowLeft' }) })
+    expect(panel.style.flexBasis).toBe('336px')
+
+    act(() => { fireEvent.keyDown(handle, { key: 'ArrowRight' }) })
+    expect(panel.style.flexBasis).toBe('320px')
   })
 
   it('opens a blank writing session directly and restores the Hero after leaving the preset', () => {

@@ -202,9 +202,14 @@
 
 .companionPanel {
   display: flex;
+  /* Basis is the CSS default until a drag replaces it inline. The percentage
+     ceiling outranks both: a column dragged wide on a roomy window must not
+     swallow the primary view when the window later narrows, and no drag
+     preference is rewritten to achieve that. */
   flex: 0 0 var(--dsh-companion-width);
   flex-direction: column;
   min-width: 0;
+  max-width: 60%;
   min-height: 0;
   border-left: 1px solid var(--dsw-alias-border-l2);
   background: var(--dsw-alias-bg-base);

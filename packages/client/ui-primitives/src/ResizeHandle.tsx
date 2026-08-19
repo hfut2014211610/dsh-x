@@ -4,7 +4,8 @@
  * Distinct from the app frame's own handle, which is an overlay positioned
  * against the frame and wired to its column solver and stored preferences.
  * This one sits BETWEEN the two columns it separates and reports a width, so a
- * view can make its rail adjustable without owning any of that.
+ * view can make its rail adjustable without owning any of that. It sizes the
+ * column on either side of itself — see `side`.
  */
 
 import { useCallback, useRef, useState } from 'react'
@@ -15,7 +16,7 @@ import css from './ResizeHandle.module.css'
 const KEY_STEP = 16
 
 export interface ResizeHandleProps {
-  /** Current width of the column left of the handle, in pixels. */
+  /** Current width of the sized column, in pixels. */
   width: number
   /** Smallest width the column may take. */
   min: number
@@ -25,10 +26,16 @@ export interface ResizeHandleProps {
   onResize: (width: number) => void
   /** Accessible name, e.g. "Resize the prototype list". */
   label: string
+  /**
+   * Which neighbour the reported width belongs to. 'left' (the default) sizes
+   * the column before the handle, so dragging right widens it; 'right' sizes
+   * the column after it, where the same gesture reads the other way round.
+   */
+  side?: 'left' | 'right'
 }
 
 /**
- * A draggable separator that reports the left column's new width.
+ * A draggable separator that reports its sized neighbour's new width.
  *
  * Pointer capture rather than window listeners: the gesture keeps receiving
  * moves when the pointer leaves the thin hit area, which it does constantly.
@@ -37,7 +44,7 @@ export interface ResizeHandleProps {
  * @param props - see {@link ResizeHandleProps}.
  * @returns the separator element.
  */
-export function ResizeHandle({ width, min, max, onResize, label }: ResizeHandleProps): React.ReactElement {
+export function ResizeHandle({ width, min, max, onResize, label, side = 'left' }: ResizeHandleProps): React.ReactElement {
   const [dragging, setDragging] = useState(false)
   const origin = useRef(0)
   const base = useRef(0)
@@ -46,6 +53,9 @@ export function ResizeHandle({ width, min, max, onResize, label }: ResizeHandleP
   const report = useRef(onResize)
   report.current = onResize
 
+  // A right-hand column grows as the pointer travels left, so its gesture and
+  // its arrow keys both read the travel with the opposite sign.
+  const direction = side === 'right' ? -1 : 1
   const clamp = useCallback((value: number) => Math.min(max, Math.max(min, value)), [min, max])
 
   const onPointerDown = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
@@ -62,9 +72,9 @@ export function ResizeHandle({ width, min, max, onResize, label }: ResizeHandleP
     latest.current = event.clientX
     frame.current ??= requestAnimationFrame(() => {
       frame.current = null
-      report.current(clamp(base.current + latest.current - origin.current))
+      report.current(clamp(base.current + (latest.current - origin.current) * direction))
     })
-  }, [clamp])
+  }, [clamp, direction])
 
   const onPointerUp = useCallback((event: ReactPointerEvent<HTMLDivElement>) => {
     if (!event.currentTarget.hasPointerCapture(event.pointerId)) return
@@ -73,16 +83,16 @@ export function ResizeHandle({ width, min, max, onResize, label }: ResizeHandleP
       cancelAnimationFrame(frame.current)
       frame.current = null
     }
-    report.current(clamp(base.current + latest.current - origin.current))
+    report.current(clamp(base.current + (latest.current - origin.current) * direction))
     setDragging(false)
-  }, [clamp])
+  }, [clamp, direction])
 
   const onKeyDown = useCallback((event: ReactKeyboardEvent<HTMLDivElement>) => {
-    const step = event.key === 'ArrowLeft' ? -KEY_STEP : event.key === 'ArrowRight' ? KEY_STEP : 0
-    if (step === 0) return
+    const travel = event.key === 'ArrowLeft' ? -KEY_STEP : event.key === 'ArrowRight' ? KEY_STEP : 0
+    if (travel === 0) return
     event.preventDefault()
-    report.current(clamp(width + step))
-  }, [clamp, width])
+    report.current(clamp(width + travel * direction))
+  }, [clamp, direction, width])
 
   return (
     <div

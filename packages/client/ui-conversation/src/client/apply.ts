@@ -272,6 +272,7 @@ export function apply(ctx: Context): void {
   // session appears after a Workspace pick.
   slots.register({
     name: 'conversation.session',
+    locale: NS,
     children: {
       'conversation.view': { kind: 'list', scope: 'session' },
     },

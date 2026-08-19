@@ -95,6 +95,25 @@ describe('ResizeHandle', () => {
     expect(onResize).toHaveBeenLastCalledWith(240)
   })
 
+  // side="right": the sized column sits AFTER the handle, so the same leftward
+  // travel that shrinks a left-hand rail widens this one. Both input paths read
+  // the travel, so both are asserted against the same distance.
+  it('widens a right-hand column as the pointer travels left', () => {
+    const onResize = vi.fn()
+    render(<ResizeHandle width={360} min={320} max={720} side="right" onResize={onResize} label="Resize" />)
+    const handle = screen.getByRole('separator', { name: 'Resize' })
+
+    drag(handle, 500, 400)
+    expect(onResize).toHaveBeenLastCalledWith(460)
+    drag(handle, 500, 560)
+    expect(onResize).toHaveBeenLastCalledWith(320)
+
+    fireEvent.keyDown(handle, { key: 'ArrowLeft' })
+    expect(onResize).toHaveBeenLastCalledWith(376)
+    fireEvent.keyDown(handle, { key: 'ArrowRight' })
+    expect(onResize).toHaveBeenLastCalledWith(344)
+  })
+
   // A move or release the gesture does not own must not report: a pointer that
   // never captured is another device crossing the handle mid-drag.
   it('ignores pointer events outside its own capture', () => {
