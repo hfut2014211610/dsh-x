@@ -26,6 +26,24 @@ export type ConnectorsKey =
   | 'feishu.flushMs.label' | 'feishu.flushMs.hint'
   | 'feishu.approvalTimeoutMs.label' | 'feishu.approvalTimeoutMs.hint'
   | 'feishu.endpoint.label' | 'feishu.endpoint.hint'
+  | 'feishu.access.label'
+  | 'feishu.access.own' | 'feishu.access.ownWhy'
+  | 'feishu.access.reuse' | 'feishu.access.reuseWhy'
+  | 'feishu.bridge.title' | 'feishu.bridge.lead'
+  | 'feishu.eventConfigDirs.label' | 'feishu.eventConfigDirs.hint'
+  | 'feishu.cardActionConfigDirs.label' | 'feishu.cardActionConfigDirs.hint'
+  | 'feishu.eventEndpoint.label' | 'feishu.eventEndpoint.hint'
+  | 'feishu.reach.title' | 'feishu.reach.lead'
+  | 'feishu.reach.nobody' | 'feishu.reach.dmOnly' | 'feishu.reach.groupOnly' | 'feishu.reach.both'
+  | 'feishu.dmMode.label' | 'feishu.dmMode.hint'
+  | 'feishu.dmMode.open' | 'feishu.dmMode.allowlist' | 'feishu.dmMode.disabled'
+  | 'feishu.dmAllowlist.label' | 'feishu.dmAllowlist.hint'
+  | 'feishu.groupAllowlist.label' | 'feishu.groupAllowlist.hint'
+  | 'feishu.requireMention.label' | 'feishu.requireMention.hint'
+  | 'feishu.requireMention.on' | 'feishu.requireMention.off'
+  | 'feishu.staleMs.label' | 'feishu.staleMs.hint'
+  | 'feishu.behaviour.title'
+  | 'auth.foldedReuse' | 'auth.unfold' | 'auth.fold'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -103,6 +121,44 @@ export const en: Record<ConnectorsKey, string> = {
   'feishu.approvalTimeoutMs.hint': 'How long an approval card waits for a tap before the tool call is refused.',
   'feishu.endpoint.label': 'Bridge endpoint',
   'feishu.endpoint.hint': 'Local socket to the bridge process. Empty takes the platform default: a named pipe on Windows, a unix socket elsewhere.',
+  'feishu.access.label': 'How dsh gets its Feishu events',
+  'feishu.access.own': 'Its own Feishu app',
+  'feishu.access.ownWhy': 'dsh has an app of its own and you authorize it below. This is the ordinary setup.',
+  'feishu.access.reuse': 'Read from the shared bridge',
+  'feishu.access.reuseWhy': 'The bridge already subscribes for other agents; dsh reads from that subscription instead of taking one of its own.',
+  'feishu.bridge.title': 'Shared subscription',
+  'feishu.bridge.lead': 'Feishu admits exactly one consumer per event key on a machine. So the bridge holds that one subscription for every app listed here and relays what arrives; any number of agents — dsh among them — read from the relay. Each app keeps its own identity, so a reply goes out as the bot that was spoken to. What the apps are is not dsh’s to decide: name the lark-cli profile directories whose owners already set them up.',
+  'feishu.eventConfigDirs.label': 'Apps to subscribe on',
+  'feishu.eventConfigDirs.hint': 'One lark-cli profile directory per line. Empty means dsh’s own app, and nothing is shared.',
+  'feishu.cardActionConfigDirs.label': 'Apps whose card taps come back',
+  'feishu.cardActionConfigDirs.hint': 'Card callbacks only arrive for an app that subscribed card.action.trigger in the developer console. Empty means all of the apps above — list a subset if only some of them did.',
+  'feishu.eventEndpoint.label': 'Relay endpoint',
+  'feishu.eventEndpoint.hint': 'Local socket other agents read the raw events from. Empty takes the platform default.',
+  'feishu.reach.title': 'Who may use it',
+  'feishu.reach.lead': 'Denied by default, and deliberately: a channel into an agent that runs tools is not something to leave open while you work out the rest.',
+  'feishu.reach.nobody': 'As set, nobody can reach it — direct messages are refused and no group is listed.',
+  'feishu.reach.dmOnly': 'As set, direct messages get through; no group is listed.',
+  'feishu.reach.groupOnly': 'As set, the listed groups get through; direct messages are refused.',
+  'feishu.reach.both': 'As set, both direct messages and the listed groups get through.',
+  'feishu.dmMode.label': 'Direct messages',
+  'feishu.dmMode.hint': 'Who may open a one-to-one conversation.',
+  'feishu.dmMode.open': 'anyone',
+  'feishu.dmMode.allowlist': 'listed people only',
+  'feishu.dmMode.disabled': 'nobody',
+  'feishu.dmAllowlist.label': 'People allowed to DM',
+  'feishu.dmAllowlist.hint': 'One open_id per line. Only read when direct messages are set to listed people only.',
+  'feishu.groupAllowlist.label': 'Groups served',
+  'feishu.groupAllowlist.hint': 'One chat_id per line. Empty means no group at all, not every group.',
+  'feishu.requireMention.label': 'Require an @ in groups',
+  'feishu.requireMention.hint': 'With this off, every message in a listed group starts a turn.',
+  'feishu.requireMention.on': 'yes, only when @-ed',
+  'feishu.requireMention.off': 'no, any message',
+  'feishu.staleMs.label': 'Message freshness (ms)',
+  'feishu.staleMs.hint': 'Messages older than this are dropped, so a reconnect does not replay yesterday’s conversation.',
+  'feishu.behaviour.title': 'How a session behaves',
+  'auth.foldedReuse': 'The apps above belong to whoever set them up, so signing in is not part of this route. Open it anyway if one of them is yours to authorize.',
+  'auth.unfold': 'Open',
+  'auth.fold': 'Fold away',
 }
 
 /** Simplified Chinese copy. */
@@ -174,4 +230,42 @@ export const zh: Record<ConnectorsKey, string> = {
   'feishu.approvalTimeoutMs.hint': '审批卡片等人点多久，超时就按拒绝处理。',
   'feishu.endpoint.label': '桥接端点',
   'feishu.endpoint.hint': '连到桥接进程的本地 socket。留空用平台默认：Windows 走命名管道，其他系统走 unix socket。',
+  'feishu.access.label': '飞书的消息怎么进到 dsh',
+  'feishu.access.own': '用 dsh 自己的应用',
+  'feishu.access.ownWhy': 'dsh 有一个自己的飞书应用，在下面扫码授权就能用。一般都走这条。',
+  'feishu.access.reuse': '复用桥接已有的订阅',
+  'feishu.access.reuseWhy': '桥接已经在替别的 agent 订阅了，dsh 从那份订阅里读，不再自己占一份。',
+  'feishu.bridge.title': '共用的订阅',
+  'feishu.bridge.lead': '同一台机器上，飞书的一个 event key 只允许一个消费者。所以桥接替下面每个应用各持有那唯一的一份订阅，收到什么就广播出去，任意多个 agent（包括 dsh）从广播里读。每个应用的身份是分开的，谁被搭话就由谁回话。这些应用不归 dsh 管——填的是别人已经配好的那些 lark-cli profile 目录。',
+  'feishu.eventConfigDirs.label': '订阅哪几个应用',
+  'feishu.eventConfigDirs.hint': '一行一个 lark-cli profile 目录。留空表示只用 dsh 自己的应用，不与谁共用。',
+  'feishu.cardActionConfigDirs.label': '哪几个应用的卡片点击会回来',
+  'feishu.cardActionConfigDirs.hint': '只有在开发者后台订阅过 card.action.trigger 的应用才收得到卡片回调。留空表示上面全部；只有一部分订阅过，就把那一部分列出来。',
+  'feishu.eventEndpoint.label': '广播端点',
+  'feishu.eventEndpoint.hint': '其他 agent 从这个本地 socket 读原始事件。留空用平台默认。',
+  'feishu.reach.title': '谁能用',
+  'feishu.reach.lead': '默认谁都不放行，这是故意的：一条通往会跑工具的 agent 的入口，不该在你还没想清楚之前先开着。',
+  'feishu.reach.nobody': '照现在的设置，没有人能用它——私聊不收，群也一个都没列。',
+  'feishu.reach.dmOnly': '照现在的设置，私聊能进来；群一个都没列。',
+  'feishu.reach.groupOnly': '照现在的设置，列出的群能进来；私聊不收。',
+  'feishu.reach.both': '照现在的设置，私聊和列出的群都能进来。',
+  'feishu.dmMode.label': '私聊',
+  'feishu.dmMode.hint': '谁可以单独找它说话。',
+  'feishu.dmMode.open': '谁都可以',
+  'feishu.dmMode.allowlist': '只认名单里的人',
+  'feishu.dmMode.disabled': '谁都不行',
+  'feishu.dmAllowlist.label': '允许私聊的人',
+  'feishu.dmAllowlist.hint': '一行一个 open_id。只在私聊设为「只认名单里的人」时才读它。',
+  'feishu.groupAllowlist.label': '放行的群',
+  'feishu.groupAllowlist.hint': '一行一个 chat_id。留空是一个群都不放行，不是全部放行。',
+  'feishu.requireMention.label': '群里必须 @ 才接活',
+  'feishu.requireMention.hint': '关掉之后，放行的群里每一句话都会起一轮。',
+  'feishu.requireMention.on': '是，@ 到才接',
+  'feishu.requireMention.off': '否，说什么都接',
+  'feishu.staleMs.label': '消息保鲜期（毫秒）',
+  'feishu.staleMs.hint': '比这更老的消息直接丢掉，免得断线重连之后把昨天的话重放一遍。',
+  'feishu.behaviour.title': '会话怎么跑',
+  'auth.foldedReuse': '上面那些应用归配置它们的人管，登录不是这条路上的事。要是其中有一个该由你授权，也可以打开。',
+  'auth.unfold': '展开',
+  'auth.fold': '收起',
 }

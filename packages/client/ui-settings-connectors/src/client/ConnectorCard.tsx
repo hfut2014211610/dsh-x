@@ -256,6 +256,123 @@ export function ValueField(props: ConnectorFieldProps & {
 }
 
 /**
+ * An either/or between two ways of setting a channel up.
+ *
+ * Radios rather than a disclosure per branch: the two paths are exclusive, and
+ * two independently-openable sections would let someone fill in both and have
+ * no way to tell which one is in effect. Each option carries the sentence that
+ * says who it is for, because the names alone ("own app", "reuse") do not tell
+ * a first-time reader which one they are.
+ * @param props - the group's copy and the current choice.
+ * @param props.t - locale reader for this page's copy.
+ * @param props.labelKey - locale key naming the choice being made.
+ * @param props.options - the branches, in display order.
+ * @param props.value - the branch in effect.
+ * @param props.disabled - disables the whole group while the document is read-only.
+ * @param props.onChange - pick a branch.
+ * @returns the branch selector.
+ */
+export function BranchField(props: {
+  t: (key: ConnectorsKey) => string
+  labelKey: ConnectorsKey
+  options: ReadonlyArray<{ value: string; nameKey: ConnectorsKey; whyKey: ConnectorsKey }>
+  value: string
+  disabled: boolean
+  onChange: (value: string) => void
+}) {
+  const name = useId()
+  return (
+    <div className={css.field} role="radiogroup" aria-label={props.t(props.labelKey)}>
+      <span className={css.fieldLabel}>{props.t(props.labelKey)}</span>
+      <div className={css.branch}>
+        {props.options.map(option => (
+          <label
+            key={option.value}
+            className={option.value === props.value ? `${css.branchOption} ${css.branchOptionActive}` : css.branchOption}
+          >
+            <input
+              className={css.branchRadio}
+              type="radio"
+              name={name}
+              value={option.value}
+              checked={option.value === props.value}
+              disabled={props.disabled}
+              onChange={() => { props.onChange(option.value) }}
+            />
+            <span className={css.branchText}>
+              <span className={css.branchName}>{props.t(option.nameKey)}</span>
+              <span className={css.branchWhy}>{props.t(option.whyKey)}</span>
+            </span>
+          </label>
+        ))}
+      </div>
+    </div>
+  )
+}
+
+/**
+ * A list control, one entry per line.
+ *
+ * A textarea rather than a row of chips: the lists these cards carry are
+ * pasted in from a config file or a chat message far more often than they are
+ * typed one at a time, and paste into a chip row loses the line breaks.
+ * @param props - the control's copy, its staged state, and the edit actions.
+ * @param props.rows - visible line count; three fits the usual two or three entries.
+ * @returns the labelled control.
+ */
+export function ListField(props: ConnectorFieldProps & { rows?: number }) {
+  const id = useId()
+  const { field } = props
+  return (
+    <div className={css.field}>
+      <FieldHead {...props} id={id} />
+      <textarea
+        id={id}
+        className={field.invalid ? `${css.textarea} ${css.inputInvalid}` : css.textarea}
+        rows={props.rows ?? 3}
+        spellCheck={false}
+        {...field.invalid ? { 'aria-invalid': true } : {}}
+        value={field.text}
+        disabled={props.disabled}
+        onChange={(event) => { props.onEdit(event.target.value) }}
+      />
+      <p className={field.invalid ? css.invalid : css.hint}>
+        {props.t(field.invalid ? 'invalid' : props.hintKey)}
+      </p>
+    </div>
+  )
+}
+
+/**
+ * A named group of controls with a rule above it.
+ *
+ * A card that carries three unrelated groups — how a session behaves, who may
+ * use it, which apps it listens on — reads as one long undifferentiated form
+ * without them, and the reader has no way to tell which knob belongs to which
+ * question.
+ * @param props - the group's heading, its lead line, and its controls.
+ * @param props.t - locale reader for this page's copy.
+ * @param props.titleKey - locale key of the group heading.
+ * @param props.leadKey - locale key of the line under the heading, when it needs one.
+ * @param props.children - the group's controls.
+ * @returns the group.
+ */
+export function FieldGroup(props: {
+  t: (key: ConnectorsKey) => string
+  titleKey: ConnectorsKey
+  leadKey?: ConnectorsKey
+  children: ReactNode
+}) {
+  return (
+    <section className={css.group}>
+      <h4 className={css.groupHeading}>{props.t(props.titleKey)}</h4>
+      {props.leadKey === undefined ? null : <p className={css.hint}>{props.t(props.leadKey)}</p>}
+      {props.children}
+    </section>
+  )
+}
+
+/**
  * A fixed-choice control. The empty option is what clears the field, so
  * re-inheriting the composition layer stays reachable without the reset badge.
  * @param props - the control's copy, its staged state, and the choice labels.

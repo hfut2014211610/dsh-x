@@ -80,6 +80,26 @@ export interface ConnectorActions {
   discard: () => void
 }
 
+/**
+ * Whether the host holds the value that was written.
+ *
+ * Reference equality is not enough: a list field writes an array, and the
+ * value read back out of the document is a different object with the same
+ * entries. Comparing by reference would report every list save as refused
+ * while it in fact landed, so the form would keep drafts nobody needs to fix.
+ * @param stored - what the user layer holds now.
+ * @param written - what the save wrote.
+ * @returns whether they are the same value.
+ */
+function sameValue(stored: unknown, written: unknown): boolean {
+  if (stored === written) return true
+  if (Array.isArray(stored) && Array.isArray(written)) {
+    return stored.length === written.length
+      && stored.every((item, index) => sameValue(item, written[index]))
+  }
+  return false
+}
+
 /** One field's staged edit. */
 interface StagedEdit {
   /** Draft text the control renders. */
@@ -133,6 +153,49 @@ export function durationField(field: string): ConnectorFieldSpec {
       const parsed = Number(trimmed)
       if (!Number.isInteger(parsed) || parsed < 0) return undefined
       return { kind: 'set', value: parsed }
+    },
+  }
+}
+
+/**
+ * A list-of-strings field, one entry per line. An empty draft clears it.
+ *
+ * Commas split too, because a list pasted from a config file or a chat message
+ * arrives comma-separated as often as newline-separated, and a control that
+ * silently treats `a, b` as one entry is a bug the user cannot see. Entries are
+ * deduplicated: for the lists these cards carry — subscribed apps, allowlisted
+ * chats — a repeat is never meaningful and sometimes harmful.
+ * @param field - field name inside the namespace section.
+ * @returns the field's conversion spec.
+ */
+export function listField(field: string): ConnectorFieldSpec {
+  return {
+    field,
+    format: value => Array.isArray(value)
+      ? value.filter((item): item is string => typeof item === 'string').join('\n')
+      : '',
+    parse: (text) => {
+      const items = [...new Set(text.split(/[\n,]/).map(item => item.trim()).filter(item => item !== ''))]
+      return items.length === 0 ? { kind: 'clear' } : { kind: 'set', value: items }
+    },
+  }
+}
+
+/**
+ * A yes/no field. The empty draft clears it, so the control's blank option is
+ * what re-inherits the composition layer — same shape as {@link choiceField},
+ * because a checkbox has no way to show "not set here".
+ * @param field - field name inside the namespace section.
+ * @returns the field's conversion spec.
+ */
+export function toggleField(field: string): ConnectorFieldSpec {
+  return {
+    field,
+    format: value => typeof value === 'boolean' ? String(value) : '',
+    parse: (text) => {
+      if (text === '') return { kind: 'clear' }
+      if (text === 'true' || text === 'false') return { kind: 'set', value: text === 'true' }
+      return undefined
     },
   }
 }
@@ -297,7 +360,7 @@ export class ConnectorForm<T> {
 
   private async store(field: string, value: unknown): Promise<boolean> {
     await this.scope.set(field, value)
-    return this.userLayer()?.[field] === value
+    return sameValue(this.userLayer()?.[field], value)
   }
 
   private stage(field: string, edit: StagedEdit): void {

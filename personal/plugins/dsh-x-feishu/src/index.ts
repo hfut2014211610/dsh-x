@@ -38,6 +38,7 @@ import type {} from '@deepseek-ai/dsh-storage-domain'
 import { BridgeClient } from './client.ts'
 import { FeishuAuthGateway } from './auth-gateway.ts'
 import { DEFAULT_BRIDGE_CONFIG, bridgeConfigPath, publishBridgeConfig } from './bridge-config.ts'
+import { dshConfigDir } from './auth.ts'
 import { defaultEventRelayEndpoint } from '../bridge/relay.ts'
 import { SessionRouter } from './router.ts'
 import { RunQueue } from './queue.ts'
@@ -179,7 +180,10 @@ export function apply(ctx: Context, config: Config): void {
     publishBridgeConfig({
       endpoint: endpoint(),
       eventEndpoint: current.eventEndpoint === '' ? defaultEventRelayEndpoint() : current.eventEndpoint,
-      eventConfigDirs: current.eventConfigDirs,
+      // 一个都没列 = 用 dsh 自己那份，跟扫码登录那一页同一条规矩。写成具体目录
+      // 而不是留空，是因为留空在桥接那边意味着"跟着环境默认走"，而这台机器上的
+      // 环境默认往往是别的工具的应用——那正是这一路上已经踩过一次的坑。
+      eventConfigDirs: current.eventConfigDirs.length === 0 ? [dshConfigDir()] : current.eventConfigDirs,
       cardActionConfigDirs: current.cardActionConfigDirs,
       policy: {
         dmMode: current.dmMode,

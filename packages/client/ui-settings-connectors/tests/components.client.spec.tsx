@@ -380,31 +380,49 @@ describe('FeishuCard', () => {
     ...settled,
     plugin: running,
     auth: signedIn,
+    access: 'own',
+    authFolded: false,
     presetId: field('ued'),
     density: field('standard'),
     flushMs: field('2500'),
     approvalTimeoutMs: field('300000'),
     endpoint: field(''),
+    eventConfigDirs: field(''),
+    cardActionConfigDirs: field(''),
+    eventEndpoint: field(''),
+    dmMode: field('allowlist'),
+    dmAllowlist: field(''),
+    groupAllowlist: field(''),
+    requireMention: field('true'),
+    staleMs: field('600000'),
+    reach: 'nobody',
   }
 
-  it('edits every field the channel plugin serves', () => {
-    const edit = vi.fn()
-    const props = {
+  function cardProps(over: Partial<FeishuCardState>, actions: Record<string, unknown> = {}): FeishuCardProps {
+    return {
       t,
-      useFeishuCard: (selector: (value: FeishuCardState) => unknown) => selector(state),
-      edit,
+      useFeishuCard: (selector: (value: FeishuCardState) => unknown) => selector({ ...state, ...over }),
+      edit: vi.fn(),
       resetField: vi.fn(),
       readPresence: vi.fn(),
       setEnabled: vi.fn(),
       readAuth: vi.fn(),
+      selectProfile: vi.fn(),
       selectDomain: vi.fn(),
       beginAuth: vi.fn(),
       cancelAuth: vi.fn(),
       logout: vi.fn(),
+      setAccess: vi.fn(),
+      toggleAuth: vi.fn(),
       save: vi.fn(),
       discard: vi.fn(),
+      ...actions,
     } as unknown as FeishuCardProps
-    render(<FeishuCard {...props} />)
+  }
+
+  it('edits every field its own-app setup shows', () => {
+    const edit = vi.fn()
+    render(<FeishuCard {...cardProps({}, { edit })} />)
     open()
 
     fireEvent.change(screen.getByLabelText(zh['feishu.presetId.label']), { target: { value: 'writing' } })
@@ -412,6 +430,9 @@ describe('FeishuCard', () => {
     fireEvent.change(screen.getByLabelText(zh['feishu.flushMs.label']), { target: { value: '4000' } })
     fireEvent.change(screen.getByLabelText(zh['feishu.approvalTimeoutMs.label']), { target: { value: '60000' } })
     fireEvent.change(screen.getByLabelText(zh['feishu.endpoint.label']), { target: { value: '\\\\.\\pipe\\x' } })
+    fireEvent.change(screen.getByLabelText(zh['feishu.dmMode.label']), { target: { value: 'open' } })
+    fireEvent.change(screen.getByLabelText(zh['feishu.groupAllowlist.label']), { target: { value: 'oc_a\noc_b' } })
+    fireEvent.change(screen.getByLabelText(zh['feishu.requireMention.label']), { target: { value: 'false' } })
 
     expect(edit.mock.calls).toEqual([
       ['presetId', 'writing'],
@@ -419,36 +440,89 @@ describe('FeishuCard', () => {
       ['flushMs', '4000'],
       ['approvalTimeoutMs', '60000'],
       ['endpoint', '\\\\.\\pipe\\x'],
+      ['dmMode', 'open'],
+      ['groupAllowlist', 'oc_a\noc_b'],
+      ['requireMention', 'false'],
     ])
   })
 
   it('resets every field back to the composition layer', () => {
     const resetField = vi.fn()
-    const overridden = Object.fromEntries(
-      (['presetId', 'density', 'flushMs', 'approvalTimeoutMs', 'endpoint'] as const)
-        .map(name => [name, { ...state[name], overridden: true }]),
-    )
-    const props = {
-      t,
-      useFeishuCard: (selector: (value: FeishuCardState) => unknown) => selector({ ...state, ...overridden }),
-      edit: vi.fn(),
-      resetField,
-      readPresence: vi.fn(),
-      setEnabled: vi.fn(),
-      readAuth: vi.fn(),
-      selectDomain: vi.fn(),
-      beginAuth: vi.fn(),
-      cancelAuth: vi.fn(),
-      logout: vi.fn(),
-      save: vi.fn(),
-      discard: vi.fn(),
-    } as unknown as FeishuCardProps
-    render(<FeishuCard {...props} />)
+    // 顺序就是屏幕上的顺序：先「谁能用」再「会话怎么跑」，因为装这条渠道的人
+    // 是按这个次序问问题的。
+    const names = [
+      'dmMode', 'dmAllowlist', 'groupAllowlist', 'requireMention', 'staleMs',
+      'presetId', 'density', 'flushMs', 'approvalTimeoutMs', 'endpoint',
+    ] as const
+    const overridden = Object.fromEntries(names.map(name => [name, { ...state[name], overridden: true }]))
+    render(<FeishuCard {...cardProps(overridden, { resetField })} />)
     open()
 
     for (const button of screen.getAllByRole('button', { name: zh.reset })) fireEvent.click(button)
 
-    expect(resetField.mock.calls.flat())
-      .toEqual(['presetId', 'density', 'flushMs', 'approvalTimeoutMs', 'endpoint'])
+    expect(resetField.mock.calls.flat()).toEqual([...names])
+  })
+
+  // 两条路是二选一，所以另一条的字段是**不渲染**，不是置灰。一个灰着的列表照样
+  // 显示着值，读起来像"这就是当前生效的，只是锁上了"。
+  describe('两条接入方式', () => {
+    it('单独申请时不摆共用订阅那几项', () => {
+      render(<FeishuCard {...cardProps({ access: 'own' })} />)
+      open()
+
+      expect(screen.queryByLabelText(zh['feishu.eventConfigDirs.label'])).toBeNull()
+      expect(screen.queryByText(zh['feishu.bridge.lead'])).toBeNull()
+    })
+
+    it('复用时摆出来，并且先讲清楚为什么要这么接', () => {
+      render(<FeishuCard {...cardProps({ access: 'reuse' })} />)
+      open()
+
+      expect(screen.getByLabelText(zh['feishu.eventConfigDirs.label'])).toBeTruthy()
+      expect(screen.getByLabelText(zh['feishu.cardActionConfigDirs.label'])).toBeTruthy()
+      expect(screen.getByText(zh['feishu.bridge.lead'])).toBeTruthy()
+    })
+
+    it('选另一条要告诉控制器', () => {
+      const setAccess = vi.fn()
+      render(<FeishuCard {...cardProps({}, { setAccess })} />)
+      open()
+
+      fireEvent.click(screen.getByRole('radio', { name: new RegExp(zh['feishu.access.reuse']) }))
+
+      expect(setAccess).toHaveBeenCalledWith('reuse')
+    })
+
+    // 复用的时候那些应用归别人管，登录不是这条路上的事——但收起来不等于拿掉，
+    // 其中一个应用可能正好该由你授权。
+    it('复用时把登录那一段收起来，但留着入口', () => {
+      const toggleAuth = vi.fn()
+      render(<FeishuCard {...cardProps({ access: 'reuse', authFolded: true }, { toggleAuth })} />)
+      open()
+
+      expect(screen.queryByText(zh['auth.domains'])).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: zh['auth.unfold'] }))
+
+      expect(toggleAuth).toHaveBeenCalled()
+    })
+  })
+
+  // 默认拒绝是不出声的：模式是"只认名单"而名单是空的，渠道开着、授权也给了、
+  // 桥接也连上了，就是没有人能用。这一行是唯一说破它的地方。
+  describe('谁能用', () => {
+    it('谁都用不了要说出来', () => {
+      render(<FeishuCard {...cardProps({ reach: 'nobody' })} />)
+      open()
+
+      expect(screen.getByText(zh['feishu.reach.nobody'])).toBeTruthy()
+    })
+
+    it('通了也说一声，免得人不确定改没改对', () => {
+      render(<FeishuCard {...cardProps({ reach: 'both' })} />)
+      open()
+
+      expect(screen.getByText(zh['feishu.reach.both'])).toBeTruthy()
+      expect(screen.queryByText(zh['feishu.reach.nobody'])).toBeNull()
+    })
   })
 })

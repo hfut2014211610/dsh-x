@@ -22,44 +22,52 @@
 
 ## 配置
 
-插件（`$DSH_HOME/settings.yaml`）：
+**配置只有一处：dsh 的「设置 → 连接器 → 飞书」**，或者等价的 `$DSH_HOME/settings.yaml`。
+桥接自己没有界面也没有设置服务，所以插件把它要的那几项写成 `~/.dsh-x-feishu/config.json`，
+桥接只读，并且盯着这个文件的变化——改完不用重起桥接。反过来桥接**不**向 dsh 要配置：
+它得在 dsh 不在的时候顶上，而文件在 dsh 挂了以后还在，RPC 不在。
 
 ```yaml
 dsh-x-feishu:
+  # dsh 这一侧
   endpoint: ''          # 留空用平台默认：win32 命名管道 / POSIX unix socket
   presetId: standard    # 飞书开的会话用哪个 agent 预设，留空用部署默认
   density: standard     # compact | standard | detailed
   flushMs: 2500         # 卡片正文最少隔多久推一次
   approvalTimeoutMs: 300000
+
+  # 接哪几个飞书应用（写 lark-cli 的 profile 目录）
+  eventConfigDirs: []           # 留空 = 只用 dsh 自己那份（~/.lark-cli/dsh-x）
+  cardActionConfigDirs: []      # 留空 = 与上面相同
+  eventEndpoint: ''             # 其他 agent 读原始事件的端点，留空用平台默认
+
+  # 谁能用。默认拒绝：名单不填，谁都用不了
+  dmMode: allowlist             # open | allowlist | disabled
+  dmAllowlist: []               # 装 open_id
+  groupAllowlist: []            # 装 chat_id，空 = 一个群都不放行
+  requireMention: true
+  staleMs: 600000
+
+  probeOrigin: ''               # 桥接探这个地址判断 dsh 在不在，留空用本进程自己的地址
 ```
 
-桥接（`~/.dsh-x-feishu/config.json`）：
+`~/.dsh-x-feishu/config.json` 里只有两项**不**归设置页管，写的时候原样留着：`launch`
+（dsh 不在时用什么命令拉起来）和 `botOpenIds`（每个应用的机器人 open_id 手工覆盖，
+留空则启动时向飞书问一次）。其余字段每次保存都整个盖掉，手改会丢。
 
-```json
-{
-  "eventEndpoint": "\\\\.\\pipe\\dsh-x-feishu-events",
-  "eventConfigDirs": [
-    "C:\\Users\\me\\.lark-cli",
-    "C:\\Users\\me\\.lark-cli\\second-app"
-  ],
-  "cardActionConfigDirs": [
-    "C:\\Users\\me\\.lark-cli"
-  ],
-  "policy": {
-    "dmMode": "allowlist",
-    "dmAllowlist": ["ou_你的open_id"],
-    "groupAllowlist": ["oc_群id"],
-    "requireMention": true
-  },
-  "botOpenId": "",
-  "probeOrigin": "http://127.0.0.1:13080",
-  "launch": { "command": "pnpm", "args": ["dsh", "web"], "cwd": "D:/dev/DSH-X" }
-}
-```
+### 一个应用还是几个
 
-`eventConfigDirs` 用于一个群里存在多个独立机器人应用的场景。飞书只会把“@某机器人”的群消息投递给那个机器人所属应用，因此 bridge 会对每个 App ID 各持有一份订阅，再汇入同一个 relay；同一 App ID + EventKey 仍然只能有一个 consumer，而且全部归 bridge 所有。`cardActionConfigDirs` 只列已经在飞书控制台订阅 `card.action.trigger` 的应用；省略时与 `eventConfigDirs` 相同。单应用部署可省略两个数组。
+`eventConfigDirs` 留空是单应用：桥接只订阅 dsh 自己那份 profile。填多个是多 agent 复用——
+一个群里有好几个独立机器人应用时，飞书只把「@某机器人」的消息投给那个机器人所属的应用，
+所以桥接对每个应用各持有一份订阅，再汇进同一条 relay。同一应用 + EventKey 仍然只能有
+一个 consumer，而且全部归桥接所有；别的组件连 relay，不要自己起 `lark-cli event consume`。
 
-**默认拒绝**：名单不填，谁都用不了。`botOpenId` 留空时桥接启动会向飞书问一次；问不到就要手填，否则群里的 @ 判定会全部落空。
+**出站跟着入站走**：事件从哪个应用进来，回它的消息、卡片就以哪个应用的身份发。这不是讲究——
+卡片只能由发它的那个应用改，身份错了连进度都刷不动；机器人 open_id 也是一个应用一个，
+拿 A 的去判 B 的 @，判出来永远是「没 @ 我」。relay 帧里带 `source` 字段，就是给复用方用的。
+
+`cardActionConfigDirs` 只列已经在飞书开发者后台订阅过 `card.action.trigger` 的应用；
+留空表示与 `eventConfigDirs` 相同。
 
 ## 跑起来
 

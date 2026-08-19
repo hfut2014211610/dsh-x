@@ -3,7 +3,7 @@
 import { describe, expect, it, vi } from 'vitest'
 import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
 import {
-  ConnectorForm, choiceField, durationField, textField,
+  ConnectorForm, choiceField, durationField, listField, textField, toggleField,
 } from '../src/client/connector-form.ts'
 
 type Section = Record<string, unknown>
@@ -109,6 +109,54 @@ describe('field specs', () => {
     expect(choice.parse('')).toEqual({ kind: 'clear' })
     expect(choice.parse('standard')).toEqual({ kind: 'set', value: 'standard' })
     expect(choice.parse('lavish')).toBeUndefined()
+  })
+
+  it('splits a list on lines or commas, and drops the repeats', () => {
+    const list = listField('groupAllowlist')
+    expect(list.format(['oc_a', 'oc_b'])).toBe('oc_a\noc_b')
+    expect(list.format('oc_a')).toBe('')
+    expect(list.parse('   ')).toEqual({ kind: 'clear' })
+    expect(list.parse('oc_a\noc_b')).toEqual({ kind: 'set', value: ['oc_a', 'oc_b'] })
+    // A list pasted out of a config file or a chat message arrives comma-
+    // separated as often as newline-separated.
+    expect(list.parse('oc_a, oc_b')).toEqual({ kind: 'set', value: ['oc_a', 'oc_b'] })
+    expect(list.parse('oc_a\noc_a')).toEqual({ kind: 'set', value: ['oc_a'] })
+  })
+
+  it('takes yes and no, and clears on the blank option', () => {
+    const toggle = toggleField('requireMention')
+    expect(toggle.format(true)).toBe('true')
+    expect(toggle.format('true')).toBe('')
+    expect(toggle.parse('')).toEqual({ kind: 'clear' })
+    expect(toggle.parse('false')).toEqual({ kind: 'set', value: false })
+    expect(toggle.parse('maybe')).toBeUndefined()
+  })
+})
+
+describe('saving a list', () => {
+  // The form asks the host whether it holds what was written. For a list that
+  // read-back is a different array object with the same entries, so comparing
+  // by reference would report every list save as refused while it in fact
+  // landed — and the card would keep drafts nobody needs to fix.
+  it('counts as landed even though the host hands back another array', async () => {
+    const scope = fakeScope()
+    const form = new ConnectorForm(scope, [listField('groupAllowlist')])
+
+    form.actions().edit('groupAllowlist', 'oc_a\noc_b')
+    await form.save()
+
+    expect(scope.writes).toEqual([{ op: 'set', field: 'groupAllowlist', value: ['oc_a', 'oc_b'] }])
+    expect(form.state()).toMatchObject({ dirty: false, failed: false })
+  })
+
+  it('still reports a list the host would not take', async () => {
+    const scope = fakeScope({ refuse: ['groupAllowlist'] })
+    const form = new ConnectorForm(scope, [listField('groupAllowlist')])
+
+    form.actions().edit('groupAllowlist', 'oc_a')
+    await form.save()
+
+    expect(form.state()).toMatchObject({ dirty: true, failed: true })
   })
 })
 
