@@ -380,22 +380,34 @@ describe('FeishuCard', () => {
     ...settled,
     plugin: running,
     auth: signedIn,
-    access: 'own',
+    access: field('own'),
+    profile: field(''),
     authFolded: false,
+    bridge: { connected: false, identity: '' },
     presetId: field('ued'),
     density: field('standard'),
     flushMs: field('2500'),
     approvalTimeoutMs: field('300000'),
     endpoint: field(''),
-    eventConfigDirs: field(''),
-    cardActionConfigDirs: field(''),
-    eventEndpoint: field(''),
     dmMode: field('allowlist'),
     dmAllowlist: field(''),
     groupAllowlist: field(''),
     requireMention: field('true'),
     staleMs: field('600000'),
     reach: 'nobody',
+  }
+
+  /** 一个连上的桥接：订着两个应用，dsh 报了第一个。 */
+  const attached = {
+    connected: true,
+    identity: '/home/me/.lark-cli',
+    bridge: {
+      apps: ['/home/me/.lark-cli', '/home/me/.lark-cli/agent-bus'],
+      dmMode: 'disabled',
+      dmAllowed: 0,
+      groupsAllowed: 0,
+      requireMention: true,
+    },
   }
 
   function cardProps(over: Partial<FeishuCardState>, actions: Record<string, unknown> = {}): FeishuCardProps {
@@ -407,12 +419,10 @@ describe('FeishuCard', () => {
       readPresence: vi.fn(),
       setEnabled: vi.fn(),
       readAuth: vi.fn(),
-      selectProfile: vi.fn(),
       selectDomain: vi.fn(),
       beginAuth: vi.fn(),
       cancelAuth: vi.fn(),
       logout: vi.fn(),
-      setAccess: vi.fn(),
       toggleAuth: vi.fn(),
       save: vi.fn(),
       discard: vi.fn(),
@@ -448,9 +458,9 @@ describe('FeishuCard', () => {
 
   it('resets every field back to the composition layer', () => {
     const resetField = vi.fn()
-    // 顺序就是屏幕上的顺序：先「谁能用」再「会话怎么跑」，因为装这条渠道的人
-    // 是按这个次序问问题的。
+    // 顺序就是屏幕上的顺序：先身份，再「谁能用」，最后「会话怎么跑」。
     const names = [
+      'profile',
       'dmMode', 'dmAllowlist', 'groupAllowlist', 'requireMention', 'staleMs',
       'presetId', 'density', 'flushMs', 'approvalTimeoutMs', 'endpoint',
     ] as const
@@ -463,47 +473,104 @@ describe('FeishuCard', () => {
     expect(resetField.mock.calls.flat()).toEqual([...names])
   })
 
-  // 两条路是二选一，所以另一条的字段是**不渲染**，不是置灰。一个灰着的列表照样
-  // 显示着值，读起来像"这就是当前生效的，只是锁上了"。
   describe('两条接入方式', () => {
-    it('单独申请时不摆共用订阅那几项', () => {
-      render(<FeishuCard {...cardProps({ access: 'own' })} />)
+    // 身份是两条路都要说的那一件事，所以它不属于任何一支。
+    it('哪条路都要说清 dsh 是哪个应用', () => {
+      render(<FeishuCard {...cardProps({ access: field('own') })} />)
       open()
+      expect(screen.getByLabelText(zh['feishu.profile.label'])).toBeTruthy()
+      cleanup()
 
-      expect(screen.queryByLabelText(zh['feishu.eventConfigDirs.label'])).toBeNull()
-      expect(screen.queryByText(zh['feishu.bridge.lead'])).toBeNull()
+      render(<FeishuCard {...cardProps({ access: field('reuse') })} />)
+      open()
+      expect(screen.getByLabelText(zh['feishu.profile.label'])).toBeTruthy()
     })
 
-    it('复用时摆出来，并且先讲清楚为什么要这么接', () => {
-      render(<FeishuCard {...cardProps({ access: 'reuse' })} />)
+    it('身份的选项来自宿主找到的那几份 profile', () => {
+      const edit = vi.fn()
+      render(<FeishuCard {...cardProps({}, { edit })} />)
       open()
 
-      expect(screen.getByLabelText(zh['feishu.eventConfigDirs.label'])).toBeTruthy()
-      expect(screen.getByLabelText(zh['feishu.cardActionConfigDirs.label'])).toBeTruthy()
-      expect(screen.getByText(zh['feishu.bridge.lead'])).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(zh['feishu.profile.label']), {
+        target: { value: '/home/me/.lark-cli' },
+      })
+
+      expect(edit).toHaveBeenCalledWith('profile', '/home/me/.lark-cli')
     })
 
-    it('选另一条要告诉控制器', () => {
-      const setAccess = vi.fn()
-      render(<FeishuCard {...cardProps({}, { setAccess })} />)
+    it('选另一条要写进设置', () => {
+      const edit = vi.fn()
+      render(<FeishuCard {...cardProps({}, { edit })} />)
       open()
 
       fireEvent.click(screen.getByRole('radio', { name: new RegExp(zh['feishu.access.reuse']) }))
 
-      expect(setAccess).toHaveBeenCalledWith('reuse')
+      expect(edit).toHaveBeenCalledWith('access', 'reuse')
     })
 
-    // 复用的时候那些应用归别人管，登录不是这条路上的事——但收起来不等于拿掉，
-    // 其中一个应用可能正好该由你授权。
+    // 复用的时候桥接是别人的，dsh 不写它的任何配置——所以那些字段不是置灰，
+    // 是根本没有。写一个跑着的桥接永远不会读的设置，比不给这个控件更糟。
+    it('复用时不给准入的控件，只报桥接现在的规矩', () => {
+      render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: attached })} />)
+      open()
+
+      expect(screen.queryByLabelText(zh['feishu.dmMode.label'])).toBeNull()
+      expect(screen.queryByLabelText(zh['feishu.groupAllowlist.label'])).toBeNull()
+      expect(screen.getByText(zh['feishu.reach.byBridge'])).toBeTruthy()
+    })
+
+    it('单独申请时准入是可以改的', () => {
+      render(<FeishuCard {...cardProps({ access: field('own') })} />)
+      open()
+
+      expect(screen.getByLabelText(zh['feishu.dmMode.label'])).toBeTruthy()
+      expect(screen.queryByText(zh['feishu.reach.byBridge'])).toBeNull()
+    })
+
     it('复用时把登录那一段收起来，但留着入口', () => {
       const toggleAuth = vi.fn()
-      render(<FeishuCard {...cardProps({ access: 'reuse', authFolded: true }, { toggleAuth })} />)
+      render(<FeishuCard {...cardProps({ access: field('reuse'), authFolded: true }, { toggleAuth })} />)
       open()
 
       expect(screen.queryByText(zh['auth.domains'])).toBeNull()
       fireEvent.click(screen.getByRole('button', { name: zh['auth.unfold'] }))
 
       expect(toggleAuth).toHaveBeenCalled()
+    })
+  })
+
+  describe('桥接现在什么样', () => {
+    it('没连上就说没连上，别的都不摆', () => {
+      render(<FeishuCard {...cardProps({ access: field('reuse') })} />)
+      open()
+
+      expect(screen.getByText(zh['feishu.bridge.offline'])).toBeTruthy()
+      expect(screen.queryByText(zh['feishu.bridge.apps'])).toBeNull()
+    })
+
+    it('连上了就把它订着什么、dsh 报了什么摆出来', () => {
+      render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: attached })} />)
+      open()
+
+      expect(screen.getByText(zh['feishu.bridge.apps'])).toBeTruthy()
+      expect(screen.getByText('/home/me/.lark-cli/agent-bus')).toBeTruthy()
+    })
+
+    // 报了一个桥接没订的应用，dsh 会一条消息都收不到，而它自己看不出区别。
+    it('报的身份不在订阅名单里要说破', () => {
+      const stranger = { ...attached, identity: '/home/me/.lark-cli/nowhere' }
+      render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: stranger })} />)
+      open()
+
+      expect(screen.getByText(zh['feishu.bridge.identityMissing'])).toBeTruthy()
+    })
+
+    it('还没选身份也要说破', () => {
+      const unset = { ...attached, identity: '' }
+      render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: unset })} />)
+      open()
+
+      expect(screen.getByText(zh['feishu.bridge.identityUnset'])).toBeTruthy()
     })
   })
 

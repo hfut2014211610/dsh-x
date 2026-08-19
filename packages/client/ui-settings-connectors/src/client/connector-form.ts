@@ -253,6 +253,17 @@ export class ConnectorForm<T> {
   }
 
   /**
+   * Run something whenever the scope or a draft changes.
+   *
+   * For the follow-on work a change implies but a projection must not do: a
+   * projection can be rebuilt at any time and has to stay free of effects.
+   * @param listener - what to run after each change.
+   */
+  watch(listener: () => void): void {
+    this.listeners.add(listener)
+  }
+
+  /**
    * Read the card-level state: what the host serves, and what a save would do.
    * @returns the form state the card renders from.
    */

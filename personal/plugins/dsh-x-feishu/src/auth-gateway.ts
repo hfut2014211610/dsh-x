@@ -17,6 +17,7 @@ import {
   AUTH_DOMAINS, LarkAuth, discoverProfiles, dshConfigDir,
   type AuthProfile, type AuthProgress, type AuthStatus,
 } from './auth.ts'
+import type { BridgeStatus, BridgeStatusView } from './bridge-status.ts'
 
 /** 退出登录的结果。 */
 export interface LogoutOutcome {
@@ -40,8 +41,11 @@ export interface ProfileList {
 export class FeishuAuthGateway extends TypertRemoteService {
   private readonly auth = new LarkAuth()
 
-  /** @param ctx - 插件上下文。 */
-  constructor(ctx: Context) {
+  /**
+   * @param ctx - 插件上下文。
+   * @param bridgeStatus - 握手带来的桥接现状，设置页要显示。
+   */
+  constructor(ctx: Context, private readonly bridgeStatus: BridgeStatus) {
     super(ctx, 'feishuAuth')
     // 插件被停用或重载时，正在等的那次授权要跟着断，否则会留下一个继续轮询
     // 十五分钟的 lark-cli。
@@ -110,6 +114,18 @@ export class FeishuAuthGateway extends TypertRemoteService {
   cancel(): Promise<Record<string, never>> {
     this.auth.cancel()
     return Promise.resolve({})
+  }
+
+  /**
+   * 桥接连上没有，以及它现在订着什么、放行谁。
+   *
+   * 复用别人的桥接时这些都不归 dsh 改，但得让人看见——一个开着、授权也给了、
+   * 就是没人能用的渠道，从界面上看不出问题在哪。
+   * @returns 桥接现状。
+   */
+  @Remote('bridge')
+  bridge(): Promise<BridgeStatusView> {
+    return Promise.resolve(this.bridgeStatus.read())
   }
 
   /**

@@ -311,6 +311,60 @@ export function BranchField(props: {
 }
 
 /**
+ * A choice control whose options are discovered at runtime, so their labels
+ * are values rather than copy keys.
+ *
+ * Separate from {@link ChoiceField} rather than folded into it: a field whose
+ * options come from the host cannot report a stored value outside them as
+ * invalid — the option may simply not have loaded yet — so it keeps whatever
+ * is stored as a selectable entry instead.
+ * @param props - the control's copy, its staged state, and the discovered options.
+ * @param props.options - value and visible label of each option, in display order.
+ * @returns the labelled control.
+ */
+export function OptionField(props: ConnectorFieldProps & {
+  options: ReadonlyArray<{ value: string; label: string }>
+}) {
+  const id = useId()
+  const { field, options } = props
+  const known = options.some(option => option.value === field.text)
+  return (
+    <div className={css.field}>
+      <FieldHead {...props} id={id} />
+      <select
+        id={id}
+        className={css.select}
+        value={field.text}
+        disabled={props.disabled}
+        onChange={(event) => { props.onEdit(event.target.value) }}
+      >
+        {known ? null : <option value={field.text}>{field.text === '' ? '' : field.text}</option>}
+        {options.map(option => (
+          <option key={option.value} value={option.value}>{option.label}</option>
+        ))}
+      </select>
+      <p className={css.hint}>{props.t(props.hintKey)}</p>
+    </div>
+  )
+}
+
+/**
+ * A read-only row of facts something else owns.
+ * @param props - the row's label and value.
+ * @param props.label - what the row names.
+ * @param props.children - the value.
+ * @returns the row.
+ */
+export function FactRow(props: { label: string; children: ReactNode }) {
+  return (
+    <div className={css.authRow}>
+      <span className={css.authLabel}>{props.label}</span>
+      <span className={css.authValue}>{props.children}</span>
+    </div>
+  )
+}
+
+/**
  * A list control, one entry per line.
  *
  * A textarea rather than a row of chips: the lists these cards carry are

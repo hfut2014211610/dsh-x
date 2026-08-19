@@ -9,18 +9,25 @@
  * 持有那唯一的消费者，dsh 反过来当它的客户端，就不需要任何交接、互斥和心跳。
  * socket 连着就等于 dsh 活着。
  *
- * 桥接自己没有界面也没有设置服务，所以**它那份配置也在这里**：下面的字段一保存
- * 就写成 `~/.dsh-x-feishu/config.json`，桥接只管读（见 `bridge-config.ts`）。人只在
- * 一个地方改，改完不用重起桥接。
+ * 接入方式有两条，配置的分工跟着它走：
+ *
+ * - `own`——桥接就是 dsh 的，所以它那份配置也在这里：下面的字段一保存就写成
+ *   `~/.dsh-x-feishu/config.json`，桥接只管读（见 `bridge-config.ts`）。
+ * - `reuse`——桥接是别人已经在跑的，**dsh 一个字都不往那份配置里写**。它订哪些
+ *   应用、放行谁，是桥接主人的事；dsh 只在连上时报一句「我是哪个飞书应用」。
+ *
+ * 两条路都只需要 dsh 说清一件事：{@link Config.profile}，dsh 的飞书身份。出站以谁
+ * 的名义发、桥接把哪些消息转过来、扫码授权动的是哪个应用，全是它。
  *
  * ```yaml
  * # $DSH_HOME/settings.yaml
  * dsh-x-feishu:
+ *   access: own           # own = dsh 自己的应用 | reuse = 复用别人的桥接
+ *   profile: ''           # dsh 的飞书身份，写 lark-cli profile 目录；own 下留空 = dsh 自己那份
  *   endpoint: ''          # 留空用平台默认（win32 命名管道 / POSIX unix socket）
  *   presetId: standard    # 飞书开的会话用哪个 agent 预设
  *   density: standard     # compact | standard | detailed
- *   eventConfigDirs: []   # 接哪几个飞书应用；空表示沿用 lark-cli 的环境默认
- *   dmMode: allowlist     # open | allowlist | disabled
+ *   dmMode: allowlist     # 只有 own 才写出去；reuse 时这条归桥接
  *   groupAllowlist: []    # 放行哪些群，装 chat_id
  * ```
  *
@@ -38,6 +45,7 @@ import type {} from '@deepseek-ai/dsh-storage-domain'
 import { BridgeClient } from './client.ts'
 import { FeishuAuthGateway } from './auth-gateway.ts'
 import { DEFAULT_BRIDGE_CONFIG, bridgeConfigPath, publishBridgeConfig } from './bridge-config.ts'
+import { BridgeStatus } from './bridge-status.ts'
 import { dshConfigDir } from './auth.ts'
 import { defaultEventRelayEndpoint } from '../bridge/relay.ts'
 import { SessionRouter } from './router.ts'
@@ -65,9 +73,9 @@ export const inject = ['agents', 'agentDefaultModel', 'sessions', 'storageDomain
 /**
  * 插件配置。
  *
- * 前一半是 dsh 这边的事，后一半是**桥接进程的事**——它们摆在同一个命名空间里，
- * 因为桥接没有自己的界面，而人不该为了同一件事在两个地方改。保存时后一半会被
- * 写成 `~/.dsh-x-feishu/config.json`。
+ * {@link Config.access} 决定后半截算谁的：`own` 时桥接就是 dsh 的，准入策略由这里
+ * 写成 `~/.dsh-x-feishu/config.json`；`reuse` 时桥接是别人的，那几项只在这里放着，
+ * 一个字都不写出去。
  */
 export interface Config {
   /** 桥接的本地端点；留空用平台默认。 */
@@ -81,17 +89,22 @@ export interface Config {
   /** 审批卡片等人点的上限。 */
   approvalTimeoutMs: number
   /**
-   * 桥接接哪几个飞书应用，写 lark-cli 的 profile 目录。
+   * 接入方式。
    *
-   * 空表示沿用 lark-cli 的环境默认那份，也就是单应用。填多个是"多 agent 复用"
-   * 那条路：同一个群里的几个机器人应用各自被订阅，事件汇进同一条 relay。
+   * `own`——dsh 有自己的飞书应用，桥接也就是它的，下面的准入策略由 dsh 写出去。
+   * `reuse`——复用别人已经在跑的桥接，dsh 不碰它那份配置，只报自己是谁。
    */
-  eventConfigDirs: string[]
-  /** 卡片回调已在开发者后台订阅的应用；空表示与 {@link eventConfigDirs} 相同。 */
-  cardActionConfigDirs: string[]
-  /** 其他本机 Agent 只读订阅原始飞书事件的端点；留空用平台默认。 */
-  eventEndpoint: string
-  /** 单聊准入：`open` 谁都能用，`allowlist` 只认名单，`disabled` 一律不理。 */
+  access: 'own' | 'reuse'
+  /**
+   * dsh 的飞书身份，写 lark-cli 的 profile 目录。
+   *
+   * 这是这条渠道唯一需要 dsh 说清的事实：出站以谁的名义发、桥接把哪些消息转给
+   * 它、扫码授权动的是哪个应用，全看它。`own` 下留空表示 dsh 自己那份
+   * （`~/.lark-cli/dsh-x`）；`reuse` 下留空表示还没定，桥接不会转任何消息过来——
+   * 那种时候替人猜一个，猜到的多半是别的工具的应用。
+   */
+  profile: string
+  /** 单聊准入：`open` 谁都能用，`allowlist` 只认名单，`disabled` 一律不理。只有 `own` 写出去。 */
   dmMode: 'open' | 'allowlist' | 'disabled'
   /** 单聊白名单，装 open_id。 */
   dmAllowlist: string[]
@@ -111,9 +124,8 @@ export const Config = z.object({
   density: z.union([z.const('compact'), z.const('standard'), z.const('detailed')]).default('standard'),
   flushMs: z.natural().default(2500),
   approvalTimeoutMs: z.natural().default(300_000),
-  eventConfigDirs: z.array(z.string()).default([]),
-  cardActionConfigDirs: z.array(z.string()).default([]),
-  eventEndpoint: z.string().default(''),
+  access: z.union([z.const('own'), z.const('reuse')]).default('own'),
+  profile: z.string().default(''),
   dmMode: z.union([z.const('open'), z.const('allowlist'), z.const('disabled')]).default('allowlist'),
   dmAllowlist: z.array(z.string()).default([]),
   groupAllowlist: z.array(z.string()).default([]),
@@ -161,9 +173,12 @@ export function apply(ctx: Context, config: Config): void {
   const logger = ctx.logger('dsh-x-feishu')
   const queue = new RunQueue()
 
+  // 桥接握手带来的现状，设置页读它。复用时那些事实不归 dsh 改，但要看得见。
+  const bridgeStatus = new BridgeStatus()
+
   // 扫码登录挂在插件自己身上，不等桥接：凭证还没配好的时候，让人先去把需要
   // 凭证的东西跑起来是说不通的。
-  ctx.plugin(FeishuAuthGateway)
+  ctx.plugin(FeishuAuthGateway, bridgeStatus)
 
   // 挂载时先指向组合基座，设置服务接上以后换成解析后的值。下面每一处都是用到
   // 才读，所以两者的切换、以及此后任何一次保存，都不需要重建任何东西。
@@ -173,18 +188,28 @@ export function apply(ctx: Context, config: Config): void {
     const declared = source().endpoint
     return declared === '' ? defaultEndpoint() : declared
   }
-  // 桥接那份配置由这里写出去。它没有界面也没有设置服务，而它要的每一项都是人
-  // 在这一页上决定的事；两边各存一份的结果就是改一处不生效。
+  // dsh 的飞书身份。出站、转发、扫码授权都认它。
+  const identity = (): string => {
+    const declared = source().profile.trim()
+    if (declared !== '') return declared
+    // own 下留空 = dsh 自己那份。reuse 下留空是"还没定"，这时候替人猜一个，
+    // 猜到的多半是别的工具的应用——宁可什么都收不到，也不能顶着别人的身份说话。
+    return source().access === 'own' ? dshConfigDir() : ''
+  }
+
+  // 只有 own 才写桥接那份配置：那种情况下桥接就是 dsh 的，而它没有界面也没有
+  // 设置服务，配置只能从这里去。reuse 时桥接是别人已经在跑的，它订哪些应用、
+  // 放行谁都是它主人的事，dsh 一个字都不写——要说的那一句在握手里说。
   const publish = (): void => {
     const current = source()
+    if (current.access !== 'own') return
     publishBridgeConfig({
       endpoint: endpoint(),
-      eventEndpoint: current.eventEndpoint === '' ? defaultEventRelayEndpoint() : current.eventEndpoint,
-      // 一个都没列 = 用 dsh 自己那份，跟扫码登录那一页同一条规矩。写成具体目录
-      // 而不是留空，是因为留空在桥接那边意味着"跟着环境默认走"，而这台机器上的
-      // 环境默认往往是别的工具的应用——那正是这一路上已经踩过一次的坑。
-      eventConfigDirs: current.eventConfigDirs.length === 0 ? [dshConfigDir()] : current.eventConfigDirs,
-      cardActionConfigDirs: current.cardActionConfigDirs,
+      eventEndpoint: defaultEventRelayEndpoint(),
+      // 就订 dsh 自己这一个。写成具体目录而不是留空，是因为留空在桥接那边意味着
+      // "跟着环境默认走"，而这台机器上的环境默认往往是别的工具的应用。
+      eventConfigDirs: [identity()],
+      cardActionConfigDirs: [],
       policy: {
         dmMode: current.dmMode,
         dmAllowlist: current.dmAllowlist,
@@ -205,9 +230,13 @@ export function apply(ctx: Context, config: Config): void {
 
   installSettingsSection(ctx, NS, Config, config, {
     setSource: (current) => { source = current },
-    // 端点是唯一一个"拨号那一刻定死"的值，所以只有它需要被通知。
+    // 端点与身份都是"拨号那一刻定死"的：身份在连上的第一帧就报出去了，改了要
+    // 重连一次才生效。
     onChange: () => {
       if (client?.redialIfMoved() === true) logger.info('桥接端点改了，正在改连 %s', endpoint())
+      if (client?.reannounceIfChanged(identity()) === true) {
+        logger.info('dsh 的飞书身份改成了 %s，已经报给桥接', identity() === '' ? '（还没定）' : identity())
+      }
       publish()
     },
   })
@@ -259,11 +288,16 @@ export function apply(ctx: Context, config: Config): void {
       flushMs: () => source().flushMs,
     })
 
-    client = new BridgeClient(endpoint, {
-      onReady(botOpenId) {
-        logger.info('已连上飞书桥接，机器人 %s', botOpenId)
+    client = new BridgeClient(endpoint, identity, {
+      onReady(hello) {
+        bridgeStatus.greeted(identity(), hello.bridge)
+        logger.info('已连上飞书桥接，身份 %s，机器人 %s', identity() === '' ? '（还没定）' : identity(), hello.botOpenId)
+        if (hello.bridge !== undefined && !hello.bridge.apps.includes(identity())) {
+          logger.warn('桥接没订 dsh 报的这个应用，收不到消息：%s', identity() === '' ? '（还没定）' : identity())
+        }
       },
       onDisconnect() {
+        bridgeStatus.dropped()
         logger.warn('飞书桥接断了，正在重连')
       },
       onError(error) {

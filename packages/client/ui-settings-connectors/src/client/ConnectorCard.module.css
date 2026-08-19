@@ -521,3 +521,9 @@
   font-size: 12px;
   line-height: 1.5;
 }
+
+.factList {
+  display: flex;
+  flex-wrap: wrap;
+  gap: 4px 10px;
+}

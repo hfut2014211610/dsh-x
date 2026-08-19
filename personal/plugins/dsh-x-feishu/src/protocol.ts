@@ -26,12 +26,39 @@ export function defaultEndpoint(): string {
     : `${process.env.XDG_RUNTIME_DIR ?? '/tmp'}/dsh-x-feishu.sock`
 }
 
-/** 桥接 → 插件：握手，插件据此校验版本并拿到机器人身份。 */
+/**
+ * 桥接现在的样子。
+ *
+ * 复用别人的桥接时，这些**都不归 dsh 改**——它只是把现状显示出来，让人知道
+ * 自己连上的是什么。所以这里给的是够显示的粒度，不是够编辑的粒度。
+ */
+export interface BridgeSummary {
+  /** 桥接现在订着哪几个应用（lark-cli profile 目录）。 */
+  readonly apps: readonly string[]
+  /** 单聊准入模式。 */
+  readonly dmMode: 'open' | 'allowlist' | 'disabled'
+  /** 单聊白名单有几个人。 */
+  readonly dmAllowed: number
+  /** 放行了几个群。 */
+  readonly groupsAllowed: number
+  /** 群里是否必须 @ 到机器人。 */
+  readonly requireMention: boolean
+}
+
+/**
+ * 桥接 → 插件：握手，插件据此校验版本、拿到机器人身份和桥接现状。
+ *
+ * 会发不止一次：插件报了自己是哪个应用（{@link AnnounceCommand}）之后，桥接
+ * 再发一帧，这一帧的 `botOpenId` 才是**插件那个应用**的机器人。第一帧发在
+ * 插件开口之前，那时桥接只能先给主应用的。
+ */
 export interface HelloFrame {
   readonly v: number
   readonly kind: 'hello'
   /** 机器人自己的 open_id，插件判 @ 时要用。 */
   readonly botOpenId: string
+  /** 桥接现状；老桥接没有这个字段。 */
+  readonly bridge?: BridgeSummary
 }
 
 /** 桥接 → 插件：一条进来的消息。白名单与 @ 判定已经在桥接侧过掉了。 */
@@ -64,6 +91,23 @@ export interface CardActionFrame {
 
 /** 桥接 → 插件的所有帧。 */
 export type InboundFrame = HelloFrame | MessageFrame | CardActionFrame
+
+/**
+ * 插件 → 桥接：我是哪个飞书应用。连上之后的第一帧。
+ *
+ * 这是复用别人桥接时 dsh 唯一需要说的话。桥接可能同时订着好几个应用，报了身份
+ * 之后它才知道：**哪些消息该转给 dsh**（不报的话 dsh 会连别人机器人的消息一起
+ * 收，两个 agent 抢着答同一句话），以及 **dsh 的回话该以谁的身份发出去**。
+ *
+ * 反过来，dsh **不**告诉桥接该订哪些应用——那是桥接主人的事。dsh 报的是一个
+ * 收件箱，不是一张订阅表。
+ */
+export interface AnnounceCommand {
+  readonly v: number
+  readonly kind: 'announce'
+  /** dsh 的飞书身份：lark-cli 的 profile 目录。空串表示还没定，桥接不转发。 */
+  readonly configDir: string
+}
 
 /** 插件 → 桥接：发一条纯文本回复（排队回执、拒绝理由、错误）。 */
 export interface ReplyCommand {
@@ -137,7 +181,7 @@ export interface AskCommand {
 
 /** 插件 → 桥接的所有命令。 */
 export type OutboundCommand =
-  | ReplyCommand | CardOpenCommand | CardUpdateCommand | CardCloseCommand | AskCommand
+  | AnnounceCommand | ReplyCommand | CardOpenCommand | CardUpdateCommand | CardCloseCommand | AskCommand
 
 /**
  * 在联合类型上逐支去字段。

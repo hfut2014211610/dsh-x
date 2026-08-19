@@ -15,8 +15,6 @@ export interface FeishuAuthPanelProps {
   /** 这一页的文案。 */
   t: (key: ConnectorsKey) => string
   state: FeishuAuthState
-  /** 换一份 profile 来管。 */
-  onSelectProfile: (configDir: string) => void
   /** 勾上或取消一个业务域。 */
   onSelect: (domain: string, wanted: boolean) => void
   /** 发起扫码。 */
@@ -74,26 +72,13 @@ export function FeishuAuthPanel(props: FeishuAuthPanelProps) {
         : (
           <>
             {/* 作用在哪个应用上，是这一页最要紧的一句话，所以它排在最前面。
-                这台机器上的默认那份往往属于别的工具，授权会加到它头上、退出
-                登录会把它踢下线——所以选中别人的那份时要明说。 */}
-            <div className={css.authRow}>
-              <span className={css.authLabel}>{t('auth.profile')}</span>
-              <span className={css.authValue}>
-                <select
-                  className={css.select}
-                  value={state.configDir}
-                  disabled={state.busy}
-                  onChange={(event) => { props.onSelectProfile(event.target.value) }}
-                >
-                  {state.profiles.map(profile => (
-                    <option key={profile.configDir} value={profile.owned ? '' : profile.configDir}>
-                      {profile.name}
-                      {profile.appId === undefined ? '' : ` · ${profile.appId}`}
-                    </option>
-                  ))}
-                </select>
-              </span>
-            </div>
+                它跟着上面「dsh 是哪个飞书应用」走，不在这里另选一次——两个地方
+                各选一次的结果是：屏幕上写着一个，扫码授权的是另一个。
+                选中的不是 dsh 自己那份时要明说：授权会加到别人的应用头上，
+                退出登录踢下线的也是它。 */}
+            <Row label={t('auth.profile')}>
+              <code className={css.reason}>{state.configDir === '' ? state.owned : state.configDir}</code>
+            </Row>
             <p className={foreign ? css.failed : css.hint} role={foreign ? 'status' : undefined}>
               {t(foreign ? 'auth.profileForeign' : 'auth.profileOwned')}
             </p>

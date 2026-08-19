@@ -22,52 +22,65 @@
 
 ## 配置
 
-**配置只有一处：dsh 的「设置 → 连接器 → 飞书」**，或者等价的 `$DSH_HOME/settings.yaml`。
-桥接自己没有界面也没有设置服务，所以插件把它要的那几项写成 `~/.dsh-x-feishu/config.json`，
-桥接只读，并且盯着这个文件的变化——改完不用重起桥接。反过来桥接**不**向 dsh 要配置：
-它得在 dsh 不在的时候顶上，而文件在 dsh 挂了以后还在，RPC 不在。
+只有一件事必须说清：**dsh 是哪个飞书应用**（`profile`，填 lark-cli 的 profile 目录）。
+出站以谁的名义发、桥接把哪些消息转过来、扫码授权动的是哪个应用，全跟着它。
+
+剩下的看走哪条路（`access`）：
+
+| | `own`——用 dsh 自己的应用 | `reuse`——复用已经在跑的桥接 |
+|---|---|---|
+| 桥接归谁 | dsh 的 | 别人的 |
+| 谁写 `~/.dsh-x-feishu/config.json` | dsh（一保存就写） | **谁都不写**，dsh 一个字都不碰 |
+| 准入名单在哪定 | 这一页 | 桥接那边 |
+| dsh 要做的 | 扫码授权自己的应用 | 连上时报一句「我是哪个应用」 |
 
 ```yaml
+# $DSH_HOME/settings.yaml
 dsh-x-feishu:
-  # dsh 这一侧
-  endpoint: ''          # 留空用平台默认：win32 命名管道 / POSIX unix socket
+  access: own           # own | reuse
+  profile: ''           # dsh 的飞书身份；own 下留空 = dsh 自己那份（~/.lark-cli/dsh-x）
+
+  # dsh 这一侧，两条路都有
+  endpoint: ''          # 连桥接的本地 socket，留空用平台默认
   presetId: standard    # 飞书开的会话用哪个 agent 预设，留空用部署默认
   density: standard     # compact | standard | detailed
-  flushMs: 2500         # 卡片正文最少隔多久推一次
+  flushMs: 2500
   approvalTimeoutMs: 300000
 
-  # 接哪几个飞书应用（写 lark-cli 的 profile 目录）
-  eventConfigDirs: []           # 留空 = 只用 dsh 自己那份（~/.lark-cli/dsh-x）
-  cardActionConfigDirs: []      # 留空 = 与上面相同
-  eventEndpoint: ''             # 其他 agent 读原始事件的端点，留空用平台默认
-
-  # 谁能用。默认拒绝：名单不填，谁都用不了
-  dmMode: allowlist             # open | allowlist | disabled
-  dmAllowlist: []               # 装 open_id
-  groupAllowlist: []            # 装 chat_id，空 = 一个群都不放行
+  # 准入。默认拒绝：名单不填谁都用不了。只有 own 会写到桥接那份配置里
+  dmMode: allowlist     # open | allowlist | disabled
+  dmAllowlist: []       # 装 open_id
+  groupAllowlist: []    # 装 chat_id，空 = 一个群都不放行
   requireMention: true
   staleMs: 600000
 
-  probeOrigin: ''               # 桥接探这个地址判断 dsh 在不在，留空用本进程自己的地址
+  probeOrigin: ''       # 桥接探这个地址判断 dsh 在不在，留空用本进程自己的地址
 ```
 
-`~/.dsh-x-feishu/config.json` 里只有两项**不**归设置页管，写的时候原样留着：`launch`
-（dsh 不在时用什么命令拉起来）和 `botOpenIds`（每个应用的机器人 open_id 手工覆盖，
-留空则启动时向飞书问一次）。其余字段每次保存都整个盖掉，手改会丢。
+`~/.dsh-x-feishu/config.json` 里 `launch`（dsh 不在时用什么命令拉起来）和 `botOpenIds`
+（每个应用的机器人 open_id 手工覆盖）永远不归设置页管，`own` 模式写的时候也原样留着。
 
-### 一个应用还是几个
+### 为什么复用时 dsh 什么都不写
 
-`eventConfigDirs` 留空是单应用：桥接只订阅 dsh 自己那份 profile。填多个是多 agent 复用——
-一个群里有好几个独立机器人应用时，飞书只把「@某机器人」的消息投给那个机器人所属的应用，
-所以桥接对每个应用各持有一份订阅，再汇进同一条 relay。同一应用 + EventKey 仍然只能有
-一个 consumer，而且全部归桥接所有；别的组件连 relay，不要自己起 `lark-cli event consume`。
+桥接可能同时替好几个 agent 订着好几个飞书应用。让 dsh 去声明「订哪些应用、放行谁」，
+那不叫复用，那叫遥控别人的基础设施——而且它也不知道别人还要什么。dsh 真正知道的只有
+一件事：哪个应用是我。所以它**报一个收件箱，不报一张订阅表**。
 
-**出站跟着入站走**：事件从哪个应用进来，回它的消息、卡片就以哪个应用的身份发。这不是讲究——
-卡片只能由发它的那个应用改，身份错了连进度都刷不动；机器人 open_id 也是一个应用一个，
-拿 A 的去判 B 的 @，判出来永远是「没 @ 我」。relay 帧里带 `source` 字段，就是给复用方用的。
+桥接据此做两件事：只把这个应用的消息转给 dsh（不然群里 @ 了别人的机器人，dsh 也会
+跟着答，一句话两个 agent 抢），以及让 dsh 的回话以这个应用的身份发出去（卡片只能由
+发它的那个应用改，身份错了连进度都刷不动）。
 
-`cardActionConfigDirs` 只列已经在飞书开发者后台订阅过 `card.action.trigger` 的应用；
-留空表示与 `eventConfigDirs` 相同。
+桥接现在订着什么、放行谁，会在握手时报给 dsh，设置页只显示不编辑。
+
+### 单应用与多应用
+
+`own` 时桥接只订 dsh 自己那一个应用，`~/.dsh-x-feishu/config.json` 由这一页写出。
+
+`reuse` 时桥接的订阅表是它主人写的，可以有好几个应用——同一个群里有多个独立机器人时，
+飞书只把「@某机器人」的消息投给那个机器人所属的应用，所以桥接对每个应用各持有一份订阅，
+再汇进同一条 relay。同一应用 + EventKey 仍然只能有一个 consumer，而且全部归桥接所有；
+别的组件连 relay，不要自己起 `lark-cli event consume`。relay 帧里带 `source` 字段，
+订阅方要回话就得以那个应用的身份回。
 
 ## 跑起来
 

@@ -3,15 +3,21 @@
  *
  * Three questions, in the order someone setting this up actually asks them:
  * where the messages come from, who is allowed to send them, and how a session
- * behaves once one starts. The first is an either/or — dsh's own Feishu app, or
- * a subscription the bridge already holds for other agents — so it is radios,
- * and only the chosen branch shows its controls. Two independently-openable
- * sections would let someone fill in both and leave no way to tell which one is
- * in effect.
+ * behaves once one starts.
+ *
+ * The first is an either/or, and which branch you are on decides how much of
+ * the rest is yours. Running dsh's own app means the bridge is dsh's too, so
+ * this page owns its configuration. Reading from a bridge someone else runs
+ * means almost none of it is: dsh says which app it is and nothing else, and
+ * what the bridge subscribes to and lets through is shown as reported rather
+ * than offered for editing. A control that writes a setting the running bridge
+ * will never read is worse than no control.
  */
 
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
-import { BranchField, ChoiceField, ConnectorCard, FieldGroup, ListField, ValueField } from './ConnectorCard.tsx'
+import {
+  BranchField, ChoiceField, ConnectorCard, FactRow, FieldGroup, ListField, OptionField, ValueField,
+} from './ConnectorCard.tsx'
 import { FeishuAuthPanel } from './FeishuAuthPanel.tsx'
 import type { FeishuAccess, FeishuCardFace, FeishuCardState } from './feishu-card-controller.ts'
 import type { ConnectorsKey } from './locales.ts'
@@ -55,11 +61,11 @@ const REACH: Record<FeishuCardState['reach'], ConnectorsKey> = {
 /**
  * The controls this card edits — the section fields, and only those. Named
  * separately from the card state because that also carries what is read but
- * never written: the plugin's presence, the sign-in panel, the branch.
+ * never written: the plugin's presence, the sign-in panel, the bridge's report.
  */
 type FeishuField =
   | 'presetId' | 'density' | 'flushMs' | 'approvalTimeoutMs' | 'endpoint'
-  | 'eventConfigDirs' | 'cardActionConfigDirs' | 'eventEndpoint'
+  | 'access' | 'profile'
   | 'dmMode' | 'dmAllowlist' | 'groupAllowlist' | 'requireMention' | 'staleMs'
 
 /** Props the renderer binds for the Feishu card. */
@@ -77,6 +83,8 @@ export function FeishuCard(props: FeishuCardProps) {
   const { t } = props
   const state = props.useFeishuCard(snapshot => snapshot)
   const disabled = !state.writable
+  const access: FeishuAccess = state.access.text === 'reuse' ? 'reuse' : 'own'
+  const summary = state.bridge.bridge
   const field = (name: FeishuField) => ({
     t,
     disabled,
@@ -84,6 +92,14 @@ export function FeishuCard(props: FeishuCardProps) {
     onEdit: (text: string) => { props.edit(name, text) },
     onReset: () => { props.resetField(name) },
   })
+  // The profiles the host found, with dsh's own carrying the empty value so
+  // "not set" and "dsh's own" stay the same answer everywhere.
+  const profiles = state.auth.profiles.map(profile => ({
+    value: profile.owned ? '' : profile.configDir,
+    label: profile.owned
+      ? `${profile.name} · ${t('feishu.profile.own')}`
+      : profile.appId === undefined ? profile.name : `${profile.name} · ${profile.appId}`,
+  }))
   return (
     <ConnectorCard
       t={t}
@@ -114,14 +130,13 @@ export function FeishuCard(props: FeishuCardProps) {
             <FeishuAuthPanel
               t={t}
               state={state.auth}
-              onSelectProfile={props.selectProfile}
               onSelect={props.selectDomain}
               onBegin={props.beginAuth}
               onCancel={props.cancelAuth}
               onLogout={props.logout}
               onReload={props.readAuth}
             />
-            {state.access === 'reuse'
+            {access === 'reuse'
               ? (
                 <div className={css.folded}>
                   <p className={css.foldedWhy} />
@@ -138,33 +153,42 @@ export function FeishuCard(props: FeishuCardProps) {
         t={t}
         labelKey="feishu.access.label"
         options={ACCESS}
-        value={state.access}
+        value={access}
         disabled={disabled}
-        onChange={(value) => { props.setAccess(value as FeishuAccess) }}
+        onChange={(value) => { props.edit('access', value) }}
       />
 
-      {/* Only the chosen branch shows controls. The other one's field is not
-          greyed out but absent: a disabled textarea still displays a value,
-          and a list sitting there greyed reads as "in effect, just locked". */}
-      {state.access === 'reuse'
+      {/* One field, both branches: everything downstream follows from it, and
+          it is the only thing dsh has to say when the bridge is not its own. */}
+      <OptionField
+        {...field('profile')}
+        labelKey="feishu.profile.label"
+        hintKey="feishu.profile.hint"
+        options={profiles}
+      />
+
+      {access === 'reuse'
         ? (
           <FieldGroup t={t} titleKey="feishu.bridge.title" leadKey="feishu.bridge.lead">
-            <ListField
-              {...field('eventConfigDirs')}
-              labelKey="feishu.eventConfigDirs.label"
-              hintKey="feishu.eventConfigDirs.hint"
-            />
-            <ListField
-              {...field('cardActionConfigDirs')}
-              labelKey="feishu.cardActionConfigDirs.label"
-              hintKey="feishu.cardActionConfigDirs.hint"
-              rows={2}
-            />
-            <ValueField
-              {...field('eventEndpoint')}
-              labelKey="feishu.eventEndpoint.label"
-              hintKey="feishu.eventEndpoint.hint"
-            />
+            {!state.bridge.connected || summary === undefined
+              ? <p className={css.absent} role="status">{t('feishu.bridge.offline')}</p>
+              : (
+                <>
+                  <FactRow label={t('feishu.bridge.apps')}>
+                    <span className={css.factList}>
+                      {summary.apps.map(app => <code className={css.reason} key={app}>{app}</code>)}
+                    </span>
+                  </FactRow>
+                  <FactRow label={t('feishu.bridge.identity')}>
+                    <code className={css.reason}>{state.bridge.identity}</code>
+                  </FactRow>
+                  {state.bridge.identity === ''
+                    ? <p className={css.failed} role="status">{t('feishu.bridge.identityUnset')}</p>
+                    : summary.apps.includes(state.bridge.identity)
+                      ? null
+                      : <p className={css.failed} role="status">{t('feishu.bridge.identityMissing')}</p>}
+                </>
+              )}
           </FieldGroup>
         )
         : null}
@@ -176,36 +200,45 @@ export function FeishuCard(props: FeishuCardProps) {
         <p className={state.reach === 'nobody' ? css.absent : css.hint} role="status">
           {t(REACH[state.reach])}
         </p>
-        <ChoiceField
-          {...field('dmMode')}
-          labelKey="feishu.dmMode.label"
-          hintKey="feishu.dmMode.hint"
-          choices={DM_MODES}
-        />
-        <ListField
-          {...field('dmAllowlist')}
-          labelKey="feishu.dmAllowlist.label"
-          hintKey="feishu.dmAllowlist.hint"
-          rows={2}
-        />
-        <ListField
-          {...field('groupAllowlist')}
-          labelKey="feishu.groupAllowlist.label"
-          hintKey="feishu.groupAllowlist.hint"
-          rows={2}
-        />
-        <ChoiceField
-          {...field('requireMention')}
-          labelKey="feishu.requireMention.label"
-          hintKey="feishu.requireMention.hint"
-          choices={MENTION}
-        />
-        <ValueField
-          {...field('staleMs')}
-          labelKey="feishu.staleMs.label"
-          hintKey="feishu.staleMs.hint"
-          numeric
-        />
+        {/* Reused bridges enforce their owner's rule, so this side reports it
+            rather than offering controls that would write a setting the running
+            bridge is never going to read. */}
+        {access === 'reuse'
+          ? <p className={css.hint}>{t('feishu.reach.byBridge')}</p>
+          : (
+            <>
+              <ChoiceField
+                {...field('dmMode')}
+                labelKey="feishu.dmMode.label"
+                hintKey="feishu.dmMode.hint"
+                choices={DM_MODES}
+              />
+              <ListField
+                {...field('dmAllowlist')}
+                labelKey="feishu.dmAllowlist.label"
+                hintKey="feishu.dmAllowlist.hint"
+                rows={2}
+              />
+              <ListField
+                {...field('groupAllowlist')}
+                labelKey="feishu.groupAllowlist.label"
+                hintKey="feishu.groupAllowlist.hint"
+                rows={2}
+              />
+              <ChoiceField
+                {...field('requireMention')}
+                labelKey="feishu.requireMention.label"
+                hintKey="feishu.requireMention.hint"
+                choices={MENTION}
+              />
+              <ValueField
+                {...field('staleMs')}
+                labelKey="feishu.staleMs.label"
+                hintKey="feishu.staleMs.hint"
+                numeric
+              />
+            </>
+          )}
       </FieldGroup>
 
       <FieldGroup t={t} titleKey="feishu.behaviour.title">
