@@ -321,6 +321,20 @@ export function WritingView({
   const directoryGenerationRef = useRef(0)
 
   currentPathRef.current = currentPath
+  /**
+   * Whether the editor still follows what the session writes.
+   *
+   * A writing session creates its document and says so in the transcript, and
+   * the editor did nothing with either: only a change to the already-open file
+   * was acted on, so a document created this turn stayed closed behind a tree
+   * the person had to go find it in.
+   *
+   * It stops the moment the person opens a document themselves, because
+   * pulling the editor away from what someone is reading is worse than not
+   * following, and an explicit open is the clearest signal that they are no
+   * longer just watching.
+   */
+  const following = useRef(true)
   draftRef.current = draft
   savedContentRef.current = savedContent
 
@@ -383,15 +397,25 @@ export function WritingView({
   useEffect(() => {
     if (initialLoadStarted.current || initialPath === '') return
     initialLoadStarted.current = true
+    // A window opened at a named path was opened at it deliberately, so it is
+    // already someone's choice and must not be followed away from.
+    following.current = false
     void loadDocument(initialPath)
   }, [initialPath, loadDocument])
 
   useEffect(() => subscribeChanged((change) => {
-    if (change.path !== currentPathRef.current) return
+    // Unsaved edits outrank both paths below: a reload would discard them, and
+    // following away from them would strand them behind a document nobody
+    // asked to open.
     if (draftRef.current !== savedContentRef.current) {
-      setStatus('conflict')
+      if (change.path === currentPathRef.current) setStatus('conflict')
       return
     }
+    if (change.path === currentPathRef.current) {
+      void loadDocument(change.path, 'external')
+      return
+    }
+    if (!following.current) return
     void loadDocument(change.path, 'external')
   }), [loadDocument, subscribeChanged])
 
@@ -508,7 +532,14 @@ export function WritingView({
 
           {panel === 'document' && (
             <>
-              <form className={css.documentForm} onSubmit={(event) => { event.preventDefault(); void loadDocument(pathInput) }}>
+              <form
+                className={css.documentForm}
+                onSubmit={(event) => {
+                  event.preventDefault()
+                  following.current = false
+                  void loadDocument(pathInput)
+                }}
+              >
                 <label htmlFor={`writing-path-${sessionId}`}>{t('document.path')}</label>
                 <input
                   id={`writing-path-${sessionId}`}
@@ -539,7 +570,7 @@ export function WritingView({
                     currentPath={currentPath}
                     loadDirectory={(path) => { void loadDirectory(path) }}
                     toggleDirectory={toggleDirectory}
-                    openDocument={(path) => { void loadDocument(path, 'tree') }}
+                    openDocument={(path) => { following.current = false; void loadDocument(path, 'tree') }}
                     t={t}
                   />
                 </div>
@@ -575,7 +606,7 @@ export function WritingView({
               <div className={css.panelList}>
                 {hits.length === 0 && <p className={css.empty}>{t('search.empty')}</p>}
                 {hits.map(hit => (
-                  <button key={`${hit.path}:${hit.title}`} type="button" className={css.searchHit} onClick={() => { void loadDocument(hit.path) }}>
+                  <button key={`${hit.path}:${hit.title}`} type="button" className={css.searchHit} onClick={() => { following.current = false; void loadDocument(hit.path) }}>
                     <strong>{hit.title}</strong>
                     <span>{hit.path}</span>
                     <p>{hit.snippet}</p>

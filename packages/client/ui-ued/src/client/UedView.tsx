@@ -94,6 +94,23 @@ export function UedView({
   const [preview, setPreview] = useState<Preview>({ status: 'idle' })
   const selectedRef = useRef<string | undefined>(undefined)
   selectedRef.current = selected
+  const directoryRef = useRef('')
+  directoryRef.current = directory
+  /**
+   * Whether the stage still follows what the thread writes.
+   *
+   * A design thread produces its artifact and then says so in the transcript,
+   * and until now the stage did nothing with either: the rail only reloaded
+   * when the person changed directory, so a prototype written this turn was
+   * not even listed, let alone shown. Following it is the whole point of
+   * having a stage.
+   *
+   * It stops the moment the person opens a prototype themselves. Yanking the
+   * stage away from something someone is reading is worse than not following
+   * at all, and a deliberate choice is the clearest signal that they are no
+   * longer just watching.
+   */
+  const following = useRef(true)
 
   const refreshListing = useCallback(async (path: string) => {
     if (list === undefined) return
@@ -121,29 +138,50 @@ export function UedView({
 
   useEffect(() => { void refreshListing(directory) }, [directory, refreshListing])
 
-  // A design thread keeps writing after the turn that started it ends, and
-  // several threads can write in the same second. Repaint on the trailing edge
-  // so the frame never shows a document caught mid-write.
-  useEffect(() => {
-    if (subscribeChanged === undefined) return undefined
-    let timer: ReturnType<typeof setTimeout> | undefined
-    const dispose = subscribeChanged((change) => {
-      if (change.path !== selectedRef.current) return
-      if (timer !== undefined) clearTimeout(timer)
-      timer = setTimeout(() => { void loadPreview(change.path) }, REFRESH_DEBOUNCE_MS)
-    })
-    return () => {
-      if (timer !== undefined) clearTimeout(timer)
-      dispose()
-    }
-  }, [subscribeChanged, loadPreview])
-
-  const open = useCallback((path: string) => {
+  const show = useCallback((path: string) => {
     setSelected(path)
     selectedRef.current = path
     setPreview({ status: 'loading' })
     void loadPreview(path)
   }, [loadPreview])
+
+  /** A prototype the person opened: the stage stays on it from here. */
+  const open = useCallback((path: string) => {
+    following.current = false
+    show(path)
+  }, [show])
+
+  // A design thread keeps writing after the turn that started it ends, and
+  // several threads can write in the same second. Act on the trailing edge so
+  // the stage never shows a document caught mid-write, and so a burst resolves
+  // to the last write rather than to each one in turn.
+  useEffect(() => {
+    if (subscribeChanged === undefined) return undefined
+    let timer: ReturnType<typeof setTimeout> | undefined
+    const dispose = subscribeChanged((change) => {
+      if (timer !== undefined) clearTimeout(timer)
+      timer = setTimeout(() => {
+        const path = change.path
+        // The rail moves first either way: a prototype written this turn is
+        // not in the listing yet, so nothing could select it.
+        if (parentOf(path) === directoryRef.current) void refreshListing(directoryRef.current)
+        if (path === selectedRef.current) {
+          void loadPreview(path)
+          return
+        }
+        if (!following.current || !isPreviewable(path)) return
+        // Following across directories: the thread decides where its artifact
+        // lands, and a stage that only follows within one folder would stop
+        // following exactly when the thread organizes its output.
+        if (parentOf(path) !== directoryRef.current) setDirectory(parentOf(path))
+        show(path)
+      }, REFRESH_DEBOUNCE_MS)
+    })
+    return () => {
+      if (timer !== undefined) clearTimeout(timer)
+      dispose()
+    }
+  }, [subscribeChanged, loadPreview, refreshListing, show])
 
   const label = (key: UedKey): string => t === undefined ? key : t(key)
   const directories = listing.entries.filter(entry => entry.kind === 'directory')

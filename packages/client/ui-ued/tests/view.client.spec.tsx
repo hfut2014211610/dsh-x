@@ -219,6 +219,58 @@ describe('UedView', () => {
     vi.useRealTimers()
   })
 
+  // The reason a stage exists: a thread writes its prototype and the stage
+  // shows it. Before this the rail only reloaded when the person changed
+  // directory, so a prototype written this turn was not even listed.
+  it('opens a prototype the thread just wrote, and relists to find it', async () => {
+    vi.useFakeTimers()
+    let publish: ((change: DocumentChange) => void) | undefined
+    const injected = renderView({
+      subscribeChanged: vi.fn((fn: (change: DocumentChange) => void) => {
+        publish = fn
+        return () => { publish = undefined }
+      }),
+    })
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(injected.load).not.toHaveBeenCalled()
+
+    await act(async () => {
+      publish?.({ path: 'home.html' } as DocumentChange)
+      await vi.advanceTimersByTimeAsync(500)
+    })
+
+    expect(injected.load).toHaveBeenCalledWith('home.html')
+    // The listing is refreshed too: the file may be new to it.
+    expect(injected.list).toHaveBeenCalledTimes(2)
+    vi.useRealTimers()
+  })
+
+  // Following is for someone watching. Once they have opened something
+  // themselves, taking the stage away is worse than not following at all.
+  it('stops following once the person opens a prototype themselves', async () => {
+    vi.useFakeTimers()
+    let publish: ((change: DocumentChange) => void) | undefined
+    const injected = renderView({
+      subscribeChanged: vi.fn((fn: (change: DocumentChange) => void) => {
+        publish = fn
+        return () => { publish = undefined }
+      }),
+    })
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    fireEvent.click(screen.getByRole('button', { name: 'home.html' }))
+    await act(async () => { await vi.advanceTimersByTimeAsync(0) })
+    expect(injected.load).toHaveBeenCalledTimes(1)
+
+    await act(async () => {
+      publish?.({ path: 'pages/other.html' } as DocumentChange)
+      await vi.advanceTimersByTimeAsync(500)
+    })
+
+    expect(injected.load).toHaveBeenCalledTimes(1)
+    expect(injected.load).not.toHaveBeenCalledWith('pages/other.html')
+    vi.useRealTimers()
+  })
+
   it('holds the frame at the viewport a prototype was written for', async () => {
     renderView()
     fireEvent.click(await screen.findByRole('button', { name: 'home.html' }))

@@ -105,6 +105,49 @@ describe('WritingView', () => {
     expect(b.view.getByRole('treeitem', { name: 'plan.md' })).toBeTruthy()
   })
 
+  // A writing session creates its document and says so in the transcript. The
+  // editor used to act only on changes to the file already open, so the one
+  // the session just produced stayed closed behind a tree to go find it in.
+  it('opens the document the session just created', async () => {
+    const b = setup()
+    await waitFor(() => { expect(b.list).toHaveBeenCalledWith(undefined) })
+
+    act(() => {
+      b.changed()?.({
+        sessionId: SID,
+        path: 'docs/新建产物.md',
+        baseVersion: null,
+        version: 'v1',
+        patches: null,
+      } as unknown as DocumentChange)
+    })
+
+    await waitFor(() => { expect(b.load).toHaveBeenCalledWith('docs/新建产物.md') })
+  })
+
+  // Following is for someone watching; an explicit open says they are not.
+  // Pulling the editor off what they chose would be worse than not following.
+  it('stops following once the person opens a document themselves', async () => {
+    const b = setup()
+    fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'docs/plan.md' } })
+    fireEvent.click(b.view.getByRole('button', { name: '打开文档' }))
+    await b.view.findByLabelText('Markdown 预览')
+    b.load.mockClear()
+
+    act(() => {
+      b.changed()?.({
+        sessionId: SID,
+        path: 'docs/其他产物.md',
+        baseVersion: null,
+        version: 'v1',
+        patches: null,
+      } as unknown as DocumentChange)
+    })
+
+    await waitFor(() => { expect(b.view.getByLabelText('Markdown 预览')).toBeTruthy() })
+    expect(b.load).not.toHaveBeenCalled()
+  })
+
   it('opens, edits, saves, and protects a dirty draft from an external change', async () => {
     const b = setup()
     fireEvent.change(b.view.getByLabelText('工作区相对路径'), { target: { value: 'docs/plan.md' } })
