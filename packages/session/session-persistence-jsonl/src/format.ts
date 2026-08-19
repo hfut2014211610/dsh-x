@@ -227,6 +227,20 @@ interface SessionLogScan {
   meta: SessionHeader
   events: SessionEvent[]
   committedBytes: number
+  /**
+   * How many events an overlapping append displaced. Zero for every log
+   * written by a single well-behaved writer; anything else is worth a line in
+   * the host log, because the usual cause is two runtimes sharing one session
+   * directory and the next overlap may not be as recoverable as this one.
+   */
+  overlaps: number
+  /**
+   * The lowest event count an overlapping append rolled the scan back to, when
+   * one did. A caller that split the scan into a durable region and a
+   * recoverable tail needs this: an overlap reaching below the split means the
+   * tail's events no longer start where the durable region ends.
+   */
+  overlapFloor?: number
 }
 
 /** Parse one complete header record supplied independently from event rows. */
@@ -279,6 +293,8 @@ export class SessionLogScanner {
   private eventLine = 0
   private issue: Error | undefined
   private finished = false
+  private overlaps = 0
+  private overlapFloor: number | undefined
 
   /**
    * Create an event scanner from exactly one newline-terminated header record.
@@ -336,11 +352,18 @@ export class SessionLogScanner {
 
   /**
    * Finish scanning, ignoring a final record without a newline as a torn tail.
-   * @returns the header, contiguous event prefix, and safe truncation offset.
+   * @returns the header, contiguous event prefix, safe truncation offset, and
+   * how many events an overlapping append displaced.
    */
   finish(): SessionLogScan {
     this.finished = true
-    return { meta: this.meta, events: this.events, committedBytes: this.committedBytes }
+    return {
+      meta: this.meta,
+      events: this.events,
+      committedBytes: this.committedBytes,
+      overlaps: this.overlaps,
+      ...this.overlapFloor === undefined ? {} : { overlapFloor: this.overlapFloor },
+    }
   }
 
   /** Decode one complete event row and update the contiguous prefix. */
@@ -357,6 +380,22 @@ export class SessionLogScanner {
     if (this.issue !== undefined) {
       if (decoded.some(event => event.type === 'turn/end')) throw this.issue
       return
+    }
+
+    // A row that restarts BELOW the events already read overlaps them rather
+    // than skipping any, and the two are not the same failure. A gap means
+    // events are missing and the conversation this log describes cannot be
+    // reconstructed. An overlap means a stretch was numbered twice — a second
+    // writer on the same file, or an append that repeated after a truncation
+    // did not land — and every event is still present. The overlapped tail is
+    // dropped so the later numbering wins, which is the one the rest of the
+    // file continues from; the alternative was refusing an entire session over
+    // a handful of duplicated seqs, which is what this did before.
+    const restart = decoded[0]
+    if (restart !== undefined && restart.seq < this.events.length) {
+      this.overlaps += this.events.length - restart.seq
+      this.overlapFloor = Math.min(this.overlapFloor ?? restart.seq, restart.seq)
+      this.events.length = restart.seq
     }
 
     const rowStart = this.events.length

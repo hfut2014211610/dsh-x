@@ -972,6 +972,37 @@ describe('JsonlSessionPersistence: scanLog unit', () => {
     expect(() => scanLog(Buffer.from(log))).toThrow(/seq gap in committed region/)
   })
 
+  // An overlap is the opposite failure to a gap: nothing is missing, a stretch
+  // was numbered twice. Two runtimes sharing one session directory produce it,
+  // and refusing the whole session over it cost a completed conversation.
+  it('lets a later append that restarts below the events read displace them', () => {
+    const log = [
+      JSON.stringify({ type: 'session', version: 0, id: 'o', createdAt: 1, delegationDepth: 0 }),
+      JSON.stringify({ type: 'turn/start', seq: 0, time: 1, data: { turn: 1 } }),
+      JSON.stringify({ type: 'step/start', seq: 1, time: 2, data: { turn: 1, step: 1 } }),
+      // A second writer closed the turn it found open, from its own count of 2.
+      JSON.stringify({ type: 'step/end', seq: 2, time: 3, data: { turn: 1, step: 1 } }),
+      JSON.stringify({ type: 'turn/end', seq: 3, time: 3, data: { turn: 1, reason: { kind: 'interrupted' } } }),
+      // The writer that was actually running never saw those, and carried on.
+      JSON.stringify({ type: 'step/end', seq: 2, time: 4, data: { turn: 1, step: 1 } }),
+      JSON.stringify({ type: 'turn/end', seq: 3, time: 5, data: { turn: 1, reason: { kind: 'completed' } } }),
+    ].join('\n') + '\n'
+
+    const scan = scanLog(Buffer.from(log))
+    expect(scan.events.map(event => event.seq)).toEqual([0, 1, 2, 3])
+    expect(scan.events.at(-1)).toMatchObject({ data: { reason: { kind: 'completed' } } })
+    expect(scan.overlaps).toBe(2)
+    // The whole file is still safe to append at: nothing was left unread.
+    expect(scan.committedBytes).toBe(log.length)
+  })
+
+  it('reports no overlap for a log one writer wrote', () => {
+    expect(scanLog(Buffer.from(
+      [JSON.stringify({ type: 'session', version: 0, id: 'o2', createdAt: 1, delegationDepth: 0 }),
+        ...oneTurnLog().map(event => JSON.stringify(event))].join('\n') + '\n',
+    )).overlaps).toBe(0)
+  })
+
   it('rejects a corrupt line BEFORE a later committed turn/end (committed data damaged)', () => {
     const log = [
       JSON.stringify({ type: 'session', version: 0, id: 'c', createdAt: 1, delegationDepth: 0 }),

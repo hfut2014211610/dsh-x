@@ -401,12 +401,17 @@ export class JsonlSessionPersistence extends SessionPersistence implements Persi
       scanner.write(recoveredPlaintext)
       const recoveredPrefix = scanner.finish()
       signal?.throwIfAborted()
+      // Ordinarily the recoverable tail is everything past the complete
+      // frames. An overlapping append reaching below that boundary moves the
+      // boundary with it: those events are no longer the ones the complete
+      // frames hold, so re-appending from the old split would drop them.
+      const recoveredFrom = Math.min(complete.eventCount, recoveredPrefix.overlapFloor ?? complete.eventCount)
       return {
         meta: recoveredPrefix.meta,
         events: recoveredPrefix.events,
         tornMarker: {
           truncateTo: tornStart,
-          recoveredEvents: recoveredPrefix.events.slice(complete.eventCount),
+          recoveredEvents: recoveredPrefix.events.slice(recoveredFrom),
         },
       }
     } catch (error) {
