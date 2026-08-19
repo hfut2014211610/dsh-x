@@ -5,49 +5,134 @@
 <meta http-equiv="Content-Security-Policy" content="default-src 'self'; style-src 'unsafe-inline'; script-src 'self'">
 <title>DeepSeek Harness</title>
 <style>
-  :root { color-scheme: dark; }
+  /* Light is the base and dark is the override, so the page has a complete
+     palette before any media query is consulted. The window is created with
+     the light background, which is what removes the white flash between the
+     frame appearing and this document painting. */
+  :root {
+    color-scheme: light dark;
+    --bg: #ffffff;
+    --bg-sunken: #f6f7f9;
+    --border: #e6e8ec;
+    --label: #1b1e24;
+    --label-dim: #6b7280;
+    --label-faint: #98a0ad;
+    --brand: #4d6bfe;
+    --track: #eceef2;
+  }
+
+  @media (prefers-color-scheme: dark) {
+    :root {
+      --bg: #101319;
+      --bg-sunken: #0a0d12;
+      --border: #232833;
+      --label: #e6e9ef;
+      --label-dim: #9aa3b2;
+      --label-faint: #6f7889;
+      --brand: #6b83ff;
+      --track: #232833;
+    }
+  }
+
   * { margin: 0; padding: 0; box-sizing: border-box; }
+
   body {
-    font-family: system-ui, -apple-system, 'Segoe UI', sans-serif;
-    background: #101319; color: #e6e9ef; height: 100vh;
-    display: flex; align-items: center; justify-content: center;
+    font-family: system-ui, -apple-system, 'Segoe UI', 'Microsoft YaHei', sans-serif;
+    background: var(--bg);
+    color: var(--label);
+    height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    /* The app underneath fades in; this screen fades out with it rather than
+       being cut away mid-frame. */
+    opacity: 1;
+    transition: opacity 200ms ease;
   }
-  .panel { width: min(640px, 88vw); }
-  .title { display: flex; align-items: center; gap: 14px; margin-bottom: 28px; }
-  .mark { width: 34px; height: 34px; border-radius: 9px; background: #4d6bfe; }
-  .title h1 { font-size: 20px; font-weight: 600; }
-  .stage { font-size: 15px; margin-bottom: 8px; }
-  .detail { font-size: 13px; color: #9aa3b2; margin-bottom: 20px; min-height: 18px; }
-  .runtime { font-size: 13px; color: #9aa3b2; margin-bottom: 20px; }
-  .runtime code { color: #c6cdd9; }
-  .bar { height: 3px; background: #232833; border-radius: 2px; overflow: hidden; margin-bottom: 20px; }
-  .bar-fill { height: 100%; width: 40%; background: #4d6bfe; border-radius: 2px; animation: slide 1.4s ease-in-out infinite; }
-  @keyframes slide { 0% { transform: translateX(-100%); } 100% { transform: translateX(320%); } }
-  .logs {
-    background: #0a0d12; border: 1px solid #232833; border-radius: 8px;
-    padding: 12px 14px; height: 180px; overflow-y: auto;
-    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 12px;
-    color: #8b94a5; white-space: pre-wrap; word-break: break-all;
+  body.ready { opacity: 0; }
+
+  .panel { width: min(460px, 84vw); }
+
+  .title { display: flex; align-items: center; gap: 12px; margin-bottom: 32px; }
+  .mark {
+    width: 30px; height: 30px; border-radius: 8px;
+    background: var(--brand);
+    /* Breathes only while work is in flight; a failed screen holds still. */
+    animation: pulse 2s ease-in-out infinite;
   }
+  body.failed .mark { animation: none; opacity: .55; }
+  @keyframes pulse { 0%, 100% { opacity: 1; } 50% { opacity: .55; } }
+  .title h1 { font-size: 17px; font-weight: 600; letter-spacing: -.01em; }
+
+  /* Five segments, one per phase: a determinate shape, because the shell
+     always knows which of the five it is in. The active one animates; the
+     ones behind it stay filled. */
+  .steps { display: flex; gap: 5px; margin-bottom: 18px; }
+  .step { flex: 1; height: 3px; border-radius: 2px; background: var(--track); overflow: hidden; }
+  .step.done { background: var(--brand); }
+  .step.active { background: var(--track); position: relative; }
+  .step.active::after {
+    content: ''; position: absolute; inset: 0;
+    background: var(--brand); border-radius: 2px;
+    animation: sweep 1.3s ease-in-out infinite;
+  }
+  @keyframes sweep { 0% { transform: translateX(-100%); } 100% { transform: translateX(100%); } }
+  body.failed .step.active::after { animation: none; background: #d0555f; }
+
+  .stage { font-size: 15px; font-weight: 500; margin-bottom: 6px; }
+  .detail { font-size: 13px; color: var(--label-dim); min-height: 18px; }
+  .elapsed { font-variant-numeric: tabular-nums; color: var(--label-faint); }
+
+  .runtime { margin-top: 18px; font-size: 12px; color: var(--label-faint); }
+  .runtime code { font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; }
+
+  .tools { display: flex; align-items: center; gap: 10px; margin-top: 24px; }
   .retry {
-    margin-top: 20px; padding: 9px 22px; border: none; border-radius: 7px;
-    background: #4d6bfe; color: #fff; font-size: 14px; cursor: pointer; display: none;
+    padding: 8px 18px; border: none; border-radius: 7px;
+    background: var(--brand); color: #fff; font-size: 13px; font-weight: 500; cursor: pointer;
+    display: none;
   }
-  .retry:hover { background: #3d59d8; }
-  body.failed .bar-fill { display: none; }
   body.failed .retry { display: inline-block; }
-  body.ready .bar-fill { display: none; }
+  .retry:hover { filter: brightness(1.08); }
+
+  .toggle {
+    padding: 0; border: none; background: none;
+    color: var(--label-faint); font-size: 12px; cursor: pointer;
+  }
+  .toggle:hover { color: var(--label-dim); }
+
+  /* The log wall is the developer view. It is not what someone opening the
+     app should be reading, so it stays closed until asked for — or until a
+     failure, where it is the only thing that explains anything. */
+  .logs {
+    display: none;
+    margin-top: 12px;
+    background: var(--bg-sunken); border: 1px solid var(--border); border-radius: 8px;
+    padding: 10px 12px; height: 152px; overflow-y: auto;
+    font-family: ui-monospace, 'Cascadia Mono', Consolas, monospace; font-size: 11px; line-height: 1.55;
+    color: var(--label-dim); white-space: pre-wrap; word-break: break-all;
+  }
+  body.logs-open .logs { display: block; }
 </style>
 </head>
 <body>
 <div class="panel">
   <div class="title"><div class="mark"></div><h1>DeepSeek Harness</h1></div>
-  <div class="stage" id="stage">Discovering the dsh runtime…</div>
-  <div class="detail" id="detail"></div>
+  <div class="steps">
+    <div class="step" data-step="preparing"></div>
+    <div class="step" data-step="discovering"></div>
+    <div class="step" data-step="launching"></div>
+    <div class="step" data-step="connecting"></div>
+    <div class="step" data-step="ready"></div>
+  </div>
+  <div class="stage" id="stage">Starting…</div>
+  <div class="detail"><span id="detail"></span><span class="elapsed" id="elapsed"></span></div>
   <div class="runtime" id="runtime"></div>
-  <div class="bar"><div class="bar-fill"></div></div>
+  <div class="tools">
+    <button class="retry" id="retry">Retry</button>
+    <button class="toggle" id="toggle">Show details</button>
+  </div>
   <div class="logs" id="logs"></div>
-  <button class="retry" id="retry">Retry</button>
 </div>
 <script src="loading.js"></script>
 </body>

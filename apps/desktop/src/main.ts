@@ -8,7 +8,7 @@
  * @module @deepseek-ai/dsh-desktop-shell/main
  */
 
-import { spawnSync } from 'node:child_process'
+import { spawn, spawnSync } from 'node:child_process'
 import { existsSync, rmSync } from 'node:fs'
 import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
@@ -18,7 +18,7 @@ import { createHash } from 'node:crypto'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { createReadStream, createWriteStream } from 'node:fs'
-import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, shell, Tray } from 'electron'
+import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, shell, Tray } from 'electron'
 import { ensureBundledRuntime } from './bundled-runtime.ts'
 import { DEFAULT_PROBE_ORIGIN, discoverRuntime } from './discovery.ts'
 import { DEFAULT_HEALTH_OPTIONS, startHealthWatch } from './health.ts'
@@ -189,17 +189,35 @@ async function connect(): Promise<void> {
         removeDir: async (path) => { await rm(path, { recursive: true, force: true }) },
         makeDir: async (path) => { await mkdir(path, { recursive: true }) },
         writeFile: async (path, contents) => { await writeFile(path, contents, 'utf8') },
-        extract: (archive, dir) => {
-          const run = (command: string, args: readonly string[]): void => {
-            // A cold Windows machine extracts the bundled runtime's tens of
-            // thousands of small files under real-time antivirus scanning;
-            // the bound covers that first run without keeping a stuck tar
-            // alive indefinitely.
-            const result = spawnSync(command, args, { encoding: 'utf8', timeout: 900_000 })
-            if (result.status !== 0) {
-              throw new Error(`${command} exited ${String(result.status)}: ${result.stderr.slice(0, 300)}`)
+        extract: async (archive, dir) => {
+          // Asynchronous, and this is the one that matters most: a cold
+          // Windows machine unpacks tens of thousands of small files under
+          // real-time antivirus scanning, and doing that synchronously froze
+          // the main process — and with it the loading screen reporting on it —
+          // for the whole of the first run.
+          const run = (command: string, args: readonly string[]): Promise<void> => new Promise((resolve, reject) => {
+            const child = spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'] })
+            let stderr = ''
+            let settled = false
+            const finish = (error?: Error): void => {
+              if (settled) return
+              settled = true
+              clearTimeout(deadline)
+              if (error === undefined) resolve()
+              else reject(error)
             }
-          }
+            // The bound covers that first run without keeping a stuck
+            // extractor alive indefinitely.
+            const deadline = setTimeout(() => {
+              child.kill()
+              finish(new Error(`${command} did not finish within 15 minutes`))
+            }, 900_000)
+            child.stderr.on('data', (chunk: Buffer) => { stderr += chunk.toString('utf8') })
+            child.once('error', (error) => { finish(error) })
+            child.once('close', (code) => {
+              finish(code === 0 ? undefined : new Error(`${command} exited ${String(code)}: ${stderr.slice(0, 300)}`))
+            })
+          })
           // bsdtar reads zip archives. On Windows, resolve the SYSTEM bsdtar by
           // absolute path: a PATH `tar` may be GNU tar (MSYS), which neither
           // reads zip nor accepts a `D:` drive letter.
@@ -207,12 +225,11 @@ async function connect(): Promise<void> {
             ? join(process.env.SystemRoot ?? 'C:\\Windows', 'system32', 'tar.exe')
             : 'tar'
           try {
-            run(tarCommand, ['-xf', archive, '-C', dir])
+            await run(tarCommand, ['-xf', archive, '-C', dir])
           } catch (tarError) {
             log(`tar extraction unavailable (${tarError instanceof Error ? tarError.message : String(tarError)}); trying unzip`)
-            run('unzip', ['-q', archive, '-d', dir])
+            await run('unzip', ['-q', archive, '-d', dir])
           }
-          return Promise.resolve()
         },
       })
       if (runtime !== undefined) {
@@ -231,14 +248,31 @@ async function connect(): Promise<void> {
   log('discovering a dsh runtime')
   const outcome = await discoverRuntime({
     fetchImpl: fetch,
-    execFile: (command, args) => {
-      const result = spawnSync(command, args, {
-        encoding: 'utf8',
+    // Asynchronous on purpose. This runs on the main process, which owns the
+    // window and the IPC that feeds the loading screen; a synchronous spawn
+    // freezes both for as long as the child takes, and on Windows that child
+    // is a shell resolving a PATH entry that usually is not there. The user
+    // sees a window that stopped updating, which reads as a hang.
+    execFile: (command, args) => new Promise((resolve) => {
+      const child = spawn(command, args, {
         shell: process.platform === 'win32',
-        timeout: 10_000,
+        stdio: ['ignore', 'pipe', 'ignore'],
       })
-      return Promise.resolve({ stdout: result.stdout, code: result.status ?? -1 })
-    },
+      let stdout = ''
+      let settled = false
+      const settle = (code: number): void => {
+        if (settled) return
+        settled = true
+        clearTimeout(deadline)
+        resolve({ stdout, code })
+      }
+      // A probe that never answers must not hold the chain open; the candidate
+      // simply fails validation and the next source is tried.
+      const deadline = setTimeout(() => { child.kill(); settle(-1) }, 10_000)
+      child.stdout.on('data', (chunk: Buffer) => { stdout += chunk.toString('utf8') })
+      child.once('error', () => { settle(-1) })
+      child.once('close', (code) => { settle(code ?? -1) })
+    }),
     readJson: async (path) => {
       try {
         return JSON.parse(await readFile(path, 'utf8')) as unknown
@@ -258,6 +292,9 @@ async function connect(): Promise<void> {
       process.env.LOCALAPPDATA === undefined ? '' : join(process.env.LOCALAPPDATA, 'npm-cache', '_npx'),
     ].filter(dir => dir !== ''),
     bundledRoot,
+    // An installed app runs the runtime it shipped with, and skips two probes
+    // per launch to get there.
+    preferBundled: app.isPackaged,
     // `--expose-internals` precedes the entry script: the web profile's HMR
     // row requires it, and the CLI's own respawn does not reach an
     // electron-as-node child. PATH `dsh` manages its own flags.
@@ -509,6 +546,9 @@ function createWindow(): void {
     minWidth: 980,
     minHeight: 640,
     show: false,
+    // Painted before any document loads, so the frame does not flash white on
+    // its way to a dark loading screen. Matches loading.html's two palettes.
+    backgroundColor: nativeTheme.shouldUseDarkColors ? '#101319' : '#ffffff',
     title: 'DeepSeek Harness',
     icon: nativeImage.createFromPath(join(HERE, '..', 'build', 'icon.png')),
     webPreferences: {

@@ -56,6 +56,39 @@ describe('discoverRuntime', () => {
     expect(outcome.trail[0]).toContain('disabled')
   })
 
+  // An installed app ships a runtime so it does not depend on what the machine
+  // happens to have; preferring it also drops a shell spawn and a cache scan
+  // from every launch. The other sources stay as fallbacks.
+  it('prefers the bundled runtime when asked, without probing PATH or the caches', async () => {
+    const execFile = vi.fn(async () => ({ stdout: '9.9.9', code: 0 }))
+    const listDirs = vi.fn(async () => ['cached'])
+    const outcome = await discoverRuntime(makeDeps({
+      preferBundled: true,
+      bundledRoot: '/bundled',
+      readJson: async path => path.startsWith('/bundled') ? { name: '@deepseek-ai/dsh', version: '3.1.0' } : undefined,
+      execFile,
+      listDirs,
+      npxCacheDirs: ['/npx'],
+    }))
+
+    expect(outcome.candidate?.source).toBe('bundled')
+    expect(execFile).not.toHaveBeenCalled()
+    expect(listDirs).not.toHaveBeenCalled()
+  })
+
+  // Preference, not exclusivity: a build with no usable bundled tree must
+  // still find the machine's runtime rather than failing outright.
+  it('falls through to the ordinary chain when the preferred bundle is unusable', async () => {
+    const outcome = await discoverRuntime(makeDeps({
+      preferBundled: true,
+      bundledRoot: '/bundled',
+      execFile: async () => ({ stdout: '1.4.2', code: 0 }),
+    }))
+
+    expect(outcome.candidate?.source).toBe('path')
+    expect(outcome.trail[0]).toContain('no dsh runtime under /bundled')
+  })
+
   it('validates the PATH runtime through --version', async () => {
     const outcome = await discoverRuntime(makeDeps({ execFile: async () => ({ stdout: '1.4.2\n', code: 0 }) }))
     expect(outcome.candidate).toEqual({ source: 'path', spawn: { command: 'dsh', args: [] }, version: '1.4.2' })

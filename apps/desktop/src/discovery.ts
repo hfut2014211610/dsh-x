@@ -59,6 +59,16 @@ export interface DiscoveryDeps {
   npxCacheDirs: readonly string[]
   /** Extracted bundled runtime root; empty string disables the bundled source. */
   bundledRoot: string
+  /**
+   * Try the bundled runtime before the machine's own installations.
+   *
+   * An installed app ships a runtime precisely so it does not depend on what
+   * the machine happens to have, and preferring it also drops two probes —
+   * a shell spawn for `dsh --version` and a scan of the npx caches — from
+   * every launch. A source checkout wants the opposite: whatever `dsh` the
+   * developer installed is the one they are working on.
+   */
+  preferBundled?: boolean
   /** Launcher that runs dsh entry scripts (system node, or Electron as node). */
   runtimeLauncher: RuntimeSpawn
   /**
@@ -104,15 +114,34 @@ function runtimeSpawn(deps: DiscoveryDeps, root: string): RuntimeSpawn {
   }
 }
 
+/** Validate the bundled runtime root, recording the attempt on the trail. */
+async function bundledCandidate(deps: DiscoveryDeps, trail: string[]): Promise<RuntimeCandidate | undefined> {
+  if (deps.bundledRoot === '') return undefined
+  const runtime = await readRuntime(deps, deps.bundledRoot)
+  if (runtime === undefined) {
+    trail.push(`bundled: no dsh runtime under ${deps.bundledRoot}`)
+    return undefined
+  }
+  trail.push(`bundled: ${deps.bundledRoot} (dsh ${runtime.version})`)
+  return { source: 'bundled', spawn: runtimeSpawn(deps, deps.bundledRoot), version: runtime.version }
+}
+
 /**
- * Walk the discovery chain in order: serving instance → PATH → npx cache →
- * bundled runtime. The first validated source wins; the trail records every
- * source examined so the connection UI can show why.
+ * Walk the discovery chain. The order is serving instance → PATH → npx cache →
+ * bundled runtime, except with `preferBundled`, where the bundled runtime is
+ * tried first and the rest remain as fallbacks. The first validated source
+ * wins; the trail records every source examined so the connection UI can show
+ * why.
  * @param deps - environment collaborators.
  * @returns the selected candidate (or none) and the per-source trail lines.
  */
 export async function discoverRuntime(deps: DiscoveryDeps): Promise<DiscoveryOutcome> {
   const trail: string[] = []
+
+  if (deps.preferBundled === true) {
+    const bundled = await bundledCandidate(deps, trail)
+    if (bundled !== undefined) return { candidate: bundled, trail }
+  }
 
   if (deps.probeOrigin === '') {
     trail.push('serving-instance: disabled — this shell only runs a runtime it owns')
@@ -152,14 +181,8 @@ export async function discoverRuntime(deps: DiscoveryDeps): Promise<DiscoveryOut
   }
   trail.push('npx-cache: no cached dsh installation')
 
-  if (deps.bundledRoot !== '') {
-    const runtime = await readRuntime(deps, deps.bundledRoot)
-    if (runtime !== undefined) {
-      trail.push(`bundled: ${deps.bundledRoot} (dsh ${runtime.version})`)
-      return { candidate: { source: 'bundled', spawn: runtimeSpawn(deps, deps.bundledRoot), version: runtime.version }, trail }
-    }
-    trail.push(`bundled: no dsh runtime under ${deps.bundledRoot}`)
-  }
+  const bundled = await bundledCandidate(deps, trail)
+  if (bundled !== undefined) return { candidate: bundled, trail }
 
   return { trail }
 }

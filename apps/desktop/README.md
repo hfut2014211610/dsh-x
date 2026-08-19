@@ -10,7 +10,11 @@ Each launch resolves a runtime through a validated chain, in order: an instance 
 
 **An installed app skips the serving-instance source entirely.** A runtime it did not spawn is one it must not stop, so attaching would leave a server running after the user quits — the installed app always owns its runtime. Probing stays the default for a source checkout, where a `dsh web` left running in a terminal is the point, and an explicit `DSH_DESKTOP_PROBE_ORIGIN` still wins in both directions.
 
+**An installed app also tries its own bundled runtime first**, with the rest of the chain kept as fallbacks. It ships a runtime precisely so it does not depend on what the machine happens to have, and preferring it drops a shell spawn and a scan of the npx caches from every launch. A source checkout keeps the original order, where whatever `dsh` the developer installed is the one they are working on.
+
 Spawned runtimes always run `web --host 127.0.0.1 --port 0`; readiness is the `dsh web:` URL line on stdout, then HTTP 200 on the index, then the `host.describe` echo — the window shows the web UI only after all three.
+
+Every step of that chain runs asynchronously, which matters more than it sounds: the main process owns both the window and the IPC that feeds the loading screen, so a synchronous child froze the screen reporting on it. The two that did are the PATH validation — a shell spawn on Windows, for a binary that usually is not there — and the first-run unpack of the bundled runtime, which on a cold machine writes tens of thousands of small files past a virus scanner. Neither now blocks a frame.
 
 ## Window and process lifecycle
 
@@ -23,6 +27,12 @@ Faults are answered by a rolling budget rather than a lifetime count (`src/resta
 A shell that is killed outright — task manager, a crash, a power cut — never runs the quit path, and the runtime it spawned keeps serving with nothing left to stop it. Each launch therefore records the pid and origin it owns and reads that note back before spawning anything (`src/owned-runtime.ts`). The reap kills only when the recorded pid is still alive AND a dsh still answers on that recorded origin: a pid alone is not an identity, and killing a reused one would take down a process this shell never started.
 
 The bundled runtime ships as one archive (`resources/dsh-runtime.zip`) and the shell extracts it into its userData on first run (`src/bundled-runtime.ts`), because this electron-builder build strips `node_modules` from resource copies outright; the extracted tree runs under the Electron binary itself (`ELECTRON_RUN_AS_NODE` plus `--expose-internals` for the web profile's HMR row), so an installed app needs no system Node.js. The `PATH` and npx sources serve development machines that already have one.
+
+## The loading screen
+
+`loading.html` is a plain sandboxed document driven by one snapshot per change. It shows five segments, one per phase, because the shell always knows which of the five it is in; the phase clock counts up locally from a timestamp in the snapshot, so a wait long enough to send no updates still visibly moves. The palette is light with a dark override and the window is created with the matching `backgroundColor`, so the frame never flashes white on its way to the page.
+
+The log wall stays closed. It is the developer view, not what someone opening the app should be reading — but a failure opens it once, because there it is the only thing that explains anything.
 
 ## Updates
 
