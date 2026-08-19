@@ -48,7 +48,7 @@ describe('ApprovalBroker', () => {
   it('没人点就超时，按拒绝收场——审批 seam 的规矩是失败关闭', async () => {
     vi.useFakeTimers()
     try {
-      const broker = new ApprovalBroker(recordingSink(), 1000)
+      const broker = new ApprovalBroker(recordingSink(), () => 1000)
       const pending = broker.request('oc_1', 'bash', '')
       await vi.advanceTimersByTimeAsync(1001)
       await expect(pending).resolves.toBe('rejected')

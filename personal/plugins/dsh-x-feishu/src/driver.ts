@@ -60,10 +60,16 @@ export interface DriverOptions {
   readonly sink: TurnSink
   /** 共用的工作区。 */
   readonly cwd: string
-  /** 建会话时用的预设；不给就用部署默认。 */
-  readonly presetId?: string
-  readonly render?: RenderOptions
-  readonly flushMs?: number
+  /**
+   * 建会话时用的预设；不给就用部署默认。
+   *
+   * 下面三项都是 thunk 而不是值：它们来自设置命名空间，用到才读，所以在页面上
+   * 改完保存对**下一次**用到它的地方就生效——不必重启插件，更不必把正在跑的
+   * 会话连同路由表一起拆掉。
+   */
+  readonly presetId?: () => string | undefined
+  readonly render?: () => RenderOptions
+  readonly flushMs?: () => number
   readonly now?: () => number
 }
 
@@ -73,12 +79,12 @@ export class SessionDriver {
   /** 按 dsh 会话 id 索引正在跑的回合，`session/event` 靠它路由。 */
   private readonly turns = new Map<string, ActiveTurn>()
   private readonly now: () => number
-  private readonly flushMs: number
+  private readonly flushMs: () => number
 
   /** @param options - 依赖与调参。 */
   constructor(private readonly options: DriverOptions) {
     this.now = options.now ?? (() => Date.now())
-    this.flushMs = options.flushMs ?? DEFAULT_FLUSH_MS
+    this.flushMs = options.flushMs ?? (() => DEFAULT_FLUSH_MS)
   }
 
   /**
@@ -90,7 +96,8 @@ export class SessionDriver {
     const existing = this.agents.get(chatKey)
     if (existing !== undefined) return existing
 
-    const { ctx, router, cwd, presetId } = this.options
+    const { ctx, router, cwd } = this.options
+    const presetId = this.options.presetId?.()
     const selection = ctx.agentDefaultModel.currentSelection()
     const setup = async (agentCtx: Context): Promise<void> => {
       // 唯一支持的挂预设位置：此时 agent 还没发布，组合失败会把整次创建回滚。
@@ -137,7 +144,7 @@ export class SessionDriver {
     const sessionId = String(agent.session.id)
     const turn: ActiveTurn = {
       chatKey,
-      renderer: new TurnRenderer(this.options.render ?? DEFAULT_RENDER_OPTIONS),
+      renderer: new TurnRenderer(this.options.render?.() ?? DEFAULT_RENDER_OPTIONS),
       cardId: undefined,
       lastFlush: 0,
       lastText: '',
@@ -225,7 +232,7 @@ export class SessionDriver {
 
   private scheduleFlush(turn: ActiveTurn): void {
     if (turn.timer !== undefined) return
-    const wait = Math.max(0, this.flushMs - (this.now() - turn.lastFlush))
+    const wait = Math.max(0, this.flushMs() - (this.now() - turn.lastFlush))
     turn.timer = setTimeout(() => { turn.timer = undefined; this.flush(turn) }, wait)
     turn.timer.unref()
   }

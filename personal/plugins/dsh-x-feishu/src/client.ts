@@ -52,16 +52,21 @@ export class BridgeClient {
     timer: NodeJS.Timeout
   }>()
 
+  /** 上一次真正拨过去的端点，用来认出配置改了。 */
+  private dialled: string | undefined
+
   /**
-   * @param endpoint - 本地 socket 路径或命名管道。
+   * @param endpoint - 读出本地 socket 路径或命名管道；**每次拨号都重新读**，
+   * 所以改配置不需要重建这个客户端，下一次连接就用新值。
    * @param handlers - 事件回调。
    */
-  constructor(private readonly endpoint: string, private readonly handlers: BridgeHandlers) {}
+  constructor(private readonly endpoint: () => string, private readonly handlers: BridgeHandlers) {}
 
   /** 连上去；断了会自己重连，直到 {@link dispose}。 */
   connect(): void {
     if (this.disposed || this.socket !== undefined) return
-    const socket = createConnection(this.endpoint)
+    this.dialled = this.endpoint()
+    const socket = createConnection(this.dialled)
     this.socket = socket
     socket.setEncoding('utf8')
     socket.on('connect', () => { this.retryMs = RETRY_MIN_MS })
@@ -97,6 +102,30 @@ export class BridgeClient {
       this.pending.set(id, { resolve, reject, timer })
       socket.write(encodeFrame({ ...command, id, v: PROTOCOL_VERSION }))
     })
+  }
+
+  /**
+   * 端点变了就重连，没变就不动。
+   *
+   * 配置里其余的值都是用到才读，唯独端点是拨号那一刻定死的——所以只有它需要
+   * 一个显式的动作。已经连在旧地址上的连接必须先断，否则新值要等到下一次意外
+   * 断线才会生效。
+   * @returns 是否真的重连了。
+   */
+  redialIfMoved(): boolean {
+    // 还没拨过号就无所谓"变了"：第一次 connect() 本来就会读当时的值。
+    if (this.disposed || this.dialled === undefined) return false
+    if (this.endpoint() === this.dialled) return false
+    // teardown() 会照常安排退避重连，所以这里只要把旧连接放掉。
+    this.socket?.destroy()
+    if (this.socket === undefined) {
+      // 本来就没连上：退避定时器还在等旧地址，让它立刻改用新的。
+      if (this.retryTimer !== undefined) clearTimeout(this.retryTimer)
+      this.retryTimer = undefined
+      this.retryMs = RETRY_MIN_MS
+      this.connect()
+    }
+    return true
   }
 
   /** 断开并停止重连。 */

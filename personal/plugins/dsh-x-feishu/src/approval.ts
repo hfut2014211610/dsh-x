@@ -60,11 +60,12 @@ export class ApprovalBroker {
 
   /**
    * @param sink - 发卡片的通道。
-   * @param timeoutMs - 等人点的上限，超时按拒绝。
+   * @param timeoutMs - 读出等人点的上限，超时按拒绝；每次提问重新读，所以改
+   * 配置对下一次审批就生效。
    */
   constructor(
     private readonly sink: AskSink,
-    private readonly timeoutMs: number = DEFAULT_ASK_TIMEOUT_MS,
+    private readonly timeoutMs: () => number = () => DEFAULT_ASK_TIMEOUT_MS,
   ) {}
 
   /**
@@ -93,7 +94,7 @@ export class ApprovalBroker {
       }
       // 发起方撤回问题时立刻按取消收场，晚到的点击会被 pending 里没有这条挡掉。
       const onAbort = (): void => { settle('cancelled') }
-      const timer = setTimeout(() => { settle('rejected') }, this.timeoutMs)
+      const timer = setTimeout(() => { settle('rejected') }, this.timeoutMs())
       timer.unref()
       if (signal?.aborted === true) { settle('cancelled'); return }
       signal?.addEventListener('abort', onAbort, { once: true })
