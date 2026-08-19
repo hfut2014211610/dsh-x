@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-usage-stats",
   "description": "Per-request model token usage projection (usageStats) plus the /usage report command for the DeepSeek Harness",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publishConfig": {
     "access": "public"
   },

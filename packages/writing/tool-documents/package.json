@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-tool-documents",
   "description": "Model-facing document tools for writing mode (search, read, outline, create, edit)",
-  "version": "0.3.2",
+  "version": "0.3.3",
   "publishConfig": {
     "access": "public"
   },
