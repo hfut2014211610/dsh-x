@@ -27,8 +27,8 @@ export interface RestartPolicyOptions {
   backoffMs: readonly number[]
 }
 
-/** What to do about one fault. */
-export interface RestartDecision {
+/** What to do about one fault; reached through {@link RestartPolicy.onFault}. */
+interface RestartDecision {
   restart: boolean
   /** How long to wait before restarting; 0 when giving up. */
   delayMs: number
