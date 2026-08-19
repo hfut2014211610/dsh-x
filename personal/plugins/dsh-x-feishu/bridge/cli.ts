@@ -33,6 +33,27 @@ function resolveWindowsEntry(): string | undefined {
 }
 
 /**
+ * 一次调用要覆盖的环境变量。
+ *
+ * `LARKSUITE_CLI_CONFIG_DIR` 决定这条命令**以哪个飞书应用的身份跑**。同一台机器
+ * 上往往还装着别的工具的 profile，环境默认那份多半是它们的——所以每一次出站调用
+ * 都显式带上目标目录，一次都不靠环境。
+ *
+ * 两个 notifier 开关一直开着：它们会往 JSON 输出里塞 `_notice`，而出站调用的
+ * 返回值是要解析的。
+ * @param configDir - 以哪份 lark-cli profile 的身份跑；空串沿用环境默认。
+ * @returns 要覆盖的环境变量。
+ */
+export function larkCliEnvironment(configDir: string): NodeJS.ProcessEnv {
+  const directory = configDir.trim()
+  return {
+    ...directory === '' ? {} : { LARKSUITE_CLI_CONFIG_DIR: directory },
+    LARKSUITE_CLI_NO_UPDATE_NOTIFIER: '1',
+    LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1',
+  }
+}
+
+/**
  * @param args - 传给 lark-cli 的 argv。
  * @returns 无需 shell 的可执行文件与参数。
  */

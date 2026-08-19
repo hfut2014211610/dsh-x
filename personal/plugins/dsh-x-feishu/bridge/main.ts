@@ -11,6 +11,14 @@
  * 过期阈值。一个跑了很久的回合会把 dsh 的事件循环占住，但 socket 照样连着，
  * 那正是"不该接管"的情形，用连接状态判断天然就对。
  *
+ * 进来的每条事件都记得**是哪个飞书应用收到的**，出去的每一次调用都以那个应用
+ * 的身份发。接了两个应用还共用一个出站身份的话，会出现"A 的机器人被 @，B 的
+ * 机器人回话"，而卡片只能由发它的那个应用改，连进度都刷不动。
+ *
+ * 配置不归这里管：`~/.dsh-x-feishu/config.json` 由 dsh 的设置页写出，这边只读、
+ * 并且盯着它变（见 `src/bridge-config.ts`）。桥接不向 dsh 要配置，因为它得在
+ * dsh 不在的时候顶上——文件在 dsh 挂了以后还在，RPC 不在。
+ *
  * 只依赖 node 内置和 lark-cli 子进程，**不 import 任何 dsh 包**——桥接能当兜底
  * 的前提就是它不跟着 dsh 一起崩。这条一旦破例，兜底就不成立了。
  *
@@ -21,74 +29,42 @@
 
 import { createServer, type Server, type Socket } from 'node:net'
 import { spawn } from 'node:child_process'
-import { readFile } from 'node:fs/promises'
-import { homedir } from 'node:os'
-import { join } from 'node:path'
 import { get as httpGet } from 'node:http'
 import {
-  FrameDecoder, PROTOCOL_VERSION, defaultEndpoint, encodeFrame,
+  FrameDecoder, PROTOCOL_VERSION, encodeFrame,
   type Ack, type OutboundCommand,
 } from '../src/protocol.ts'
 import {
-  DEFAULT_POLICY, MessageDedup, admit, cardActionValue,
-  type AccessPolicy, type LarkCardActionEvent, type LarkMessageEvent,
+  MessageDedup, admit, cardActionValue,
+  type LarkCardActionEvent, type LarkMessageEvent,
 } from '../src/lark-events.ts'
+import {
+  bridgeConfigPath, readBridgeConfig, watchBridgeConfig,
+  type BridgeConfig,
+} from '../src/bridge-config.ts'
+import { AppRouter } from '../src/app-routing.ts'
 import { EventConsumer } from './consumer.ts'
+import { larkCliEnvironment } from './cli.ts'
 import { approvalCard, messageIdOf, patchCard, progressCard, replyMessage, sendMessage, resolveBotOpenId } from './lark.ts'
-import { defaultEventRelayEndpoint, encodeEventRelayFrame } from './relay.ts'
+import { encodeEventRelayFrame } from './relay.ts'
 
-/** 桥接配置。 */
-interface BridgeConfig {
-  readonly endpoint: string
-  /** 其他本机 Agent 只读订阅原始飞书事件的端点。 */
-  readonly eventEndpoint: string
-  /**
-   * 要接入 relay 的飞书应用配置目录。每个应用的每个 EventKey 仍然只有桥接中的
-   * 一个 consumer；数组用来覆盖同群里的多个独立机器人应用。
-   */
-  readonly eventConfigDirs: readonly string[]
-  /** 卡片回调已在控制台订阅的应用；省略时与 eventConfigDirs 相同。 */
-  readonly cardActionConfigDirs?: readonly string[]
-  readonly policy: AccessPolicy
-  /** 机器人 open_id；留空则启动时向飞书问一次。 */
-  readonly botOpenId: string
-  /** 探这个地址判断 dsh 在不在，与桌面壳同一套。 */
-  readonly probeOrigin: string
-  /** dsh 不在时用什么命令拉起来。 */
-  readonly launch: { readonly command: string; readonly args: readonly string[]; readonly cwd?: string }
-}
-
-const CONFIG_PATH = join(homedir(), '.dsh-x-feishu', 'config.json')
-
-const DEFAULT_CONFIG: BridgeConfig = {
-  endpoint: defaultEndpoint(),
-  eventEndpoint: defaultEventRelayEndpoint(),
-  eventConfigDirs: [],
-  policy: DEFAULT_POLICY,
-  botOpenId: '',
-  probeOrigin: 'http://127.0.0.1:13080',
-  launch: { command: 'pnpm', args: ['dsh', 'web'] },
-}
+/** 消息事件的 EventKey。 */
+const MESSAGE_EVENT = 'im.message.receive_v1'
+/** 卡片回调的 EventKey。 */
+const CARD_EVENT = 'card.action.trigger'
 
 function log(message: string): void {
   process.stdout.write(`[feishu-bridge] ${new Date().toISOString()} ${message}\n`)
 }
 
-async function loadConfig(): Promise<BridgeConfig> {
-  try {
-    const parsed: unknown = JSON.parse(await readFile(CONFIG_PATH, 'utf8'))
-    if (typeof parsed !== 'object' || parsed === null) return DEFAULT_CONFIG
-    const record = parsed as Partial<BridgeConfig>
-    return {
-      ...DEFAULT_CONFIG,
-      ...record,
-      policy: { ...DEFAULT_POLICY, ...(record.policy ?? {}) },
-      launch: { ...DEFAULT_CONFIG.launch, ...(record.launch ?? {}) },
-    }
-  } catch {
-    log(`没读到 ${CONFIG_PATH}，用默认配置（默认拒绝，谁都用不了，先去填名单）`)
-    return DEFAULT_CONFIG
-  }
+/** 日志里怎么称呼一个 profile 目录。 */
+function label(configDir: string): string {
+  return configDir === '' ? '默认应用' : configDir
+}
+
+/** 一个消费者的身份：订阅哪个 EventKey、以哪个应用的身份。 */
+function consumerKey(eventKey: string, configDir: string): string {
+  return `${eventKey} @ ${label(configDir)}`
 }
 
 /** 探 dsh 在不在。桌面壳判断"要不要自己拉运行时"用的是同一套。 */
@@ -111,27 +87,23 @@ class Bridge {
   private eventServer: Server | undefined
   private readonly eventClients = new Set<Socket>()
   private readonly dedup = new MessageDedup()
-  /** 插件给的 cardId → 飞书 message_id。 */
-  private readonly cards = new Map<string, string>()
-  /** cardId → 它属于哪个会话，收尾时要用。 */
-  private readonly cardTitles = new Map<string, string>()
-  private botOpenId = ''
+  /** 每个会话、每张卡片是从哪个飞书应用来的。 */
+  private readonly router = new AppRouter(
+    () => this.primaryApp(),
+    { onGuess: (chatKey, app) => { log(`不认得会话 ${chatKey} 是从哪个应用进来的，按 ${label(app)} 发`) } },
+  )
+  /** configDir → 这个应用的机器人 open_id。判"有没有 @ 我"要用。 */
+  private readonly botOpenIds = new Map<string, string>()
+  /** 现在跑着的消费者，键是 {@link consumerKey}。 */
+  private readonly consumers = new Map<string, EventConsumer>()
   private launching = false
-  /** chatKey → chatId，回消息要用。 */
-  private readonly chats = new Map<string, string>()
+  /** 已经听上的端点。改端点要重启桥接，所以要记住当初听的是哪个。 */
+  private listening = { endpoint: '', eventEndpoint: '' }
+  private stopWatching: (() => void) | undefined
 
-  constructor(private readonly config: BridgeConfig) {}
+  constructor(private config: BridgeConfig) {}
 
   async start(): Promise<void> {
-    this.botOpenId = this.config.botOpenId !== ''
-      ? this.config.botOpenId
-      : (await resolveBotOpenId()) ?? ''
-    if (this.botOpenId === '') {
-      log('取不到机器人 open_id，群里的 @ 判定会全部落空。在 config.json 里填 botOpenId')
-    } else {
-      log(`机器人身份 ${this.botOpenId}`)
-    }
-
     this.server = createServer((socket) => { this.attach(socket) })
     this.server.on('error', (error: Error) => { log(`socket 服务端出错：${error.message}`) })
     this.server.listen(this.config.endpoint, () => {
@@ -142,43 +114,155 @@ class Bridge {
     this.eventServer.listen(this.config.eventEndpoint, () => {
       log(`在 ${this.config.eventEndpoint} 上广播飞书事件`)
     })
+    this.listening = { endpoint: this.config.endpoint, eventEndpoint: this.config.eventEndpoint }
 
-    const configuredDirs = this.config.eventConfigDirs
-      .map(value => value.trim())
-      .filter(value => value !== '')
-    // 空数组保持单应用默认行为；显式数组会在每个应用里各持有一份唯一订阅。
-    const eventSources = configuredDirs.length === 0 ? [''] : [...new Set(configuredDirs)]
-    const cardActionSources = this.config.cardActionConfigDirs === undefined
-      ? eventSources
-      : [...new Set(this.config.cardActionConfigDirs.map(value => value.trim()).filter(value => value !== ''))]
-    const environmentFor = (configDir: string): NodeJS.ProcessEnv | undefined => configDir === '' ? undefined : {
-      LARKSUITE_CLI_CONFIG_DIR: configDir,
-      LARKSUITE_CLI_NO_UPDATE_NOTIFIER: '1',
-      LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1',
-    }
-    const handlersFor = (configDir: string) => {
-      const source = configDir === '' ? 'default' : configDir
-      return {
-        onDiagnostic: (line: string) => { log(`lark-cli[${source}]: ${line}`) },
-        onExit: (code: number | null, wait: number) => {
-          log(`消费者[${source}]退出（code=${String(code)}），${wait}ms 后重启`)
-        },
+    this.logPolicy()
+    await this.syncConsumers()
+
+    // 设置页保存之后不用重起桥接。端点例外，它已经听上了。
+    this.stopWatching = watchBridgeConfig(bridgeConfigPath(), () => { void this.reload() })
+  }
+
+  /**
+   * 收摊：放掉每个 EventKey 的订阅，停掉文件监听。
+   *
+   * 要等消费者真的退干净再走。lark-cli 靠关 stdin 才会把**服务端**那份订阅
+   * 退掉，桥接先一步 exit 的话，那些子进程在 Windows 上会变成孤儿继续占着，
+   * 下一次起桥接就抢不到——一个 EventKey 只允许一个消费者。
+   * @returns 每个消费者都退完为止。
+   */
+  async stop(): Promise<void> {
+    this.stopWatching?.()
+    this.stopWatching = undefined
+    const leaving = [...this.consumers]
+    this.consumers.clear()
+    await Promise.all(leaving.map(async ([key, consumer]) => {
+      await consumer.stop()
+      log(`放掉订阅 ${key}`)
+    }))
+    this.server?.close()
+    this.eventServer?.close()
+    for (const socket of this.eventClients) socket.destroy()
+    this.client?.destroy()
+  }
+
+  /** 接哪几个应用的消息。空数组沿用环境默认那份。 */
+  private eventSources(): readonly string[] {
+    const configured = this.config.eventConfigDirs
+    return configured.length === 0 ? [''] : configured
+  }
+
+  /** 哪几个应用的卡片回调已经在开发者后台订阅过。空数组表示与消息源相同。 */
+  private cardActionSources(): readonly string[] {
+    const configured = this.config.cardActionConfigDirs
+    return configured.length === 0 ? this.eventSources() : configured
+  }
+
+  /** 出站找不到来源时落到哪个应用。第一个消息源，而不是环境默认。 */
+  private primaryApp(): string {
+    return this.eventSources()[0] ?? ''
+  }
+
+  private logPolicy(): void {
+    const policy = this.config.policy
+    const dm = policy.dmMode === 'open'
+      ? '私聊谁都能用'
+      : policy.dmMode === 'disabled'
+        ? '私聊一律不理'
+        : policy.dmAllowlist.length === 0
+          ? '私聊只认名单，而名单是空的——现在没有人能私聊它'
+          : `私聊只认名单（${policy.dmAllowlist.length} 人）`
+    const group = policy.groupAllowlist.length === 0
+      ? '群聊一个都没放行'
+      : `群聊放行 ${policy.groupAllowlist.length} 个`
+    const mention = policy.requireMention ? '，群里必须 @ 到机器人' : ''
+    log(`准入：${dm}；${group}${mention}`)
+  }
+
+  /**
+   * 问出每个应用的机器人 open_id。
+   *
+   * 一个应用一个机器人，open_id 各不相同。拿 A 的 id 去判 B 的 @，判出来的
+   * 永远是"没 @ 我"，那个群就整个哑了。
+   */
+  private async resolveIdentities(sources: readonly string[]): Promise<void> {
+    await Promise.all(sources.map(async (configDir) => {
+      const override = this.config.botOpenIds[configDir]
+      if (override !== undefined && override !== '') {
+        this.botOpenIds.set(configDir, override)
+        return
       }
+      // 问过一次就不再问：这是一次网络往返，而机器人身份不会变。
+      const known = this.botOpenIds.get(configDir)
+      if (known !== undefined && known !== '') return
+      const resolved = await resolveBotOpenId(configDir)
+      if (resolved === undefined || resolved === '') {
+        this.botOpenIds.set(configDir, '')
+        log(`取不到 ${label(configDir)} 的机器人 open_id，这个应用在群里的 @ 判定会全部落空`)
+        return
+      }
+      this.botOpenIds.set(configDir, resolved)
+      log(`机器人身份 ${label(configDir)} → ${resolved}`)
+    }))
+  }
+
+  /**
+   * 让跑着的消费者与配置对齐：多出来的停掉，缺的起来，已经在跑的不动。
+   *
+   * 不动已经在跑的那些是要紧的：重建一个消费者要先放掉 EventKey 再抢回来，
+   * 那个缝里进来的消息谁也收不到。
+   */
+  private async syncConsumers(): Promise<void> {
+    const events = this.eventSources()
+    const cards = this.cardActionSources()
+    await this.resolveIdentities([...new Set([...events, ...cards])])
+
+    const wanted = new Map<string, { eventKey: string; configDir: string }>()
+    for (const configDir of events) wanted.set(consumerKey(MESSAGE_EVENT, configDir), { eventKey: MESSAGE_EVENT, configDir })
+    for (const configDir of cards) wanted.set(consumerKey(CARD_EVENT, configDir), { eventKey: CARD_EVENT, configDir })
+
+    for (const [key, consumer] of this.consumers) {
+      if (wanted.has(key)) continue
+      this.consumers.delete(key)
+      // 不等它退完：走的是这个应用整份订阅，没有别人在等这个位置，而等下去
+      // 会把新应用的订阅一起拖三秒。
+      void consumer.stop().then(() => { log(`不再订阅 ${key}`) })
     }
-    for (const [index, configDir] of eventSources.entries()) {
-      new EventConsumer('im.message.receive_v1', {
-        ...handlersFor(configDir),
-        onEvent: (event: unknown) => { void this.onMessageEvent(event as LarkMessageEvent) },
-      }, undefined, environmentFor(configDir)).start()
-      log(`消息事件源 ${index + 1}/${eventSources.length} 已启动：${configDir === '' ? 'default' : configDir}`)
+    for (const [key, spec] of wanted) {
+      if (this.consumers.has(key)) continue
+      const consumer: EventConsumer = new EventConsumer(spec.eventKey, {
+        onDiagnostic: (line: string) => { log(`lark-cli[${label(spec.configDir)}]: ${line}`) },
+        onExit: (code: number | null, wait: number) => {
+          log(`消费者[${key}]退出（code=${String(code)}），${wait}ms 后重启`)
+        },
+        onEvent: (event: unknown) => {
+          if (spec.eventKey === MESSAGE_EVENT) void this.onMessageEvent(spec.configDir, event as LarkMessageEvent)
+          else this.onCardActionEvent(spec.configDir, event as LarkCardActionEvent)
+        },
+      }, undefined, larkCliEnvironment(spec.configDir))
+      consumer.start()
+      this.consumers.set(key, consumer)
+      log(`开始订阅 ${key}`)
     }
-    for (const [index, configDir] of cardActionSources.entries()) {
-      new EventConsumer('card.action.trigger', {
-        ...handlersFor(configDir),
-        onEvent: (event: unknown) => { this.onCardActionEvent(event as LarkCardActionEvent) },
-      }, undefined, environmentFor(configDir)).start()
-      log(`卡片事件源 ${index + 1}/${cardActionSources.length} 已启动：${configDir === '' ? 'default' : configDir}`)
+  }
+
+  /** 配置文件动了：能热更的热更，热不了的说清楚。 */
+  private async reload(): Promise<void> {
+    const read = await readBridgeConfig()
+    if (read.problem !== undefined) {
+      log(`配置读不了，保持原样：${read.problem}`)
+      return
     }
+    this.config = read.config
+    log('配置更新了')
+    this.logPolicy()
+    if (read.config.endpoint !== this.listening.endpoint) {
+      log(`endpoint 改成了 ${read.config.endpoint}，但桥接已经听在 ${this.listening.endpoint} 上，要重启才换`)
+    }
+    if (read.config.eventEndpoint !== this.listening.eventEndpoint) {
+      log(`eventEndpoint 改成了 ${read.config.eventEndpoint}，同样要重启桥接才换`)
+    }
+    await this.syncConsumers()
   }
 
   /** dsh 插件连上来了。只认一个客户端，第二个连接把前一个顶掉。 */
@@ -198,7 +282,12 @@ class Bridge {
       if (this.client === socket) this.client = undefined
       log('dsh 断开了')
     })
-    socket.write(encodeFrame({ v: PROTOCOL_VERSION, kind: 'hello', botOpenId: this.botOpenId }))
+    // 握手只报主应用的身份：插件那边只拿它写日志，真正判 @ 的是桥接自己。
+    socket.write(encodeFrame({
+      v: PROTOCOL_VERSION,
+      kind: 'hello',
+      botOpenId: this.botOpenIds.get(this.primaryApp()) ?? '',
+    }))
     log('dsh 连上了')
   }
 
@@ -216,8 +305,8 @@ class Bridge {
     log('事件 relay 客户端连上')
   }
 
-  private relayEvent(event: unknown): void {
-    const frame = encodeEventRelayFrame(event)
+  private relayEvent(configDir: string, event: unknown): void {
+    const frame = encodeEventRelayFrame(event, configDir)
     for (const socket of this.eventClients) {
       if (!socket.destroyed) socket.write(frame)
     }
@@ -228,13 +317,14 @@ class Bridge {
     this.client?.write(encodeFrame(frame))
   }
 
-  private async onMessageEvent(event: LarkMessageEvent): Promise<void> {
-    this.relayEvent(event)
-    const verdict = admit(event, this.config.policy, this.botOpenId)
+  private async onMessageEvent(configDir: string, event: LarkMessageEvent): Promise<void> {
+    this.relayEvent(configDir, event)
+    const botOpenId = this.botOpenIds.get(configDir) ?? ''
+    const verdict = admit(event, this.config.policy, botOpenId)
     if (!verdict.ok) {
       // 不够格的消息根本不该穿过 socket 进到 dsh 里去建会话。
       if (verdict.reason !== 'from-bot' && verdict.reason !== 'not-a-message') {
-        log(`挡下一条消息：${verdict.reason}`)
+        log(`挡下一条消息[${label(configDir)}]：${verdict.reason}`)
       }
       return
     }
@@ -244,22 +334,26 @@ class Bridge {
       log(`重投的消息，跳过：${message.messageId}`)
       return
     }
-    this.chats.set(message.chatKey, message.chatId)
+    this.router.rememberChat(message.chatKey, message.chatId, configDir)
 
     if (this.dshOnline) {
       this.send({ v: PROTOCOL_VERSION, kind: 'message', ...message })
       return
     }
     // dsh 不在：自己回执，然后把它拉起来。不在桥接里跑 agent。
-    await replyMessage(message.messageId, 'text', { text: 'dsh 现在不在，我去把它拉起来，起来后你再说一次。' })
+    await replyMessage(configDir, message.messageId, 'text', {
+      text: 'dsh 现在不在，我去把它拉起来，起来后你再说一次。',
+    })
     void this.launchDsh()
   }
 
-  private onCardActionEvent(event: LarkCardActionEvent): void {
-    this.relayEvent(event)
+  private onCardActionEvent(configDir: string, event: LarkCardActionEvent): void {
+    this.relayEvent(configDir, event)
     const chatId = event.chat_id ?? ''
     const messageId = event.message_id ?? ''
     if (messageId === '') return
+    // 点按钮的这个会话可能是桥接重启后第一次见到，记下它属于哪个应用。
+    if (chatId !== '') this.router.rememberChat(chatId, chatId, configDir)
     this.send({
       v: PROTOCOL_VERSION,
       kind: 'card-action',
@@ -300,52 +394,51 @@ class Bridge {
     const command = frame as OutboundCommand
     switch (command.kind) {
       case 'reply': {
-        const chatId = this.chats.get(command.chatKey) ?? command.chatKey
+        const app = this.router.appOfChat(command.chatKey)
+        const chatId = this.router.chatId(command.chatKey)
         const payload = { text: command.text }
         const result = command.replyTo !== undefined
-          ? await replyMessage(command.replyTo, 'text', payload)
-          : await sendMessage(chatId, 'text', payload)
+          ? await replyMessage(app, command.replyTo, 'text', payload)
+          : await sendMessage(app, chatId, 'text', payload)
         if (!result.ok) log(`回消息失败：${result.error ?? ''}`)
         return
       }
       case 'card.open': {
-        const chatId = this.chats.get(command.chatKey) ?? command.chatKey
+        const app = this.router.appOfChat(command.chatKey)
+        const chatId = this.router.chatId(command.chatKey)
         const card = progressCard(command.title, '开始', command.text, command.stoppable ? { chatKey: command.chatKey } : undefined)
         const result = command.replyTo !== undefined
-          ? await replyMessage(command.replyTo, 'interactive', card)
-          : await sendMessage(chatId, 'interactive', card)
+          ? await replyMessage(app, command.replyTo, 'interactive', card)
+          : await sendMessage(app, chatId, 'interactive', card)
         const messageId = messageIdOf(result)
         if (!result.ok || messageId === undefined) {
           this.ack(command.id, false, { error: result.error ?? '发卡片没拿到 message_id' })
           return
         }
-        this.cards.set(command.id, messageId)
-        this.cardTitles.set(command.id, command.title)
+        this.router.rememberCard(command.id, { messageId, title: command.title, configDir: app })
         this.ack(command.id, true, { cardId: command.id })
         return
       }
       case 'card.update': {
-        const messageId = this.cards.get(command.cardId)
-        if (messageId === undefined) return
-        const title = this.cardTitles.get(command.cardId) ?? '正在处理'
-        const result = await patchCard(messageId, progressCard(title, command.stage, command.text))
+        const card = this.router.card(command.cardId)
+        if (card === undefined) return
+        const result = await patchCard(card.configDir, card.messageId, progressCard(card.title, command.stage, command.text))
         if (!result.ok) log(`更新卡片失败：${result.error ?? ''}`)
         return
       }
       case 'card.close': {
-        const messageId = this.cards.get(command.cardId)
-        if (messageId === undefined) return
-        const title = this.cardTitles.get(command.cardId) ?? '已完成'
+        const card = this.router.card(command.cardId)
+        if (card === undefined) return
         const stage = command.outcome === 'completed' ? '完成' : command.outcome
-        const result = await patchCard(messageId, progressCard(title, stage, command.text))
+        const result = await patchCard(card.configDir, card.messageId, progressCard(card.title, stage, command.text))
         if (!result.ok) log(`收尾卡片失败：${result.error ?? ''}`)
-        this.cards.delete(command.cardId)
-        this.cardTitles.delete(command.cardId)
+        this.router.forgetCard(command.cardId)
         return
       }
       case 'ask': {
-        const chatId = this.chats.get(command.chatKey) ?? command.chatKey
-        const result = await sendMessage(chatId, 'interactive', approvalCard(command.askId, command.title, command.detail))
+        const app = this.router.appOfChat(command.chatKey)
+        const chatId = this.router.chatId(command.chatKey)
+        const result = await sendMessage(app, chatId, 'interactive', approvalCard(command.askId, command.title, command.detail))
         this.ack(command.id, result.ok, result.ok ? {} : { error: result.error ?? '发审批卡片失败' })
         return
       }
@@ -355,6 +448,17 @@ class Bridge {
   }
 }
 
-const config = await loadConfig()
-const bridge = new Bridge(config)
+const read = await readBridgeConfig()
+if (read.problem !== undefined) {
+  log(`${read.problem}，先按默认配置跑（默认拒绝，谁都用不了）。去 dsh 的「设置 → 连接器 → 飞书」填一份。`)
+}
+const bridge = new Bridge(read.config)
 await bridge.start()
+
+// Ctrl+C 或者被 kill 掉时把订阅放干净，否则下一次起桥接会抢不到 EventKey。
+for (const signal of ['SIGINT', 'SIGTERM'] as const) {
+  process.on(signal, () => {
+    log(`收到 ${signal}，收摊`)
+    void bridge.stop().then(() => { process.exit(0) })
+  })
+}

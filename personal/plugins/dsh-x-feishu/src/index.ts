@@ -9,12 +9,19 @@
  * 持有那唯一的消费者，dsh 反过来当它的客户端，就不需要任何交接、互斥和心跳。
  * socket 连着就等于 dsh 活着。
  *
+ * 桥接自己没有界面也没有设置服务，所以**它那份配置也在这里**：下面的字段一保存
+ * 就写成 `~/.dsh-x-feishu/config.json`，桥接只管读（见 `bridge-config.ts`）。人只在
+ * 一个地方改，改完不用重起桥接。
+ *
  * ```yaml
  * # $DSH_HOME/settings.yaml
  * dsh-x-feishu:
  *   endpoint: ''          # 留空用平台默认（win32 命名管道 / POSIX unix socket）
  *   presetId: standard    # 飞书开的会话用哪个 agent 预设
  *   density: standard     # compact | standard | detailed
+ *   eventConfigDirs: []   # 接哪几个飞书应用；空表示沿用 lark-cli 的环境默认
+ *   dmMode: allowlist     # open | allowlist | disabled
+ *   groupAllowlist: []    # 放行哪些群，装 chat_id
  * ```
  *
  * @module @personal/dsh-x-feishu
@@ -30,6 +37,8 @@ import type {} from '@deepseek-ai/dsh-user-approval'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { BridgeClient } from './client.ts'
 import { FeishuAuthGateway } from './auth-gateway.ts'
+import { DEFAULT_BRIDGE_CONFIG, bridgeConfigPath, publishBridgeConfig } from './bridge-config.ts'
+import { defaultEventRelayEndpoint } from '../bridge/relay.ts'
 import { SessionRouter } from './router.ts'
 import { RunQueue } from './queue.ts'
 import { SessionDriver, type TurnSink } from './driver.ts'
@@ -52,7 +61,13 @@ const NS = settingsNamespace('dsh-x-feishu')
 /** 依赖。`agentPresets` 是可选的——没有预设组合的部署照样能跑。 */
 export const inject = ['agents', 'agentDefaultModel', 'sessions', 'storageDomain']
 
-/** 插件配置。 */
+/**
+ * 插件配置。
+ *
+ * 前一半是 dsh 这边的事，后一半是**桥接进程的事**——它们摆在同一个命名空间里，
+ * 因为桥接没有自己的界面，而人不该为了同一件事在两个地方改。保存时后一半会被
+ * 写成 `~/.dsh-x-feishu/config.json`。
+ */
 export interface Config {
   /** 桥接的本地端点；留空用平台默认。 */
   endpoint: string
@@ -64,6 +79,29 @@ export interface Config {
   flushMs: number
   /** 审批卡片等人点的上限。 */
   approvalTimeoutMs: number
+  /**
+   * 桥接接哪几个飞书应用，写 lark-cli 的 profile 目录。
+   *
+   * 空表示沿用 lark-cli 的环境默认那份，也就是单应用。填多个是"多 agent 复用"
+   * 那条路：同一个群里的几个机器人应用各自被订阅，事件汇进同一条 relay。
+   */
+  eventConfigDirs: string[]
+  /** 卡片回调已在开发者后台订阅的应用；空表示与 {@link eventConfigDirs} 相同。 */
+  cardActionConfigDirs: string[]
+  /** 其他本机 Agent 只读订阅原始飞书事件的端点；留空用平台默认。 */
+  eventEndpoint: string
+  /** 单聊准入：`open` 谁都能用，`allowlist` 只认名单，`disabled` 一律不理。 */
+  dmMode: 'open' | 'allowlist' | 'disabled'
+  /** 单聊白名单，装 open_id。 */
+  dmAllowlist: string[]
+  /** 群白名单，装 chat_id；空表示任何群都不理。 */
+  groupAllowlist: string[]
+  /** 群里是否必须 @ 到机器人才接活。 */
+  requireMention: boolean
+  /** 超过这个岁数的消息直接丢，防止长连接重连后重放一堆旧消息。 */
+  staleMs: number
+  /** 桥接探这个地址判断 dsh 在不在；留空用本进程正在听的地址。 */
+  probeOrigin: string
 }
 
 export const Config = z.object({
@@ -72,7 +110,37 @@ export const Config = z.object({
   density: z.union([z.const('compact'), z.const('standard'), z.const('detailed')]).default('standard'),
   flushMs: z.natural().default(2500),
   approvalTimeoutMs: z.natural().default(300_000),
+  eventConfigDirs: z.array(z.string()).default([]),
+  cardActionConfigDirs: z.array(z.string()).default([]),
+  eventEndpoint: z.string().default(''),
+  dmMode: z.union([z.const('open'), z.const('allowlist'), z.const('disabled')]).default('allowlist'),
+  dmAllowlist: z.array(z.string()).default([]),
+  groupAllowlist: z.array(z.string()).default([]),
+  requireMention: z.boolean().default(true),
+  staleMs: z.natural().default(600_000),
+  probeOrigin: z.string().default(''),
 }) as unknown as z<Config>
+
+/**
+ * 本进程正在服务的地址，用来告诉桥接"探哪儿能知道 dsh 在不在"。
+ *
+ * 结构化地读而不是 import 那个包：这个插件不该为了一句探活地址就依赖 web 服务，
+ * 而没有 web 服务的部署（纯 CLI）读出来是空的，正好退回配置里的默认值。
+ * @param ctx - 插件上下文。
+ * @returns 形如 `http://127.0.0.1:13080`；读不到时为 `undefined`。
+ */
+function servingOrigin(ctx: Context): string | undefined {
+  try {
+    const server = (ctx as unknown as { webServer?: { host?: string; port?: number } }).webServer
+    const port = server?.port
+    if (port === undefined || port === 0) return undefined
+    // 听在 0.0.0.0 上时探回环：探活是本机的事，不该走对外地址。
+    const host = server?.host === undefined || server.host === '0.0.0.0' ? '127.0.0.1' : server.host
+    return `http://${host}:${port}`
+  } catch {
+    return undefined
+  }
+}
 
 /** 停止按钮回传的值。 */
 interface StopVote { kind: 'stop'; chatKey: string }
@@ -104,11 +172,39 @@ export function apply(ctx: Context, config: Config): void {
     const declared = source().endpoint
     return declared === '' ? defaultEndpoint() : declared
   }
+  // 桥接那份配置由这里写出去。它没有界面也没有设置服务，而它要的每一项都是人
+  // 在这一页上决定的事；两边各存一份的结果就是改一处不生效。
+  const publish = (): void => {
+    const current = source()
+    publishBridgeConfig({
+      endpoint: endpoint(),
+      eventEndpoint: current.eventEndpoint === '' ? defaultEventRelayEndpoint() : current.eventEndpoint,
+      eventConfigDirs: current.eventConfigDirs,
+      cardActionConfigDirs: current.cardActionConfigDirs,
+      policy: {
+        dmMode: current.dmMode,
+        dmAllowlist: current.dmAllowlist,
+        groupAllowlist: current.groupAllowlist,
+        requireMention: current.requireMention,
+        staleMs: current.staleMs,
+      },
+      probeOrigin: current.probeOrigin === ''
+        ? servingOrigin(ctx) ?? DEFAULT_BRIDGE_CONFIG.probeOrigin
+        : current.probeOrigin,
+    }).then((written) => {
+      if (written) logger.info('桥接配置写好了：%s', bridgeConfigPath())
+    }).catch((error: unknown) => {
+      // 写不下去不该把通道带停：dsh 这一侧照样能收发，只是桥接还按上一份跑。
+      logger.warn('写不了桥接配置，桥接还按上一份跑：%o', error)
+    })
+  }
+
   installSettingsSection(ctx, NS, Config, config, {
     setSource: (current) => { source = current },
     // 端点是唯一一个"拨号那一刻定死"的值，所以只有它需要被通知。
     onChange: () => {
       if (client?.redialIfMoved() === true) logger.info('桥接端点改了，正在改连 %s', endpoint())
+      publish()
     },
   })
 

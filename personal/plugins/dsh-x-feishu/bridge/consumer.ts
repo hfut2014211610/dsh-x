@@ -19,6 +19,9 @@ import { larkCliInvocation } from './cli.ts'
 const RESTART_MIN_MS = 1_000
 const RESTART_MAX_MS = 30_000
 
+/** 关掉 stdin 之后等 lark-cli 自己退的时长，超了才动手杀。 */
+const STOP_GRACE_MS = 3_000
+
 /** 消费者的回调。 */
 export interface ConsumerHandlers {
   /** 收到一条事件（已经 JSON.parse 过）。 */
@@ -76,13 +79,34 @@ export class EventConsumer {
     child.on('exit', (code: number | null) => { this.handleExit(code) })
   }
 
-  /** 停掉消费者并放弃重启。 */
-  stop(): void {
+  /**
+   * 停掉消费者并放弃重启。
+   *
+   * 关 stdin 是 lark-cli 认的那条正常收尾路径，它会把**服务端**那份订阅退掉。
+   * 直接杀进程走不到这一步，订阅会留在服务端，下一次起来就抢不回来——lark-cli
+   * 自己在 stderr 里也警告了这一点。所以这里先关 stdin，等它自己走；实在不走
+   * 才动手，那是两害相权。
+   * @returns 子进程退干净、或者等到超时为止。
+   */
+  async stop(): Promise<void> {
     this.stopped = true
     if (this.restartTimer !== undefined) clearTimeout(this.restartTimer)
     this.restartTimer = undefined
-    this.child?.stdin.end()
+    const child = this.child
     this.child = undefined
+    if (child === undefined) return
+    await new Promise<void>((resolve) => {
+      const forced = setTimeout(() => {
+        child.kill()
+        resolve()
+      }, STOP_GRACE_MS)
+      forced.unref()
+      child.once('exit', () => {
+        clearTimeout(forced)
+        resolve()
+      })
+      child.stdin.end()
+    })
   }
 
   private ingestStdout(chunk: string): void {

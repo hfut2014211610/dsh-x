@@ -11,12 +11,18 @@
  * 时发现，所以下面的路径与载荷集中放在一处，接真凭证之前要先用一次性脚本
  * 逐个打通。
  *
+ * 每个函数的第一个参数都是 `configDir`，**以哪个飞书应用的身份发**。这不是可选的
+ * 讲究：入站按应用分开订阅（一个 EventKey 一个 consumer），出站要是跟着环境默认
+ * 走，就会出现"消息从 A 应用进来、回复由 B 应用的机器人发出去"；而 `patchCard`
+ * 只能改**本应用发出的**消息，身份错了连卡片都更新不了。收到那条事件的应用是谁，
+ * 回它的就得是谁。
+ *
  * @module @personal/dsh-x-feishu/bridge/lark
  */
 
 import { execFile } from 'node:child_process'
 import { promisify } from 'node:util'
-import { larkCliInvocation } from './cli.ts'
+import { larkCliEnvironment, larkCliInvocation } from './cli.ts'
 
 const run = promisify(execFile)
 
@@ -59,13 +65,16 @@ function errorOf(value: unknown): string {
 
 /**
  * 调一次 `lark-cli api`。
+ * @param configDir - 以哪个飞书应用的身份发；空串沿用环境默认。
  * @param method - HTTP 方法。
  * @param path - 开放平台路径。
  * @param body - 请求体，没有就不传。
  * @param query - 查询参数。
+ * @param format - 输出格式；`ndjson` 才保留完整原始响应。
  * @returns 解析后的结果；失败时带上原因而不是抛。
  */
 export async function larkApi(
+  configDir: string,
   method: 'GET' | 'POST' | 'PATCH' | 'PUT',
   path: string,
   body?: unknown,
@@ -80,6 +89,7 @@ export async function larkApi(
     const { stdout } = await run(invocation.file, [...invocation.args], {
       timeout: CALL_TIMEOUT_MS,
       maxBuffer: 8 * 1024 * 1024,
+      env: { ...process.env, ...larkCliEnvironment(configDir) },
     })
     const parsed: unknown = stdout.trim() === '' ? {} : JSON.parse(stdout)
     const record = recordOf(parsed)
@@ -151,13 +161,19 @@ export function approvalCard(askId: string, title: string, detail: string): unkn
 
 /**
  * 发一条消息到会话。
+ * @param configDir - 以哪个飞书应用的身份发。
  * @param chatId - 会话 id。
  * @param msgType - `text` 或 `interactive`。
  * @param content - 载荷；飞书要求是 JSON 字符串。
  * @returns 结果，成功时 data 里带 message_id。
  */
-export function sendMessage(chatId: string, msgType: 'text' | 'interactive', content: unknown): Promise<LarkResult> {
-  return larkApi('POST', ENDPOINTS.sendMessage, {
+export function sendMessage(
+  configDir: string,
+  chatId: string,
+  msgType: 'text' | 'interactive',
+  content: unknown,
+): Promise<LarkResult> {
+  return larkApi(configDir, 'POST', ENDPOINTS.sendMessage, {
     receive_id: chatId,
     msg_type: msgType,
     content: JSON.stringify(content),
@@ -166,16 +182,19 @@ export function sendMessage(chatId: string, msgType: 'text' | 'interactive', con
 
 /**
  * 回复某条消息（群里会留在原话题里）。
+ * @param configDir - 以哪个飞书应用的身份回。
  * @param messageId - 被回复的消息。
  * @param msgType - `text` 或 `interactive`。
  * @param content - 载荷。
+ * @returns 结果，成功时 data 里带 message_id。
  */
 export function replyMessage(
+  configDir: string,
   messageId: string,
   msgType: 'text' | 'interactive',
   content: unknown,
 ): Promise<LarkResult> {
-  return larkApi('POST', ENDPOINTS.replyMessage(messageId), {
+  return larkApi(configDir, 'POST', ENDPOINTS.replyMessage(messageId), {
     msg_type: msgType,
     content: JSON.stringify(content),
   })
@@ -183,11 +202,16 @@ export function replyMessage(
 
 /**
  * 更新一张已经发出去的卡片。
+ *
+ * 飞书只让**发这条消息的那个应用**改它，所以这里的身份必须与当初 `card.open`
+ * 用的那个一致，错了会被拒。
+ * @param configDir - 当初发出这张卡片的那个飞书应用。
  * @param messageId - 卡片所在消息。
  * @param card - 新的卡片 JSON。
+ * @returns 结果。
  */
-export function patchCard(messageId: string, card: unknown): Promise<LarkResult> {
-  return larkApi('PATCH', ENDPOINTS.patchMessage(messageId), { content: JSON.stringify(card) })
+export function patchCard(configDir: string, messageId: string, card: unknown): Promise<LarkResult> {
+  return larkApi(configDir, 'PATCH', ENDPOINTS.patchMessage(messageId), { content: JSON.stringify(card) })
 }
 
 /**
@@ -211,13 +235,17 @@ export function botOpenIdOf(value: unknown): string | undefined {
 }
 
 /**
- * 取机器人自己的 open_id。判"有没有 @ 我"要用它，按名字匹配不可靠。
+ * 取某个应用的机器人自己的 open_id。判"有没有 @ 我"要用它，按名字匹配不可靠。
+ *
+ * 每个应用是一个不同的机器人，open_id 也各不相同——接了两个应用就要问两次，
+ * 拿一个去判另一个的 @，判出来的永远是"没 @ 我"。
+ * @param configDir - 问哪个应用；空串沿用环境默认。
  * @returns open_id，取不到时 `undefined`。
  */
-export async function resolveBotOpenId(): Promise<string | undefined> {
+export async function resolveBotOpenId(configDir: string): Promise<string | undefined> {
   // v1.0.87 的 json 输出只保留 OpenAPI data 字段，而 bot/v3/info 把结果放在顶层 bot；
   // ndjson 才会保留完整原始响应。
-  const result = await larkApi('GET', ENDPOINTS.botInfo, undefined, undefined, 'ndjson')
+  const result = await larkApi(configDir, 'GET', ENDPOINTS.botInfo, undefined, undefined, 'ndjson')
   if (!result.ok) return undefined
   return botOpenIdOf(result.data)
 }

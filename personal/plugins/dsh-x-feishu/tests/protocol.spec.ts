@@ -54,7 +54,14 @@ describe('event relay', () => {
   })
 
   it('只广播一行带版本的原始事件', () => {
-    expect(encodeEventRelayFrame({ type: 'im.message.receive_v1', message_id: 'om_1' }))
-      .toBe(`{"v":${EVENT_RELAY_VERSION},"kind":"lark-event","event":{"type":"im.message.receive_v1","message_id":"om_1"}}\n`)
+    expect(encodeEventRelayFrame({ type: 'im.message.receive_v1', message_id: 'om_1' }, ''))
+      .toBe(`{"v":${EVENT_RELAY_VERSION},"kind":"lark-event","source":"","event":{"type":"im.message.receive_v1","message_id":"om_1"}}\n`)
+  })
+
+  // 订阅方要回话就得以收到它的那个应用的身份回：一个应用一个机器人，卡片也只能
+  // 由发它的那个应用改。少了这一句，复用方只能听不能说。
+  it('带上是哪个应用收到的', () => {
+    const frame: unknown = JSON.parse(encodeEventRelayFrame({ message_id: 'om_1' }, 'C:\\lark\\agent-bus'))
+    expect(frame).toMatchObject({ source: 'C:\\lark\\agent-bus' })
   })
 })

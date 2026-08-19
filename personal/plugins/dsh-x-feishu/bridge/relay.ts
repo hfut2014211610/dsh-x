@@ -19,8 +19,11 @@ export function defaultEventRelayEndpoint(): string {
 
 /**
  * @param event - lark-cli event consume 解析出的原始事件。
+ * @param source - 收到它的那个 lark-cli profile 目录；空串是环境默认那份。
+ *   订阅方要回话的话，必须以同一个应用的身份回：一个应用一个机器人，卡片也
+ *   只能由发它的那个应用改。
  * @returns 一行 JSON 帧。
  */
-export function encodeEventRelayFrame(event: unknown): string {
-  return `${JSON.stringify({ v: EVENT_RELAY_VERSION, kind: 'lark-event', event })}\n`
+export function encodeEventRelayFrame(event: unknown, source: string): string {
+  return `${JSON.stringify({ v: EVENT_RELAY_VERSION, kind: 'lark-event', source, event })}\n`
 }
