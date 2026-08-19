@@ -29,6 +29,7 @@ import type {} from '@deepseek-ai/dsh-agent-default-model'
 import type {} from '@deepseek-ai/dsh-user-approval'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { BridgeClient } from './client.ts'
+import { FeishuAuthGateway } from './auth-gateway.ts'
 import { SessionRouter } from './router.ts'
 import { RunQueue } from './queue.ts'
 import { SessionDriver, type TurnSink } from './driver.ts'
@@ -90,6 +91,10 @@ function isStopVote(value: unknown): value is StopVote {
 export function apply(ctx: Context, config: Config): void {
   const logger = ctx.logger('dsh-x-feishu')
   const queue = new RunQueue()
+
+  // 扫码登录挂在插件自己身上，不等桥接：凭证还没配好的时候，让人先去把需要
+  // 凭证的东西跑起来是说不通的。
+  ctx.plugin(FeishuAuthGateway)
 
   // 挂载时先指向组合基座，设置服务接上以后换成解析后的值。下面每一处都是用到
   // 才读，所以两者的切换、以及此后任何一次保存，都不需要重建任何东西。
