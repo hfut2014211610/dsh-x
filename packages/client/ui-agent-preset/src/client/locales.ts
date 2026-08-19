@@ -43,7 +43,7 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   presetAnchoredName: 'Anchored Standard mode',
   presetAnchoredDescription:
     'Anchors the first model request on the Minimal two-tool, zero-injection condition, then promotes to an on-demand-unlocked Standard toolset.',
-  presetCodeName: 'Code mode',
+  presetCodeName: 'PTC mode',
   presetCodeDescription:
     'All Standard mode capabilities, with tools exposed through the Code Mode SDK so the model can combine multi-step operations in one TypeScript program.',
   presetMinimalName: 'Minimal mode',
