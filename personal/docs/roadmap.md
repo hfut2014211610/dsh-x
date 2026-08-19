@@ -10,6 +10,7 @@
 |---|---|---|
 | **桌面 sidecar 壳（Stage A）** — `dsh --profile web` 之上的 Electron 窗口，四来源运行时发现、三信号就绪门控、托盘驻留、单实例锁、进程树拆除 | `apps/desktop/` | [笔记](notes/implemented/2026-08-15-desktop-sidecar-shell.md) |
 | **桌面 packed runtime 与安装包发布** — 安装包内嵌由该 release tag 自身构建的运行时，首启解压到 userData，校验和门控 | `scripts/release/`、`apps/desktop/electron-builder.yml` | [笔记](notes/implemented/2026-08-17-desktop-packed-runtime.md) |
+| **实机反馈修复轮** — 启动不再冻结主进程（同步 spawn 移出绘制线程、安装版优先自带运行时）、加载页重做（跟随系统主题、分阶段进度、日志默认收起）、伴随栏拖宽驱动共享属性使 composer 同步、伴随栏横向溢出归零、产物自动在预览/编辑器中打开、每种格式都有阅读视图 | `apps/desktop/`、`packages/client/ui-{conversation,writing,ued}/` | [笔记](notes/implemented/2026-08-19-desktop-and-workspace-feedback-round.md) |
 | **桌面生命周期归属与应用内升级** — 安装版不再附着外部实例、退出即关停；跨启动回收孤儿运行时（pid + origin 双证据）；退出与「活着但不应答」按同一故障处理，滚动窗口重启预算；自建升级链路（GitHub API 发现、tag 任意位置读版本、sha512 校验、退出时装） | `apps/desktop/` | [笔记](notes/implemented/2026-08-19-desktop-lifecycle-and-updates.md) |
 | **写作模式** — `documents` 能力族、文档工具、`writing` preset、浏览器写作 UI | `packages/writing/{documents,documents-local,tool-documents,writing-mode}`、`packages/client/ui-writing/`、`apps/cli/config/agent-presets/writing/` | [笔记](notes/proposed/2026-08-17-writing-mode.md) ⚠️ 状态待订正 |
 | **用量统计** — 每请求模型 token 用量折叠为会话投影、`/usage` 报告命令、设置页模型用量面板 | 跨 `packages/`，Web 设置面 | [笔记](notes/implemented/2026-08-14-usage-stats-session-projection-and-command.md) |
