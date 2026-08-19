@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-client-ui-settings-usage",
   "description": "Model usage settings section: cross-session token consumption over the usageStats session-list projection rows",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publishConfig": {
     "access": "public"
   },

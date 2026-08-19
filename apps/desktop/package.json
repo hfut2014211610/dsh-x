@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-desktop-shell",
   "description": "dsh desktop shell: the Electron sidecar window over the official dsh web runtime",
-  "version": "0.3.1",
+  "version": "0.3.2",
   "publishConfig": {
     "access": "public"
   },
