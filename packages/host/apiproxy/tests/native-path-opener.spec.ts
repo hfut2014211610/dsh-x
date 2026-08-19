@@ -105,6 +105,53 @@ describe('native path opener', () => {
       ['-NoProfile', '-Command', "Invoke-Item -LiteralPath 'C:\\work\\settings.yaml'"],
       expect.any(AbortSignal),
     )
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  // A stock Windows associates nothing with .yaml, and Invoke-Item then fails
+  // outright rather than falling back — which is what made the settings button
+  // report that it could not open the configuration file.
+  it('falls back to Notepad when Windows associates nothing with the text document', async () => {
+    const run = vi.fn<PathOpenerRunner>(async (command) => {
+      if (command === 'powershell.exe') throw new Error('Command failed: Application not found')
+      return { stdout: '', stderr: '' }
+    })
+    await openNativeTextFile('C:\\Users\\me\\.dsh\\settings.yaml', signal(), { platform: 'win32', run })
+    expect(run.mock.calls[1]).toEqual([
+      'notepad.exe', ['C:\\Users\\me\\.dsh\\settings.yaml'], expect.any(AbortSignal),
+    ])
+  })
+
+  // The default intent has not been told the file is text, so there is nothing
+  // safe to hand a missing association to.
+  it('does not fall back to Notepad for the default open intent', async () => {
+    const run = vi.fn<PathOpenerRunner>(async () => { throw new Error('Application not found') })
+    await expect(openNativePath('C:\\work\\model.step', signal(), { platform: 'win32', run }))
+      .rejects.toThrow('Application not found')
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('does not open Notepad when the request aborted rather than the association missing', async () => {
+    const abort = new AbortController()
+    const run = vi.fn<PathOpenerRunner>(async () => {
+      abort.abort(new Error('closed'))
+      throw new Error('Command failed: aborted')
+    })
+    await expect(openNativeTextFile('C:\\work\\settings.yaml', abort.signal, { platform: 'win32', run }))
+      .rejects.toThrow('closed')
+    expect(run).toHaveBeenCalledOnce()
+  })
+
+  it('falls back to Notepad for a WSL text document the Windows desktop cannot associate', async () => {
+    const run = vi.fn<PathOpenerRunner>(async (command) => {
+      if (command === 'wslpath') return { stdout: 'C:\\wsl\\settings.yaml\r\n', stderr: '' }
+      if (command === 'powershell.exe') throw new Error('Application not found')
+      return { stdout: '', stderr: '' }
+    })
+    await openNativeTextFile('/home/test/settings.yaml', signal(), {
+      platform: 'linux', osRelease: '6.8.0-generic', env: { WSL_DISTRO_NAME: 'Ubuntu' }, run,
+    })
+    expect(run.mock.calls[2]).toEqual(['notepad.exe', ['C:\\wsl\\settings.yaml'], expect.any(AbortSignal)])
   })
 
   it('opens with Linux xdg-open', async () => {

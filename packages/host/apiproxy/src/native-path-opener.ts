@@ -106,13 +106,49 @@ async function openWindowsPath(path: string, signal: AbortSignal, run: PathOpene
   ], signal)
 }
 
+/**
+ * Open one Windows-resolvable path, honouring the desktop association first.
+ *
+ * A stock Windows registers nothing for `.yaml`, `.yml`, or `.toml`, and
+ * `Invoke-Item` on an unassociated file falls back to nothing — it fails with
+ * `Application not found`. That took the settings-document button with it: the
+ * one gesture whose whole purpose is showing someone their configuration file
+ * could not open one, on the platform where configuration files are least
+ * likely to have a handler.
+ *
+ * So the text-editor intent falls back to Notepad, which every Windows install
+ * carries. The association is still tried first, and unlike macOS the fallback
+ * is second rather than first: `open -t` exists because a Mac association is
+ * usually whatever some installer claimed, while a Windows association for
+ * these extensions exists only because a person set one deliberately.
+ *
+ * The default intent keeps failing, and should — the caller has not said the
+ * file is text, so there is nothing safe to hand it to.
+ */
+async function openWindowsTarget(
+  path: string, signal: AbortSignal, intent: PathOpenIntent, run: PathOpenerRunner,
+): Promise<void> {
+  try {
+    await openWindowsPath(path, signal, run)
+    return
+  } catch (error) {
+    // An abort is not a missing association: the caller has gone away, and
+    // opening a second window on the way out is the wrong answer.
+    signal.throwIfAborted()
+    if (intent !== 'text-editor') throw error
+  }
+  await run('notepad.exe', [path], signal)
+}
+
 /** Translate a WSL path before handing it to the Windows desktop. */
-async function openWslPath(path: string, signal: AbortSignal, run: PathOpenerRunner): Promise<void> {
+async function openWslPath(
+  path: string, signal: AbortSignal, intent: PathOpenIntent, run: PathOpenerRunner,
+): Promise<void> {
   const translated = await run('wslpath', ['-w', path], signal)
   signal.throwIfAborted()
   const windowsPath = translated.stdout.replace(/[\r\n]+$/, '')
   if (windowsPath === '') throw new Error('wslpath returned no Windows path')
-  await openWindowsPath(windowsPath, signal, run)
+  await openWindowsTarget(windowsPath, signal, intent, run)
 }
 
 /** Dispatch one shell-free platform command for the requested open intent. */
@@ -136,13 +172,13 @@ async function openNativePathWithIntent(
   }
 
   if (platform === 'win32') {
-    await openWindowsPath(path, signal, run)
+    await openWindowsTarget(path, signal, intent, run)
     return
   }
 
   if (platform === 'linux') {
     if (wsl) {
-      await openWslPath(path, signal, run)
+      await openWslPath(path, signal, intent, run)
       return
     }
     await run('xdg-open', [path], signal)
@@ -187,8 +223,10 @@ export function openNativePath(
 }
 
 /**
- * Open a text document for editing; macOS bypasses the file-type association
- * so a YAML association with a browser cannot consume the gesture.
+ * Open a text document for editing. macOS bypasses the file-type association
+ * so a YAML association with a browser cannot consume the gesture; Windows
+ * tries the association and falls back to Notepad, because the usual state
+ * there is no association at all.
  * @param path - absolute or host-resolvable text-document path.
  * @param signal - caller/connection lifetime; abort terminates the native command.
  * @param internals - Platform and runner hooks for deterministic tests.
