@@ -1,6 +1,6 @@
 /** Strict per-session header/body content inserted into the resident conversation layout. */
 
-import { useCallback, useEffect, useState, useSyncExternalStore } from 'react'
+import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import { ResizeHandle } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { SessionId, SessionListState, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
@@ -32,6 +32,18 @@ const DEFAULT_VIEW_ID = 'chat'
  */
 const COMPANION_MIN = 320
 const COMPANION_MAX = 720
+
+/**
+ * The custom property the whole companion column is sized from.
+ *
+ * A drag has to write THIS rather than the panel's own width, because the
+ * panel is not the only thing sized from it: the resident composer is one
+ * shared instance positioned against the frame, and it is a SIBLING of this
+ * slot rather than a descendant, so it can only be reached through the
+ * declaring element. Sizing the panel directly moves the column and leaves the
+ * composer at its old width.
+ */
+const COMPANION_WIDTH_PROPERTY = '--dsh-companion-width'
 
 /** Clamp a measured or dragged companion width into its drag range. */
 function clampCompanion(px: number): number {
@@ -187,11 +199,29 @@ export function ConversationSession({
   // expression, so the first drag has to start from what it actually resolved
   // to rather than from a number this component picked.
   const [companionWidth, setCompanionWidth] = useState<number | null>(null)
+  const declaringElement = useRef<HTMLElement | null>(null)
   const measureCompanion = useCallback((node: HTMLElement | null) => {
     if (node === null) return
+    declaringElement.current = node.closest<HTMLElement>('[data-conversation-root]')
     const measured = clampCompanion(node.getBoundingClientRect().width)
     setCompanionWidth(current => current ?? measured)
   }, [])
+
+  // Mirrors the two early returns below: the property must be released the
+  // moment the companion layout stops rendering, not only when this slot
+  // unmounts, or a session that once showed a dragged assistant column keeps
+  // imposing that width on every later layout.
+  const showsCompanion = companion !== null && !(blank && composerPhase === 'blank' && activePreferredId === null)
+
+  // Written to the DOM rather than rendered as a style prop: the element that
+  // declares this property is above this slot, so a style prop here could not
+  // reach it.
+  useEffect(() => {
+    const element = declaringElement.current
+    if (element === null || companionWidth === null || !showsCompanion) return undefined
+    element.style.setProperty(COMPANION_WIDTH_PROPERTY, `${String(companionWidth)}px`)
+    return () => { element.style.removeProperty(COMPANION_WIDTH_PROPERTY) }
+  }, [companionWidth, showsCompanion])
 
   useEffect(() => {
     if (inputState.draft === '' && storedDraft !== '') inputActions.setDraft(storedDraft)
@@ -233,9 +263,6 @@ export function ConversationSession({
       <aside
         ref={measureCompanion}
         className={css.companionPanel}
-        // Before the first measurement the CSS default owns the width; after
-        // it, the drag preference does.
-        style={companionWidth === null ? undefined : { flexBasis: `${String(companionWidth)}px` }}
         data-conversation-companion=""
         aria-label={companion.label}
       >

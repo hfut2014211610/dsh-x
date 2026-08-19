@@ -230,6 +230,10 @@
 .companionBody {
   display: flex;
   flex: 1 1 auto;
+  /* Both minimums, for the same reason the transcript inside needs them: this
+     is a flex item of the panel AND a flex container for the view, so a
+     content-based minimum on either axis would be paid for by the column. */
+  min-width: 0;
   min-height: 0;
   overflow: hidden;
 }
@@ -376,7 +380,11 @@
   bottom: 0;
   left: auto;
   z-index: 7;
+  /* Same ceiling as the panel it sits in: both are sized from the same custom
+     property, so a drag on a roomy window would otherwise carry the composer
+     past the column once the window narrows. */
   width: calc(var(--dsh-companion-width) - var(--dsh-scrollbar-width));
+  max-width: 60%;
   background: linear-gradient(
     180deg,
     color-mix(in srgb, var(--dsw-alias-bg-base) 0%, transparent) 0,

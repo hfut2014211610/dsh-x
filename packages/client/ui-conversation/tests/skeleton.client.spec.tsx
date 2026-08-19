@@ -496,16 +496,68 @@ describe('ConversationRoot resident composer', () => {
     })
     act(() => { b.chat.actions.setView('writing') })
 
-    const panel = b.view.getByRole('complementary', { name: 'Assistant' })
+    const root = b.view.container.querySelector<HTMLElement>('[data-conversation-root]')
     const handle = b.view.getByRole('separator', { name: '调整助手对话栏宽度' })
-    expect(panel.style.flexBasis).toBe('320px')
+    if (root === null) throw new Error('the conversation root did not render')
+    expect(root.style.getPropertyValue('--dsh-companion-width')).toBe('320px')
     expect(handle.getAttribute('aria-valuenow')).toBe('320')
 
     act(() => { fireEvent.keyDown(handle, { key: 'ArrowLeft' }) })
-    expect(panel.style.flexBasis).toBe('336px')
+    expect(root.style.getPropertyValue('--dsh-companion-width')).toBe('336px')
 
     act(() => { fireEvent.keyDown(handle, { key: 'ArrowRight' }) })
-    expect(panel.style.flexBasis).toBe('320px')
+    expect(root.style.getPropertyValue('--dsh-companion-width')).toBe('320px')
+  })
+
+  // The drag has to move the composer too. It is one shared instance
+  // positioned against the frame, a SIBLING of this slot rather than a
+  // descendant, and it takes its width from the same custom property — sizing
+  // the panel alone leaves the input box at its old width beside a resized
+  // column, which is what the first attempt at this did.
+  it('sizes the companion column through the property the composer also reads', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      viewTabs: [
+        { id: 'chat', label: 'Chat' },
+        { id: 'writing', label: 'Writing' },
+      ],
+      companion: (_sessionId, activeViewId) => activeViewId === 'writing'
+        ? { id: 'chat', label: 'Assistant' }
+        : null,
+    })
+    act(() => { b.chat.actions.setView('writing') })
+
+    const root = b.view.container.querySelector<HTMLElement>('[data-conversation-root]')
+    const seat = b.view.container.querySelector<HTMLElement>('[data-composer-seat]')
+    if (root === null || seat === null) throw new Error('the root and the composer seat must both render')
+    // The seat is a sibling of the session slot, so it inherits the property
+    // only because the drag writes it on their common ancestor.
+    expect(seat.closest('[data-conversation-root]')).toBe(root)
+
+    const handle = b.view.getByRole('separator', { name: '调整助手对话栏宽度' })
+    act(() => { fireEvent.keyDown(handle, { key: 'ArrowLeft' }) })
+    expect(root.style.getPropertyValue('--dsh-companion-width')).toBe('336px')
+  })
+
+  // Leaving the companion layout has to hand the width back to the stylesheet,
+  // or a session that once had a dragged assistant column keeps imposing it.
+  it('releases the width when the session leaves the companion layout', () => {
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      viewTabs: [
+        { id: 'chat', label: 'Chat' },
+        { id: 'writing', label: 'Writing' },
+      ],
+      companion: (_sessionId, activeViewId) => activeViewId === 'writing'
+        ? { id: 'chat', label: 'Assistant' }
+        : null,
+    })
+    act(() => { b.chat.actions.setView('writing') })
+    const root = b.view.container.querySelector<HTMLElement>('[data-conversation-root]')
+    if (root === null) throw new Error('the conversation root did not render')
+    expect(root.style.getPropertyValue('--dsh-companion-width')).toBe('320px')
+
+    act(() => { b.chat.actions.setView('chat') })
+
+    expect(root.style.getPropertyValue('--dsh-companion-width')).toBe('')
   })
 
   it('opens a blank writing session directly and restores the Hero after leaving the preset', () => {

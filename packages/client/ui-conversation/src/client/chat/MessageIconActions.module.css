@@ -7,15 +7,25 @@
   align-items: center;
   gap: 10px;
   height: 28px;
+  min-width: 0;
 }
 
-/* Clock before icons (user figma 388:20051) / after (assistant 43:32997). */
+/* Clock before icons (user figma 388:20051) / after (assistant 43:32997).
+   The label stays on one line — a run of metrics reads badly broken — but it
+   must still be able to lose the argument for space. `nowrap` alone makes its
+   min-content width the full string, and a flex item may not shrink below
+   that, so in a column narrower than the label the row spilled past the
+   transcript: invisible until hover, yet wide enough to give the whole
+   companion column a horizontal scroll. */
 .timeStart {
   padding-right: 12px;
   font-size: 14px;
   line-height: 24px;
   color: var(--dsw-alias-label-tertiary);
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 .timeEnd {
@@ -24,6 +34,9 @@
   line-height: 24px;
   color: var(--dsw-alias-label-tertiary);
   white-space: nowrap;
+  min-width: 0;
+  overflow: hidden;
+  text-overflow: ellipsis;
 }
 
 /* Separator between the clock and the run-time label (time · Ran for 15s). */

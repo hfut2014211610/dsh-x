@@ -36,6 +36,14 @@
    owns an independent transcript scrollport beside the primary view. */
 :global([data-conversation-companion]) .root {
   flex: 1 1 auto;
+  /* min-width matters as much as min-height here, and only in this column.
+     This root is a flex ITEM of the companion body, so it defaults to a
+     content-based minimum: one code block, terminal card, or table that does
+     not wrap widens the whole transcript past the column, and everything
+     inside then lays out at that wider measure — wrappable prose included,
+     which is why the symptom reads as text failing to wrap rather than as one
+     wide block. In the centre column the same content simply fits. */
+  min-width: 0;
   min-height: 0;
   height: 100%;
 }
