@@ -9,7 +9,8 @@ export type ConnectorsKey =
   | 'expand' | 'collapse' | 'unsaved' | 'save' | 'saving' | 'discard'
   | 'saveFailed' | 'readOnly' | 'overridden' | 'reset' | 'invalid'
   | 'state.on' | 'state.off' | 'state.missing' | 'state.loading'
-  | 'power.label' | 'power.hint' | 'power.failed' | 'power.offNoSettings'
+  | 'power.label' | 'power.hint' | 'power.failed'
+  | 'power.offNoSettings' | 'power.noSettings'
   | 'feishu.name' | 'feishu.summary' | 'feishu.absent'
   | 'feishu.presetId.label' | 'feishu.presetId.hint'
   | 'feishu.density.label' | 'feishu.density.hint'
@@ -50,6 +51,7 @@ export const en: Record<ConnectorsKey, string> = {
   'power.hint': 'Switches the channel’s plugin on and off in this profile, and the change is written back — so it survives a restart. Anything the channel needs outside dsh, such as a bridge process, is still yours to start.',
   'power.failed': 'The host did not take the switch. The state above is what the plugin tree reports now.',
   'power.offNoSettings': 'Switched off, so it serves no settings to edit. Switch it on to see its controls.',
+  'power.noSettings': 'Running, but it registers no settings namespace, so there is nothing here to edit. How it behaves is fixed by however it was composed.',
   'feishu.name': 'Feishu',
   'feishu.summary': 'One line in a DM starts work; an @ in a group picks it up. Progress rides a card that updates in stages.',
   'feishu.absent': 'Not in this deployment. Add it with dsh plugin --profile web add <plugin directory> — this fork keeps it at personal/plugins/dsh-x-feishu, which the packaged app does not carry. Credentials stay with the bridge process; nothing on this page touches them.',
@@ -93,6 +95,7 @@ export const zh: Record<ConnectorsKey, string> = {
   'power.hint': '在这个 profile 里开关渠道插件，改动会写回配置，重启后还在。渠道在 dsh 之外还需要的东西——比如桥接进程——仍然要你自己起。',
   'power.failed': '宿主没收下这次开关。上面显示的是插件树现在的状态。',
   'power.offNoSettings': '停用状态下它不提供任何配置项。启用后才能看到它的设置。',
+  'power.noSettings': '正在运行，但它没有注册配置命名空间，所以这里没有可改的东西。它怎么干活由挂载时的组合决定。',
   'feishu.name': '飞书',
   'feishu.summary': '单聊发一句话就干活，群里 @ 一下就接活，过程在一张分阶段更新的卡片上。',
   'feishu.absent': '这个部署里没有。用 dsh plugin --profile web add <插件目录> 挂进来——本 fork 放在 personal/plugins/dsh-x-feishu，安装包里不带。凭证在桥接进程手里，这一页碰不到。',

@@ -159,6 +159,18 @@ describe('ConnectorCard', () => {
     expect(screen.getByRole<HTMLInputElement>('switch').checked).toBe(false)
   })
 
+  // A running plugin that registers no namespace is not a switched-off one.
+  // Saying it is tells the reader their channel is off while its switch reads
+  // on, which is the one contradiction the card must never print.
+  it('does not call a running channel switched off when it just has no settings', () => {
+    renderCard({ status: 'absent', writable: false }, { presence: { presence: 'enabled' } })
+    open()
+
+    expect(screen.getByText(zh['power.noSettings'])).toBeTruthy()
+    expect(screen.queryByText(zh['power.offNoSettings'])).toBeNull()
+    expect(screen.getByRole<HTMLInputElement>('switch').checked).toBe(true)
+  })
+
   it('reads the plugin tree when the card is first opened, not on mount', () => {
     const readPresence = vi.fn()
     renderCard({}, { readPresence })

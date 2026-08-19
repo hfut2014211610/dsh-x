@@ -128,11 +128,17 @@ export function ConnectorCard(props: ConnectorCardProps) {
                       </p>
                     )
                     : null}
-                  {/* A disabled plugin serves no settings namespace, so there
-                      is nothing to render controls from — and saying so beats
-                      a form that cannot be filled in. */}
+                  {/* No namespace means no controls to render, but not for
+                      one reason: a switched-off plugin serves none because it
+                      is not running, and a running one may simply register
+                      none. Saying the first when the second is true tells the
+                      reader their channel is off while its switch reads on. */}
                   {state.status === 'absent'
-                    ? <p className={css.absent} role="status">{t('power.offNoSettings')}</p>
+                    ? (
+                      <p className={css.absent} role="status">
+                        {t(presence.presence === 'disabled' ? 'power.offNoSettings' : 'power.noSettings')}
+                      </p>
+                    )
                     : (
                       <>
                         {state.writable ? null : <p className={css.readOnly} role="status">{t('readOnly')}</p>}
