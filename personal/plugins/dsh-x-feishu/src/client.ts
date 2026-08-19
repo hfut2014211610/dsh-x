@@ -55,21 +55,12 @@ export class BridgeClient {
   /** 上一次真正拨过去的端点，用来认出配置改了。 */
   private dialled: string | undefined
 
-  /** 上一次报出去的身份，用来认出它改了。 */
-  private announced: string | undefined
-
   /**
    * @param endpoint - 读出本地 socket 路径或命名管道；**每次拨号都重新读**，
    * 所以改配置不需要重建这个客户端，下一次连接就用新值。
-   * @param identity - 读出 dsh 的飞书身份（lark-cli profile 目录）。同样每次
-   * 拨号重新读，而且每次重连都要重报——桥接不记得断掉的那个客户端是谁。
    * @param handlers - 事件回调。
    */
-  constructor(
-    private readonly endpoint: () => string,
-    private readonly identity: () => string,
-    private readonly handlers: BridgeHandlers,
-  ) {}
+  constructor(private readonly endpoint: () => string, private readonly handlers: BridgeHandlers) {}
 
   /** 连上去；断了会自己重连，直到 {@link dispose}。 */
   connect(): void {
@@ -78,12 +69,7 @@ export class BridgeClient {
     const socket = createConnection(this.dialled)
     this.socket = socket
     socket.setEncoding('utf8')
-    socket.on('connect', () => {
-      this.retryMs = RETRY_MIN_MS
-      // 第一帧就报身份：桥接在收到它之前不知道该把哪些消息转过来，也不知道
-      // 该以谁的身份替 dsh 发话。
-      this.announce(this.identity())
-    })
+    socket.on('connect', () => { this.retryMs = RETRY_MIN_MS })
     socket.on('data', (chunk: string) => { this.ingest(chunk) })
     socket.on('error', (error: unknown) => { this.handlers.onError(error) })
     socket.on('close', () => { this.teardown() })
@@ -116,27 +102,6 @@ export class BridgeClient {
       this.pending.set(id, { resolve, reject, timer })
       socket.write(encodeFrame({ ...command, id, v: PROTOCOL_VERSION }))
     })
-  }
-
-  /**
-   * 身份变了就重报一次，没变就不动。
-   *
-   * 不用重连：桥接随时收得下这一帧，而重连会把在途的回执一起断掉。
-   * @param identity - 现在的身份。
-   * @returns 是否真的重报了。
-   */
-  reannounceIfChanged(identity: string): boolean {
-    // 还没报过就无所谓"变了"：下一次 connect() 本来就会读当时的值。
-    if (this.disposed || this.announced === undefined || this.announced === identity) return false
-    this.announce(identity)
-    return true
-  }
-
-  private announce(identity: string): void {
-    const socket = this.socket
-    if (socket === undefined || socket.destroyed) return
-    this.announced = identity
-    socket.write(encodeFrame({ v: PROTOCOL_VERSION, kind: 'announce', configDir: identity }))
   }
 
   /**
@@ -223,8 +188,6 @@ export class BridgeClient {
   private teardown(): void {
     this.socket = undefined
     this.decoder = new FrameDecoder()
-    // 桥接不记得断掉的那个客户端是谁，重连之后 connect 会重新报一次。
-    this.announced = undefined
     this.handlers.onDisconnect()
     if (this.disposed) return
     this.retryTimer = setTimeout(() => { this.connect() }, this.retryMs)

@@ -48,9 +48,9 @@ export interface BridgeSummary {
 /**
  * 桥接 → 插件：握手，插件据此校验版本、拿到机器人身份和桥接现状。
  *
- * 会发不止一次：插件报了自己是哪个应用（{@link AnnounceCommand}）之后，桥接
- * 再发一帧，这一帧的 `botOpenId` 才是**插件那个应用**的机器人。第一帧发在
- * 插件开口之前，那时桥接只能先给主应用的。
+ * 会发不止一次：桥接的配置变了，它手里那份现状就过期了，于是再发一帧。
+ * `botOpenId` 给的是主应用的机器人，只用来写日志——真正判 @ 的是桥接自己，
+ * 而它对每个应用各有一个。
  */
 export interface HelloFrame {
   readonly v: number
@@ -65,6 +65,13 @@ export interface HelloFrame {
 export interface MessageFrame {
   readonly v: number
   readonly kind: 'message'
+  /**
+   * 收到它的那个飞书应用（lark-cli profile 目录）；空串是环境默认那份。
+   *
+   * 插件不用它做任何判断——回话的身份由桥接按会话查回来。它在这里是为了让
+   * 日志、以及任何读这条线的人，看得出这句话是从哪个机器人进来的。
+   */
+  readonly source: string
   /** 会话容器键，由桥接算好（单聊是 chatId，群里话题带 threadId）。 */
   readonly chatKey: string
   readonly chatId: string
@@ -82,6 +89,8 @@ export interface MessageFrame {
 export interface CardActionFrame {
   readonly v: number
   readonly kind: 'card-action'
+  /** 收到它的那个飞书应用；含义同 {@link MessageFrame.source}。 */
+  readonly source: string
   readonly chatKey: string
   readonly messageId: string
   readonly operatorId: string
@@ -91,23 +100,6 @@ export interface CardActionFrame {
 
 /** 桥接 → 插件的所有帧。 */
 export type InboundFrame = HelloFrame | MessageFrame | CardActionFrame
-
-/**
- * 插件 → 桥接：我是哪个飞书应用。连上之后的第一帧。
- *
- * 这是复用别人桥接时 dsh 唯一需要说的话。桥接可能同时订着好几个应用，报了身份
- * 之后它才知道：**哪些消息该转给 dsh**（不报的话 dsh 会连别人机器人的消息一起
- * 收，两个 agent 抢着答同一句话），以及 **dsh 的回话该以谁的身份发出去**。
- *
- * 反过来，dsh **不**告诉桥接该订哪些应用——那是桥接主人的事。dsh 报的是一个
- * 收件箱，不是一张订阅表。
- */
-export interface AnnounceCommand {
-  readonly v: number
-  readonly kind: 'announce'
-  /** dsh 的飞书身份：lark-cli 的 profile 目录。空串表示还没定，桥接不转发。 */
-  readonly configDir: string
-}
 
 /** 插件 → 桥接：发一条纯文本回复（排队回执、拒绝理由、错误）。 */
 export interface ReplyCommand {
@@ -181,7 +173,7 @@ export interface AskCommand {
 
 /** 插件 → 桥接的所有命令。 */
 export type OutboundCommand =
-  | AnnounceCommand | ReplyCommand | CardOpenCommand | CardUpdateCommand | CardCloseCommand | AskCommand
+  | ReplyCommand | CardOpenCommand | CardUpdateCommand | CardCloseCommand | AskCommand
 
 /**
  * 在联合类型上逐支去字段。

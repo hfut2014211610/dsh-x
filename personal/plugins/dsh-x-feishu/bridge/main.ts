@@ -53,14 +53,6 @@ const MESSAGE_EVENT = 'im.message.receive_v1'
 /** 卡片回调的 EventKey。 */
 const CARD_EVENT = 'card.action.trigger'
 
-/**
- * 等 dsh 的身份定下来再挑它的错。
- *
- * dsh 的连接常常比它的设置早一步就位，所以第一帧报的往往是个占位值，紧接着就
- * 会被改正。不等这一下的话，每次启动都要诬告一次"你报的应用我没订"。
- */
-const ANNOUNCE_SETTLE_MS = 1_500
-
 function log(message: string): void {
   process.stdout.write(`[feishu-bridge] ${new Date().toISOString()} ${message}\n`)
 }
@@ -97,9 +89,7 @@ class Bridge {
   private readonly dedup = new MessageDedup()
   /** 每个会话、每张卡片是从哪个飞书应用来的。 */
   private readonly router = new AppRouter(
-    // dsh 只收得到自己那个应用的消息，所以认不出来源时，它报的身份就是答案，
-    // 不是猜。没报身份才退回主应用。
-    () => this.dshApp() ?? this.primaryApp(),
+    () => this.primaryApp(),
     { onGuess: (chatKey, app) => { log(`不认得会话 ${chatKey} 是从哪个应用进来的，按 ${label(app)} 发`) } },
   )
   /** configDir → 这个应用的机器人 open_id。判"有没有 @ 我"要用。 */
@@ -107,15 +97,6 @@ class Bridge {
   /** 现在跑着的消费者，键是 {@link consumerKey}。 */
   private readonly consumers = new Map<string, EventConsumer>()
   private launching = false
-  /**
-   * dsh 报的身份：它是哪个飞书应用。
-   *
-   * 报了才转发。没报之前一条都不转——桥接可能同时订着好几个应用，把别人机器人
-   * 的消息也塞给 dsh，两个 agent 会抢着答同一句话。
-   */
-  private clientApp: string | undefined
-  /** 等身份定下来再挑错的那个定时器。 */
-  private announceSettle: NodeJS.Timeout | undefined
   /** 已经听上的端点。改端点要重启桥接，所以要记住当初听的是哪个。 */
   private listening = { endpoint: '', eventEndpoint: '' }
   private stopWatching: (() => void) | undefined
@@ -151,8 +132,6 @@ class Bridge {
    * @returns 每个消费者都退完为止。
    */
   async stop(): Promise<void> {
-    if (this.announceSettle !== undefined) clearTimeout(this.announceSettle)
-    this.announceSettle = undefined
     this.stopWatching?.()
     this.stopWatching = undefined
     const leaving = [...this.consumers]
@@ -286,7 +265,7 @@ class Bridge {
     await this.syncConsumers()
     // dsh 手里那份现状是握手那一刻的，配置一变它就过期了。设置页照着过期的
     // 名单说"桥接没订你这个应用"，人会去改一个本来没错的地方。
-    if (this.dshOnline) this.greet(this.dshApp() ?? this.primaryApp())
+    if (this.dshOnline) this.greet(this.primaryApp())
   }
 
   /** dsh 插件连上来了。只认一个客户端，第二个连接把前一个顶掉。 */
@@ -308,8 +287,6 @@ class Bridge {
       if (this.client === socket) this.client = undefined
       log('dsh 断开了')
     })
-    // 这一帧发在 dsh 开口之前，所以只能先给主应用的机器人；等它报了身份，
-    // 下面 onAnnounce 会再发一帧带上真正属于它的那个。
     this.greet(this.primaryApp())
     log('dsh 连上了')
   }
@@ -333,45 +310,6 @@ class Bridge {
       botOpenId: this.botOpenIds.get(configDir) ?? '',
       bridge: this.summary(),
     }))
-  }
-
-  /**
-   * dsh 说它是哪个应用。
-   *
-   * 报了才开始转发。报了一个没订阅的应用要说出来——那种情况下 dsh 会一条消息
-   * 都收不到，而它自己看不出区别。
-   */
-  private onAnnounce(configDir: string): void {
-    const declared = configDir.trim()
-    if (declared === '') {
-      this.clientApp = undefined
-      log('dsh 还没说自己是哪个应用，先不给它转消息')
-      return
-    }
-    this.clientApp = declared
-    log(`dsh 的身份是 ${label(declared)}`)
-    this.greet(declared)
-    if (this.announceSettle !== undefined) clearTimeout(this.announceSettle)
-    this.announceSettle = setTimeout(() => {
-      const app = this.clientApp
-      if (app === undefined || this.eventSources().includes(app)) return
-      log(`桥接没订 ${label(app)}（订的是 ${this.eventSources().map(label).join('、')}），dsh 收不到任何消息`)
-    }, ANNOUNCE_SETTLE_MS)
-    this.announceSettle.unref()
-  }
-
-  /**
-   * dsh 是哪个应用。
-   *
-   * 优先用它自己报的。它还没连过的时候退一步：只订了一个应用的话那就是它——
-   * 单应用部署里桥接本来就是 dsh 的。订了好几个就认不出来，这时宁可不认，也
-   * 不能猜——猜错的后果是替别人的机器人回一句"dsh 不在"。
-   * @returns dsh 的 profile 目录；认不出来时 `undefined`。
-   */
-  private dshApp(): string | undefined {
-    if (this.clientApp !== undefined) return this.clientApp
-    const sources = this.eventSources()
-    return sources.length === 1 ? sources[0] : undefined
   }
 
   private get dshOnline(): boolean {
@@ -419,11 +357,10 @@ class Bridge {
     }
     this.router.rememberChat(message.chatKey, message.chatId, configDir)
 
-    // 只管 dsh 那个应用的消息。别人机器人的消息归别人（他们连 relay），dsh
-    // 插手的话，一句话会被两个 agent 同时答。
-    if (this.dshApp() !== configDir) return
+    // 过了准入的消息一律转给 dsh：它是这条 socket 上唯一的消费者，桥接订了
+    // 什么就给它什么。要缩范围就去改订阅名单——那是跑桥接的人的事。
     if (this.dshOnline) {
-      this.send({ v: PROTOCOL_VERSION, kind: 'message', ...message })
+      this.send({ v: PROTOCOL_VERSION, kind: 'message', source: configDir, ...message })
       return
     }
     // dsh 不在：自己回执，然后把它拉起来。不在桥接里跑 agent。
@@ -438,12 +375,12 @@ class Bridge {
     const chatId = event.chat_id ?? ''
     const messageId = event.message_id ?? ''
     if (messageId === '') return
-    if (this.dshApp() !== configDir) return
     // 点按钮的这个会话可能是桥接重启后第一次见到，记下它属于哪个应用。
     if (chatId !== '') this.router.rememberChat(chatId, chatId, configDir)
     this.send({
       v: PROTOCOL_VERSION,
       kind: 'card-action',
+      source: configDir,
       chatKey: chatId,
       messageId,
       operatorId: event.operator_id ?? '',
@@ -480,10 +417,6 @@ class Bridge {
     if (typeof frame !== 'object' || frame === null) return
     const command = frame as OutboundCommand
     switch (command.kind) {
-      case 'announce': {
-        this.onAnnounce(command.configDir)
-        return
-      }
       case 'reply': {
         const app = this.router.appOfChat(command.chatKey)
         const chatId = this.router.chatId(command.chatKey)

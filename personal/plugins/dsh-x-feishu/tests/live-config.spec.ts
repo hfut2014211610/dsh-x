@@ -50,7 +50,7 @@ describe('审批超时', () => {
 describe('桥接端点', () => {
   // 端点是唯一一个拨号那一刻定死的值，所以它是唯一需要被通知的。
   it('端点没变就不重连', () => {
-    const client = new BridgeClient(() => '\\\\.\\pipe\\dsh-feishu-test', () => '', handlers)
+    const client = new BridgeClient(() => '\\\\.\\pipe\\dsh-feishu-test', handlers)
     client.connect()
     expect(client.redialIfMoved()).toBe(false)
     client.dispose()
@@ -58,7 +58,7 @@ describe('桥接端点', () => {
 
   it('端点变了要重连', () => {
     let endpoint = '\\\\.\\pipe\\dsh-feishu-a'
-    const client = new BridgeClient(() => endpoint, () => '', handlers)
+    const client = new BridgeClient(() => endpoint, handlers)
     client.connect()
 
     endpoint = '\\\\.\\pipe\\dsh-feishu-b'
@@ -69,14 +69,14 @@ describe('桥接端点', () => {
   // 还没拨过号的时候谈不上"变了"：第一次 connect() 本来就读当时的值，这里再
   // 拨一次只会多开一条连接。
   it('从没连过就不算变', () => {
-    const client = new BridgeClient(() => '\\\\.\\pipe\\dsh-feishu-never', () => '', handlers)
+    const client = new BridgeClient(() => '\\\\.\\pipe\\dsh-feishu-never', handlers)
     expect(client.redialIfMoved()).toBe(false)
     client.dispose()
   })
 
   it('关掉之后不再重连', () => {
     let endpoint = '\\\\.\\pipe\\dsh-feishu-a'
-    const client = new BridgeClient(() => endpoint, () => '', handlers)
+    const client = new BridgeClient(() => endpoint, handlers)
     client.connect()
     client.dispose()
 

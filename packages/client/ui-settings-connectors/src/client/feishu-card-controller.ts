@@ -63,8 +63,6 @@ export interface BridgeSummaryView {
 export interface BridgeStatusView {
   /** Whether the channel plugin currently holds a connection to the bridge. */
   connected: boolean
-  /** The identity dsh announced on that connection. */
-  identity: string
   /** What the bridge reports; absent while disconnected. */
   bridge?: BridgeSummaryView
 }
@@ -83,7 +81,7 @@ export interface FeishuSettings {
   approvalTimeoutMs?: number
   /** Whether dsh runs its own Feishu app or reads from a bridge someone else runs. */
   access?: string
-  /** dsh's Feishu identity: the lark-cli profile directory. */
+  /** dsh's own Feishu app: the lark-cli profile directory. */
   profile?: string
   /** Direct-message access mode. */
   dmMode?: string
@@ -105,7 +103,7 @@ export interface FeishuCardState extends ConnectorFormState {
   auth: FeishuAuthState
   /** Which of the two setups this card is showing. */
   access: ConnectorFieldState
-  /** dsh's Feishu identity. */
+  /** dsh's own Feishu app. */
   profile: ConnectorFieldState
   /** Whether the sign-in section is folded away, which reuse does by default. */
   authFolded: boolean
@@ -187,7 +185,7 @@ export class FeishuCardController {
   /** Whether the reader unfolded the sign-in section that reuse folds away. */
   private authOpened = false
   /** What the bridge last reported. Read-only: nothing on this card writes it. */
-  private status: BridgeStatusView = { connected: false, identity: '' }
+  private status: BridgeStatusView = { connected: false }
 
   /**
    * @param scope - the bound settings scope for the `dsh-x-feishu` namespace.
@@ -301,7 +299,7 @@ export class FeishuCardController {
     const result = await this.rpc.call('/api', 'feishuAuth/bridge', { args: {} })
     // A bridge that cannot be read is reported as not connected, which is the
     // truthful reading: nothing on this card can act on it either way.
-    this.status = result.ok ? result.value as BridgeStatusView : { connected: false, identity: '' }
+    this.status = result.ok ? result.value as BridgeStatusView : { connected: false }
     this.store.set(this.projection())
   }
 

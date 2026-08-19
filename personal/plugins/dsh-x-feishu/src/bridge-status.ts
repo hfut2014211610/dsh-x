@@ -17,29 +17,26 @@ import type { BridgeSummary } from './protocol.ts'
 export interface BridgeStatusView {
   /** 桥接连上没有。没连上时下面的现状是空的。 */
   readonly connected: boolean
-  /** dsh 报给桥接的身份（lark-cli profile 目录）；空串表示还没定。 */
-  readonly identity: string
   /** 桥接现在的样子；没连上，或者对面是个老桥接，就没有。 */
   readonly bridge?: BridgeSummary
 }
 
 /** 握手带来的桥接现状。插件写，设置页读。 */
 export class BridgeStatus {
-  private view: BridgeStatusView = { connected: false, identity: '' }
+  private view: BridgeStatusView = { connected: false }
 
   /**
    * 握手到了。
-   * @param identity - dsh 这一侧报出去的身份。
    * @param bridge - 桥接现状；老桥接不带这个字段。
    */
-  greeted(identity: string, bridge: BridgeSummary | undefined): void {
+  greeted(bridge: BridgeSummary | undefined): void {
     // 没有 bridge 字段时不写这个键，而不是写一个 undefined。
-    this.view = { connected: true, identity, ...bridge === undefined ? {} : { bridge } }
+    this.view = { connected: true, ...bridge === undefined ? {} : { bridge } }
   }
 
   /** 断了。现状一并丢掉——留着上一次的会让人以为还连着。 */
   dropped(): void {
-    this.view = { connected: false, identity: this.view.identity }
+    this.view = { connected: false }
   }
 
   /**

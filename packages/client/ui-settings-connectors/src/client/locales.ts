@@ -30,8 +30,7 @@ export type ConnectorsKey =
   | 'feishu.access.own' | 'feishu.access.ownWhy'
   | 'feishu.access.reuse' | 'feishu.access.reuseWhy'
   | 'feishu.bridge.title' | 'feishu.bridge.lead'
-  | 'feishu.bridge.offline' | 'feishu.bridge.apps' | 'feishu.bridge.identity'
-  | 'feishu.bridge.identityMissing' | 'feishu.bridge.identityUnset' | 'feishu.bridge.owned'
+  | 'feishu.bridge.offline' | 'feishu.bridge.apps'
   | 'feishu.profile.label' | 'feishu.profile.hint' | 'feishu.profile.own'
   | 'feishu.reach.title' | 'feishu.reach.lead' | 'feishu.reach.byBridge'
   | 'feishu.reach.nobody' | 'feishu.reach.dmOnly' | 'feishu.reach.groupOnly' | 'feishu.reach.both'
@@ -125,17 +124,13 @@ export const en: Record<ConnectorsKey, string> = {
   'feishu.access.own': 'Its own Feishu app',
   'feishu.access.ownWhy': 'dsh has an app of its own, and the bridge is dsh’s — so everything below is set here. This is the ordinary setup.',
   'feishu.access.reuse': 'Read from a bridge already running',
-  'feishu.access.reuseWhy': 'Someone already runs a bridge for other agents. dsh reads from it and configures none of it — it only says which app it is.',
+  'feishu.access.reuseWhy': 'Someone already runs a bridge for other agents. dsh just connects to it as one more consumer — nothing to configure here.',
   'feishu.bridge.title': 'The bridge dsh reads from',
-  'feishu.bridge.lead': 'Feishu admits exactly one consumer per event key on a machine, so the bridge holds that one subscription and relays what arrives; any number of agents read from it. What it subscribes to and who it lets through belong to whoever runs it — dsh writes none of that. All dsh says is which app it is, so the bridge knows which messages are its and whose bot to answer as.',
+  'feishu.bridge.lead': 'Feishu admits exactly one consumer per event key on a machine, so the bridge holds that one subscription and relays what arrives. What it subscribes to and who it lets through belong to whoever runs it — dsh configures none of it and asks for nothing. It connects, takes what the bridge sends, and replies as whichever bot was spoken to.',
   'feishu.bridge.offline': 'The bridge is not connected. Nothing reaches dsh until it is running.',
   'feishu.bridge.apps': 'Subscribed apps',
-  'feishu.bridge.identity': 'dsh announced itself as',
-  'feishu.bridge.identityMissing': 'The bridge does not subscribe to this app, so nothing will reach dsh. Pick one it does subscribe to, or ask whoever runs it to add this one.',
-  'feishu.bridge.identityUnset': 'No app chosen yet, so the bridge forwards nothing. Pick one above.',
-  'feishu.bridge.owned': 'Set these where the bridge is configured, not here.',
-  'feishu.profile.label': 'Which Feishu app dsh is',
-  'feishu.profile.hint': 'A lark-cli profile. Everything follows from it: which messages the bridge forwards, whose bot replies, and which app a scan below authorizes.',
+  'feishu.profile.label': 'dsh’s own Feishu app',
+  'feishu.profile.hint': 'The lark-cli profile the bridge subscribes to, and the one a scan below authorizes.',
   'feishu.profile.own': 'dsh’s own',
   'feishu.reach.title': 'Who may use it',
   'feishu.reach.lead': 'Denied by default, and deliberately: a channel into an agent that runs tools is not something to leave open while you work out the rest.',
@@ -238,17 +233,13 @@ export const zh: Record<ConnectorsKey, string> = {
   'feishu.access.own': '用 dsh 自己的应用',
   'feishu.access.ownWhy': 'dsh 有一个自己的飞书应用，桥接也就是它的——下面这些都在这一页定。一般都走这条。',
   'feishu.access.reuse': '复用已经在跑的桥接',
-  'feishu.access.reuseWhy': '别人已经为其他 agent 跑着一个桥接。dsh 从它那儿读，不配它的任何东西——只报一句自己是哪个应用。',
+  'feishu.access.reuseWhy': '别人已经为其他 agent 跑着一个桥接。dsh 就当它的一个消费端连上去，这一页不用配任何东西。',
   'feishu.bridge.title': 'dsh 读的那个桥接',
-  'feishu.bridge.lead': '同一台机器上，飞书的一个 event key 只允许一个消费者，所以桥接持有那唯一的一份，收到什么广播出去，任意多个 agent 从它那儿读。它订了什么、放行谁，都是跑它那个人的事——dsh 一个字都不写。dsh 只说一句：我是哪个应用。桥接据此知道哪些消息是它的，以及该用谁的机器人回话。',
+  'feishu.bridge.lead': '同一台机器上，飞书的一个 event key 只允许一个消费者，所以桥接持有那唯一的一份，收到什么广播出去。它订了什么、放行谁，都是跑它那个人的事——dsh 不配它的任何东西，也不要你在这里填什么。它连上去、收桥接给的、然后用被搭话的那个机器人回话。',
   'feishu.bridge.offline': '桥接没连上。它不在的时候，一条消息也到不了 dsh。',
   'feishu.bridge.apps': '它订着这几个',
-  'feishu.bridge.identity': 'dsh 报的身份',
-  'feishu.bridge.identityMissing': '桥接没订这个应用，dsh 什么都收不到。换一个它订了的，或者让跑桥接的人把这个加上。',
-  'feishu.bridge.identityUnset': '还没选应用，桥接不会转任何消息过来。先在上面选一个。',
-  'feishu.bridge.owned': '这些在桥接那边改，不在这一页。',
-  'feishu.profile.label': 'dsh 是哪个飞书应用',
-  'feishu.profile.hint': '一份 lark-cli profile。剩下的都跟着它走：桥接把哪些消息转过来、回话用谁的机器人、下面扫码授权的又是哪个应用。',
+  'feishu.profile.label': 'dsh 自己的飞书应用',
+  'feishu.profile.hint': '桥接订的就是这份 lark-cli profile，下面扫码授权动的也是它。',
   'feishu.profile.own': 'dsh 自己那份',
   'feishu.reach.title': '谁能用',
   'feishu.reach.lead': '默认谁都不放行，这是故意的：一条通往会跑工具的 agent 的入口，不该在你还没想清楚之前先开着。',

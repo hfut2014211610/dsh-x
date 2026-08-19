@@ -383,7 +383,7 @@ describe('FeishuCard', () => {
     access: field('own'),
     profile: field(''),
     authFolded: false,
-    bridge: { connected: false, identity: '' },
+    bridge: { connected: false },
     presetId: field('ued'),
     density: field('standard'),
     flushMs: field('2500'),
@@ -397,10 +397,9 @@ describe('FeishuCard', () => {
     reach: 'nobody',
   }
 
-  /** 一个连上的桥接：订着两个应用，dsh 报了第一个。 */
+  /** 一个连上的桥接：订着两个应用。 */
   const attached = {
     connected: true,
-    identity: '/home/me/.lark-cli',
     bridge: {
       apps: ['/home/me/.lark-cli', '/home/me/.lark-cli/agent-bus'],
       dmMode: 'disabled',
@@ -474,19 +473,24 @@ describe('FeishuCard', () => {
   })
 
   describe('两条接入方式', () => {
-    // 身份是两条路都要说的那一件事，所以它不属于任何一支。
-    it('哪条路都要说清 dsh 是哪个应用', () => {
+    // 复用时 dsh 只是那条 socket 上的一个消费端：不报身份、不声明订阅、不配置
+    // 对面。这一页因此一个要填的东西都没有。
+    it('复用时什么都不用填', () => {
+      render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: attached })} />)
+      open()
+
+      expect(screen.queryByLabelText(zh['feishu.profile.label'])).toBeNull()
+      expect(screen.queryByLabelText(zh['feishu.dmMode.label'])).toBeNull()
+    })
+
+    it('单独申请要说清用哪份 profile', () => {
       render(<FeishuCard {...cardProps({ access: field('own') })} />)
       open()
-      expect(screen.getByLabelText(zh['feishu.profile.label'])).toBeTruthy()
-      cleanup()
 
-      render(<FeishuCard {...cardProps({ access: field('reuse') })} />)
-      open()
       expect(screen.getByLabelText(zh['feishu.profile.label'])).toBeTruthy()
     })
 
-    it('身份的选项来自宿主找到的那几份 profile', () => {
+    it('那份 profile 的选项来自宿主找到的那几份', () => {
       const edit = vi.fn()
       render(<FeishuCard {...cardProps({}, { edit })} />)
       open()
@@ -508,13 +512,12 @@ describe('FeishuCard', () => {
       expect(edit).toHaveBeenCalledWith('access', 'reuse')
     })
 
-    // 复用的时候桥接是别人的，dsh 不写它的任何配置——所以那些字段不是置灰，
-    // 是根本没有。写一个跑着的桥接永远不会读的设置，比不给这个控件更糟。
-    it('复用时不给准入的控件，只报桥接现在的规矩', () => {
+    // 写一个跑着的桥接永远不会读的设置，比不给这个控件更糟，所以那些字段不是
+    // 置灰，是根本没有——只把桥接自己报的规矩说出来。
+    it('复用时只报桥接现在的规矩', () => {
       render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: attached })} />)
       open()
 
-      expect(screen.queryByLabelText(zh['feishu.dmMode.label'])).toBeNull()
       expect(screen.queryByLabelText(zh['feishu.groupAllowlist.label'])).toBeNull()
       expect(screen.getByText(zh['feishu.reach.byBridge'])).toBeTruthy()
     })
@@ -548,7 +551,7 @@ describe('FeishuCard', () => {
       expect(screen.queryByText(zh['feishu.bridge.apps'])).toBeNull()
     })
 
-    it('连上了就把它订着什么、dsh 报了什么摆出来', () => {
+    it('连上了就把它订着什么摆出来', () => {
       render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: attached })} />)
       open()
 
@@ -556,22 +559,6 @@ describe('FeishuCard', () => {
       expect(screen.getByText('/home/me/.lark-cli/agent-bus')).toBeTruthy()
     })
 
-    // 报了一个桥接没订的应用，dsh 会一条消息都收不到，而它自己看不出区别。
-    it('报的身份不在订阅名单里要说破', () => {
-      const stranger = { ...attached, identity: '/home/me/.lark-cli/nowhere' }
-      render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: stranger })} />)
-      open()
-
-      expect(screen.getByText(zh['feishu.bridge.identityMissing'])).toBeTruthy()
-    })
-
-    it('还没选身份也要说破', () => {
-      const unset = { ...attached, identity: '' }
-      render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: unset })} />)
-      open()
-
-      expect(screen.getByText(zh['feishu.bridge.identityUnset'])).toBeTruthy()
-    })
   })
 
   // 默认拒绝是不出声的：模式是"只认名单"而名单是空的，渠道开着、授权也给了、

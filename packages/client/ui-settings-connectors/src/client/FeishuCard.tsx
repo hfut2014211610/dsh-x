@@ -158,40 +158,32 @@ export function FeishuCard(props: FeishuCardProps) {
         onChange={(value) => { props.edit('access', value) }}
       />
 
-      {/* One field, both branches: everything downstream follows from it, and
-          it is the only thing dsh has to say when the bridge is not its own. */}
-      <OptionField
-        {...field('profile')}
-        labelKey="feishu.profile.label"
-        hintKey="feishu.profile.hint"
-        options={profiles}
-      />
-
+      {/* Reuse asks nothing: dsh is a consumer on that socket, so the only
+          thing to show is what the bridge is currently doing. Own app needs the
+          one field that says which app the bridge subscribes to and a scan
+          authorizes. */}
       {access === 'reuse'
         ? (
           <FieldGroup t={t} titleKey="feishu.bridge.title" leadKey="feishu.bridge.lead">
             {!state.bridge.connected || summary === undefined
               ? <p className={css.absent} role="status">{t('feishu.bridge.offline')}</p>
               : (
-                <>
-                  <FactRow label={t('feishu.bridge.apps')}>
-                    <span className={css.factList}>
-                      {summary.apps.map(app => <code className={css.reason} key={app}>{app}</code>)}
-                    </span>
-                  </FactRow>
-                  <FactRow label={t('feishu.bridge.identity')}>
-                    <code className={css.reason}>{state.bridge.identity}</code>
-                  </FactRow>
-                  {state.bridge.identity === ''
-                    ? <p className={css.failed} role="status">{t('feishu.bridge.identityUnset')}</p>
-                    : summary.apps.includes(state.bridge.identity)
-                      ? null
-                      : <p className={css.failed} role="status">{t('feishu.bridge.identityMissing')}</p>}
-                </>
+                <FactRow label={t('feishu.bridge.apps')}>
+                  <span className={css.factList}>
+                    {summary.apps.map(app => <code className={css.reason} key={app}>{app}</code>)}
+                  </span>
+                </FactRow>
               )}
           </FieldGroup>
         )
-        : null}
+        : (
+          <OptionField
+            {...field('profile')}
+            labelKey="feishu.profile.label"
+            hintKey="feishu.profile.hint"
+            options={profiles}
+          />
+        )}
 
       <FieldGroup t={t} titleKey="feishu.reach.title" leadKey="feishu.reach.lead">
         {/* The standing answer, above the knobs that produce it. Deny-by-default
