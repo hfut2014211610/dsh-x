@@ -49,6 +49,8 @@ export class EventConsumer {
     private readonly eventKey: string,
     private readonly handlers: ConsumerHandlers,
     private readonly command?: string,
+    /** 可选的进程环境。用于让同一桥接进程分别持有不同飞书应用的唯一订阅。 */
+    private readonly environment?: NodeJS.ProcessEnv,
   ) {}
 
   /** 起消费者；子进程退出会自动重启，直到 {@link stop}。 */
@@ -61,6 +63,9 @@ export class EventConsumer {
     const child = spawn(invocation.file, [...invocation.args], {
       stdio: ['pipe', 'pipe', 'pipe'],
       windowsHide: true,
+      ...(this.environment === undefined
+        ? {}
+        : { env: { ...process.env, ...this.environment } }),
     })
     this.child = child
     child.stdout.setEncoding('utf8')

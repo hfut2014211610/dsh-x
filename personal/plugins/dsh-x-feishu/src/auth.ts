@@ -16,13 +16,18 @@
  * 里就启动轮询，那是针对不透传中间输出的 harness 说的；这里二维码在 `begin()`
  * 返回的那一刻就已经在屏幕上，所以并发启动轮询正是设备码 UI 本来的样子。
  *
+ * 每一条命令都带**显式的** `LARKSUITE_CLI_CONFIG_DIR`，一次都不用环境默认。
+ * 这台机器上默认那份属于别的工具，而 `auth login` 会把 scope 加到那个应用上、
+ * `auth logout` 会把那个应用的登录态清掉。隐式地跟着环境走，等于让这一页随手
+ * 改动别人的授权。不指定就落到 dsh 自己那份（{@link dshConfigDir}）。
+ *
  * @module @personal/dsh-x-feishu/src/auth
  */
 
 import { execFile } from 'node:child_process'
-import { mkdtemp, readFile, rm } from 'node:fs/promises'
-import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
+import { homedir, tmpdir } from 'node:os'
+import { basename, join } from 'node:path'
 import { larkCliInvocation } from '../bridge/cli.ts'
 
 /** 读命令的上限。`auth status` 要解析 token，偶尔还会摸一次网络。 */
@@ -43,14 +48,60 @@ const QUIET_ENV = {
   LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1',
 } as const
 
+/**
+ * lark-cli 存 profile 的根目录。
+ * @returns `~/.lark-cli`。
+ */
+function larkRoot(): string {
+  return join(homedir(), '.lark-cli')
+}
+
+/**
+ * dsh 自己那份 profile 的目录。
+ *
+ * 单独一份，不跟环境默认共用：默认那份先到先得，谁跑过 `lark-cli config init`
+ * 就是谁的，而这一页的每个动作都会改到它。
+ * @returns `~/.lark-cli/dsh-x`。
+ */
+export function dshConfigDir(): string {
+  return join(larkRoot(), 'dsh-x')
+}
+
+/**
+ * 把请求里的目录解析成真正要用的那个。
+ *
+ * 空串落到 dsh 自己那份，**不落到环境默认**。这是唯一的收口：只要每条命令都
+ * 经过它，就不存在"忘了指定于是改了别人的应用"这条路。
+ * @param requested - 调用方指定的目录，空串表示没指定。
+ * @returns 要写进 `LARKSUITE_CLI_CONFIG_DIR` 的绝对路径。
+ */
+export function resolveConfigDir(requested: string): string {
+  return requested.trim() === '' ? dshConfigDir() : requested.trim()
+}
+
+/** 一份可以在这一页上管理的 lark-cli profile。 */
+export interface AuthProfile {
+  /** 绝对路径。 */
+  readonly configDir: string
+  /** 目录名；`~/.lark-cli` 本身叫 default。 */
+  readonly name: string
+  /** 这个目录绑的应用；还没绑就没有。 */
+  readonly appId?: string
+  /** 是不是 dsh 自己那份。 */
+  readonly owned: boolean
+}
+
 /** 一次 lark-cli 调用的结果。 */
 interface CliResult {
   /** 进程退出码为 0。 */
   readonly ok: boolean
   /** 解析出来的 JSON，能解析的话。 */
   readonly json?: Record<string, unknown>
-  /** 失败原因；`missing` 表示这台机器上根本没有 lark-cli。 */
-  readonly failure?: { kind: 'missing' | 'failed'; message: string }
+  /**
+   * 失败原因。`missing` 是这台机器上没有 lark-cli，`unconfigured` 是这份
+   * profile 还没绑应用——两者都不是"没登录"，指向的下一步也完全不同。
+   */
+  readonly failure?: { kind: 'missing' | 'unconfigured' | 'failed'; message: string; hint?: string }
 }
 
 function record(value: unknown): Record<string, unknown> | undefined {
@@ -67,6 +118,7 @@ function text(value: unknown): string | undefined {
  * 跑一条 lark-cli 命令。
  *
  * 从不抛：调用方要区分的是"没装"、"跑失败了"和"跑成功了"，这三种都是答案。
+ * @param configDir - 这条命令作用在哪份 profile 上。必填，没有"跟着环境走"。
  * @param args - 传给 lark-cli 的 argv。
  * @param timeoutMs - 这条命令的上限。
  * @param cwd - 工作目录；只有二维码那条需要（`--output` 只收当前目录下的相对路径）。
@@ -75,7 +127,7 @@ function text(value: unknown): string | undefined {
  * @returns 结果与失败原因。
  */
 async function runLark(
-  args: readonly string[], timeoutMs: number, cwd?: string, signal?: AbortSignal,
+  configDir: string, args: readonly string[], timeoutMs: number, cwd?: string, signal?: AbortSignal,
 ): Promise<CliResult> {
   const invocation = larkCliInvocation(args)
   return new Promise<CliResult>((resolve) => {
@@ -86,20 +138,23 @@ async function runLark(
         encoding: 'utf8',
         timeout: timeoutMs,
         windowsHide: true,
-        env: { ...process.env, ...QUIET_ENV },
+        env: { ...process.env, ...QUIET_ENV, LARKSUITE_CLI_CONFIG_DIR: configDir },
         ...cwd === undefined ? {} : { cwd },
         ...signal === undefined ? {} : { signal },
         maxBuffer: 4 * 1024 * 1024,
       },
       (error, stdout, stderr) => {
-        // stdout 先解析：lark-cli 失败时也常常回一份带 error 字段的 JSON，
-        // 那比退出码更能说清楚发生了什么。
-        let json: Record<string, unknown> | undefined
-        try {
-          json = record(JSON.parse(stdout))
-        } catch {
-          json = undefined
+        // stdout 先、stderr 后：lark-cli 成功时把结果写 stdout，失败时把那份
+        // 带 `error.subtype` 的信封写 stderr。只读 stdout 的话，"这份 profile
+        // 还没绑应用"就会退化成一整坨 JSON 塞进错误消息里。
+        const parse = (raw: string): Record<string, unknown> | undefined => {
+          try {
+            return record(JSON.parse(raw))
+          } catch {
+            return undefined
+          }
         }
+        const json = parse(stdout) ?? parse(stderr)
         if (error === null) {
           resolve(json === undefined ? { ok: true } : { ok: true, json })
           return
@@ -109,14 +164,23 @@ async function runLark(
           resolve({ ok: false, failure: { kind: 'missing', message: 'lark-cli 不在这台机器上' } })
           return
         }
-        const message = text(record(json?.error)?.message)
+        const envelope = record(json?.error)
+        const message = text(envelope?.message)
           ?? text(json?.message)
           ?? text(stderr.trim())
           ?? error.message
+        // 「这份 profile 还没绑应用」有它自己的下一步（`config init`），跟登录
+        // 失败不是一回事，所以在这里就分开，别让上层去猜措辞。
+        const unconfigured = envelope?.subtype === 'not_configured' || envelope?.type === 'config'
+        const hint = text(envelope?.hint)
         resolve({
           ok: false,
           ...json === undefined ? {} : { json },
-          failure: { kind: 'failed', message },
+          failure: {
+            kind: unconfigured ? 'unconfigured' : 'failed',
+            message,
+            ...hint === undefined ? {} : { hint },
+          },
         })
       },
     )
@@ -141,6 +205,56 @@ export type AuthDomain = typeof AUTH_DOMAINS[number]
 
 const DOMAIN_SET: ReadonlySet<string> = new Set(AUTH_DOMAINS)
 
+/**
+ * 列出这台机器上可以管理的 profile。
+ *
+ * 直接读每个目录的 `config.json` 而不是逐个 spawn lark-cli：快，而且读一份
+ * 配置不该有任何副作用。
+ * @returns 默认那份、每个子目录一份，外加 dsh 自己那份（哪怕还不存在）。
+ */
+export async function discoverProfiles(): Promise<AuthProfile[]> {
+  const root = larkRoot()
+  const owned = dshConfigDir()
+  const seen = new Map<string, AuthProfile>()
+
+  const appIdOf = async (dir: string): Promise<string | undefined> => {
+    try {
+      const parsed = record(JSON.parse(await readFile(join(dir, 'config.json'), 'utf8')))
+      const apps = parsed?.apps
+      if (!Array.isArray(apps)) return undefined
+      return text(record(apps[0])?.appId)
+    } catch {
+      return undefined
+    }
+  }
+
+  const add = async (dir: string, name: string): Promise<void> => {
+    const appId = await appIdOf(dir)
+    // 没绑应用就**不写这个字段**，而不是写一个 undefined：RPC 边界按"键在不在"
+    // 校验，一个值为 undefined 的键会被判成类型不对，整条结果被拒。
+    seen.set(dir, {
+      configDir: dir,
+      name,
+      ...appId === undefined ? {} : { appId },
+      owned: dir === owned,
+    })
+  }
+
+  await add(root, 'default')
+  try {
+    for (const entry of await readdir(root, { withFileTypes: true })) {
+      if (!entry.isDirectory()) continue
+      const dir = join(root, entry.name)
+      if (await appIdOf(dir) === undefined && dir !== owned) continue
+      await add(dir, basename(dir))
+    }
+  } catch {
+    // 根目录都没有：这台机器上还没用过 lark-cli，下面 dsh 那份照样要列出来。
+  }
+  if (!seen.has(owned)) seen.set(owned, { configDir: owned, name: basename(owned), owned: true })
+  return [...seen.values()]
+}
+
 /** 一个身份现在的样子。 */
 export interface AuthIdentity {
   /** lark-cli 自己的措辞：`ready` / `needs_refresh` / `missing` …… */
@@ -160,10 +274,21 @@ export interface AuthUserIdentity extends AuthIdentity {
   readonly refreshExpiresAt?: string
 }
 
-/** 这台机器上的飞书登录态。 */
+/** 这台机器上某一份 profile 的飞书登录态。 */
 export interface AuthStatus {
+  /** 这份状态说的是哪个目录。原样回给页面，省得它自己去记。 */
+  readonly configDir: string
   /** lark-cli 在不在。不在的话下面全是空的，页面只能先让人去装。 */
   readonly installed: boolean
+  /**
+   * 这份 profile 绑没绑应用。
+   *
+   * 没绑跟没登录是两件事：没绑要先 `lark-cli config init` 申请/绑定一个应用，
+   * 没登录才轮到扫码。dsh 自己那份一开始必然是没绑的。
+   */
+  readonly configured: boolean
+  /** lark-cli 自己给的下一步提示，没绑的时候有。 */
+  readonly configHint?: string
   readonly appId?: string
   readonly brand?: string
   /** 当前生效的身份（`user` / `bot`）。 */
@@ -228,6 +353,8 @@ function userIdentityOf(value: unknown): AuthUserIdentity | undefined {
  * 授权票，页面拿它没有用处，泄漏出去却能被人替你把授权兑走。
  */
 interface Pending {
+  /** 这次授权作用在哪份 profile 上。 */
+  readonly configDir: string
   readonly challenge: AuthChallenge
   /** 轮询进程结束时落定；`undefined` 表示还在等。 */
   outcome: { granted: boolean; message?: string } | undefined
@@ -239,21 +366,40 @@ export class LarkAuth {
   private aborter: AbortController | undefined
 
   /**
-   * 读当前登录态。
+   * 读某一份 profile 的登录态。
+   * @param requestedDir - 要读哪个目录；空串落到 dsh 自己那份。
    * @returns 登录态；lark-cli 不在时 `installed` 为 false。
    */
-  async status(): Promise<AuthStatus> {
-    const result = await runLark(['auth', 'status', '--json'], READ_TIMEOUT_MS)
-    if (result.failure?.kind === 'missing') return { installed: false }
+  async status(requestedDir: string): Promise<AuthStatus> {
+    const configDir = resolveConfigDir(requestedDir)
+    const result = await runLark(configDir, ['auth', 'status', '--json'], READ_TIMEOUT_MS)
+    if (result.failure?.kind === 'missing') {
+      return { configDir, installed: false, configured: false }
+    }
+    if (result.failure?.kind === 'unconfigured') {
+      return {
+        configDir,
+        installed: true,
+        configured: false,
+        ...result.failure.hint === undefined ? {} : { configHint: result.failure.hint },
+      }
+    }
     if (!result.ok || result.json === undefined) {
-      return { installed: true, error: result.failure?.message ?? 'lark-cli 没有返回可解析的登录态' }
+      return {
+        configDir,
+        installed: true,
+        configured: true,
+        error: result.failure?.message ?? 'lark-cli 没有返回可解析的登录态',
+      }
     }
     const json = result.json
     const identities = record(json.identities)
     const bot = identityOf(identities?.bot)
     const user = userIdentityOf(identities?.user)
     return {
+      configDir,
       installed: true,
+      configured: true,
       ...text(json.appId) === undefined ? {} : { appId: text(json.appId)! },
       ...text(json.brand) === undefined ? {} : { brand: text(json.brand)! },
       ...text(json.identity) === undefined ? {} : { identity: text(json.identity)! },
@@ -270,11 +416,11 @@ export class LarkAuth {
    * @param url - 原样传入的验证链接。
    * @returns data URI，生成不出来就是 undefined。
    */
-  private async qrcode(url: string): Promise<string | undefined> {
+  private async qrcode(configDir: string, url: string): Promise<string | undefined> {
     let dir: string | undefined
     try {
       dir = await mkdtemp(join(tmpdir(), 'dsh-feishu-qr-'))
-      const result = await runLark(['auth', 'qrcode', url, '--output', 'qr.png'], READ_TIMEOUT_MS, dir)
+      const result = await runLark(configDir, ['auth', 'qrcode', url, '--output', 'qr.png'], READ_TIMEOUT_MS, dir)
       if (!result.ok) return undefined
       const png = await readFile(join(dir, 'qr.png'))
       return `data:image/png;base64,${png.toString('base64')}`
@@ -291,15 +437,18 @@ export class LarkAuth {
    * `auth login` 必须带范围，`--domain` 或 `--scope` 至少给一个；多次登录的
    * scope 是累加的，所以只勾这次要加的就够了。已经在等的那一次会被顶掉——
    * 页面上只有一张二维码，留着旧的只会让人扫到一张已经不作数的。
+   * @param requestedDir - 授权给哪份 profile；空串落到 dsh 自己那份。
    * @param domains - 要开通的业务域。
    * @returns 链接与二维码；发起失败时是失败态。
    */
-  async begin(domains: readonly string[]): Promise<AuthProgress> {
+  async begin(requestedDir: string, domains: readonly string[]): Promise<AuthProgress> {
     this.cancel()
+    const configDir = resolveConfigDir(requestedDir)
     const wanted = domains.filter(domain => DOMAIN_SET.has(domain))
     if (wanted.length === 0) return { phase: 'failed', message: '至少要选一个要开通的权限域' }
 
     const started = await runLark(
+      configDir,
       ['auth', 'login', '--no-wait', '--json', '--domain', wanted.join(',')],
       BEGIN_TIMEOUT_MS,
     )
@@ -316,12 +465,12 @@ export class LarkAuth {
       }
     }
 
-    const qrDataUrl = await this.qrcode(url)
+    const qrDataUrl = await this.qrcode(configDir, url)
     const challenge: AuthChallenge = {
       verificationUrl: url,
       ...qrDataUrl === undefined ? {} : { qrDataUrl },
     }
-    const pending: Pending = { challenge, outcome: undefined }
+    const pending: Pending = { configDir, challenge, outcome: undefined }
     this.pending = pending
     this.poll(pending, deviceCode)
     return { phase: 'waiting', challenge }
@@ -335,7 +484,7 @@ export class LarkAuth {
   private poll(pending: Pending, deviceCode: string): void {
     const aborter = new AbortController()
     this.aborter = aborter
-    void runLark(['auth', 'login', '--device-code', deviceCode, '--json'], POLL_TIMEOUT_MS, undefined, aborter.signal)
+    void runLark(pending.configDir, ['auth', 'login', '--device-code', deviceCode, '--json'], POLL_TIMEOUT_MS, undefined, aborter.signal)
       .then((result) => {
         if (aborter.signal.aborted) return
         pending.outcome = result.ok
@@ -376,11 +525,12 @@ export class LarkAuth {
    *
    * 只清这台机器上的 token；用户在飞书那边给应用的授权仍然在，要撤销得去飞书
    * 的授权管理页。页面必须把这句话说出来，否则"退出登录"会被当成"取消授权"。
+   * @param requestedDir - 退哪份 profile；空串落到 dsh 自己那份。
    * @returns 是否真的退了，以及失败原因。
    */
-  async logout(): Promise<{ loggedOut: boolean; message?: string }> {
+  async logout(requestedDir: string): Promise<{ loggedOut: boolean; message?: string }> {
     this.cancel()
-    const result = await runLark(['auth', 'logout', '--json'], READ_TIMEOUT_MS)
+    const result = await runLark(resolveConfigDir(requestedDir), ['auth', 'logout', '--json'], READ_TIMEOUT_MS)
     if (result.ok) return { loggedOut: result.json?.loggedOut !== false }
     return { loggedOut: false, message: result.failure?.message ?? '退出登录没有成功' }
   }

@@ -33,9 +33,24 @@ export interface AuthUserView extends AuthIdentityView {
   refreshExpiresAt?: string
 }
 
-/** 这台机器上的飞书登录态。 */
+/** 一份可以管理的 lark-cli profile。 */
+export interface AuthProfileView {
+  configDir: string
+  name: string
+  appId?: string
+  /** dsh 自己那份。不指定时作用的就是它。 */
+  owned: boolean
+}
+
+/** 某一份 profile 的飞书登录态。 */
 export interface AuthStatusView {
+  /** 这份状态说的是哪个目录。 */
+  configDir?: string
   installed: boolean
+  /** 这份 profile 绑没绑应用；没绑要先申请/绑定，还轮不到扫码。 */
+  configured?: boolean
+  /** lark-cli 给的下一步提示，没绑的时候有。 */
+  configHint?: string
   appId?: string
   brand?: string
   identity?: string
@@ -55,6 +70,12 @@ export interface FeishuAuthState {
   /** 读登录态这件事走到哪了。 */
   phase: 'idle' | 'loading' | 'ready' | 'error'
   status?: AuthStatusView
+  /** 这台机器上可以管理的 profile。 */
+  profiles: readonly AuthProfileView[]
+  /** 当前动作作用在哪份上；空串表示 dsh 自己那份。 */
+  configDir: string
+  /** dsh 自己那份的目录，用来认出"这不是我们的应用"。 */
+  owned: string
   /** 宿主给的可选业务域。 */
   domains: readonly string[]
   /** 这次打算开通哪些。 */
@@ -89,7 +110,14 @@ function record(value: unknown): Record<string, unknown> | undefined {
 export class FeishuAuthController {
   /** uSES 安全的状态源，卡片通过绑定的选择器读它。 */
   readonly store: SnapshotStore<FeishuAuthState> = createSnapshotStore<FeishuAuthState>({
-    phase: 'idle', domains: [], selected: [DEFAULT_DOMAIN], busy: false, granted: false,
+    phase: 'idle',
+    profiles: [],
+    configDir: '',
+    owned: '',
+    domains: [],
+    selected: [DEFAULT_DOMAIN],
+    busy: false,
+    granted: false,
   })
 
   private timer: ReturnType<typeof setTimeout> | undefined
@@ -127,13 +155,21 @@ export class FeishuAuthController {
       delete state.error
     })
     try {
-      const [status, domains] = await Promise.all([this.call('status'), this.call('domains')])
+      const configDir = this.store.getSnapshot().configDir
+      const [status, domains, profiles] = await Promise.all([
+        this.call('status', { configDir }),
+        this.call('domains'),
+        this.call('profiles'),
+      ])
       if (generation !== this.generation) return
       const list = record(domains)?.domains
+      const roster = record(profiles)
       this.store.update((state) => {
         state.phase = 'ready'
         state.status = status as AuthStatusView
         if (Array.isArray(list)) state.domains = list.filter((item): item is string => typeof item === 'string')
+        if (Array.isArray(roster?.profiles)) state.profiles = roster.profiles as AuthProfileView[]
+        if (typeof roster?.owned === 'string') state.owned = roster.owned
         delete state.error
       })
     } catch (error) {
@@ -143,6 +179,25 @@ export class FeishuAuthController {
         state.error = messageOf(error)
       })
     }
+  }
+
+  /**
+   * 换一份 profile 来管。
+   *
+   * 换完立刻重读：每个动作作用在哪个应用上是这一页最要紧的事实，不能让屏幕上
+   * 还留着上一份的状态。
+   * @param configDir - 目标目录；空串表示 dsh 自己那份。
+   * @returns 重读完为止。
+   */
+  async selectProfile(configDir: string): Promise<void> {
+    this.stopPolling()
+    this.store.update((state) => {
+      state.configDir = configDir
+      delete state.challenge
+      state.granted = false
+      delete state.error
+    })
+    await this.load()
   }
 
   /**
@@ -175,7 +230,10 @@ export class FeishuAuthController {
       delete state.error
     })
     try {
-      const progress = record(await this.call('begin', { domains: [...selected] }))
+      const progress = record(await this.call('begin', {
+        configDir: this.store.getSnapshot().configDir,
+        domains: [...selected],
+      }))
       this.applyProgress(progress)
     } catch (error) {
       this.store.update((state) => { state.error = messageOf(error) })
@@ -211,7 +269,7 @@ export class FeishuAuthController {
     })
     let failure: string | undefined
     try {
-      const outcome = record(await this.call('logout'))
+      const outcome = record(await this.call('logout', { configDir: this.store.getSnapshot().configDir }))
       if (outcome?.loggedOut !== true) {
         failure = typeof outcome?.message === 'string' ? outcome.message : '退出登录没有成功'
       }

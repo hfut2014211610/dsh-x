@@ -13,7 +13,10 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
-import { AUTH_DOMAINS, LarkAuth, type AuthProgress, type AuthStatus } from './auth.ts'
+import {
+  AUTH_DOMAINS, LarkAuth, discoverProfiles, dshConfigDir,
+  type AuthProfile, type AuthProgress, type AuthStatus,
+} from './auth.ts'
 
 /** 退出登录的结果。 */
 export interface LogoutOutcome {
@@ -24,6 +27,13 @@ export interface LogoutOutcome {
 /** 页面渲染权限勾选框需要的那份清单。 */
 export interface DomainList {
   readonly domains: readonly string[]
+}
+
+/** 这台机器上可以管理的 profile。 */
+export interface ProfileList {
+  readonly profiles: readonly AuthProfile[]
+  /** dsh 自己那份的目录；不指定 configDir 时作用的就是它。 */
+  readonly owned: string
 }
 
 /** 浏览器这一侧能调到的扫码登录动作。 */
@@ -39,12 +49,25 @@ export class FeishuAuthGateway extends TypertRemoteService {
   }
 
   /**
-   * 这台机器上的登录态。
-   * @returns 登录态；lark-cli 不在时 `installed` 为 false。
+   * 某一份 profile 的登录态。
+   * @param configDir - 读哪个目录；空串落到 dsh 自己那份，**不落到环境默认**。
+   * @returns 登录态。
    */
   @Remote('status')
-  status(): Promise<AuthStatus> {
-    return this.auth.status()
+  status(configDir: string): Promise<AuthStatus> {
+    return this.auth.status(configDir)
+  }
+
+  /**
+   * 这台机器上有哪些 profile 可以管。
+   *
+   * 页面必须先看见这份清单再动手：默认那份往往属于别的工具，对它 `auth login`
+   * 是往别人的应用上加权限，`auth logout` 是把别人踢下线。
+   * @returns profile 清单，以及 dsh 自己那份的位置。
+   */
+  @Remote('profiles')
+  async profiles(): Promise<ProfileList> {
+    return { profiles: await discoverProfiles(), owned: dshConfigDir() }
   }
 
   /**
@@ -61,12 +84,13 @@ export class FeishuAuthGateway extends TypertRemoteService {
 
   /**
    * 发起一次扫码授权。
+   * @param configDir - 授权给哪份 profile；空串落到 dsh 自己那份。
    * @param domains - 这次要开通的业务域。
    * @returns 链接与二维码，或失败原因。
    */
   @Remote('begin')
-  begin(domains: readonly string[]): Promise<AuthProgress> {
-    return this.auth.begin(domains)
+  begin(configDir: string, domains: readonly string[]): Promise<AuthProgress> {
+    return this.auth.begin(configDir, domains)
   }
 
   /**
@@ -89,12 +113,13 @@ export class FeishuAuthGateway extends TypertRemoteService {
   }
 
   /**
-   * 退出本机登录态。
+   * 退出某一份 profile 的本机登录态。
+   * @param configDir - 退哪份；空串落到 dsh 自己那份。
    * @returns 是否真的退了，以及失败原因。
    */
   @Remote('logout')
-  logout(): Promise<LogoutOutcome> {
-    return this.auth.logout()
+  logout(configDir: string): Promise<LogoutOutcome> {
+    return this.auth.logout(configDir)
   }
 }
 

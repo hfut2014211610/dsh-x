@@ -36,8 +36,16 @@ const settled: ConnectorFormState = {
 /** Sign-in state the card tests default to: read, signed in, nothing in flight. */
 const signedIn: FeishuAuthState = {
   phase: 'ready',
+  profiles: [
+    { configDir: '/home/me/.lark-cli/dsh-x', name: 'dsh-x', appId: 'cli_test', owned: true },
+    { configDir: '/home/me/.lark-cli', name: 'default', appId: 'cli_other', owned: false },
+  ],
+  configDir: '',
+  owned: '/home/me/.lark-cli/dsh-x',
   status: {
+    configDir: '/home/me/.lark-cli/dsh-x',
     installed: true,
+    configured: true,
     appId: 'cli_test',
     bot: { status: 'ready', available: true, message: '' },
     user: { status: 'ready', available: true, message: '', userName: '测试用户', scopes: ['im:message'] },

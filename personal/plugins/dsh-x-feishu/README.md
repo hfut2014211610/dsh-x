@@ -38,6 +38,13 @@ dsh-x-feishu:
 ```json
 {
   "eventEndpoint": "\\\\.\\pipe\\dsh-x-feishu-events",
+  "eventConfigDirs": [
+    "C:\\Users\\me\\.lark-cli",
+    "C:\\Users\\me\\.lark-cli\\second-app"
+  ],
+  "cardActionConfigDirs": [
+    "C:\\Users\\me\\.lark-cli"
+  ],
   "policy": {
     "dmMode": "allowlist",
     "dmAllowlist": ["ou_你的open_id"],
@@ -49,6 +56,8 @@ dsh-x-feishu:
   "launch": { "command": "pnpm", "args": ["dsh", "web"], "cwd": "D:/dev/DSH-X" }
 }
 ```
+
+`eventConfigDirs` 用于一个群里存在多个独立机器人应用的场景。飞书只会把“@某机器人”的群消息投递给那个机器人所属应用，因此 bridge 会对每个 App ID 各持有一份订阅，再汇入同一个 relay；同一 App ID + EventKey 仍然只能有一个 consumer，而且全部归 bridge 所有。`cardActionConfigDirs` 只列已经在飞书控制台订阅 `card.action.trigger` 的应用；省略时与 `eventConfigDirs` 相同。单应用部署可省略两个数组。
 
 **默认拒绝**：名单不填，谁都用不了。`botOpenId` 留空时桥接启动会向飞书问一次；问不到就要手填，否则群里的 @ 判定会全部落空。
 

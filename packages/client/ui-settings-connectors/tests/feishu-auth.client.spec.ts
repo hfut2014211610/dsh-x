@@ -16,18 +16,29 @@ const STATUS = {
   user: { status: 'ready', available: true, message: '', userName: '测试用户', scopes: ['im:message'] },
 }
 
-/** 一个按端点回答的假 RPC。 */
+const PROFILES = {
+  profiles: [
+    { configDir: '/home/me/.lark-cli/dsh-x', name: 'dsh-x', appId: 'cli_dsh', owned: true },
+    { configDir: '/home/me/.lark-cli', name: 'default', appId: 'cli_other', owned: false },
+  ],
+  owned: '/home/me/.lark-cli/dsh-x',
+}
+
+/** 一个按端点回答的假 RPC；profiles 有默认答案，因为每次 load 都会问它。 */
 function fakeRpc(answers: Record<string, () => unknown>) {
   const calls: string[] = []
+  const args: Record<string, unknown>[] = []
+  const withDefaults: Record<string, () => unknown> = { profiles: () => PROFILES, ...answers }
   const rpc: AuthRpc = {
-    call: (_channel, endpoint) => {
+    call: (_channel, endpoint, payload) => {
       calls.push(endpoint)
-      const answer = answers[endpoint.replace('feishuAuth/', '')]
+      args.push(payload.args)
+      const answer = withDefaults[endpoint.replace('feishuAuth/', '')]
       if (answer === undefined) return Promise.resolve<AuthRpcResult>({ ok: false, error: { message: `no stub for ${endpoint}` } })
       return Promise.resolve<AuthRpcResult>({ ok: true, value: answer() })
     },
   }
-  return { rpc, calls }
+  return { rpc, calls, args }
 }
 
 /** 把微任务队列排空，让 await 链走完。 */
@@ -80,14 +91,14 @@ describe('扫码', () => {
   const challenge = { verificationUrl: 'https://accounts.feishu.cn/oauth/v1/device/verify?flow_id=x', qrDataUrl: 'data:image/png;base64,AAA' }
 
   function bench(progress: () => unknown) {
-    const { rpc, calls } = fakeRpc({
+    const { rpc, calls, args } = fakeRpc({
       status: () => STATUS,
       domains: () => ({ domains: ['im'] }),
       begin: () => ({ phase: 'waiting', challenge }),
       progress,
       cancel: () => ({}),
     })
-    return { controller: new FeishuAuthController(rpc), calls }
+    return { controller: new FeishuAuthController(rpc), calls, args }
   }
 
   it('拿到二维码就上屏', async () => {
@@ -187,6 +198,48 @@ describe('扫码', () => {
 
     expect(controller.store.getSnapshot().challenge).toBeUndefined()
     expect(controller.store.getSnapshot().error).toBe('宿主没有回授权链接')
+  })
+})
+
+describe('作用在哪份 profile 上', () => {
+  // 这一页的每个动作都会改到某个飞书应用的授权。默认那份往往属于别的工具，
+  // 所以"作用在哪儿"必须是显式的、随请求走的，不能靠环境。
+  it('每个动作都带上目标目录', async () => {
+    const { rpc, args } = fakeRpc({
+      status: () => STATUS,
+      domains: () => ({ domains: ['im'] }),
+      begin: () => ({ phase: 'waiting', challenge: { verificationUrl: 'https://x/d' } }),
+      logout: () => ({ loggedOut: true }),
+    })
+    const controller = new FeishuAuthController(rpc)
+
+    await controller.selectProfile('/home/me/.lark-cli')
+    await controller.begin()
+    await controller.logout()
+
+    expect(args.filter(a => 'configDir' in a).every(a => a.configDir === '/home/me/.lark-cli')).toBe(true)
+    expect(args.some(a => a.domains !== undefined && a.configDir === '/home/me/.lark-cli')).toBe(true)
+  })
+
+  it('没选就是空串，由宿主落到 dsh 自己那份', async () => {
+    const { rpc, args } = fakeRpc({ status: () => STATUS, domains: () => ({ domains: ['im'] }) })
+    const controller = new FeishuAuthController(rpc)
+
+    await controller.load()
+
+    expect(args.some(a => a.configDir === '')).toBe(true)
+    expect(controller.store.getSnapshot().owned).toBe('/home/me/.lark-cli/dsh-x')
+    expect(controller.store.getSnapshot().profiles).toHaveLength(2)
+  })
+
+  it('换一份就重读，不留上一份的状态', async () => {
+    const { rpc, calls } = fakeRpc({ status: () => STATUS, domains: () => ({ domains: ['im'] }) })
+    const controller = new FeishuAuthController(rpc)
+
+    await controller.selectProfile('/home/me/.lark-cli')
+
+    expect(controller.store.getSnapshot().configDir).toBe('/home/me/.lark-cli')
+    expect(calls).toContain('feishuAuth/status')
   })
 })
 

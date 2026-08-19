@@ -20,7 +20,7 @@ type ExecFileMock = (
 const { execFileMock } = vi.hoisted(() => ({ execFileMock: vi.fn<ExecFileMock>() }))
 vi.mock('node:child_process', () => ({ execFile: execFileMock }))
 
-const { LarkAuth } = await import('../src/auth.ts')
+const { LarkAuth, dshConfigDir, discoverProfiles } = await import('../src/auth.ts')
 
 /** `auth status --json` 的真实形状，照抄本机输出。 */
 const STATUS = {
@@ -49,11 +49,12 @@ const PNG = Buffer.from('89504e470d0a1a0a', 'hex')
 /** 按命令派发假输出；`args` 是传给 lark-cli 的 argv。 */
 function respond(handler: (args: readonly string[], options: { cwd?: string }) => {
   stdout?: string
+  stderr?: string
   error?: Error & { code?: string }
 }): void {
   execFileMock.mockImplementation((_file, args, options, callback) => {
     const outcome = handler(args, options)
-    queueMicrotask(() => { callback(outcome.error ?? null, outcome.stdout ?? '', '') })
+    queueMicrotask(() => { callback(outcome.error ?? null, outcome.stdout ?? '', outcome.stderr ?? '') })
   })
 }
 
@@ -62,12 +63,61 @@ afterEach(() => { execFileMock.mockReset() })
 describe('登录态', () => {
   it('没装 lark-cli 就如实说没装，而不是说没登录', async () => {
     respond(() => ({ error: Object.assign(new Error('spawn ENOENT'), { code: 'ENOENT' }) }))
-    expect(await new LarkAuth().status()).toEqual({ installed: false })
+    expect(await new LarkAuth().status('')).toMatchObject({ installed: false, configured: false })
+  })
+
+  // 每条命令都必须显式指定 profile。这台机器上的环境默认往往属于别的工具，
+  // 跟着它走等于让这一页随手改别人的授权。
+  it('不指定就落到 dsh 自己那份，不落到环境默认', async () => {
+    let seen: string | undefined
+    execFileMock.mockImplementation((_file, _args, options, callback) => {
+      seen = (options as { env?: Record<string, string> }).env?.LARKSUITE_CLI_CONFIG_DIR
+      queueMicrotask(() => { callback(null, JSON.stringify(STATUS), '') })
+    })
+
+    const status = await new LarkAuth().status('')
+
+    expect(seen).toBe(dshConfigDir())
+    expect(seen?.endsWith('dsh-x')).toBe(true)
+    expect(status.configDir).toBe(dshConfigDir())
+  })
+
+  it('指定了就作用在指定的那份上', async () => {
+    let seen: string | undefined
+    execFileMock.mockImplementation((_file, _args, options, callback) => {
+      seen = (options as { env?: Record<string, string> }).env?.LARKSUITE_CLI_CONFIG_DIR
+      queueMicrotask(() => { callback(null, JSON.stringify(STATUS), '') })
+    })
+
+    await new LarkAuth().status('/home/me/.lark-cli/agent-bus')
+
+    expect(seen).toBe('/home/me/.lark-cli/agent-bus')
+  })
+
+  // 「这份 profile 还没绑应用」跟「没登录」的下一步完全不同：前者要先申请或
+  // 绑定一个应用，后者才轮到扫码。dsh 自己那份一开始必然是前者。
+  // 真实的 lark-cli 把失败信封写在 stderr 上，stdout 是空的——只读 stdout 的话
+  // 这一条会退化成"一整坨 JSON 塞进错误消息里"。
+  it('没绑应用不等于没登录（信封在 stderr 上）', async () => {
+    respond(() => ({
+      stdout: '',
+      stderr: JSON.stringify({
+        ok: false,
+        error: { type: 'config', subtype: 'not_configured', message: 'not configured', hint: 'run `lark-cli config init --new`' },
+      }),
+      error: Object.assign(new Error('exit 3'), { code: 3 as unknown as string }),
+    }))
+
+    expect(await new LarkAuth().status('')).toMatchObject({
+      installed: true,
+      configured: false,
+      configHint: 'run `lark-cli config init --new`',
+    })
   })
 
   it('把两个身份和 scope 拆出来', async () => {
     respond(() => ({ stdout: JSON.stringify(STATUS) }))
-    const status = await new LarkAuth().status()
+    const status = await new LarkAuth().status('')
 
     expect(status).toMatchObject({
       installed: true,
@@ -87,8 +137,9 @@ describe('登录态', () => {
       stdout: JSON.stringify({ error: { message: 'config not initialized' } }),
       error: Object.assign(new Error('exit 1'), { code: 1 as unknown as string }),
     }))
-    expect(await new LarkAuth().status()).toEqual({
+    expect(await new LarkAuth().status('')).toMatchObject({
       installed: true,
+      configured: true,
       error: 'config not initialized',
     })
   })
@@ -97,7 +148,7 @@ describe('登录态', () => {
 describe('发起扫码', () => {
   it('必须先选权限域', async () => {
     respond(() => ({ stdout: '{}' }))
-    expect(await new LarkAuth().begin([])).toEqual({
+    expect(await new LarkAuth().begin('', [])).toEqual({
       phase: 'failed',
       message: '至少要选一个要开通的权限域',
     })
@@ -108,7 +159,7 @@ describe('发起扫码', () => {
   // execFile 而不是 shell，一个 `--scope` 之类的值也能改掉这条命令的意思。
   it('形状不对的域一个都不放行', async () => {
     respond(() => ({ stdout: '{}' }))
-    const outcome = await new LarkAuth().begin(['--scope', 'im;rm -rf /', ''])
+    const outcome = await new LarkAuth().begin('', ['--scope', 'im;rm -rf /', ''])
     expect(outcome).toMatchObject({ phase: 'failed' })
     expect(execFileMock).not.toHaveBeenCalled()
   })
@@ -130,7 +181,7 @@ describe('发起扫码', () => {
       return { stdout: '{}' }
     })
 
-    const outcome = await new LarkAuth().begin(['im'])
+    const outcome = await new LarkAuth().begin('', ['im'])
     expect(outcome.phase).toBe('waiting')
     if (outcome.phase !== 'waiting') return
     expect(outcome.challenge.verificationUrl).toBe('https://open.feishu.cn/device?code=ABCD')
@@ -154,7 +205,7 @@ describe('发起扫码', () => {
         }),
       })
 
-    const outcome = await new LarkAuth().begin(['im', 'docs'])
+    const outcome = await new LarkAuth().begin('', ['im', 'docs'])
     expect(outcome).toMatchObject({
       phase: 'waiting',
       challenge: { verificationUrl: 'https://open.feishu.cn/device?code=EFGH' },
@@ -165,7 +216,7 @@ describe('发起扫码', () => {
 
   it('lark-cli 没回链接就算失败，而不是给一张空二维码', async () => {
     respond(() => ({ stdout: JSON.stringify({ device_code: 'only-the-code' }) }))
-    expect(await new LarkAuth().begin(['im'])).toMatchObject({ phase: 'failed' })
+    expect(await new LarkAuth().begin('', ['im'])).toMatchObject({ phase: 'failed' })
   })
 })
 
@@ -191,7 +242,7 @@ describe('授权进度', () => {
 
   it('扫完之前一直是 waiting，扫完变 granted', async () => {
     const { auth, settle } = beginWithHangingPoll()
-    await auth.begin(['im'])
+    await auth.begin('', ['im'])
     expect(auth.progress().phase).toBe('waiting')
 
     settle(true)
@@ -202,7 +253,7 @@ describe('授权进度', () => {
   // 结果只该被读到一次：留着会让下一次发起看起来"早就成了"。
   it('读到结果之后回到 idle', async () => {
     const { auth, settle } = beginWithHangingPoll()
-    await auth.begin(['im'])
+    await auth.begin('', ['im'])
     settle(true)
     await new Promise<void>((resolve) => { queueMicrotask(resolve) })
 
@@ -216,16 +267,34 @@ describe('授权进度', () => {
 
   it('放弃之后不再报进度', async () => {
     const { auth } = beginWithHangingPoll()
-    await auth.begin(['im'])
+    await auth.begin('', ['im'])
     auth.cancel()
     expect(auth.progress()).toEqual({ phase: 'idle' })
+  })
+})
+
+describe('列出可管理的 profile', () => {
+  // 没绑应用的目录不能写 `appId: undefined`：RPC 边界按"键在不在"校验，一个值
+  // 为 undefined 的键会让整条结果被拒，页面上就只剩一句校验失败。
+  it('没绑应用的目录不带 appId 这个键', async () => {
+    const profiles = await discoverProfiles()
+    for (const profile of profiles) {
+      expect(Object.hasOwn(profile, 'appId') ? typeof profile.appId : 'string').toBe('string')
+    }
+  })
+
+  it('总是列出 dsh 自己那份，哪怕它还不存在', async () => {
+    const profiles = await discoverProfiles()
+    const owned = profiles.filter(profile => profile.owned)
+    expect(owned).toHaveLength(1)
+    expect(owned[0]?.configDir).toBe(dshConfigDir())
   })
 })
 
 describe('退出登录', () => {
   it('退成功', async () => {
     respond(() => ({ stdout: JSON.stringify({ loggedOut: true }) }))
-    expect(await new LarkAuth().logout()).toEqual({ loggedOut: true })
+    expect(await new LarkAuth().logout('')).toEqual({ loggedOut: true })
   })
 
   it('退失败要带原因', async () => {
@@ -233,7 +302,7 @@ describe('退出登录', () => {
       stdout: JSON.stringify({ error: { message: 'nothing to log out' } }),
       error: Object.assign(new Error('exit 1'), { code: 1 as unknown as string }),
     }))
-    expect(await new LarkAuth().logout()).toEqual({
+    expect(await new LarkAuth().logout('')).toEqual({
       loggedOut: false,
       message: 'nothing to log out',
     })

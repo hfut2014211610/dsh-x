@@ -73,6 +73,8 @@ export interface FeishuCardFace extends ConnectorActions {
   setEnabled: (enabled: boolean) => void
   /** Read the sign-in state and the grantable domains. */
   readAuth: () => void
+  /** Point every sign-in action at a different lark-cli profile. */
+  selectProfile: (configDir: string) => void
   /** Check or clear one permission domain for the next scan. */
   selectDomain: (domain: string, wanted: boolean) => void
   /** Start a scan-to-authorize. */
@@ -135,6 +137,7 @@ export class FeishuCardController {
       readPresence: () => { void this.presence.refresh() },
       setEnabled: (enabled) => { void this.presence.setEnabled(enabled) },
       readAuth: () => { void this.auth.load() },
+      selectProfile: (configDir) => { void this.auth.selectProfile(configDir) },
       selectDomain: (domain, wanted) => { this.auth.select(domain, wanted) },
       beginAuth: () => { void this.auth.begin() },
       cancelAuth: () => { void this.auth.cancel() },

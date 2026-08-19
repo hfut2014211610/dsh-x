@@ -42,6 +42,13 @@ interface BridgeConfig {
   readonly endpoint: string
   /** 其他本机 Agent 只读订阅原始飞书事件的端点。 */
   readonly eventEndpoint: string
+  /**
+   * 要接入 relay 的飞书应用配置目录。每个应用的每个 EventKey 仍然只有桥接中的
+   * 一个 consumer；数组用来覆盖同群里的多个独立机器人应用。
+   */
+  readonly eventConfigDirs: readonly string[]
+  /** 卡片回调已在控制台订阅的应用；省略时与 eventConfigDirs 相同。 */
+  readonly cardActionConfigDirs?: readonly string[]
   readonly policy: AccessPolicy
   /** 机器人 open_id；留空则启动时向飞书问一次。 */
   readonly botOpenId: string
@@ -56,6 +63,7 @@ const CONFIG_PATH = join(homedir(), '.dsh-x-feishu', 'config.json')
 const DEFAULT_CONFIG: BridgeConfig = {
   endpoint: defaultEndpoint(),
   eventEndpoint: defaultEventRelayEndpoint(),
+  eventConfigDirs: [],
   policy: DEFAULT_POLICY,
   botOpenId: '',
   probeOrigin: 'http://127.0.0.1:13080',
@@ -135,20 +143,42 @@ class Bridge {
       log(`在 ${this.config.eventEndpoint} 上广播飞书事件`)
     })
 
-    const handlers = {
-      onDiagnostic: (line: string) => { log(`lark-cli: ${line}`) },
-      onExit: (code: number | null, wait: number) => {
-        log(`消费者退出（code=${String(code)}），${wait}ms 后重启`)
-      },
+    const configuredDirs = this.config.eventConfigDirs
+      .map(value => value.trim())
+      .filter(value => value !== '')
+    // 空数组保持单应用默认行为；显式数组会在每个应用里各持有一份唯一订阅。
+    const eventSources = configuredDirs.length === 0 ? [''] : [...new Set(configuredDirs)]
+    const cardActionSources = this.config.cardActionConfigDirs === undefined
+      ? eventSources
+      : [...new Set(this.config.cardActionConfigDirs.map(value => value.trim()).filter(value => value !== ''))]
+    const environmentFor = (configDir: string): NodeJS.ProcessEnv | undefined => configDir === '' ? undefined : {
+      LARKSUITE_CLI_CONFIG_DIR: configDir,
+      LARKSUITE_CLI_NO_UPDATE_NOTIFIER: '1',
+      LARKSUITE_CLI_NO_SKILLS_NOTIFIER: '1',
     }
-    new EventConsumer('im.message.receive_v1', {
-      ...handlers,
-      onEvent: (event: unknown) => { void this.onMessageEvent(event as LarkMessageEvent) },
-    }).start()
-    new EventConsumer('card.action.trigger', {
-      ...handlers,
-      onEvent: (event: unknown) => { this.onCardActionEvent(event as LarkCardActionEvent) },
-    }).start()
+    const handlersFor = (configDir: string) => {
+      const source = configDir === '' ? 'default' : configDir
+      return {
+        onDiagnostic: (line: string) => { log(`lark-cli[${source}]: ${line}`) },
+        onExit: (code: number | null, wait: number) => {
+          log(`消费者[${source}]退出（code=${String(code)}），${wait}ms 后重启`)
+        },
+      }
+    }
+    for (const [index, configDir] of eventSources.entries()) {
+      new EventConsumer('im.message.receive_v1', {
+        ...handlersFor(configDir),
+        onEvent: (event: unknown) => { void this.onMessageEvent(event as LarkMessageEvent) },
+      }, undefined, environmentFor(configDir)).start()
+      log(`消息事件源 ${index + 1}/${eventSources.length} 已启动：${configDir === '' ? 'default' : configDir}`)
+    }
+    for (const [index, configDir] of cardActionSources.entries()) {
+      new EventConsumer('card.action.trigger', {
+        ...handlersFor(configDir),
+        onEvent: (event: unknown) => { this.onCardActionEvent(event as LarkCardActionEvent) },
+      }, undefined, environmentFor(configDir)).start()
+      log(`卡片事件源 ${index + 1}/${cardActionSources.length} 已启动：${configDir === '' ? 'default' : configDir}`)
+    }
   }
 
   /** dsh 插件连上来了。只认一个客户端，第二个连接把前一个顶掉。 */

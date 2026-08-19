@@ -15,6 +15,8 @@ export interface FeishuAuthPanelProps {
   /** 这一页的文案。 */
   t: (key: ConnectorsKey) => string
   state: FeishuAuthState
+  /** 换一份 profile 来管。 */
+  onSelectProfile: (configDir: string) => void
   /** 勾上或取消一个业务域。 */
   onSelect: (domain: string, wanted: boolean) => void
   /** 发起扫码。 */
@@ -45,6 +47,12 @@ function Row({ label, children }: { label: string; children: React.ReactNode }) 
 export function FeishuAuthPanel(props: FeishuAuthPanelProps) {
   const { t, state } = props
   const status = state.status
+  // 选中的不是 dsh 自己那份：这一段的每个动作都会落到别人的应用上。
+  const foreign = state.configDir !== '' && state.configDir !== state.owned
+  // 还没绑应用的 profile 没有可授权的对象，扫码在这里毫无意义。
+  const unconfigured = status?.installed === true && status.configured === false
+  // lark-cli 自己那句下一步比我们的通用措辞准，有就用它的。
+  const configHint = state.status?.configHint
 
   if (state.phase === 'loading' || state.phase === 'idle') {
     return (
@@ -65,6 +73,31 @@ export function FeishuAuthPanel(props: FeishuAuthPanelProps) {
         ? <p className={css.absent} role="status">{t('auth.absent')}</p>
         : (
           <>
+            {/* 作用在哪个应用上，是这一页最要紧的一句话，所以它排在最前面。
+                这台机器上的默认那份往往属于别的工具，授权会加到它头上、退出
+                登录会把它踢下线——所以选中别人的那份时要明说。 */}
+            <div className={css.authRow}>
+              <span className={css.authLabel}>{t('auth.profile')}</span>
+              <span className={css.authValue}>
+                <select
+                  className={css.select}
+                  value={state.configDir}
+                  disabled={state.busy}
+                  onChange={(event) => { props.onSelectProfile(event.target.value) }}
+                >
+                  {state.profiles.map(profile => (
+                    <option key={profile.configDir} value={profile.owned ? '' : profile.configDir}>
+                      {profile.name}
+                      {profile.appId === undefined ? '' : ` · ${profile.appId}`}
+                    </option>
+                  ))}
+                </select>
+              </span>
+            </div>
+            <p className={foreign ? css.failed : css.hint} role={foreign ? 'status' : undefined}>
+              {t(foreign ? 'auth.profileForeign' : 'auth.profileOwned')}
+            </p>
+
             {status?.appId === undefined ? null : (
               <Row label={t('auth.app')}><code className={css.reason}>{status.appId}</code></Row>
             )}
@@ -98,9 +131,16 @@ export function FeishuAuthPanel(props: FeishuAuthPanelProps) {
               </>
             )}
 
+            {unconfigured ? (
+              <>
+                <p className={css.absent} role="status">{t('auth.unconfigured')}</p>
+                <p className={css.hint}>{configHint ?? t('auth.unconfiguredHint')}</p>
+              </>
+            ) : null}
+
             {/* 二维码在场的时候，权限勾选就不该再动了：这次要什么已经写进那张
                 码里，改勾选不会改变它，只会让人以为改了。 */}
-            {state.challenge === undefined
+            {unconfigured ? null : state.challenge === undefined
               ? (
                 <>
                   <div className={css.authDomains} role="group" aria-label={t('auth.domains')}>
@@ -144,17 +184,19 @@ export function FeishuAuthPanel(props: FeishuAuthPanelProps) {
             {state.error === undefined ? null : <p className={css.failed} role="status">{state.error}</p>}
 
             <div className={css.authActions}>
-              {state.challenge === undefined
-                ? (
-                  <button type="button" className={css.save} disabled={state.busy} onClick={props.onBegin}>
-                    {t(state.busy ? 'auth.scanning' : 'auth.scan')}
-                  </button>
-                )
-                : (
-                  <button type="button" className={css.discard} onClick={props.onCancel}>
-                    {t('auth.cancel')}
-                  </button>
-                )}
+              {unconfigured
+                ? null
+                : state.challenge === undefined
+                  ? (
+                    <button type="button" className={css.save} disabled={state.busy} onClick={props.onBegin}>
+                      {t(state.busy ? 'auth.scanning' : 'auth.scan')}
+                    </button>
+                  )
+                  : (
+                    <button type="button" className={css.discard} onClick={props.onCancel}>
+                      {t('auth.cancel')}
+                    </button>
+                  )}
               <button type="button" className={css.discard} onClick={props.onReload}>
                 {t('auth.reload')}
               </button>

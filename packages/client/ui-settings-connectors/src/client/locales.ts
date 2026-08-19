@@ -17,6 +17,8 @@ export type ConnectorsKey =
   | 'auth.domains' | 'auth.domainsHint' | 'auth.scan' | 'auth.scanning'
   | 'auth.qrHint' | 'auth.openLink' | 'auth.cancel' | 'auth.granted'
   | 'auth.logout' | 'auth.logoutHint'
+  | 'auth.profile' | 'auth.profileOwned' | 'auth.profileForeign'
+  | 'auth.unconfigured' | 'auth.unconfiguredHint'
   | 'feishu.name' | 'feishu.summary' | 'feishu.absent'
   | 'feishu.presetId.label' | 'feishu.presetId.hint'
   | 'feishu.density.label' | 'feishu.density.hint'
@@ -80,6 +82,11 @@ export const en: Record<ConnectorsKey, string> = {
   'auth.granted': 'Authorized.',
   'auth.logout': 'Sign out on this machine',
   'auth.logoutHint': 'Clears the token here only. What you granted the app in Feishu stays granted; take it back in Feishu’s authorization manager.',
+  'auth.profile': 'Acting on',
+  'auth.profileOwned': 'dsh’s own app.',
+  'auth.profileForeign': 'This app belongs to another tool on this machine. Authorizing adds permissions to it, and signing out signs that tool out — not dsh.',
+  'auth.unconfigured': 'No app is bound to this profile yet, so there is nothing to authorize.',
+  'auth.unconfiguredHint': 'Bind one first: run lark-cli config init --new with LARKSUITE_CLI_CONFIG_DIR set to the directory above, then come back.',
   'feishu.name': 'Feishu',
   'feishu.summary': 'One line in a DM starts work; an @ in a group picks it up. Progress rides a card that updates in stages.',
   'feishu.absent': 'Not in this deployment. Add it with dsh plugin --profile web add <plugin directory> — this fork keeps it at personal/plugins/dsh-x-feishu, which the packaged app does not carry. Credentials stay with the bridge process; nothing on this page touches them.',
@@ -146,6 +153,11 @@ export const zh: Record<ConnectorsKey, string> = {
   'auth.granted': '授权成功。',
   'auth.logout': '退出本机登录',
   'auth.logoutHint': '只清这台机器上的登录态。你在飞书那边给应用的授权还在，要收回得去飞书的授权管理页。',
+  'auth.profile': '作用在',
+  'auth.profileOwned': 'dsh 自己的应用。',
+  'auth.profileForeign': '这个应用属于这台机器上的别的工具。在这里授权是往它上面加权限，退出登录退的也是它，不是 dsh。',
+  'auth.unconfigured': '这份 profile 还没绑应用，所以没有可授权的对象。',
+  'auth.unconfiguredHint': '先绑一个：把 LARKSUITE_CLI_CONFIG_DIR 设成上面那个目录，跑一次 lark-cli config init --new，然后回来。',
   'feishu.name': '飞书',
   'feishu.summary': '单聊发一句话就干活，群里 @ 一下就接活，过程在一张分阶段更新的卡片上。',
   'feishu.absent': '这个部署里没有。用 dsh plugin --profile web add <插件目录> 挂进来——本 fork 放在 personal/plugins/dsh-x-feishu，安装包里不带。凭证在桥接进程手里，这一页碰不到。',

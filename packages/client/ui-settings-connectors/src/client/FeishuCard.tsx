@@ -46,6 +46,7 @@ export function FeishuCard(props: FeishuCardProps) {
         <FeishuAuthPanel
           t={t}
           state={state.auth}
+          onSelectProfile={props.selectProfile}
           onSelect={props.selectDomain}
           onBegin={props.beginAuth}
           onCancel={props.cancelAuth}
