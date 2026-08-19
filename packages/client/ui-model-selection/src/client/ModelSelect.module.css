@@ -11,7 +11,11 @@
   align-items: center;
   gap: 4px;
   min-width: 0;
-  max-width: 220px;
+  /* A button sizes to its content, so a shrinking row moves the seat's edge
+     without moving the button's — capping at the seat width is what hands the
+     shrink down to the label, which is the one part with an ellipsis to give.
+     220px stays the ceiling on a wide row. */
+  max-width: min(220px, 100%);
   height: 28px;
   padding: 0 4px 0 8px;
   border: none;

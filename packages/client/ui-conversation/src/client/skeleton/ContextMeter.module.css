@@ -4,6 +4,9 @@
 .root {
   position: relative;
   display: inline-flex;
+  /* A fixed 28px ring: it has nothing to give a shrinking row, and shrinking
+     it anyway only pushes the trigger out of its own box. */
+  flex: none;
 }
 
 /* Same 28px circular hit target family as the composer's attach button. */

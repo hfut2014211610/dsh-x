@@ -310,7 +310,13 @@
 /* figma 75:8208 drew 16 between + and the mode chips and 4 between Plan /
    Read-only; the chip gap widened to 12 so the pill chips read as separate
    controls. */
+/* The left group holds controls; the right group holds one long label and two
+   fixed buttons. So when the row runs out of width the label is what gives.
+   Held rigid, the left group is squeezed to nothing while every button inside
+   it keeps its own width and slides out under the right group — the model name
+   was covering the attach and mode chips in a companion-width card. */
 .tools {
+  flex: 0 0 auto;
   gap: 16px;
 }
 
@@ -319,7 +325,7 @@
 }
 
 .trailing {
-  flex: none;
+  flex: 0 1 auto;
   gap: 12px;
 }
 
