@@ -244,6 +244,7 @@
    Grid stretches its only child, so the frame fills the stage; a narrower
    viewport caps the frame's width and `justify-items` centers what is left. */
 .frameWrap {
+  position: relative;
   display: grid;
   flex: 1;
   justify-items: center;
@@ -284,4 +285,128 @@
 
 .error {
   color: var(--dsw-alias-state-error-primary);
+}
+
+/* Armed picker: the toggle stays lit while the frame is listening, because the
+   only other sign is a crosshair cursor inside the frame. */
+.iconButtonOn {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+  color: var(--dsw-alias-label-primary);
+}
+
+.armHint {
+  position: absolute;
+  top: 20px;
+  left: 50%;
+  z-index: 1;
+  max-width: 40ch;
+  margin: 0;
+  padding: 6px 10px;
+  border-radius: 8px;
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-shadow-lv2);
+  color: var(--dsw-alias-label-secondary);
+  font-size: 12px;
+  line-height: 1.5;
+  transform: translateX(-50%);
+}
+
+/* The hit stack floats over the frame rather than beside it: it names things
+   the person is looking AT, and the outline it drives is in the frame. */
+.stack {
+  position: absolute;
+  top: 20px;
+  right: 20px;
+  z-index: 1;
+  display: flex;
+  flex-direction: column;
+  width: 280px;
+  max-height: calc(100% - 40px);
+  overflow-y: auto;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-2);
+  box-shadow: var(--dsw-shadow-lv3);
+}
+
+.stackHeader {
+  display: flex;
+  flex: none;
+  align-items: center;
+  justify-content: space-between;
+  gap: 8px;
+  padding: 6px 6px 6px 12px;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 12px;
+}
+
+.stackRow {
+  display: flex;
+  align-items: center;
+  gap: 8px;
+  padding: 6px 6px 6px 10px;
+  cursor: default;
+}
+
+.stackRow:hover {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+}
+
+/* Depth reads as a rank, not a count: 1 is what the pointer is over and the
+   rest are what it is over TOP of. */
+.stackDepth {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  justify-content: center;
+  width: 18px;
+  height: 18px;
+  border-radius: 5px;
+  background: var(--dsw-alias-bg-module-platform);
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  font-variant-numeric: tabular-nums;
+}
+
+.stackWhat {
+  display: flex;
+  flex-direction: column;
+  gap: 2px;
+  min-width: 0;
+}
+
+.stackLabel {
+  overflow: hidden;
+  color: var(--dsw-alias-label-primary);
+  font-size: 12px;
+  font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stackText {
+  overflow: hidden;
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 11px;
+  text-overflow: ellipsis;
+  white-space: nowrap;
+}
+
+.stackAdd {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  margin-left: auto;
+  padding: 4px;
+  border: 0;
+  border-radius: 6px;
+  background: transparent;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.stackAdd:hover {
+  background: var(--dsw-alias-interactive-bg-hover-solid);
+  color: var(--dsw-alias-label-primary);
 }

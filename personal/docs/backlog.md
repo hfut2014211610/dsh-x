@@ -2,13 +2,12 @@
 
 滚动记录。编号沿用最早提出的顺序，新增项接着排字母。**只看清单的话看下面两张表就够了。**
 
-最后整理：2026-08-20（第二轮）。
+最后整理：2026-08-20（第三轮）。
 
 ## 待做
 
 | # | 事项 | 状态 | 落点 |
 |---|---|---|---|
-| 9 | UED 预览支持标注组件 / 加入对话；层叠元素可选中被遮挡项 | ⏸ 需定范围（大件） | iframe 是 `allow-scripts` 且不与 `allow-same-origin` 同列，宿主拿不到里面的 DOM。要注入受控拾取脚本 + postMessage，且不能破坏现有隔离断言 |
 | N | `test:web` 在 Windows 上过不去 | **保持现状（你定的）** | 直接断言工具目录的两个文件已改成认平台；剩下 14 个是重放夹具——录制时模型调 `bash`，win32 目录里没这个名字。**本机 `test:web` 的红不构成信号**，别拿它判断回归 |
 
 ## 部分完成
@@ -55,6 +54,7 @@
 | T | 飞书端到端 | ✅ 用户实测通了（2026-08-20）。dsh 侧的出站身份、桥接配置、连接器卡片见本会话前半段 |
 | A | 写作产物落进受管目录 `75c7056c24` | `writing` 与 `ued` 的 policy 现在说了产物落哪：用户指定处或工作区根，不进项目自有的文档树/源码树 |
 | D | 写作 / UED 默认不展开文件目录 `e62eda2bb8` `dd52743cda` | 写作面板默认折起，第一份非人工打开的产物到达时自己出来；设计栏在有原型前干脆不存在 |
+| 9 | UED 预览标注组件 / 加入对话；层叠可选被遮挡项 | 拾取只能在框内做（宿主读 `contentDocument` 是 `null`），所以注入脚本 + `postMessage`。回话**不按 origin 验**——沙箱框的 origin 全是 `'null'`——改按 `event.source` 对象身份认；载荷一律当敌意文本重构一遍，不进任何标记渲染口。层叠靠 `elementsFromPoint` 取整条栈。脚本随文档进去而不是按下标注时才注入（晚注入要重载框，会丢掉人正要指的那个状态），`previewSrcdoc` 默认仍不注入。确认后经 `sessions.scope` → `input.setDraft` 落进草稿，不直发 |
 | R | 写作模式笔记状态订正 `HEAD` | 九条验收逐条核过并写进笔记；第九条缺的那半——组装后的写作会话零断言——本轮补上了 |
 
 ---
@@ -111,6 +111,14 @@
 - 围栏代码块与展示公式渲染成组件与 Fragment，没有元素能挂属性，于是走一个 `display: contents` 的包装元素——它不生成盒子，布局与没有它时一致，代价是读几何量要穿到里面那一层。裸 HTML 仍不标：它渲染成裸字符串，包起来会改变相邻字面文本的合并方式，而那正是 parity fixture 钉的东西。
 
 取舍全文见[笔记](notes/implemented/2026-08-20-markdown-source-positions.md)。
+
+## #9 之后还欠仓库的：三个毕业包没过门
+
+写 #9 时把仓库的门跑全了，发现上一轮毕业的三个包（`channel/feishu`、`llm/model-tuning`、`host/instance-lock`）没过四道门：`verify-export-jsdoc`、`verify-package-invariants`、`verify-package-readme-limitations`、`verify-package-readme-model-experience`。**上一轮我报「九个门全绿」时跑的是更窄的一组，这四道没在里面。**
+
+这些门只扫 `packages/` 与 `apps/`——包还在 `personal/` 底下时它们根本看不见，一毕业就全部到期。
+
+（另有 `verify-client-domain-graph` 27 条全在上游 `runtime/` 与 `ui-workspace/`，与本轮无关，本来就是红的。）
 
 ## #N：`test:web` 与 win32
 

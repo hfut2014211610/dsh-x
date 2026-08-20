@@ -11,6 +11,8 @@ export type UedKey =
   | 'preview.open' | 'preview.reload' | 'preview.badge'
   | 'preview.width.label' | 'preview.width.auto'
   | 'preview.width.desktop' | 'preview.width.tablet' | 'preview.width.mobile'
+  | 'inspect.arm' | 'inspect.disarm' | 'inspect.hint'
+  | 'inspect.stack' | 'inspect.add' | 'inspect.close'
 
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface LocaleNamespaceMap {
@@ -42,6 +44,12 @@ export const en: Record<UedKey, string> = {
   'preview.width.desktop': 'Desktop',
   'preview.width.tablet': 'Tablet',
   'preview.width.mobile': 'Phone',
+  'inspect.arm': 'Annotate an element',
+  'inspect.disarm': 'Stop annotating',
+  'inspect.hint': 'Click an element in the preview. Where things overlap, every layer under the pointer is listed.',
+  'inspect.stack': 'Elements at this point',
+  'inspect.add': 'Add to conversation',
+  'inspect.close': 'Close',
 }
 
 /** Simplified Chinese copy. */
@@ -67,4 +75,10 @@ export const zh: Record<UedKey, string> = {
   'preview.width.desktop': '桌面',
   'preview.width.tablet': '平板',
   'preview.width.mobile': '手机',
+  'inspect.arm': '标注元素',
+  'inspect.disarm': '退出标注',
+  'inspect.hint': '在预览里点一个元素。层叠的地方，指针下的每一层都会列出来。',
+  'inspect.stack': '这个位置上的元素',
+  'inspect.add': '加入对话',
+  'inspect.close': '关闭',
 }

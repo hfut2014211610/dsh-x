@@ -4,9 +4,12 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ConvViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
   IconChevronRightOutline14,
+  IconCloseOutline16,
   IconCodeOutline16,
   IconFolderClose16,
+  IconListPenOutline16,
   IconLoadingOutline16,
+  IconPlusOutline16,
   IconRefreshOutline16,
   IconWarningOutline16,
   ResizeHandle,
@@ -18,6 +21,8 @@ import type {
   DocumentReadResult,
 } from '@deepseek-ai/dsh-documents/types'
 import type { UedKey } from './locales.ts'
+import type { InspectCandidate } from './inspect.ts'
+import { annotationFor, postInspectCommand, readInspectMessage } from './inspect.ts'
 import { isPreviewable, previewSrcdoc, PREVIEW_SANDBOX } from './sandbox.ts'
 import css from './UedView.module.css'
 
@@ -66,6 +71,14 @@ export interface UedViewInjected {
   load: (path: string) => Promise<DocumentReadResult | { error: string }>
   subscribeChanged: (fn: (change: DocumentChange) => void) => () => void
   translate: (key: UedKey) => string
+  /**
+   * Put an element reference into this session's composer draft.
+   *
+   * Its absence is what turns the whole feature off: without a composer to
+   * annotate into there is nothing for a pick to become, so the view neither
+   * offers the affordance nor injects the picker into the frame.
+   */
+  annotate?: (text: string) => void
 }
 
 /** Parent of a workspace-relative directory path; empty string is the root. */
@@ -85,6 +98,7 @@ export function UedView({
   load,
   subscribeChanged,
   translate: t,
+  annotate,
 }: ConvViewProps & Partial<UedViewInjected>): React.ReactElement {
   const [railWidth, setRailWidth] = useState(RAIL_DEFAULT)
   const [viewport, setViewport] = useState<number | undefined>(undefined)
@@ -111,6 +125,12 @@ export function UedView({
    * longer just watching.
    */
   const following = useRef(true)
+  /** The framed window — the only `event.source` a pick is ever accepted from. */
+  const frameRef = useRef<HTMLIFrameElement>(null)
+  const [armed, setArmed] = useState(false)
+  const [picked, setPicked] = useState<readonly InspectCandidate[] | null>(null)
+  const armedRef = useRef(false)
+  armedRef.current = armed
 
   const refreshListing = useCallback(async (path: string) => {
     if (list === undefined) return
@@ -133,14 +153,21 @@ export function UedView({
       setPreview({ status: 'error', error: result.error })
       return
     }
-    setPreview({ status: 'ready', srcdoc: previewSrcdoc(result.content) })
-  }, [load])
+    // The picker travels with the document rather than being injected when
+    // someone arms it: injecting later means reloading the frame, and a
+    // prototype reloaded mid-annotation loses the state the person navigated
+    // it into. Without a composer to annotate into, it is left out entirely.
+    setPreview({ status: 'ready', srcdoc: previewSrcdoc(result.content, { inspect: annotate !== undefined }) })
+  }, [load, annotate])
 
   useEffect(() => { void refreshListing(directory) }, [directory, refreshListing])
 
   const show = useCallback((path: string) => {
     setSelected(path)
     selectedRef.current = path
+    // A hit stack names elements in the document that produced it; the next
+    // one has its own.
+    setPicked(null)
     setPreview({ status: 'loading' })
     void loadPreview(path)
   }, [loadPreview])
@@ -182,6 +209,54 @@ export function UedView({
       dispose()
     }
   }, [subscribeChanged, loadPreview, refreshListing, show])
+
+  // The picker runs inside the frame and answers over postMessage: the sandbox
+  // leaves the host no way to read the framed document, so there is no
+  // host-side hit testing to do. Nothing here trusts the message's origin —
+  // every sandboxed frame posts as `null` — which is why readInspectMessage
+  // is handed this frame's window and matches on identity.
+  useEffect(() => {
+    const onMessage = (event: MessageEvent): void => {
+      const frame = frameRef.current?.contentWindow ?? null
+      const message = readInspectMessage(event.data, event.source, frame)
+      if (message === undefined) return
+      if (message.type === 'ready') {
+        // Reloading the prototype re-runs the injected script from scratch, so
+        // an armed picker would otherwise go quietly dead under a repaint.
+        if (armedRef.current) postInspectCommand(frame, { type: 'arm' })
+        return
+      }
+      if (message.type === 'cancelled') {
+        setArmed(false)
+        setPicked(null)
+        return
+      }
+      setPicked(message.candidates)
+    }
+    window.addEventListener('message', onMessage)
+    return () => { window.removeEventListener('message', onMessage) }
+  }, [])
+
+  const toggleArmed = useCallback(() => {
+    const next = !armedRef.current
+    setArmed(next)
+    if (!next) setPicked(null)
+    postInspectCommand(frameRef.current?.contentWindow ?? null, { type: next ? 'arm' : 'disarm' })
+  }, [])
+
+  /** Outline one candidate in the frame; a negative depth clears the outline. */
+  const highlight = useCallback((depth: number) => {
+    postInspectCommand(frameRef.current?.contentWindow ?? null, { type: 'highlight', depth })
+  }, [])
+
+  const addToConversation = useCallback((candidate: InspectCandidate) => {
+    const path = selectedRef.current
+    if (annotate === undefined || path === undefined) return
+    annotate(annotationFor(path, candidate))
+    setArmed(false)
+    setPicked(null)
+    postInspectCommand(frameRef.current?.contentWindow ?? null, { type: 'disarm' })
+  }, [annotate])
 
   const label = (key: UedKey): string => t === undefined ? key : t(key)
   const directories = listing.entries.filter(entry => entry.kind === 'directory')
@@ -290,6 +365,17 @@ export function UedView({
               </button>
             ))}
           </div>
+          {annotate !== undefined && preview.status === 'ready' && (
+            <button
+              type="button"
+              className={armed ? `${css.iconButton} ${css.iconButtonOn}` : css.iconButton}
+              aria-label={label(armed ? 'inspect.disarm' : 'inspect.arm')}
+              aria-pressed={armed}
+              onClick={toggleArmed}
+            >
+              <IconListPenOutline16 />
+            </button>
+          )}
           {selected !== undefined && (
             <button
               type="button"
@@ -316,12 +402,59 @@ export function UedView({
             // host origin; a same-origin route would hand it a valid Origin
             // for /api and defeat the sandbox entirely.
             <iframe
+              ref={frameRef}
               className={css.frame}
               style={viewport === undefined ? undefined : { maxWidth: `${String(viewport)}px` }}
               title={label('preview.label')}
               sandbox={PREVIEW_SANDBOX}
               srcDoc={preview.srcdoc}
             />
+          )}
+          {armed && picked === null && preview.status === 'ready' && (
+            <p className={css.armHint}>{label('inspect.hint')}</p>
+          )}
+          {picked !== null && (
+            // Every field here is rendered as text. The frame can forge this
+            // payload — it shares a realm with the prototype — so none of it
+            // is ever handed to a markup sink.
+            <aside
+              className={css.stack}
+              aria-label={label('inspect.stack')}
+              onMouseLeave={() => { highlight(-1) }}
+            >
+              <header className={css.stackHeader}>
+                <span>{label('inspect.stack')}</span>
+                <button
+                  type="button"
+                  className={css.iconButton}
+                  aria-label={label('inspect.close')}
+                  onClick={() => { setPicked(null); highlight(-1) }}
+                >
+                  <IconCloseOutline16 />
+                </button>
+              </header>
+              {picked.map(candidate => (
+                <div
+                  key={candidate.depth}
+                  className={css.stackRow}
+                  onMouseEnter={() => { highlight(candidate.depth) }}
+                >
+                  <span className={css.stackDepth}>{candidate.depth + 1}</span>
+                  <span className={css.stackWhat}>
+                    <code className={css.stackLabel}>{candidate.label}</code>
+                    {candidate.text !== '' && <span className={css.stackText}>{candidate.text}</span>}
+                  </span>
+                  <button
+                    type="button"
+                    className={css.stackAdd}
+                    aria-label={label('inspect.add')}
+                    onClick={() => { addToConversation(candidate) }}
+                  >
+                    <IconPlusOutline16 />
+                  </button>
+                </div>
+              ))}
+            </aside>
           )}
         </div>
       </section>

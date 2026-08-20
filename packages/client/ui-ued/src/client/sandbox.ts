@@ -6,6 +6,8 @@
  * @module @deepseek-ai/dsh-client-ui-ued/sandbox
  */
 
+import { INSPECT_SCRIPT } from './inspect.ts'
+
 /**
  * Every sandbox token the preview frame is ever given.
  *
@@ -58,6 +60,35 @@ export const PREVIEW_CSP = [
 
 const CSP_META = `<meta http-equiv="Content-Security-Policy" content="${PREVIEW_CSP}">`
 
+/** How much the frame is asked to carry beyond the prototype itself. */
+export interface PreviewOptions {
+  /**
+   * Inject the element picker ({@link INSPECT_SCRIPT}).
+   *
+   * Off by default, so this function's plain form stays exactly the document
+   * the model wrote plus the policy. The view turns it on for every preview
+   * rather than at the moment someone arms the picker: injecting later would
+   * mean reloading the frame, and a prototype reloaded mid-inspection loses
+   * whatever state the person navigated it into — which is usually the state
+   * they wanted to point at.
+   *
+   * It grants the prototype nothing. `postMessage` to the embedder was never
+   * gated by `sandbox`, so a hostile prototype could always talk to the host;
+   * what changes is that the host now listens, and that listener is what
+   * `readInspectMessage` hardens.
+   */
+  readonly inspect?: boolean
+}
+
+/** Head content inserted ahead of the prototype's own, policy always first. */
+function preamble(options: PreviewOptions | undefined): string {
+  // The policy leads unconditionally: a script inserted before it would run
+  // under whatever the document declares for itself, which is the one thing
+  // this insert exists to overrule.
+  if (options?.inspect !== true) return CSP_META
+  return `${CSP_META}<script>${INSPECT_SCRIPT}</script>`
+}
+
 /**
  * Wrap one prototype for `srcdoc` injection, putting the CSP where the parser
  * will honour it.
@@ -71,24 +102,26 @@ const CSP_META = `<meta http-equiv="Content-Security-Policy" content="${PREVIEW_
  * This is a defence in depth, not the defence: {@link PREVIEW_SANDBOX} is. A
  * prototype whose markup defeats the insert is still confined by the sandbox.
  * @param html - the prototype document, as the model wrote it.
+ * @param options - what else the frame should carry; the picker is opt-in.
  * @returns markup for the frame's `srcdoc`.
  */
-export function previewSrcdoc(html: string): string {
+export function previewSrcdoc(html: string, options?: PreviewOptions): string {
+  const inserted = preamble(options)
   const head = /<head\b[^>]*>/i.exec(html)
   if (head !== null) {
     const at = head.index + head[0].length
-    return `${html.slice(0, at)}${CSP_META}${html.slice(at)}`
+    return `${html.slice(0, at)}${inserted}${html.slice(at)}`
   }
   const htmlTag = /<html\b[^>]*>/i.exec(html)
   if (htmlTag !== null) {
     const at = htmlTag.index + htmlTag[0].length
-    return `${html.slice(0, at)}<head>${CSP_META}</head>${html.slice(at)}`
+    return `${html.slice(0, at)}<head>${inserted}</head>${html.slice(at)}`
   }
   const doctype = /^\s*<!doctype[^>]*>/i.exec(html)
   if (doctype !== null) {
-    return `${doctype[0]}<html><head>${CSP_META}</head>${html.slice(doctype[0].length)}</html>`
+    return `${doctype[0]}<html><head>${inserted}</head>${html.slice(doctype[0].length)}</html>`
   }
-  return `<!doctype html><html><head>${CSP_META}</head><body>${html}</body></html>`
+  return `<!doctype html><html><head>${inserted}</head><body>${html}</body></html>`
 }
 
 /** Prototype file extensions this view previews. */

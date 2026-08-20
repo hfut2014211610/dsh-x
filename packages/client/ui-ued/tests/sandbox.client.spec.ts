@@ -5,6 +5,7 @@
  */
 
 import { describe, expect, it } from 'vitest'
+import { INSPECT_SCRIPT } from '../src/client/inspect.ts'
 import {
   FORBIDDEN_SANDBOX_TOKENS,
   isPreviewable,
@@ -65,6 +66,43 @@ describe('previewSrcdoc', () => {
     const out = previewSrcdoc('<p>hi</p>')
     expect(out.startsWith('<!doctype html><html><head><meta http-equiv=')).toBe(true)
     expect(out).toContain('<body><p>hi</p></body>')
+  })
+})
+
+describe('previewSrcdoc with the picker', () => {
+  it('leaves the frame exactly as before unless asked', () => {
+    // The picker is the view's choice, not this function's default: every
+    // assertion above describes the document a prototype gets when nobody
+    // asked for anything more.
+    const html = '<!doctype html><html><head></head><body>b</body></html>'
+    expect(previewSrcdoc(html, {})).toBe(previewSrcdoc(html))
+    expect(previewSrcdoc(html, { inspect: false })).toBe(previewSrcdoc(html))
+    expect(previewSrcdoc(html)).not.toContain('elementsFromPoint')
+  })
+
+  it('keeps the policy ahead of the script it injects', () => {
+    // Order is the assertion. A script parsed before the meta element runs
+    // under whatever policy the document declared for itself, which is the one
+    // thing the insert exists to overrule.
+    const out = previewSrcdoc('<!doctype html><html><head></head><body>b</body></html>', { inspect: true })
+    expect(out.indexOf('Content-Security-Policy')).toBeLessThan(out.indexOf('<script>'))
+    expect(out).toContain(INSPECT_SCRIPT)
+  })
+
+  it('carries the picker into a document that declared no head', () => {
+    for (const html of ['<html><body>b</body></html>', '<!doctype html><p>bare</p>', '<p>hi</p>']) {
+      const out = previewSrcdoc(html, { inspect: true })
+      expect(out).toContain(INSPECT_SCRIPT)
+      expect(out.indexOf('Content-Security-Policy')).toBeLessThan(out.indexOf('<script>'))
+    }
+  })
+
+  it('needs no sandbox token of its own', () => {
+    // Injecting hands the prototype nothing: postMessage to the embedder was
+    // never gated by sandbox. If this ever needs a token, the trade has
+    // changed and the whole approach is back up for review.
+    expect(tokensOf(PREVIEW_SANDBOX)).toEqual(['allow-scripts'])
+    expect(PREVIEW_CSP).toContain("script-src 'unsafe-inline'")
   })
 })
 

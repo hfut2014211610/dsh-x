@@ -18,6 +18,20 @@ Three properties carry it:
 
 The frame keeps a visible border and a preview badge. A prototype can draw something that looks like the host's own settings page, and the sandbox does not address that.
 
+## Picking an element
+
+Annotating a component means naming one element of a document the host cannot read. `sandbox="allow-scripts"` without `allow-same-origin` makes `contentDocument` null by design, so there is no host-side hit test to run: the pick happens inside the frame, in a script injected beside the policy, and the answer comes back over `postMessage`. `src/client/inspect.ts` owns both halves.
+
+Three things about that channel carry the weight.
+
+- **The reply cannot be authenticated by origin.** A document in an opaque origin posts with `event.origin === 'null'` — and so does every other sandboxed frame on the page, which makes the string worth nothing as a check. The host matches `event.source` against the very `Window` it framed, which is why `readInspectMessage` takes that window as an argument. Commands going the other way target `'*'` for the mirror-image reason: an opaque origin matches no other value.
+- **The payload is untrusted.** The injected script shares a realm with the prototype, which can forge any message it likes. Injecting grants the prototype nothing new — `postMessage` to the embedder was never gated by `sandbox` — but the host now listens, so every field is rebuilt on arrival: capped, stripped of control characters, and used only as text. Nothing from the frame reaches a markup sink.
+- **Occluded elements are the point.** `elementsFromPoint` returns the whole hit stack under the pointer rather than the topmost element alone, so a control behind an overlay is one row further down the list instead of unreachable. Hovering a row outlines that element back inside the frame.
+
+The picker travels with the document rather than arriving when someone arms it. Injecting later would mean reloading the frame, and a prototype reloaded mid-annotation loses whatever state the person navigated it into — usually the state they wanted to point at. It is left out entirely when the host supplies no `annotate` callback, and `previewSrcdoc` leaves it out by default, so that function's plain form is still the prototype plus the policy and nothing else.
+
+A confirmed pick lands in the session's composer draft through `conversation.input`, not in a sent message. A reference is not a request: the person still has to say what they want changed.
+
 ## Refresh
 
 A design thread keeps writing after the turn that started it ends, and several threads can write within the same second. The view repaints on the trailing edge of a `documents/changed` burst for the previewed path, so the frame never shows a document caught mid-write. A late read for a prototype the person has already navigated away from is discarded rather than painted.
@@ -32,6 +46,8 @@ None; this package neither assembles nor sends a provider request.
 
 ## Known Limitations and Deferred Work
 
-- **Replacing `srcdoc` reloads the frame** — scroll position inside the prototype is lost on refresh. Restoring it means injecting script into the prototype, which conflicts with keeping it self-contained.
+- **Replacing `srcdoc` reloads the frame** — scroll position inside the prototype is lost on refresh. The injected picker gives this a route it did not have before, since the frame could report and restore its own scroll, but nothing does that yet.
 - **No in-view editing** — the view reads prototypes; changing one goes through the model, as the design policy requires.
+- **A pick carries markup, not pixels** — the model gets the element’s selector and its own markup. What the element *looks like* is not in the annotation, and the sandbox gives the host no way to capture it; a screenshot would have to be drawn inside the frame.
+- **The outline is an element in the prototype’s tree** — it hangs off `documentElement` rather than `body` to stay clear of the page’s own selectors, and it is removed on disarm, but a rule written against `html > *` would still see it.
 - **The tab cannot be hidden per session** — `conversation.view` registrations are global, so Design appears beside Chat everywhere. Hiding it where it does not apply needs an availability resolver on `ctx.conversation`, beside the preferred- and companion-view ones.

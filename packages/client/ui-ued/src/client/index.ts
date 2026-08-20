@@ -12,6 +12,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
 import type { DocumentChange } from '@deepseek-ai/dsh-documents/types'
 import { UedView, type UedViewInjected } from './UedView.tsx'
+import { draftWith } from './inspect.ts'
 import { en, NS, zh } from './locales.ts'
 
 /** The preset whose sessions this view belongs to. */
@@ -52,6 +53,26 @@ export function apply(ctx: ClientContext): void {
       : null,
   ), 'ui-ued: assistant companion')
 
+  /**
+   * Put an element reference into one session's composer draft.
+   *
+   * The scope is resolved per call, not once per session: `sessions.scope` is
+   * the registered id-to-context interchange, and holding on to the context it
+   * returns would outlive the scope it came from. A pick that lands after the
+   * session went away is dropped rather than written somewhere else.
+   */
+  const annotateIn = (sessionId: SessionId) => (text: string): void => {
+    const actx = ctx.sessions.scope(sessionId)
+    if (actx === undefined) return
+    const conversation = actx.get('conversation')
+    if (conversation === undefined) return
+    const input = conversation.input.for(actx)
+    // setDraft is the single write path — every draft mutation rides the input
+    // machine's events, so appending by hand elsewhere would desynchronize the
+    // chip occurrence table from the text.
+    input.setDraft(draftWith(input.state.getSnapshot().draft, text))
+  }
+
   const documentsFor = (sessionId: SessionId): UedViewInjected => ({
     list: async (path) => {
       const result = await ctx.remote.documents.list({ sessionId, ...(path === undefined ? {} : { path }) })
@@ -74,6 +95,7 @@ export function apply(ctx: ClientContext): void {
       }
     },
     translate: t,
+    annotate: annotateIn(sessionId),
   })
 
   ctx.slots.inject('conversation.view', () => ctx.slots.register({

@@ -353,3 +353,116 @@ describe('UedView', () => {
     expect(screen.queryByLabelText('files.label')).toBeNull()
   })
 })
+
+/**
+ * The element picker. The frame answers over postMessage because the sandbox
+ * leaves the host no way into it, so the view's half is: what it sends in,
+ * what it accepts back, and what it refuses.
+ */
+describe('UedView annotation', () => {
+  /** Post one message as if the framed document had sent it. */
+  function fromFrame(data: unknown, source?: Window | null): void {
+    const window_ = source === undefined ? frame().contentWindow : source
+    fireEvent(window, new MessageEvent('message', { data, source: window_ }))
+  }
+
+  /** One picked message naming a stack two deep. */
+  const STACK = {
+    source: 'dsh-ued-inspect',
+    type: 'picked',
+    candidates: [
+      { tag: 'div', label: 'div.overlay', selector: 'body > div', text: '', html: '<div class="overlay"></div>' },
+      { tag: 'button', label: 'button.buy', selector: 'body > button', text: 'Buy', html: '<button class="buy">Buy</button>' },
+    ],
+  }
+
+  async function armed(annotate = vi.fn()) {
+    const injected = renderView({ annotate })
+    fireEvent.click(await screen.findByRole('button', { name: 'home.html' }))
+    await screen.findByTitle(en['preview.label'])
+    const toggle = await screen.findByRole('button', { name: en['inspect.arm'] })
+    const post = vi.fn()
+    Object.defineProperty(frame(), 'contentWindow', { value: { postMessage: post }, configurable: true })
+    fireEvent.click(toggle)
+    return { annotate, injected, post }
+  }
+
+  it('offers nothing to annotate into when the host supplies no composer', async () => {
+    renderView()
+    fireEvent.click(await screen.findByRole('button', { name: 'home.html' }))
+    await screen.findByTitle(en['preview.label'])
+
+    expect(screen.queryByRole('button', { name: en['inspect.arm'] })).toBeNull()
+    // And the frame carries only the prototype: with nothing to annotate into
+    // there is no reason to put a picker in front of the person's page.
+    expect(frame().getAttribute('srcdoc')).not.toContain('elementsFromPoint')
+  })
+
+  it('arms the picker inside the frame, since the host cannot reach into it', async () => {
+    const { post } = await armed()
+
+    expect(post).toHaveBeenCalledWith({ source: 'dsh-ued-inspect', type: 'arm' }, '*')
+    expect(screen.getByRole('button', { name: en['inspect.disarm'] })).toBeTruthy()
+    expect(await screen.findByText(en['inspect.hint'])).toBeTruthy()
+  })
+
+  it('carries the picker into the framed document', async () => {
+    renderView({ annotate: vi.fn() })
+    fireEvent.click(await screen.findByRole('button', { name: 'home.html' }))
+    await screen.findByTitle(en['preview.label'])
+
+    expect(frame().getAttribute('srcdoc')).toContain('elementsFromPoint')
+  })
+
+  it('lists every layer under the pointer, not just the one on top', async () => {
+    await armed()
+    fromFrame(STACK)
+
+    const stack = await screen.findByRole('complementary', { name: en['inspect.stack'] })
+    // The occluded button is the whole point: it is under the overlay and
+    // still selectable.
+    expect(within(stack).getByText('div.overlay')).toBeTruthy()
+    expect(within(stack).getByText('button.buy')).toBeTruthy()
+  })
+
+  it('ignores a pick that did not come from its own frame', async () => {
+    await armed()
+    fromFrame(STACK, {} as Window)
+
+    await waitFor(() => { expect(screen.getByText(en['inspect.hint'])).toBeTruthy() })
+    expect(screen.queryByRole('complementary', { name: en['inspect.stack'] })).toBeNull()
+  })
+
+  it('puts the chosen element into the draft and stands down', async () => {
+    const { annotate, post } = await armed()
+    fromFrame(STACK)
+    const stack = await screen.findByRole('complementary', { name: en['inspect.stack'] })
+
+    fireEvent.click(within(stack).getAllByRole('button', { name: en['inspect.add'] })[1]!)
+
+    expect(annotate).toHaveBeenCalledWith(
+      'home.html · body > button\n```html\n<button class="buy">Buy</button>\n```\n',
+    )
+    expect(post).toHaveBeenLastCalledWith({ source: 'dsh-ued-inspect', type: 'disarm' }, '*')
+    expect(screen.queryByRole('complementary', { name: en['inspect.stack'] })).toBeNull()
+    expect(screen.getByRole('button', { name: en['inspect.arm'] })).toBeTruthy()
+  })
+
+  it('re-arms a frame that reloaded under it', async () => {
+    const { post } = await armed()
+    post.mockClear()
+    // A design thread writing again repaints the frame, which re-runs the
+    // injected script from scratch; without this the picker goes quietly dead.
+    fromFrame({ source: 'dsh-ued-inspect', type: 'ready' })
+
+    expect(post).toHaveBeenCalledWith({ source: 'dsh-ued-inspect', type: 'arm' }, '*')
+  })
+
+  it('stands down when the person pressed Escape inside the frame', async () => {
+    await armed()
+    fromFrame({ source: 'dsh-ued-inspect', type: 'cancelled' })
+
+    expect(await screen.findByRole('button', { name: en['inspect.arm'] })).toBeTruthy()
+    expect(screen.queryByText(en['inspect.hint'])).toBeNull()
+  })
+})
