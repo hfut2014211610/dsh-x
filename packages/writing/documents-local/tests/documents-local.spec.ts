@@ -272,6 +272,64 @@ describe('documents-local', () => {
     policyFiber = await ctx.plugin(SandboxPolicyService, { mode: 'danger-full-access', workspaceRoot: dir })
   })
 
+  // `create` reaches the fence by writing the text through `ctx.fs.writeText`
+  // first and letting the package bytes land on a path already proven
+  // writable. Editing a `.docx` used to skip all of that and call node:fs
+  // outright — the one document write in the provider that no policy saw,
+  // while the comment on `create` claimed the edit path worked the same way.
+  it('crosses the fence before rewriting a packaged document', async () => {
+    await docsFiber.dispose()
+    await fsFiber.dispose()
+    fsFiber = await ctx.plugin(SandboxedFileSystem, { cwd: dir })
+    docsFiber = await ctx.plugin(DocumentsLocal, {})
+    documents = ctx.documents as DocumentsLocal
+
+    await documents.create({ sessionId: SID, path: 'fenced.docx', content: '原文' })
+    const before = await documents.read({ sessionId: SID, path: 'fenced.docx' })
+    const writeText = vi.spyOn(ctx.fs, 'writeText')
+    await documents.apply({
+      sessionId: SID,
+      path: 'fenced.docx',
+      baseVersion: before.version,
+      edit: { kind: 'replace', locator: { unit: 'line', start: 1, end: 1 }, text: '改写' },
+    })
+
+    expect(writeText.mock.calls.at(-1)?.[4]).toMatchObject({ mode: 'danger-full-access', workspaceRoot: dir })
+    // And what survives on disk is the package, not the plain text the fence
+    // write leaves behind on its way through.
+    const zip = await JSZip.loadAsync(await readFile(join(dir, 'fenced.docx')))
+    expect(await zip.file('word/document.xml')?.async('string') ?? '').toContain('改写')
+    await expect(documents.read({ sessionId: SID, path: 'fenced.docx' }))
+      .resolves.toMatchObject({ content: '改写' })
+  })
+
+  // Pinned on read-only rather than on a workspace root: `workspace-write`
+  // always grants the OS temp directory, and the fixture workspace lives
+  // there, so an unfenced write would still be allowed under it. read-only
+  // refuses every mutation whatever the path, which leaves crossing the fence
+  // at all as the only thing the denial can be evidence of.
+  it('refuses a packaged-document edit the sandbox mode denies', async () => {
+    await documents.create({ sessionId: SID, path: 'denied.docx', content: '原文' })
+    const before = await documents.read({ sessionId: SID, path: 'denied.docx' })
+    const bytes = await readFile(join(dir, 'denied.docx'))
+
+    await docsFiber.dispose()
+    await fsFiber.dispose()
+    await policyFiber.dispose()
+    policyFiber = await ctx.plugin(SandboxPolicyService, { mode: 'read-only', workspaceRoot: dir })
+    fsFiber = await ctx.plugin(SandboxedFileSystem, { cwd: dir })
+    docsFiber = await ctx.plugin(DocumentsLocal, {})
+    documents = ctx.documents as DocumentsLocal
+
+    await expect(documents.apply({
+      sessionId: SID,
+      path: 'denied.docx',
+      baseVersion: before.version,
+      edit: { kind: 'replace', locator: { unit: 'line', start: 1, end: 1 }, text: '不该落盘' },
+    })).rejects.toMatchObject({ code: 'FS_SANDBOX_DENIED' })
+    expect(await readFile(join(dir, 'denied.docx'))).toEqual(bytes)
+  })
+
   it('applies a version-guarded line replace', async () => {
     await writeFile(join(dir, 'edit.txt'), 'one\ntwo\nthree')
     const before = await documents.read({ sessionId: SID, path: 'edit.txt' })

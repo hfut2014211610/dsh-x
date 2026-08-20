@@ -20,7 +20,7 @@ import type {
   DocumentSearchHit,
   DocumentSearchResult,
 } from '@deepseek-ai/dsh-documents'
-import type { FsTarget } from '@deepseek-ai/dsh-fs'
+import type { FsTarget, FsWriteIntent } from '@deepseek-ai/dsh-fs'
 import type { SandboxExecutionPolicy } from '@deepseek-ai/dsh-sandbox'
 import type {} from '@deepseek-ai/dsh-sandbox-policy'
 import type { SessionId } from '@deepseek-ai/dsh-session'
@@ -196,13 +196,39 @@ async function buildStructuredDocument(format: 'docx' | 'xlsx', content: string)
   return await zip.generateAsync({ type: 'nodebuffer' })
 }
 
-async function applyStructuredEdit(ctx: Context, target: FsTarget, format: 'docx' | 'xlsx', content: string): Promise<void> {
+/**
+ * Rewrite the text-bearing part of a packaged document in place, keeping every
+ * other part of the original zip.
+ *
+ * The text write is not incidental: `ctx.fs.writeText` is the call that crosses
+ * the sandbox fence and refuses a target outside the workspace, and the raw
+ * byte write that follows has no fence of its own. Reading the zip first and
+ * writing the text last narrows the window in which the file on disk is plain
+ * text rather than a valid package to the span between the two writes — the
+ * same window `create` already opens.
+ * @param ctx - the plugin context, for the filesystem seam.
+ * @param target - the resolved document to rewrite.
+ * @param format - which of the two packages this is.
+ * @param content - the new document text.
+ * @param expected - the write intent guarding the text write.
+ * @param sandboxPolicy - the calling session's policy; undefined when the
+ *   composition mounts a plain filesystem with no fence to satisfy.
+ */
+async function applyStructuredEdit(
+  ctx: Context,
+  target: FsTarget,
+  format: 'docx' | 'xlsx',
+  content: string,
+  expected: FsWriteIntent,
+  sandboxPolicy: SandboxExecutionPolicy | undefined,
+): Promise<void> {
   const bytes = await ctx.fs.readBytes(target, undefined, MAX_STRUCTURED_BYTES)
   const zip = await JSZip.loadAsync(bytes)
   const lines = content.split(/\r?\n/)
   if (format === 'docx') zip.file('word/document.xml', wordBody(lines))
   else zip.file('xl/sharedStrings.xml', sharedStringTable(lines))
   const buffer = await zip.generateAsync({ type: 'nodebuffer' })
+  await ctx.fs.writeText(target, content, expected, undefined, sandboxPolicy)
   await fsWriteFile(ctx.fs.processPath(target), buffer)
 }
 
@@ -415,7 +441,14 @@ export class DocumentsLocal extends Documents {
     if (format === 'docx' || format === 'xlsx') {
       const current = await readStructuredText(this.ctx, target, format)
       const edited = applyTextEdit(current, request.edit)
-      await applyStructuredEdit(this.ctx, target, format, edited.content)
+      await applyStructuredEdit(
+        this.ctx,
+        target,
+        format,
+        edited.content,
+        { kind: 'replaceIfVersion', version: info.version },
+        this.policyFor(request.sessionId),
+      )
       const after = await this.ctx.fs.stat(target)
       const version = String(after?.version ?? info.version)
       this.ctx.emit('documents/changed', { sessionId: request.sessionId, path: request.path, baseVersion: request.baseVersion, version, patches: null })
