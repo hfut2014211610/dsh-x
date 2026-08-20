@@ -205,6 +205,7 @@
     { "path": "./packages/code-runtime/code-runtime-worker-thread" },
     { "path": "./packages/llm/llm-deepseek" },
     { "path": "./packages/llm/llm-pi-ai" },
+    { "path": "./packages/channel/feishu" },
     { "path": "./packages/llm/model-hub" },
     { "path": "./packages/llm/model-tuning" },
     { "path": "./packages/shell/bash-local" },

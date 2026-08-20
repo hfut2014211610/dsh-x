@@ -607,6 +607,75 @@ export interface Config {
 
 Source: [`packages/e2b/e2b/src/index.ts:43`](../packages/e2b/e2b/src/index.ts)
 
+<a id="deepseek-aidsh-feishu"></a>
+
+## `@deepseek-ai/dsh-feishu`
+
+Requires: `agents` · `agentDefaultModel` · `sessions` · `storageDomain`
+
+```ts config-catalog
+/** 插件配置。 */
+export interface Config {
+  /**
+   * 接入方式。空串表示还没接入——那时卡片上只有两条路可选，别的都不显示。
+   *
+   * `direct` 是常规路：dsh 自己一个飞书应用，扫码授权。`bridge` 是高级路：
+   * 事件由别的进程供给，dsh 只管消费。
+   */
+  mode: '' | 'direct' | 'bridge'
+  /**
+   * `direct`：用哪个 lark-cli profile，写名字不写路径，落在 `~/.lark-cli/<id>`。
+   *
+   * 单独一份、不跟环境默认共用：默认那份先到先得，谁跑过 `config init` 就是谁的，
+   * 而授权、退出登录都会改到它。
+   */
+  profileId: string
+  /** `bridge`：事件来自哪个飞书应用，写 app id。出站要按它找回本机的 profile。 */
+  appId: string
+  /**
+   * `bridge`：替代 `lark-cli event consume <key> --as bot` 的命令。
+   *
+   * 桥接会 spawn 它并按行读 NDJSON，事件键作为最后一个参数追加。别的进程已经
+   * 独占了那个 EventKey 时，用它把事件引过来——一个 EventKey 只允许一个消费者。
+   */
+  eventCommand: string
+  /**
+   * 飞书开的会话落在哪个工作区，写目录。
+   *
+   * 留空落在 `$DSH_HOME/feishu`——它不是注册过的工作区，所以这些会话会出现在
+   * 「未分组」下，不会混进你手上的项目里。
+   */
+  workspace: string
+  /** 桥接的本地端点；留空用平台默认。 */
+  endpoint: string
+  /** 飞书开的会话用哪个 agent 预设；留空用部署默认。 */
+  presetId: string
+  /** 卡片展示密度。 */
+  density: Density
+  /** 卡片正文最少隔多久推一次。 */
+  flushMs: number
+  /** 审批卡片等人点的上限。 */
+  approvalTimeoutMs: number
+  /** 单聊准入：`open` 谁都能用，`allowlist` 只认名单，`disabled` 一律不理。 */
+  dmMode: 'open' | 'allowlist' | 'disabled'
+  /** 单聊白名单，装 open_id。 */
+  dmAllowlist: string[]
+  /** 群白名单，装 chat_id；空表示任何群都不理。 */
+  groupAllowlist: string[]
+  /** 群里是否必须 @ 到机器人才接活。 */
+  requireMention: boolean
+  /** 超过这个岁数的消息直接丢，防止长连接重连后重放一堆旧消息。 */
+  staleMs: number
+  /** 桥接探这个地址判断 dsh 在不在；留空用本进程正在听的地址。 */
+  probeOrigin: string
+}
+
+/** 展示密度。 */
+export type Density = 'compact' | 'standard' | 'detailed'
+```
+
+Source: [`packages/channel/feishu/src/index.ts:75`](../packages/channel/feishu/src/index.ts)
+
 <a id="deepseek-aidsh-fs-local"></a>
 
 ## `@deepseek-ai/dsh-fs-local`

@@ -1,0 +1,6 @@
+# Mounted by the Web bundle; this file is what a profile-local install would
+# apply instead. The channel is dormant until `mode` names a way in — see the
+# Connectors settings page, which is where it is meant to be configured.
+- insert:
+    - id: feishu
+      name: '@deepseek-ai/dsh-feishu'

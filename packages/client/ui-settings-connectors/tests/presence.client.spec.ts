@@ -4,7 +4,7 @@ import { describe, expect, it, vi } from 'vitest'
 import type { PluginInventorySnapshot } from '@deepseek-ai/dsh-api-remotes/client'
 import { ConnectorPresenceController, type ConnectorPluginFace } from '../src/client/connector-presence.ts'
 
-const MODULE = '@personal/dsh-x-feishu'
+const MODULE = '@deepseek-ai/dsh-feishu'
 
 /** One inventory snapshot holding the channel's entry in the given state. */
 function tree(enabled: boolean, moduleName = MODULE): PluginInventorySnapshot {

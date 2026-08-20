@@ -31,7 +31,7 @@ export const FEISHU_NS = 'dsh-x-feishu'
  * facts separate: a plugin can serve a namespace under any name it likes, and
  * only the specifier identifies the entry in the tree.
  */
-export const FEISHU_MODULE = '@personal/dsh-x-feishu'
+export const FEISHU_MODULE = '@deepseek-ai/dsh-feishu'
 
 /** Card densities the channel's renderer takes, in display order. */
 export const FEISHU_DENSITIES = ['compact', 'standard', 'detailed'] as const

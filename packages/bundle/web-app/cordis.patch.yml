@@ -103,6 +103,12 @@
     - id: model-tuning
       name: '@deepseek-ai/dsh-model-tuning'
 
+    # The Feishu channel. Dormant until its settings name a way in, which
+    # the Connectors page is for; an unconfigured install mounts the row and
+    # opens no socket.
+    - id: feishu
+      name: '@deepseek-ai/dsh-feishu'
+
     # Resolve bind host, SSH launch, and display once at boot, then mount the
     # matching dual-face directory picker. Mount -native or -browse directly in
     # an overlay to pin the interaction.
