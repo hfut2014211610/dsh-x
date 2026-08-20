@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-feishu",
   "description": "Feishu channel: reach a dsh session from a direct message or an @ in a group, with the run rendered on a card",
-  "version": "0.1.0-rc.7",
+  "version": "0.1.0-rc.8",
   "publishConfig": {
     "access": "public"
   },
