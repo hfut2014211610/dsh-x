@@ -125,8 +125,12 @@ export class SessionDriver {
         lastUsedAt: this.now(),
       })
     } else {
-      agent = (await ctx.agents.resume({
-        resumeSessionId: SessionId(bound.sessionId),
+      const sessionId = SessionId(bound.sessionId)
+      // 插件热重载会丢掉上面的 chat -> agent 内存映射，但 agent 本身仍由
+      // AgentRegistry 持有。此时不能 resume 同一份持久会话，否则 persistence
+      // 会以 "while it is live" 拒绝；直接接回现有 agent 即可。
+      agent = ctx.agents.get(sessionId) ?? (await ctx.agents.resume({
+        resumeSessionId: sessionId,
         agentOptions,
         setup,
       })).agent
