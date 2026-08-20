@@ -220,8 +220,24 @@ export class FeishuAuthController {
    * @returns 拿到二维码就返回；扫完与否由轮询写回状态。
    */
   async begin(): Promise<void> {
-    const { selected, busy } = this.store.getSnapshot()
-    if (busy) return
+    const { selected } = this.store.getSnapshot()
+    await this.start('begin', { domains: [...selected] })
+  }
+
+  /**
+   * 给这份 profile 建一个飞书应用。
+   *
+   * 扫码授权之前的那一步：没有应用就没有可授权的对象。宿主那边跟授权共用同一个
+   * 进度槽，所以这里也共用同一条轮询循环。
+   * @returns 拿到二维码就返回；建完与否由轮询写回状态。
+   */
+  async bind(): Promise<void> {
+    await this.start('bind', {})
+  }
+
+  /** 发起一次要人扫码的动作，然后一直问到它落定。 */
+  private async start(method: string, args: Record<string, unknown>): Promise<void> {
+    if (this.store.getSnapshot().busy) return
     this.stopPolling()
     this.store.update((state) => {
       state.busy = true
@@ -230,9 +246,9 @@ export class FeishuAuthController {
       delete state.error
     })
     try {
-      const progress = record(await this.call('begin', {
+      const progress = record(await this.call(method, {
         configDir: this.store.getSnapshot().configDir,
-        domains: [...selected],
+        ...args,
       }))
       this.applyProgress(progress)
     } catch (error) {

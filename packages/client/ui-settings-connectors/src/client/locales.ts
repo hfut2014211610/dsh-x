@@ -14,7 +14,7 @@ export type ConnectorsKey =
   | 'auth.loading' | 'auth.reload' | 'auth.absent'
   | 'auth.scopes' | 'auth.domains' | 'auth.scan' | 'auth.scanning'
   | 'auth.qrHint' | 'auth.openLink' | 'auth.cancel' | 'auth.granted'
-  | 'auth.unconfigured' | 'auth.unconfiguredHint'
+  | 'auth.unconfigured' | 'auth.bind' | 'auth.binding'
   | 'feishu.name' | 'feishu.summary' | 'feishu.absent'
   | 'feishu.mode.label' | 'feishu.mode.direct' | 'feishu.mode.directWhy'
   | 'feishu.mode.bridge' | 'feishu.mode.bridgeWhy'
@@ -87,13 +87,14 @@ export const en: Record<ConnectorsKey, string> = {
   'auth.openLink': 'Open the authorization link',
   'auth.cancel': 'Cancel',
   'auth.granted': 'Authorized.',
-  'auth.unconfigured': 'No Feishu app is bound to this profile yet.',
-  'auth.unconfiguredHint': 'Run lark-cli config init --new against the profile directory, then read again.',
+  'auth.unconfigured': 'This profile has no Feishu app yet.',
+  'auth.bind': 'Create the app',
+  'auth.binding': 'Opening…',
   'feishu.name': 'Feishu',
   'feishu.summary': 'One line in a DM starts work; an @ in a group picks it up.',
   'feishu.absent': 'Not in this deployment. Add it with dsh plugin --profile web add <plugin directory>.',
   'feishu.mode.label': 'How to connect',
-  'feishu.mode.direct': 'Its own Feishu app',
+  'feishu.mode.direct': 'lark-cli',
   'feishu.mode.directWhy': 'Scan a code and you are done.',
   'feishu.mode.bridge': 'Third-party bridge',
   'feishu.mode.bridgeWhy': 'Events come from another process. Advanced; you probably do not want this.',
@@ -189,13 +190,14 @@ export const zh: Record<ConnectorsKey, string> = {
   'auth.openLink': '打开授权链接',
   'auth.cancel': '取消',
   'auth.granted': '授权成功。',
-  'auth.unconfigured': '这份 profile 还没绑飞书应用。',
-  'auth.unconfiguredHint': '对着这个 profile 目录跑一次 lark-cli config init --new，然后重新读。',
+  'auth.unconfigured': '这份 profile 还没有飞书应用。',
+  'auth.bind': '创建应用',
+  'auth.binding': '正在打开…',
   'feishu.name': '飞书',
   'feishu.summary': '单聊发一句话就干活，群里 @ 一下就接活。',
   'feishu.absent': '这个部署里没有。用 dsh plugin --profile web add <插件目录> 挂进来。',
   'feishu.mode.label': '怎么接',
-  'feishu.mode.direct': '用 dsh 自己的飞书应用',
+  'feishu.mode.direct': 'lark-cli 接入',
   'feishu.mode.directWhy': '扫个码就好了。',
   'feishu.mode.bridge': '第三方桥接',
   'feishu.mode.bridgeWhy': '事件由别的进程供给。高级用法，一般用不上。',

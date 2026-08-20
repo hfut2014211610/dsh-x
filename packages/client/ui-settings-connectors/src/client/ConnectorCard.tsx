@@ -24,8 +24,14 @@ export interface ConnectorCardProps {
   t: (key: ConnectorsKey) => string
   /** Locale key of the channel's name. */
   nameKey: ConnectorsKey
-  /** Locale key of the line saying what the channel does. */
-  summaryKey: ConnectorsKey
+  /**
+   * Locale key of the line under the name, when the channel wants one.
+   *
+   * Optional because a channel whose name says it all is better off without:
+   * a header that explains what everybody already knows is one more thing to
+   * read past on the way to the controls.
+   */
+  summaryKey?: ConnectorsKey
   /** Locale key of the line that installs the channel, shown while it is absent. */
   absentKey: ConnectorsKey
   /** The card's form state: what the host serves, and what a save would do. */
@@ -111,7 +117,9 @@ export function ConnectorCard(props: ConnectorCardProps) {
             <span className={css.name}>{name}</span>
             <span className={css.state} data-state={presence.presence}>{t(pillKey)}</span>
           </span>
-          <span className={css.summary}>{t(props.summaryKey)}</span>
+          {props.summaryKey === undefined
+            ? null
+            : <span className={css.summary}>{t(props.summaryKey)}</span>}
         </span>
         {state.dirty ? <span className={css.pending}>{t('unsaved')}</span> : null}
         <IconChevronDownOutline14 className={open ? `${css.chevron} ${css.chevronOpen}` : css.chevron} />

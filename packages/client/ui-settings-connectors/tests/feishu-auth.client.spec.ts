@@ -201,6 +201,59 @@ describe('扫码', () => {
   })
 })
 
+describe('先建应用', () => {
+  // 没有应用就没有可授权的对象。这一步跟扫码授权是同一个形状——一条链接、
+  // 一张码、一段轮询——所以宿主那边共用同一个进度槽，这里共用同一条循环。
+  it('走的是 bind，不是 begin', async () => {
+    const { rpc, calls } = fakeRpc({
+      status: () => STATUS,
+      domains: () => ({ domains: ['im'] }),
+      bind: () => ({ phase: 'waiting', challenge: { verificationUrl: 'https://x/new' } }),
+      progress: () => ({ phase: 'waiting', challenge: { verificationUrl: 'https://x/new' } }),
+    })
+    const controller = new FeishuAuthController(rpc)
+
+    await controller.bind()
+
+    expect(calls).toContain('feishuAuth/bind')
+    expect(calls).not.toContain('feishuAuth/begin')
+    expect(controller.store.getSnapshot().challenge).toMatchObject({ verificationUrl: 'https://x/new' })
+    controller.dispose()
+  })
+
+  it('建完了跟授权成功一样收尾', async () => {
+    const { rpc, calls } = fakeRpc({
+      status: () => STATUS,
+      domains: () => ({ domains: ['im'] }),
+      bind: () => ({ phase: 'waiting', challenge: { verificationUrl: 'https://x/new' } }),
+      progress: () => ({ phase: 'granted' }),
+    })
+    const controller = new FeishuAuthController(rpc)
+    await controller.bind()
+
+    await vi.advanceTimersByTimeAsync(2100)
+    await settle()
+
+    expect(controller.store.getSnapshot()).toMatchObject({ granted: true })
+    expect(calls).toContain('feishuAuth/status')
+  })
+
+  it('建应用不带权限域——那是下一步的事', async () => {
+    const { rpc, args } = fakeRpc({
+      status: () => STATUS,
+      domains: () => ({ domains: ['im'] }),
+      bind: () => ({ phase: 'waiting', challenge: { verificationUrl: 'https://x/new' } }),
+      progress: () => ({ phase: 'idle' }),
+    })
+    const controller = new FeishuAuthController(rpc)
+
+    await controller.bind()
+
+    expect(args.some(a => 'domains' in a)).toBe(false)
+    controller.dispose()
+  })
+})
+
 describe('作用在哪份 profile 上', () => {
   // 这一页的每个动作都会改到某个飞书应用的授权。默认那份往往属于别的工具，
   // 所以"作用在哪儿"必须是显式的、随请求走的，不能靠环境。

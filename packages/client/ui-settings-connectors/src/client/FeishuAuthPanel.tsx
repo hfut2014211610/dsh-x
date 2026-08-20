@@ -17,6 +17,8 @@ export interface FeishuAuthPanelProps {
   state: FeishuAuthState
   /** 勾上或取消一个业务域。 */
   onSelect: (domain: string, wanted: boolean) => void
+  /** 给这份 profile 建一个飞书应用。 */
+  onBind: () => void
   /** 发起扫码。 */
   onBegin: () => void
   /** 放弃这次扫码。 */
@@ -46,14 +48,54 @@ export function FeishuAuthPanel(props: FeishuAuthPanelProps) {
     return <p className={css.absent} role="status">{t('auth.absent')}</p>
   }
 
+  // 建应用与扫码授权是同一个形状——一条链接、一张码、一段轮询——所以二维码
+  // 那一段两步共用，只有上面问的问题不一样。
+  const challenge = state.challenge === undefined
+    ? null
+    : (
+      <div className={css.authChallenge}>
+        {state.challenge.qrDataUrl === undefined
+          ? null
+          : <img className={css.authQr} src={state.challenge.qrDataUrl} alt={t('auth.scan')} />}
+        <p className={css.hint}>{t('auth.qrHint')}</p>
+        {/* 链接原样透传，一个字符都不改：改过的授权链接不作数。 */}
+        <a
+          className={css.authLink}
+          href={state.challenge.verificationUrl}
+          target="_blank"
+          rel="noreferrer noopener"
+        >
+          {t('auth.openLink')}
+        </a>
+      </div>
+    )
+
+  const outcome = (
+    <>
+      {state.granted ? <p className={css.authGranted} role="status">{t('auth.granted')}</p> : null}
+      {state.error === undefined ? null : <p className={css.failed} role="status">{state.error}</p>}
+    </>
+  )
+
+  // 没有应用就没有可授权的对象，所以这一步在扫码之前：先建一个。
   if (unconfigured) {
     return (
       <section className={css.auth}>
         <p className={css.absent} role="status">{t('auth.unconfigured')}</p>
-        {/* lark-cli 自己那句下一步是写给 agent harness 看的，一长串英文，
-            不往人脸上摆。 */}
-        <p className={css.hint}>{t('auth.unconfiguredHint')}</p>
+        {challenge}
+        {outcome}
         <div className={css.authActions}>
+          {state.challenge === undefined
+            ? (
+              <button type="button" className={css.save} disabled={state.busy} onClick={props.onBind}>
+                {t(state.busy ? 'auth.binding' : 'auth.bind')}
+              </button>
+            )
+            : (
+              <button type="button" className={css.discard} onClick={props.onCancel}>
+                {t('auth.cancel')}
+              </button>
+            )}
           <button type="button" className={css.discard} onClick={props.onReload}>
             {t('auth.reload')}
           </button>
@@ -85,26 +127,9 @@ export function FeishuAuthPanel(props: FeishuAuthPanelProps) {
             </div>
           </div>
         )
-        : (
-          <div className={css.authChallenge}>
-            {state.challenge.qrDataUrl === undefined
-              ? null
-              : <img className={css.authQr} src={state.challenge.qrDataUrl} alt={t('auth.scan')} />}
-            <p className={css.hint}>{t('auth.qrHint')}</p>
-            {/* 链接原样透传，一个字符都不改：改过的授权链接不作数。 */}
-            <a
-              className={css.authLink}
-              href={state.challenge.verificationUrl}
-              target="_blank"
-              rel="noreferrer noopener"
-            >
-              {t('auth.openLink')}
-            </a>
-          </div>
-        )}
+        : challenge}
 
-      {state.granted ? <p className={css.authGranted} role="status">{t('auth.granted')}</p> : null}
-      {state.error === undefined ? null : <p className={css.failed} role="status">{state.error}</p>}
+      {outcome}
 
       <div className={css.authActions}>
         {state.challenge === undefined

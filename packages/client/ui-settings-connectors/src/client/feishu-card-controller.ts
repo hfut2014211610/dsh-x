@@ -190,6 +190,8 @@ export interface FeishuCardFace extends ConnectorActions {
   readAuth: () => void
   /** Check or clear one permission domain for the next scan. */
   selectDomain: (domain: string, wanted: boolean) => void
+  /** Create a Feishu app for this profile — the step before authorizing. */
+  bindApp: () => void
   /** Start a scan-to-authorize. */
   beginAuth: () => void
   /** Abandon the scan in flight. */
@@ -381,6 +383,7 @@ export class FeishuCardController {
         void this.readBridge()
       },
       selectDomain: (domain, wanted) => { this.auth.select(domain, wanted) },
+      bindApp: () => { void this.auth.bind() },
       beginAuth: () => { void this.auth.begin() },
       cancelAuth: () => { void this.auth.cancel() },
       reopenSetup: () => {

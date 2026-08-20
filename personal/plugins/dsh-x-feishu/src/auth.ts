@@ -24,7 +24,9 @@
  * @module @personal/dsh-x-feishu/src/auth
  */
 
-import { execFile } from 'node:child_process'
+import { execFile, spawn } from 'node:child_process'
+import type { ChildProcessByStdio } from 'node:child_process'
+import type { Readable } from 'node:stream'
 import { mkdtemp, readdir, readFile, rm } from 'node:fs/promises'
 import { homedir, tmpdir } from 'node:os'
 import { basename, join } from 'node:path'
@@ -36,6 +38,10 @@ const READ_TIMEOUT_MS = 30_000
 const BEGIN_TIMEOUT_MS = 60_000
 /** 轮询的上限。设备码本身会先过期，这只是兜底。 */
 const POLL_TIMEOUT_MS = 15 * 60_000
+/** 建应用那一步等多久才该吐出验证链接。 */
+const BIND_URL_TIMEOUT_MS = 60_000
+/** 建应用整个过程的上限：它一直挂到人在浏览器里做完。 */
+const BIND_TIMEOUT_MS = 15 * 60_000
 
 /**
  * 抑制 lark-cli 的更新与技能提示。
@@ -101,6 +107,56 @@ export function resolveConfigDir(requested: string): string {
   // 设置项不该有办法把目录指到 `~/.lark-cli` 外面去。
   const named = /^[A-Za-z0-9._-]+$/.test(value) && value !== '.' && value !== '..'
   return named ? join(larkRoot(), value) : dshConfigDir()
+}
+
+/**
+ * 等一条长跑命令把验证链接打出来。
+ *
+ * 它不会因此结束——链接出现的时候人还没开始操作。所以这里只等到第一条链接，
+ * 进程留着继续跑。
+ * @param child - 已经在跑的子进程。
+ * @param output - 到目前为止收到的全部输出。
+ * @param timeoutMs - 等多久放弃。
+ * @returns 第一条 https 链接；没等到就是 `undefined`。
+ */
+function firstUrl(
+  child: ChildProcessByStdio<null, Readable, Readable>,
+  output: () => string,
+  timeoutMs: number,
+): Promise<string | undefined> {
+  return new Promise((resolve) => {
+    let settled = false
+    const done = (url: string | undefined): void => {
+      if (settled) return
+      settled = true
+      clearTimeout(timer)
+      child.stdout.off('data', look)
+      child.stderr.off('data', look)
+      child.off('exit', onExit)
+      resolve(url)
+    }
+    const look = (): void => {
+      const match = /https:\/\/\S+/.exec(output())
+      if (match !== null) done(match[0].replace(/[)\]"',.]+$/, ''))
+    }
+    const onExit = (): void => { look(); done(undefined) }
+    const timer = setTimeout(() => { done(undefined) }, timeoutMs)
+    timer.unref()
+    child.stdout.on('data', look)
+    child.stderr.on('data', look)
+    child.once('exit', onExit)
+    look()
+  })
+}
+
+/**
+ * 一段输出里最后那句有内容的话，用来当失败原因。
+ * @param output - 全部输出。
+ * @returns 最后一行非空文本；全空就是 `undefined`。
+ */
+function tailOf(output: string): string | undefined {
+  const lines = output.split('\n').map(line => line.trim()).filter(line => line !== '')
+  return lines.at(-1)
 }
 
 /** 一份可以在这一页上管理的 lark-cli profile。 */
@@ -453,6 +509,88 @@ export class LarkAuth {
     } finally {
       if (dir !== undefined) await rm(dir, { recursive: true, force: true }).catch(() => {})
     }
+  }
+
+  /**
+   * 给这份 profile 建一个飞书应用。
+   *
+   * 扫码授权之前的那一步。没有应用就没有可授权的对象，所以一份新 profile 上
+   * 「扫码授权」是点不了的——先得有个应用。
+   *
+   * `config init --new` 与设备码是同一个形状：它一直挂到人在浏览器里做完，中途
+   * 把验证链接打到输出里。所以这里也是后台跑、页面轮询，而且**跟授权共用同一个
+   * 进度槽**——页面那条轮询循环因此一行都不用改。
+   *
+   * 它没有 `--json`，只能从输出里捞第一条 https 链接。
+   * @param requestedDir - 建在哪份 profile 上；空串落到 dsh 自己那份。
+   * @returns 链接与二维码，或失败原因。
+   */
+  async bind(requestedDir: string): Promise<AuthProgress> {
+    this.cancel()
+    const configDir = resolveConfigDir(requestedDir)
+    let child: ChildProcessByStdio<null, Readable, Readable>
+    try {
+      const invocation = larkCliInvocation(['config', 'init', '--new'])
+      child = spawn(invocation.file, [...invocation.args], {
+        stdio: ['ignore', 'pipe', 'pipe'],
+        windowsHide: true,
+        env: { ...process.env, ...QUIET_ENV, LARKSUITE_CLI_CONFIG_DIR: configDir },
+      })
+    } catch (error: unknown) {
+      return { phase: 'failed', message: error instanceof Error ? error.message : String(error) }
+    }
+
+    const seen: string[] = []
+    child.stdout.setEncoding('utf8')
+    child.stderr.setEncoding('utf8')
+    const collect = (chunk: string): void => { seen.push(chunk) }
+    child.stdout.on('data', collect)
+    child.stderr.on('data', collect)
+
+    const aborter = new AbortController()
+    this.aborter = aborter
+    aborter.signal.addEventListener('abort', () => { child.kill() })
+
+    const url = await firstUrl(child, () => seen.join(''), BIND_URL_TIMEOUT_MS)
+    if (url === undefined) {
+      child.kill()
+      this.aborter = undefined
+      return { phase: 'failed', message: tailOf(seen.join('')) ?? 'lark-cli 没有回建应用的链接' }
+    }
+
+    const qrDataUrl = await this.qrcode(configDir, url)
+    const pending: Pending = {
+      configDir,
+      challenge: { verificationUrl: url, ...qrDataUrl === undefined ? {} : { qrDataUrl } },
+      outcome: undefined,
+    }
+    this.pending = pending
+    this.watchBind(pending, child, aborter, () => seen.join(''))
+    return { phase: 'waiting', challenge: pending.challenge }
+  }
+
+  /** 等 `config init` 退出，然后看这份 profile 到底绑上没有。 */
+  private watchBind(
+    pending: Pending,
+    child: ChildProcessByStdio<null, Readable, Readable>,
+    aborter: AbortController,
+    output: () => string,
+  ): void {
+    const timer = setTimeout(() => { child.kill() }, BIND_TIMEOUT_MS)
+    timer.unref()
+    child.once('exit', (code: number | null) => {
+      clearTimeout(timer)
+      if (aborter.signal.aborted) return
+      // 以 `auth status` 为准而不是退出码：真正要问的是"这份 profile 现在有
+      // 应用了没有"，而不是"那条命令自认为成功了没有"。
+      void this.status(pending.configDir).then((status) => {
+        pending.outcome = status.configured === true
+          ? { granted: true }
+          : { granted: false, message: tailOf(output()) ?? `lark-cli 退出码 ${String(code)}` }
+      }).catch((error: unknown) => {
+        pending.outcome = { granted: false, message: error instanceof Error ? error.message : String(error) }
+      })
+    })
   }
 
   /**

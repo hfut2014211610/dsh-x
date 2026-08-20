@@ -98,6 +98,16 @@ export class FeishuAuthGateway extends TypertRemoteService {
   }
 
   /**
+   * 给这份 profile 建一个飞书应用。扫码授权之前的那一步。
+   * @param configDir - 建在哪份 profile 上；空串落到 dsh 自己那份。
+   * @returns 链接与二维码，或失败原因。进度与授权共用 {@link progress}。
+   */
+  @Remote('bind')
+  bind(configDir: string): Promise<AuthProgress> {
+    return this.auth.bind(configDir)
+  }
+
+  /**
    * 这次授权走到哪一步了。页面靠轮询它知道人扫完了没有。
    * @returns 当前进度。
    */

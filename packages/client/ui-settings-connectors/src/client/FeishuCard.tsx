@@ -93,7 +93,6 @@ export function FeishuCard(props: FeishuCardProps) {
     <ConnectorCard
       t={t}
       nameKey="feishu.name"
-      summaryKey="feishu.summary"
       absentKey="feishu.absent"
       state={state}
       presence={state.plugin}
@@ -108,6 +107,7 @@ export function FeishuCard(props: FeishuCardProps) {
           <FeishuAuthPanel
             t={t}
             state={state.auth}
+            onBind={props.bindApp}
             onSelect={props.selectDomain}
             onBegin={props.beginAuth}
             onCancel={props.cancelAuth}

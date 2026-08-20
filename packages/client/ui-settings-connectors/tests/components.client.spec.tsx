@@ -420,6 +420,7 @@ describe('FeishuCard', () => {
       setEnabled: vi.fn(),
       readAuth: vi.fn(),
       selectDomain: vi.fn(),
+      bindApp: vi.fn(),
       beginAuth: vi.fn(),
       cancelAuth: vi.fn(),
       reopenSetup: vi.fn(),
@@ -459,6 +460,46 @@ describe('FeishuCard', () => {
       expect(screen.getByLabelText(zh['feishu.appId.label'])).toBeTruthy()
       expect(screen.getByLabelText(zh['feishu.eventCommand.label'])).toBeTruthy()
       expect(screen.queryByLabelText(zh['feishu.profileId.label'])).toBeNull()
+    })
+
+    // 名字已经说明白了，头上再挂一句「单聊发一句话就干活」是往控件路上多一样
+    // 要读过去的东西。
+    it('卡片头上不挂描述', () => {
+      render(<FeishuCard {...cardProps({})} />)
+
+      expect(screen.queryByText(zh['feishu.summary'])).toBeNull()
+    })
+
+    // 没有应用就没有可授权的对象——所以「扫码授权」之前还有一步：先建一个。
+    // 少了它，选完 A 的人看到的是一句"还没有应用"和无处可点。
+    it('profile 还没有应用时，先给一个创建应用', () => {
+      const unbound = {
+        ...signedIn,
+        status: { installed: true, configured: false },
+      } as FeishuAuthState
+      const bindApp = vi.fn()
+      render(<FeishuCard {...cardProps({ mode: field('direct'), auth: unbound }, { bindApp })} />)
+      open()
+
+      expect(screen.getByText(zh['auth.unconfigured'])).toBeTruthy()
+      expect(screen.queryByRole('button', { name: zh['auth.scan'] })).toBeNull()
+      fireEvent.click(screen.getByRole('button', { name: zh['auth.bind'] }))
+
+      expect(bindApp).toHaveBeenCalled()
+    })
+
+    // 建应用和扫码授权是同一个形状，所以二维码那一段两步共用。
+    it('建应用也出二维码', () => {
+      const binding = {
+        ...signedIn,
+        status: { installed: true, configured: false },
+        challenge: { verificationUrl: 'https://accounts.feishu.cn/x', qrDataUrl: 'data:image/png;base64,AAA' },
+      } as FeishuAuthState
+      render(<FeishuCard {...cardProps({ mode: field('direct'), auth: binding })} />)
+      open()
+
+      expect(screen.getByAltText(zh['auth.scan'])).toBeTruthy()
+      expect(screen.getByRole('link', { name: zh['auth.openLink'] })).toBeTruthy()
     })
 
     it('选哪条路要写进设置', () => {
