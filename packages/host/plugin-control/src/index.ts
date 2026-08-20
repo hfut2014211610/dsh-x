@@ -18,20 +18,112 @@
  */
 
 import type { Context } from '@deepseek-ai/cordis'
+import type { FiberState } from '@deepseek-ai/cordis'
 import type {} from '@deepseek-ai/cordis-plugin-loader'
 import { TypertRemoteService, Remote } from '@deepseek-ai/dsh-typert-protocol'
 // Typert-generated ./typert and ./remote artifacts import Zod at runtime.
 import type {} from 'zod'
 import type { PluginEntryId } from '@deepseek-ai/dsh-host-plugin-inventory/types'
 import type { PluginControlOutcome } from './types.ts'
+import { createSupervisor, DEFAULT_SUPERVISOR, type Supervisor } from './supervisor.ts'
 export type * from './types.ts'
+export {
+  createSupervisor, DEFAULT_SUPERVISOR,
+  type RestartDecision, type Supervisor, type SupervisorOptions,
+} from './supervisor.ts'
+
+/**
+ * Runtime mirror of the one FiberState this package reads.
+ *
+ * FiberState is a cross-package const enum: importing it as a value inlines a
+ * number at compile time and leaves nothing for a bundler to resolve. The
+ * inventory package mirrors it the same way for the same reason.
+ */
+const FIBER_FAILED = 3 as FiberState.FAILED
+
+/** How often the supervisor looks for an entry that is on but not running. */
+const DEFAULT_SCAN_MS = 15_000
+
+/** Plugin config: whether to supervise, and how often to look. */
+export interface Config {
+  /**
+   * Bring a switched-on entry back when its fiber has failed.
+   *
+   * On by default. A channel whose plugin faulted stops answering with no
+   * outward sign, and the previous answer was for a person to notice that
+   * messages had stopped and go toggle it.
+   */
+  supervise?: boolean
+  /** Seconds between scans; the fault is not urgent, only unattended. */
+  scanIntervalMs?: number
+}
 
 /** Remote service that turns configured plugin entries on and off. */
 export class PluginControlGateway extends TypertRemoteService {
   static inject = ['loader']
 
-  constructor(ctx: Context) {
+  private readonly supervisor: Supervisor = createSupervisor(DEFAULT_SUPERVISOR)
+  /** Entries with a restart already scheduled, so one scan does not stack another. */
+  private readonly pending = new Set<string>()
+
+  constructor(ctx: Context, config: Config = {}) {
     super(ctx, 'pluginControl')
+    if (config.supervise === false) return
+    const every = config.scanIntervalMs ?? DEFAULT_SCAN_MS
+    const timer = setInterval(() => { this.sweep() }, every)
+    // The Node timer would hold the process open on its own; a supervisor is
+    // not a reason for dsh to keep running.
+    timer.unref()
+    ctx.effect(() => () => { clearInterval(timer) })
+  }
+
+  /**
+   * Look for entries that are switched on and not running, and act on them.
+   *
+   * A person who switches an entry off is not someone the supervisor argues
+   * with, which is why only `enabled` entries are candidates: the enablement
+   * is the intent, and the failed fiber is the deviation from it.
+   */
+  private sweep(): void {
+    for (const entry of this.ctx.loader.entries()) {
+      if (entry.options.group) continue
+      const id = entry.id
+      if (entry.options.disabled === true || entry.fiber?.state !== FIBER_FAILED) {
+        // Running again, or switched off on purpose. Either way its streak is
+        // over — a fault next week should get the full budget, not the
+        // remainder of one it recovered from.
+        this.supervisor.forget(id)
+        this.pending.delete(id)
+        continue
+      }
+      if (this.pending.has(id)) continue
+      const decision = this.supervisor.onDown(id, Date.now())
+      this.ctx.logger.info(`plugin-control: ${entry.options.name} is enabled but failed — ${decision.reason}`)
+      if (!decision.restart) continue
+      this.pending.add(id)
+      const restart = (): void => {
+        this.pending.delete(id)
+        void this.restart(entry.id as PluginEntryId)
+      }
+      if (decision.delayMs === 0) restart()
+      else setTimeout(restart, decision.delayMs).unref()
+    }
+  }
+
+  /**
+   * The off-and-on a person would have done by hand.
+   *
+   * Off first: the Loader only re-runs a plugin's apply on the transition into
+   * enabled, so writing `enabled` over an entry that already reads as enabled
+   * changes nothing at all.
+   * @param entryId - the entry to bring back.
+   */
+  private async restart(entryId: PluginEntryId): Promise<void> {
+    await this.setEnabled({ entryId, enabled: false })
+    const outcome = await this.setEnabled({ entryId, enabled: true })
+    if (outcome.failure !== undefined) {
+      this.ctx.logger.info(`plugin-control: ${String(entryId)} did not come back — ${outcome.failure}`)
+    }
   }
 
   /**

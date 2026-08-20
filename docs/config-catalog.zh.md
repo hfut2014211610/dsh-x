@@ -809,6 +809,30 @@ export interface Config {
 
 来源：[`packages/host/frontend-static/src/index.ts:28`](../packages/host/frontend-static/src/index.ts)
 
+<a id="deepseek-aidsh-host-plugin-control"></a>
+
+## `@deepseek-ai/dsh-host-plugin-control`
+
+需要：`loader`
+
+```ts config-catalog
+/** Plugin config: whether to supervise, and how often to look. */
+export interface Config {
+  /**
+   * Bring a switched-on entry back when its fiber has failed.
+   *
+   * On by default. A channel whose plugin faulted stops answering with no
+   * outward sign, and the previous answer was for a person to notice that
+   * messages had stopped and go toggle it.
+   */
+  supervise?: boolean
+  /** Seconds between scans; the fault is not urgent, only unattended. */
+  scanIntervalMs?: number
+}
+```
+
+来源：[`packages/host/plugin-control/src/index.ts:48`](../packages/host/plugin-control/src/index.ts)
+
 <a id="deepseek-aidsh-host-webserver"></a>
 
 ## `@deepseek-ai/dsh-host-webserver`
@@ -3196,7 +3220,6 @@ export interface Config {
 - `@deepseek-ai/dsh-goal-round-driver` — 需要 `agents` · `goals` · `sessions`（[`packages/goal/goal-round-driver/src/index.ts`](../packages/goal/goal-round-driver/src/index.ts)）
 - `@deepseek-ai/dsh-host-directory-picker-auto` — 需要 `webServer` · `loader`（[`packages/host/directory-picker-auto/src/index.ts`](../packages/host/directory-picker-auto/src/index.ts)）
 - `@deepseek-ai/dsh-host-directory-picker-native`（[`packages/host/directory-picker-native/src/index.ts`](../packages/host/directory-picker-native/src/index.ts)）
-- `@deepseek-ai/dsh-host-plugin-control` — 需要 `loader`（[`packages/host/plugin-control/src/index.ts`](../packages/host/plugin-control/src/index.ts)）
 - `@deepseek-ai/dsh-host-plugin-inventory` — 需要 `loader`（[`packages/host/plugin-inventory/src/index.ts`](../packages/host/plugin-inventory/src/index.ts)）
 - `@deepseek-ai/dsh-llm`（[`packages/llm/llm/src/index.ts`](../packages/llm/llm/src/index.ts)）
 - `@deepseek-ai/dsh-lsp`（[`packages/lsp/lsp/src/index.ts`](../packages/lsp/lsp/src/index.ts)）
