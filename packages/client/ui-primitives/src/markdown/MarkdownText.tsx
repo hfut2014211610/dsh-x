@@ -20,6 +20,7 @@ import {
   wrapBlockChildren,
 } from './render.tsx'
 import type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownRenderContext, ReferenceTargets } from './render.tsx'
+import { renderBlocksWithSource } from './source-positions.tsx'
 import 'katex/dist/katex.min.css'
 import css from './MarkdownText.module.css'
 
@@ -42,10 +43,11 @@ function renderSettled(
     targets,
     footnoteOrder: [],
     footnoteCounts: new Map(),
-    sourcePositions,
   }
   const blocks = wrapBlockChildren(
-    renderBlocks(root.children.map((node, index) => ({ node, key: index })), context),
+    sourcePositions
+      ? renderBlocksWithSource(root.children, context)
+      : renderBlocks(root.children.map((node, index) => ({ node, key: index })), context),
     false,
   )
   const section = renderFootnoteSection(context)
