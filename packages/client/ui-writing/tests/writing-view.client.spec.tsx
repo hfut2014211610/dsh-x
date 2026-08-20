@@ -1,7 +1,7 @@
 // @vitest-environment jsdom
 
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { act, cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { DocumentChange, DocumentOutlineEntry, DocumentReadResult } from '@deepseek-ai/dsh-documents/types'
@@ -107,6 +107,16 @@ function openByPath(view: ReturnType<typeof render>, path: string): void {
 /** Set the filter text without submitting it. */
 function filterBy(view: ReturnType<typeof render>, text: string): void {
   fireEvent.change(view.getByLabelText(zh['filter.label']), { target: { value: text } })
+}
+
+/** Reopen the Files panel — opening a document closes it behind itself. */
+function openFilesPanel(view: ReturnType<typeof render>): void {
+  fireEvent.click(view.getByRole('button', { name: zh['tools.document'] }))
+}
+
+/** The tab strip, once at least one document is open. */
+function tabStrip(view: ReturnType<typeof render>): HTMLElement {
+  return view.getByRole('tablist', { name: zh['tabs.label'] })
 }
 
 /** Expand `docs` and wait for its listing, so the filter has it to work on. */
@@ -262,6 +272,56 @@ describe('WritingView', () => {
 
     await waitFor(() => { expect(b.view.getByLabelText('文档预览')).toBeTruthy() })
     expect(b.load).not.toHaveBeenCalled()
+  })
+
+  // Opening a second document used to close the first, and with it whatever
+  // was typed into it and never saved. Two documents open at once is the
+  // ordinary shape of revising one against another; losing an edit to do it
+  // is not a trade a writing view gets to make.
+  it('keeps the first document open, and hands its unsaved draft back', async () => {
+    const b = setup()
+    openByPath(b.view, 'docs/plan.md')
+    await b.view.findByLabelText('文档预览')
+    fireEvent.click(b.view.getByRole('button', { name: zh['mode.edit'] }))
+    const editor = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
+    fireEvent.change(editor, { target: { value: '还没保存的改动' } })
+
+    openFilesPanel(b.view)
+    openByPath(b.view, 'docs/result.md')
+    await waitFor(() => { expect(b.load).toHaveBeenCalledWith('docs/result.md') })
+
+    const tabs = tabStrip(b.view)
+    expect(within(tabs).getAllByRole('tab').map(tab => tab.textContent)).toEqual(['plan.md', 'result.md'])
+    // The one holding edits says so, and it is not the one being looked at.
+    expect(within(tabs).getByLabelText(zh['tabs.dirty'])).toBeTruthy()
+
+    b.load.mockClear()
+    fireEvent.click(within(tabs).getByRole('tab', { name: /plan\.md/ }))
+    const back = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
+    expect(back.value).toBe('还没保存的改动')
+    // Re-reading the file is the one thing that would have lost the draft.
+    expect(b.load).not.toHaveBeenCalled()
+  })
+
+  it('closes onto the neighbour, and empties the editor on the last tab', async () => {
+    const b = setup()
+    openByPath(b.view, 'docs/plan.md')
+    await b.view.findByLabelText('文档预览')
+    openFilesPanel(b.view)
+    openByPath(b.view, 'docs/result.md')
+    await waitFor(() => { expect(b.load).toHaveBeenCalledWith('docs/result.md') })
+
+    const tabs = tabStrip(b.view)
+    fireEvent.click(within(tabs).getByRole('button', { name: `${zh['action.close']} result.md` }))
+    await waitFor(() => {
+      const remaining = within(tabs).getAllByRole('tab')
+      expect(remaining).toHaveLength(1)
+      expect(remaining[0]?.getAttribute('aria-selected')).toBe('true')
+    })
+
+    fireEvent.click(within(tabs).getByRole('button', { name: `${zh['action.close']} plan.md` }))
+    await waitFor(() => { expect(b.view.queryByRole('tablist')).toBeNull() })
+    expect(b.view.getByText(zh['document.untitled'])).toBeTruthy()
   })
 
   // Reading is what opening a document usually is, and until now only markdown

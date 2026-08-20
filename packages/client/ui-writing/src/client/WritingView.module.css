@@ -517,6 +517,79 @@
   color: var(--dsw-alias-state-warn-label);
 }
 
+/* One row of open documents, scrolling sideways rather than wrapping: a
+   second row would move the editor down every time a tab is opened. */
+.tabStrip {
+  display: flex;
+  flex: none;
+  align-items: stretch;
+  gap: 2px;
+  padding: 0 10px;
+  overflow-x: auto;
+  border-bottom: 1px solid var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-base);
+  scrollbar-width: thin;
+}
+
+.tab {
+  display: inline-flex;
+  flex: none;
+  align-items: center;
+  max-width: 220px;
+  border-bottom: 2px solid transparent;
+}
+
+.tab[data-active] {
+  border-bottom-color: var(--dsw-alias-brand-primary);
+}
+
+.tabName,
+.tabClose {
+  display: inline-flex;
+  align-items: center;
+  height: 34px;
+  padding: 0;
+  border: 0;
+  background: none;
+  color: var(--dsw-alias-label-tertiary);
+  cursor: pointer;
+}
+
+.tabName {
+  gap: 6px;
+  min-width: 0;
+  padding-left: 10px;
+  font-size: 13px;
+}
+
+.tab[data-active] .tabName {
+  color: var(--dsw-alias-label-primary);
+}
+
+.tabName:hover,
+.tabClose:hover {
+  color: var(--dsw-alias-label-primary);
+}
+
+/* A dot, not a word: the strip has no room for one, and the status line at
+   the top of the editor already says it in full for the active document. */
+.tabDirty {
+  flex: none;
+  width: 6px;
+  height: 6px;
+  border-radius: 50%;
+  background: var(--dsw-alias-state-warn-label);
+}
+
+.tabClose {
+  padding: 0 8px;
+  opacity: 0.55;
+}
+
+.tabClose:hover {
+  opacity: 1;
+}
+
 .error,
 .conflict {
   display: flex;

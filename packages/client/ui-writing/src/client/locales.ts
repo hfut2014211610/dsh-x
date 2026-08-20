@@ -9,6 +9,7 @@ export type WritingKey =
   | 'tools.label' | 'tools.document' | 'tools.outline' | 'tools.search'
   | 'panel.document' | 'panel.outline' | 'panel.search' | 'panel.resize'
   | 'document.untitled'
+  | 'tabs.label' | 'tabs.dirty'
   | 'filter.label' | 'filter.placeholder' | 'filter.clear' | 'filter.empty'
   | 'tree.label' | 'tree.heading' | 'tree.loading' | 'tree.empty' | 'tree.error' | 'tree.truncated' | 'tree.refresh'
   | 'outline.empty' | 'search.input' | 'search.placeholder' | 'search.empty'
@@ -40,6 +41,8 @@ export const zh: Record<WritingKey, string> = {
   'panel.search': '搜索工作区',
   'panel.resize': '调整面板宽度',
   'document.untitled': '未打开文档',
+  'tabs.label': '已打开的文档',
+  'tabs.dirty': '有未保存修改',
   'filter.label': '过滤文件',
   'filter.placeholder': '输入名称过滤，回车打开',
   'filter.clear': '清除过滤',
@@ -95,6 +98,8 @@ export const en: Record<WritingKey, string> = {
   'panel.search': 'Search workspace',
   'panel.resize': 'Resize the panel',
   'document.untitled': 'No document open',
+  'tabs.label': 'Open documents',
+  'tabs.dirty': 'Unsaved changes',
   'filter.label': 'Filter files',
   'filter.placeholder': 'Filter by name; Enter opens',
   'filter.clear': 'Clear the filter',

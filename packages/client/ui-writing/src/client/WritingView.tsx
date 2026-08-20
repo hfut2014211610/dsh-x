@@ -278,6 +278,25 @@ function documentName(path: string, untitled: string): string {
   return name === undefined || name === '' ? untitled : name
 }
 
+/**
+ * Everything that makes one open document what it is, held for the tabs that
+ * are not on screen.
+ *
+ * The active document lives in the component's own state — this is the copy
+ * taken when someone switches away, so switching back gives them what they
+ * left rather than what the file says now: an unsaved draft, the reading
+ * position implied by the view mode, and the version the edits are against.
+ */
+interface ParkedDocument {
+  draft: string
+  savedContent: string
+  version: string
+  format: DocumentFormat
+  viewMode: ViewMode
+  status: SaveStatus
+  entries: readonly DocumentOutlineEntry[]
+}
+
 function parentDirectory(path: string): string {
   const normalized = path.replaceAll('\\', '/')
   const separator = normalized.lastIndexOf('/')
@@ -421,6 +440,12 @@ export function WritingView({
   const [expandedDirectories, setExpandedDirectories] = useState<ReadonlySet<string>>(() => new Set(['']))
   const [format, setFormat] = useState<DocumentFormat>('text')
   const [viewMode, setViewMode] = useState<ViewMode>('edit')
+  // The tab strip's order, oldest first. The buffers behind the inactive ones
+  // are a ref rather than state: they change on every switch and nothing in
+  // the tree renders from them except the unsaved dot, which the strip reads
+  // during the render the switch already causes.
+  const [openPaths, setOpenPaths] = useState<readonly string[]>([])
+  const parkedRef = useRef(new Map<string, ParkedDocument>())
   const treeFilter = useMemo(() => buildTreeFilter(pathInput, directories), [pathInput, directories])
   const markdown = format === 'markdown'
   const editorRef = useRef<HTMLTextAreaElement>(null)
@@ -450,6 +475,33 @@ export function WritingView({
   const following = useRef(true)
   draftRef.current = draft
   savedContentRef.current = savedContent
+  // Mirrored every render so parking has nothing to close over: a `park` that
+  // captured state would change identity every render, and `loadDocument`
+  // depends on it — which would re-subscribe the change listener each time.
+  const activeRef = useRef<ParkedDocument>({
+    draft, savedContent, version, format, viewMode, status, entries,
+  })
+  activeRef.current = { draft, savedContent, version, format, viewMode, status, entries }
+
+  /** Hold the active document's buffer under its path, if there is one. */
+  const park = useCallback(() => {
+    const path = currentPathRef.current
+    if (path === '') return
+    parkedRef.current.set(path, activeRef.current)
+  }, [])
+
+  /** Make a held buffer the active document again, without reading the file. */
+  const restore = useCallback((path: string, held: ParkedDocument) => {
+    setError(null)
+    setCurrentPath(path)
+    setDraft(held.draft)
+    setSavedContent(held.savedContent)
+    setVersion(held.version)
+    setFormat(held.format)
+    setViewMode(held.viewMode)
+    setStatus(held.status)
+    setEntries(held.entries)
+  }, [])
 
   const loadDirectory = useCallback(async (path: string) => {
     if (directoryLoadsRef.current.has(path)) return
@@ -479,6 +531,18 @@ export function WritingView({
       setPanel('document')
       return
     }
+    // Leaving a document is not closing it. Switching to one already open
+    // hands back the buffer that was parked, unsaved edits and all — reading
+    // the file again would be the one thing that loses work.
+    if (normalizedPath !== currentPathRef.current) {
+      park()
+      const held = parkedRef.current.get(normalizedPath)
+      if (held !== undefined && source !== 'reload' && source !== 'external') {
+        restore(normalizedPath, held)
+        if (source === 'manual') setPanel(null)
+        return
+      }
+    }
     setError(null)
     setStatus('loading')
     const result = await load(normalizedPath)
@@ -489,6 +553,7 @@ export function WritingView({
       return
     }
     void loadDirectory(parentDirectory(normalizedPath))
+    setOpenPaths(current => current.includes(normalizedPath) ? current : [...current, normalizedPath])
     setCurrentPath(normalizedPath)
     setDraft(result.content)
     setSavedContent(result.content)
@@ -502,7 +567,7 @@ export function WritingView({
     setEntries(await outline(normalizedPath))
     setStatus(source === 'external' ? 'external' : 'saved')
     if (source === 'manual') setPanel(null)
-  }, [load, loadDirectory, outline])
+  }, [load, loadDirectory, outline, park, restore])
 
   useEffect(() => {
     if (panel !== 'document' || directories.has('')) return
@@ -519,6 +584,13 @@ export function WritingView({
   }, [initialPath, loadDocument])
 
   useEffect(() => subscribeChanged((change) => {
+    // A tab nobody is looking at. Drop a clean buffer so switching back reads
+    // the new bytes; keep a dirty one, because the edits in it outrank a
+    // reload nobody asked for — the same rule the active document follows.
+    if (change.path !== currentPathRef.current) {
+      const held = parkedRef.current.get(change.path)
+      if (held !== undefined && held.draft === held.savedContent) parkedRef.current.delete(change.path)
+    }
     // Unsaved edits outrank both paths below: a reload would discard them, and
     // following away from them would strand them behind a document nobody
     // asked to open.
@@ -594,6 +666,42 @@ export function WritingView({
       return
     }
     setViewMode('edit')
+  }
+
+  /**
+   * Close one tab.
+   *
+   * Closing the active one moves to its right-hand neighbour, or its
+   * left-hand one when it was last — the direction a reader's attention was
+   * already going. A held buffer goes with the tab: closing IS the discard,
+   * and keeping the draft around under a tab that no longer exists would mean
+   * reopening the file silently ignored what the file says.
+   */
+  const closeDocument = (path: string) => {
+    const index = openPaths.indexOf(path)
+    const remaining = openPaths.filter(open => open !== path)
+    parkedRef.current.delete(path)
+    setOpenPaths(remaining)
+    if (path !== currentPath) return
+    const next = remaining[Math.min(index, remaining.length - 1)]
+    if (next === undefined) {
+      setCurrentPath('')
+      setDraft('')
+      setSavedContent('')
+      setVersion('')
+      setFormat('text')
+      setViewMode('edit')
+      setEntries([])
+      setStatus('idle')
+      setError(null)
+      return
+    }
+    const held = parkedRef.current.get(next)
+    if (held === undefined) {
+      void loadDocument(next, 'tree')
+      return
+    }
+    restore(next, held)
   }
 
   const togglePanel = (next: Panel) => {
@@ -828,6 +936,44 @@ export function WritingView({
             </button>
           </div>
         </header>
+
+        {/* The strip appears with the first document and not before: an empty
+            writing view has nothing to switch between. */}
+        {openPaths.length > 0 && (
+          <div className={css.tabStrip} role="tablist" aria-label={t('tabs.label')}>
+            {openPaths.map((path) => {
+              const active = path === currentPath
+              const held = parkedRef.current.get(path)
+              const dirty = active
+                ? draft !== savedContent
+                : held !== undefined && held.draft !== held.savedContent
+              const name = documentName(path, t('document.untitled'))
+              return (
+                <span key={path} className={css.tab} data-active={active || undefined}>
+                  <button
+                    type="button"
+                    role="tab"
+                    aria-selected={active}
+                    className={css.tabName}
+                    title={path}
+                    onClick={() => { following.current = false; void loadDocument(path, 'tree') }}
+                  >
+                    {name}
+                    {dirty && <span className={css.tabDirty} title={t('tabs.dirty')} aria-label={t('tabs.dirty')} />}
+                  </button>
+                  <button
+                    type="button"
+                    className={css.tabClose}
+                    aria-label={`${t('action.close')} ${name}`}
+                    onClick={() => { closeDocument(path) }}
+                  >
+                    <IconCloseOutline16 />
+                  </button>
+                </span>
+              )
+            })}
+          </div>
+        )}
 
         {error !== null && <div className={css.error} role="alert">{error}</div>}
         {status === 'conflict' && (

@@ -353,6 +353,25 @@ describe('web e2e: agent-preset selection', () => {
       return element.value.slice(element.selectionStart, element.selectionEnd)
     })).toBe('Final target')
 
+    // Two documents open at once. The strip is the only thing on screen that
+    // says the first one is still there, and going back to it has to be a
+    // switch rather than a re-read — a re-read is what used to lose the draft.
+    await page.getByRole('button', { name: 'Files', exact: true }).click()
+    await page.getByRole('button', { name: PROTOTYPE_DOCUMENT, exact: true }).click()
+    const strip = page.getByRole('tablist', { name: 'Open documents' })
+    await expect.poll(async () => strip.getByRole('tab').allTextContents(), { timeout: 15_000 })
+      .toEqual([OUTLINE_DOCUMENT, PROTOTYPE_DOCUMENT])
+    await expect.poll(async () => strip.getByRole('tab', { name: PROTOTYPE_DOCUMENT }).getAttribute('aria-selected'))
+      .toBe('true')
+
+    await strip.getByRole('tab', { name: OUTLINE_DOCUMENT }).click()
+    await expect.poll(async () => strip.getByRole('tab', { name: OUTLINE_DOCUMENT }).getAttribute('aria-selected'))
+      .toBe('true')
+    await expect.poll(async () => editor.evaluate((element) => {
+      if (!(element instanceof HTMLTextAreaElement)) throw new Error('Document editor is not a textarea')
+      return element.value.includes('Final target')
+    })).toBe(true)
+
     // The assistant column starts at whatever the CSS default resolves to for
     // this viewport and the separator owns it from there. Only a real browser
     // proves that chain: the starting width is a measurement of a laid-out
