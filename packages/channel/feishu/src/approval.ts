@@ -31,7 +31,11 @@ export interface ApprovalVote {
   readonly decision: 'allow' | 'reject'
 }
 
-/** 判断一个按钮值是不是审批投票。 */
+/**
+ * 判断一个按钮值是不是审批投票。
+ * @param value - 卡片按钮回传的 value，形状未知。
+ * @returns 是审批投票则为 true，并把类型收窄到 {@link ApprovalVote}。
+ */
 export function isApprovalVote(value: unknown): value is ApprovalVote {
   if (typeof value !== 'object' || value === null) return false
   const record = value as Record<string, unknown>
@@ -74,6 +78,7 @@ export class ApprovalBroker {
    * @param chatKey - 发到哪个会话。
    * @param title - 要批的动作，通常是工具名。
    * @param detail - 补充信息，通常是参数摘要。
+   * @param signal - 取消信号；中断时按拒绝落定。
    * @returns 人点出来的结论；超时或发不出去都按拒绝。
    */
   async request(
@@ -119,7 +124,10 @@ export class ApprovalBroker {
     return true
   }
 
-  /** 这个会话还有几个审批等着。 */
+  /**
+   * 这个会话还有几个审批等着。
+   * @returns 尚未落定的审批数。
+   */
   pendingCount(): number {
     return this.pending.size
   }

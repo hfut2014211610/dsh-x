@@ -54,3 +54,17 @@ pnpm exec vitest run packages/llm/model-tuning
 
 - 只管 `LlmCallConfig` 那四个字段。协议、endpoint、上下文窗口、思考等级词汇属于官方 `llm-pi-ai` 段。
 - 厂商私有的 body 参数（`top_p`、`enable_search` 之类）不在官方请求词汇表里，本包注入不了。真要用得自己写一个 `LlmAdapter`，那是大得多的工程。
+
+## Model Experience
+
+None, as it only fills sampling fields on an outgoing request; it registers no tool, prompt section, or result projection.
+
+#### KV Cache effect
+
+None; sampling parameters travel beside the prompt rather than in it, so the cached prefix is unchanged.
+
+## Known Limitations and Deferred Work
+
+- **按模型 id 匹配，不按能力** — 新模型得有人点名才拿得到默认值；改了名的模型会静默退回提供方自己的默认值。
+- **只管瀑布流里声明过的字段** — 请求上别的东西原样透传，这是有意的，但也意味着某个提供方专有的旋钮在这里没有位置。
+- **不能按会话覆盖** — 调优是整个 harness 里按模型生效的；单独一次对话想换采样，只能去改设置。

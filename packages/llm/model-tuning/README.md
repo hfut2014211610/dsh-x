@@ -54,3 +54,17 @@ pnpm exec vitest run packages/llm/model-tuning
 
 - Only the four `LlmCallConfig` fields. Protocol, endpoint, context window, and thinking-level vocabulary belong to the stock `llm-pi-ai` section.
 - Vendor-specific body parameters (`top_p`, `enable_search`, and the like) are not in the sanctioned request vocabulary, so this package cannot inject them. Needing one means writing an `LlmAdapter`, which is a much larger undertaking.
+
+## Model Experience
+
+None, as it only fills sampling fields on an outgoing request; it registers no tool, prompt section, or result projection.
+
+#### KV Cache effect
+
+None; sampling parameters travel beside the prompt rather than in it, so the cached prefix is unchanged.
+
+## Known Limitations and Deferred Work
+
+- **Matching is by model id, not by capability** — a new model gets defaults only once someone names it, and a renamed model silently falls back to the provider's own defaults.
+- **Only fields the waterfall declares are managed** — anything else on the request passes through untouched, which is deliberate but means a provider-specific knob has no home here.
+- **No per-session override** — the tuning is per model for the whole harness; a single conversation that wants different sampling has to change the setting.

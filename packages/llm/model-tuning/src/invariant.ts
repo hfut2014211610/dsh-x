@@ -14,9 +14,8 @@ export const name = 'model-tuning-invariant'
 export const inject = ['invariants']
 
 /**
- * No runtime invariant.
- *
- * The relation this package owns — a declared field reaches the request it
+ * No runtime invariant: the relation this package owns — a declared field
+ * reaches the request it
  * matched — is a property of one request's config, observable only while that
  * request is being assembled. The teardown stream this seam watches carries
  * no requests, so there is nothing here to probe. The waterfall's precedence

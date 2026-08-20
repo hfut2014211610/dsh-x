@@ -96,7 +96,10 @@ export class SessionRouter {
     return this.domain.table('chats').delete(key)
   }
 
-  /** 当前所有绑定的快照。 */
+  /**
+   * 当前所有绑定的快照。
+   * @returns chat 到绑定的键值对数组。
+   */
   entries(): [ChatKey, ChatBinding][] {
     return [...this.domain.table('chats').entries()]
   }

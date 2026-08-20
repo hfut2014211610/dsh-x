@@ -106,3 +106,17 @@ pnpm exec vitest run packages/channel/feishu
 ## 已经量过的数
 
 `lark-cli` 冷启动五次：339 / 361 / 291 / 343 / 282 ms。**约 300ms 一次**，这就是卡片按阶段更新而不是逐字流式的原因——逐字要 200–500ms 一帧，光进程启动就吃满了。
+
+## Model Experience
+
+Indirectly, through the message text it hands a session: a Lark message arrives with the bot mention stripped and nothing added, and the session's own preset owns every tool and prompt section from there.
+
+#### KV Cache effect
+
+None of its own; the prefix a session assembles is the same whether the turn arrived from Lark or from the composer.
+
+## Known Limitations and Deferred Work
+
+- **一次只能一种模式** — 身份与事件来源是一起配的，所以没法让身份走 A 模式、事件来源走 B 模式。要拆开就得把 `mode` 变成两个独立维度，配置结构要动。
+- **桥接被杀会留下消费者** — 回收发生在下次启动时，靠它写下的 pid 与 event key 认领，所以一个被杀且再没起来的桥接会一直留着一个 `lark-cli` 消费者。
+- **卡片只能由发它的那个应用改** — 回话必须以收到消息的同一个应用的身份发出，所以一个在对话中途轮换应用的部署会失去改自己卡片的能力。

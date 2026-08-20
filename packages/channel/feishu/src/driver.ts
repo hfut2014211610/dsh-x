@@ -195,7 +195,11 @@ export class SessionDriver {
     return undefined
   }
 
-  /** 这个 chat 现在是不是有回合在跑。 */
+  /**
+   * 这个 chat 现在是不是有回合在跑。
+   * @param chatKey - 要问的会话。
+   * @returns 有回合在跑则为 true。
+   */
   isRunning(chatKey: string): boolean {
     const agent = this.agents.get(chatKey)
     if (agent === undefined) return false

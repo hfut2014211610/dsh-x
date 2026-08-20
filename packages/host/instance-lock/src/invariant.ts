@@ -14,9 +14,8 @@ export const name = 'host-instance-lock-invariant'
 export const inject = ['invariants']
 
 /**
- * No runtime invariant.
- *
- * The relation this package owns — at most one live runtime per harness home —
+ * No runtime invariant: the relation this package owns — at most one live
+ * runtime per harness home —
  * is a fact about other processes, and nothing inside this one can observe it.
  * The claim file is the only local evidence, and a probe of it would answer
  * for whoever wrote it last rather than for the set of runtimes actually

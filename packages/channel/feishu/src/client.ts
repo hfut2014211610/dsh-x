@@ -75,7 +75,10 @@ export class BridgeClient {
     socket.on('close', () => { this.teardown() })
   }
 
-  /** 发一条不需要回执的命令。连接不在时静默丢弃——桥接没在，回执也没处送。 */
+  /**
+   * 发一条不需要回执的命令。连接不在时静默丢弃——桥接没在，回执也没处送。
+   * @param command - 要发的命令，版本号由这里补上。
+   */
   send(command: SendableCommand): void {
     const socket = this.socket
     if (socket === undefined || socket.destroyed) return

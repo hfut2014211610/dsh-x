@@ -106,3 +106,17 @@ These raw escape hatches were driven through `lark-cli` v1.0.87 against a real g
 ## Numbers actually measured
 
 Five cold `lark-cli` starts: 339 / 361 / 291 / 343 / 282 ms. **About 300ms each**, which is why the card updates in stages rather than streaming token by token — streaming wants a frame every 200–500ms, and process startup alone eats that.
+
+## Model Experience
+
+Indirectly, through the message text it hands a session: a Lark message arrives with the bot mention stripped and nothing added, and the session's own preset owns every tool and prompt section from there.
+
+#### KV Cache effect
+
+None of its own; the prefix a session assembles is the same whether the turn arrived from Lark or from the composer.
+
+## Known Limitations and Deferred Work
+
+- **One mode at a time** — identity and event source are configured together, so an A-mode identity cannot be paired with a B-mode event feed. Splitting them means making `mode` two independent dimensions, which changes the config shape.
+- **A killed bridge leaves its consumer behind** — reaping happens on the next start, from the pid and event key it wrote down, so a bridge killed and never restarted leaves one `lark-cli` consumer running until then.
+- **Cards are patched by the app that sent them** — a reply must go out as the same application that received the message, so a deployment that rotates applications mid-conversation loses the ability to update its own cards.

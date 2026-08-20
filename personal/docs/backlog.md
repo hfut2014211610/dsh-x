@@ -112,13 +112,31 @@
 
 取舍全文见[笔记](notes/implemented/2026-08-20-markdown-source-positions.md)。
 
-## #9 之后还欠仓库的：三个毕业包没过门
+## 毕业包欠的门债：已清
 
-写 #9 时把仓库的门跑全了，发现上一轮毕业的三个包（`channel/feishu`、`llm/model-tuning`、`host/instance-lock`）没过四道门：`verify-export-jsdoc`、`verify-package-invariants`、`verify-package-readme-limitations`、`verify-package-readme-model-experience`。**上一轮我报「九个门全绿」时跑的是更窄的一组，这四道没在里面。**
+写 #9 时把仓库的门跑全了（`run-gates ci-static`，36 道），发现上一轮毕业的三个包欠了六道。**上一轮我报「九个门全绿」时跑的是更窄的一组，这六道没在里面。**
 
-这些门只扫 `packages/` 与 `apps/`——包还在 `personal/` 底下时它们根本看不见，一毕业就全部到期。
+| 门 | 欠的是什么 |
+|---|---|
+| `verify-export-jsdoc` | 飞书 27 处导出缺 `@param` / `@returns` |
+| `verify-package-invariants` | 三个 `invariant.ts` 写的是「No runtime invariant.」，门认的是带冒号的 `No runtime invariant:` |
+| `verify-package-readme-limitations` | 飞书、model-tuning 缺这一节；instance-lock 整个 README 都没有 |
+| `verify-package-readme-model-experience` | 同上，另需在门自己的审计表里登记（`ui-writing`/`ui-ued` 早有先例） |
+| `constraints` | 飞书的 bin 指着 `lib/bridge/main.js`，仓库约定是 `lib/bin.js`——补了 `src/bin.ts` 与 `tsdown.config.ts`，桥接现在打成一个文件（也更合它的本分：dsh 挂了它得顶上，少一个可能缺失的文件就少一种顶不上的方式） |
+| `doc graphs` | 事件矩阵没重生成：`model-tuning` 是 `agent/request` 的消费者、`feishu` 是 `approval/request` 的消费者，两条都缺 |
 
-（另有 `verify-client-domain-graph` 27 条全在上游 `runtime/` 与 `ui-workspace/`，与本轮无关，本来就是红的。）
+这些门只扫 `packages/` 与 `apps/`——包还在 `personal/` 底下时它们根本看不见，一毕业就全部到期。这是「从 `personal/` 毕业」的真实成本，下次搬包前先跑一遍 `ci-static`。
+
+**还红着但不是本轮的**：`knip` 115 条未列依赖、`verify-client-domain-graph` 27 条，改动前后逐条相同，全在上游包里。
+
+## #9 借鉴外部实现：看过 dsh-openpencil
+
+`ZSeven-W/dsh-openpencil` 做的是 OpenPencil（矢量设计工具）的通道，预览是 headless 导出器渲的 PNG，选择发生在另外挂的只读 Web SDK 画布里，回到模型靠模型**主动调工具** `openpencil_selection`。
+
+**不能借**：渲 PNG 是因为 `.op` 非用导出器不可；HTML 原型换成 PNG 是纯损失——交互没了，而要指的常常正是交互出来的那个状态。它的文档也完全没提层叠遮挡。
+
+**值得记**：选择用「拉」不用「推」。模型随时能问「现在选中什么」，人选一下直接说「改窄」就行，不需要「加入对话」这个动作。障碍是真的：选择状态在浏览器、工具在宿主，现有 Remote 面只有浏览器调宿主这一个方向。视图里已经存着确认过的候选，将来接工具不用推翻现有结构。
+
 
 ## #N：`test:web` 与 win32
 

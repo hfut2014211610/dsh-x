@@ -14,9 +14,8 @@ export const name = 'feishu-invariant'
 export const inject = ['invariants']
 
 /**
- * No runtime invariant.
- *
- * The relations worth holding this channel to are all on the other side of a
+ * No runtime invariant: the relations worth holding this channel to are all
+ * on the other side of a
  * socket: one consumer per event key, one reply sent as the app that received
  * the message, one card patched by the app that sent it. None of them is
  * observable from the teardown stream this seam watches, and a probe here

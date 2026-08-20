@@ -10,7 +10,10 @@
 /** relay 协议版本。 */
 export const EVENT_RELAY_VERSION = 1
 
-/** 默认的事件 relay 端点。 */
+/**
+ * 默认的事件 relay 端点。
+ * @returns win32 上是具名管道，其余平台是 unix socket 路径。
+ */
 export function defaultEventRelayEndpoint(): string {
   return process.platform === 'win32'
     ? '\\\\.\\pipe\\dsh-x-feishu-events'
@@ -18,6 +21,7 @@ export function defaultEventRelayEndpoint(): string {
 }
 
 /**
+ * 把一条原始事件编成一行 relay 帧。
  * @param event - lark-cli event consume 解析出的原始事件。
  * @param source - 收到它的那个 lark-cli profile 目录；空串是环境默认那份。
  *   订阅方要回话的话，必须以同一个应用的身份回：一个应用一个机器人，卡片也

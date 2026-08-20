@@ -98,7 +98,11 @@ export function readCommandLine(pid: number): string | undefined {
   }
 }
 
-/** `process.kill(pid, 0)`：不发信号，只问它还在不在。 */
+/**
+ * `process.kill(pid, 0)`：不发信号，只问它还在不在。
+ * @param pid - 要问的进程号。
+ * @returns 进程还在则为 true。
+ */
 export function processAlive(pid: number): boolean {
   try {
     process.kill(pid, 0)
@@ -150,7 +154,10 @@ export async function readOwnedConsumers(path: string): Promise<readonly OwnedCo
   }
 }
 
-/** 扔掉字条；文件本来就不在也算成功。 */
+/**
+ * 扔掉字条；文件本来就不在也算成功。
+ * @param path - 字条路径。
+ */
 export async function clearOwnedConsumers(path: string): Promise<void> {
   await rm(path, { force: true })
 }

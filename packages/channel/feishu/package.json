@@ -14,7 +14,7 @@
   "main": "lib/index.js",
   "types": "lib/types/index.d.ts",
   "bin": {
-    "dsh-feishu-bridge": "lib/bridge/main.js"
+    "dsh-feishu-bridge": "lib/bin.js"
   },
   "exports": {
     ".": {
@@ -28,6 +28,10 @@
     "./types": {
       "types": "./lib/types/types.d.ts",
       "default": "./lib/types/types.js"
+    },
+    "./bin": {
+      "types": "./lib/types/bin.d.ts",
+      "default": "./lib/bin.js"
     },
     "./src/*": "./src/*",
     "./package.json": "./package.json"
@@ -67,7 +71,7 @@
   "files": [
     "lib/index.js",
     "lib/invariant.js",
-    "lib/bridge/**/*.js",
+    "lib/bin.js",
     "lib/types/**/*.js",
     "lib/types/**/*.d.ts"
   ]

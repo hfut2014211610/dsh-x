@@ -144,7 +144,12 @@ export function stripMentions(
   return text.trim()
 }
 
-/** 这条事件有没有 @ 到机器人。 */
+/**
+ * 这条事件有没有 @ 到机器人。
+ * @param event - 收到的消息事件。
+ * @param botOpenId - 本机器人的 open_id。
+ * @returns 被 @ 到则为 true。
+ */
 export function mentionsBot(event: LarkMessageEvent, botOpenId: string): boolean {
   return (event.mentions ?? []).some(mention => mention.id === botOpenId)
 }

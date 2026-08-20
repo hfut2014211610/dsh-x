@@ -19,7 +19,10 @@
 /** 协议版本。两端不一致时握手直接拒绝，不做兼容猜测。 */
 export const PROTOCOL_VERSION = 1
 
-/** 默认的本地端点路径。 */
+/**
+ * 默认的本地端点路径。
+ * @returns win32 上是具名管道，其余平台是 unix socket 路径。
+ */
 export function defaultEndpoint(): string {
   return process.platform === 'win32'
     ? '\\\\.\\pipe\\dsh-x-feishu'

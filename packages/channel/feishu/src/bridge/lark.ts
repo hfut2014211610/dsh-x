@@ -106,7 +106,14 @@ export async function larkApi(
   }
 }
 
-/** 一张卡片的 JSON（飞书卡片 2.0）。 */
+/**
+ * 一张进度卡片的 JSON（飞书卡片 2.0）。
+ * @param title - 卡片标题。
+ * @param stage - 卡片底部那行状态说明。
+ * @param text - 正文 Markdown；空串时显示「正在开始」。
+ * @param stop - 带上就多一个停止按钮，值里是要停的 chat。
+ * @returns 可直接发给飞书的卡片对象。
+ */
 export function progressCard(title: string, stage: string, text: string, stop?: { chatKey: string }): unknown {
   const elements: unknown[] = [
     { tag: 'markdown', content: text === '' ? '_正在开始…_' : text },
@@ -131,7 +138,13 @@ export function progressCard(title: string, stage: string, text: string, stop?: 
   }
 }
 
-/** 审批卡片：允许一次 / 拒绝。 */
+/**
+ * 审批卡片：允许一次 / 拒绝。
+ * @param askId - 这次审批的 id，回传时用它对上。
+ * @param title - 要批的动作，通常是工具名。
+ * @param detail - 补充信息；空串时用一句兜底说明。
+ * @returns 可直接发给飞书的卡片对象。
+ */
 export function approvalCard(askId: string, title: string, detail: string): unknown {
   return {
     config: { wide_screen_mode: true, update_multi: true },

@@ -54,6 +54,7 @@ export function larkCliEnvironment(configDir: string): NodeJS.ProcessEnv {
 }
 
 /**
+ * 组一次不经过 shell 的 lark-cli 调用。
  * @param args - 传给 lark-cli 的 argv。
  * @returns 无需 shell 的可执行文件与参数。
  */
