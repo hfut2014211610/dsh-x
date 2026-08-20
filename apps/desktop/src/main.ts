@@ -20,6 +20,7 @@ import { pipeline } from 'node:stream/promises'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, shell, Tray } from 'electron'
 import { aboutMessage, releaseDetail } from './about.ts'
+import { appMenuTemplate } from './app-menu.ts'
 import { ensureBundledRuntime } from './bundled-runtime.ts'
 import { DEFAULT_PROBE_ORIGIN, discoverRuntime } from './discovery.ts'
 import { DEFAULT_HEALTH_OPTIONS, startHealthWatch } from './health.ts'
@@ -573,6 +574,21 @@ function createWindow(): void {
   })
 }
 
+/**
+ * Install the window menu, replacing the one Electron installs by default.
+ *
+ * Before anything loads: the default menu is in place from the moment a window
+ * exists, so a person who opens the menu bar during the connection screen
+ * would otherwise find Toggle Developer Tools there.
+ */
+function installApplicationMenu(): void {
+  Menu.setApplicationMenu(Menu.buildFromTemplate(appMenuTemplate({
+    about: () => { void showAbout() },
+    checkUpdates: () => { void checkUpdates(true) },
+    quit: () => { quit(); app.quit() },
+  }) as Parameters<typeof Menu.buildFromTemplate>[0]))
+}
+
 function createTray(): void {
   tray = new Tray(nativeImage.createFromPath(TRAY_ICON))
   tray.setToolTip('DeepSeek Harness')
@@ -676,6 +692,7 @@ app.whenReady().then(() => {
     app.quit()
     return
   }
+  installApplicationMenu()
   createWindow()
   createTray()
   void reapPreviousRuntime().then(connect)
