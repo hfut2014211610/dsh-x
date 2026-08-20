@@ -9,8 +9,13 @@
 import type { RuntimeCandidate, RuntimeSpawn } from './discovery.ts'
 import { describeOrigin } from './rpc-probe.ts'
 
-/** The web arguments the shell always passes: loopback only, OS-assigned port. */
-const WEB_ARGS = ['web', '--host', '127.0.0.1', '--port', '0'] as const
+/**
+ * The web arguments the shell always passes: loopback only, OS-assigned port,
+ * and no browser — the Electron window is this product's only surface, and the
+ * runtime's default "open the default browser" would put a second copy of the
+ * UI on screen at every launch.
+ */
+const WEB_ARGS = ['web', '--host', '127.0.0.1', '--port', '0', '--no-open'] as const
 
 /** A spawned runtime as the sidecar sees it; every member is a test seam. */
 export interface RuntimeProcess {

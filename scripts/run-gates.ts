@@ -248,7 +248,6 @@ export function gatesForMode(selected: Mode): Gate[] {
         pnpmScript('duplication', 'duplication'),
         snapshotGate(),
         pnpmScript('build', 'build'),
-        pnpmScript('build:web', 'build:web'),
         ...hygieneLeafGates({ artifactNeeds: ['build'] }),
         ...docSyncLeafGates({
           docTypecheckNeeds: ['build'],
@@ -319,10 +318,6 @@ function nodeCompatGates(): Gate[] {
     pnpmScript('build', 'build', {
       ...typecheck.length === 0 ? {} : { needs: ['typecheck'] },
     }),
-    pnpmScript('build:web', 'build:web', {
-      label: 'Web frontend build',
-      needs: ['build'],
-    }),
     ...nodeCompatSmokeGates({ cliSmoke: true }),
   ]
 }
@@ -359,7 +354,7 @@ function nodeCompatSmokeGates(options: { cliSmoke?: boolean } = {}): Gate[] {
       ], {
         label: 'CLI lazy-search startup smoke',
         env: { DSH_REQUIRE_BUILT_CLI_SMOKE: '1' },
-        needs: ['build:web'],
+        needs: ['build'],
       }),
     )
   }
@@ -648,39 +643,40 @@ function docSyncLeafGates(options: {
   if (options.docTypecheckNeeds !== undefined) docTypecheckOptions.needs = options.docTypecheckNeeds
   if (options.docTypecheckEnv !== undefined) docTypecheckOptions.env = options.docTypecheckEnv
   return [
+    // FIFO dispatch starts expensive independent work first so shorter checks
+    // fill worker gaps instead of delaying the aggregate's critical path.
+    pnpmScript('docs-site-build', options.docsBuildScript ?? 'docs:build', { label: 'documentation build' }),
     ...options.includeDocTypecheck === false
       ? []
       : [pnpmScript('doc-typecheck', options.docTypecheckScript ?? 'doc-typecheck', docTypecheckOptions)],
-    pnpmScript('cordis-catalog', 'verify-cordis-catalog', { label: 'cordis catalog' }),
-    pnpmScript('client-catalog', 'verify-client-catalog', { label: 'client catalog' }),
-    pnpmScript('export-jsdoc', 'verify-export-jsdoc', { label: 'export jsdoc' }),
-    pnpmScript('tool-catalog', 'verify-tool-catalog', { label: 'tool catalog' }),
-    pnpmScript('config-catalog', 'verify-config-catalog', { label: 'config catalog' }),
-    pnpmScript('persistence-catalog', 'verify-persistence-catalog', { label: 'persistence catalog' }),
     pnpmScript('doc-graphs', 'verify-doc-graphs', { label: 'doc graphs' }),
     pnpmScript('scoped-events', 'verify-scoped-events', { label: 'scoped events' }),
-    pnpmScript('markdown-wrap', 'verify-md-wrap', { label: 'markdown wrap' }),
-    pnpmScript('markdown-links', 'verify-md-links', { label: 'markdown links' }),
-    pnpmScript('public-repository-links', 'verify-public-repository-links', { label: 'public repository links' }),
-    pnpmScript('doc-refs', 'verify-doc-refs', { label: 'doc refs' }),
-    pnpmScript('package-paths', 'verify-package-paths', { label: 'package paths' }),
-    pnpmScript('config-source-ownership', 'verify-config-source-ownership', { label: 'config source ownership' }),
-    pnpmScript('package-readme-model-experience', 'verify-package-readme-model-experience', { label: 'package README model experience' }),
+    pnpmScript('cordis-catalog', 'verify-cordis-catalog', { label: 'cordis catalog' }),
     pnpmScript('mermaid', 'verify-mermaid'),
-    pnpmScript('agent-note-classification', 'verify-agent-note-classification', { label: 'agent note classification' }),
-    pnpmScript('agent-note-format', 'verify-agent-note-format', { label: 'agent note format' }),
-    pnpmScript('archived-agent-notes', 'verify-archived-agent-notes', { label: 'archived agent notes' }),
+    pnpmScript('tool-catalog', 'verify-tool-catalog', { label: 'tool catalog' }),
+    pnpmScript('markdown-links', 'verify-md-links', { label: 'markdown links' }),
     pnpmScript('type-equivalence', 'verify-type-equiv', { label: 'type equivalence' }),
-    pnpmScript('skill-invocation-metadata', 'verify-skill-invocation-metadata', { label: 'skill invocation metadata' }),
-    pnpmScript('translation-prompt', 'verify-translation-prompt', { label: 'translation prompt' }),
+    pnpmScript('markdown-wrap', 'verify-md-wrap', { label: 'markdown wrap' }),
     pnpmScript('translation-pairing', 'verify-translation-pairing', { label: 'translation pairing' }),
-    pnpmScript('doc-budgets', 'verify-doc-budgets', { label: 'doc budgets' }),
+    pnpmScript('export-jsdoc', 'verify-export-jsdoc', { label: 'export jsdoc' }),
     pnpmExec('docs-site-projection', ['vitest', 'run', 'scripts/project-doc-site.spec.ts', 'scripts/verify-doc-site-fragments.spec.ts'], {
       label: 'documentation site checks',
     }),
-    // Keep the VitePress build itself in one gate because projection rewrites website/.generated.
-    pnpmScript('docs-site-build', options.docsBuildScript ?? 'docs:build', { label: 'documentation build' }),
+    pnpmScript('package-readme-model-experience', 'verify-package-readme-model-experience', { label: 'package README model experience' }),
+    pnpmScript('client-catalog', 'verify-client-catalog', { label: 'client catalog' }),
     pnpmScript('package-readme-limitations', 'verify-package-readme-limitations', { label: 'package README limitations' }),
+    pnpmScript('public-repository-links', 'verify-public-repository-links', { label: 'public repository links' }),
+    pnpmScript('package-paths', 'verify-package-paths', { label: 'package paths' }),
+    pnpmScript('persistence-catalog', 'verify-persistence-catalog', { label: 'persistence catalog' }),
+    pnpmScript('config-catalog', 'verify-config-catalog', { label: 'config catalog' }),
+    pnpmScript('doc-refs', 'verify-doc-refs', { label: 'doc refs' }),
+    pnpmScript('config-source-ownership', 'verify-config-source-ownership', { label: 'config source ownership' }),
+    pnpmScript('archived-agent-notes', 'verify-archived-agent-notes', { label: 'archived agent notes' }),
+    pnpmScript('agent-note-format', 'verify-agent-note-format', { label: 'agent note format' }),
+    pnpmScript('agent-note-classification', 'verify-agent-note-classification', { label: 'agent note classification' }),
+    pnpmScript('skill-invocation-metadata', 'verify-skill-invocation-metadata', { label: 'skill invocation metadata' }),
+    pnpmScript('translation-prompt', 'verify-translation-prompt', { label: 'translation prompt' }),
+    pnpmScript('doc-budgets', 'verify-doc-budgets', { label: 'doc budgets' }),
   ]
 }
 

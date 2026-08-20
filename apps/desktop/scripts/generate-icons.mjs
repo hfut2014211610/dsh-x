@@ -107,32 +107,47 @@ function parseSubpaths(d) {
 /**
  * Render `size`×`size` RGBA with `ss`× supersampling: the mark centered at
  * `scale` of the canvas, nonzero-winding filled, on full transparency.
+ *
+ * Pixel→viewBox mapping: a pixel coordinate is measured from the canvas edge,
+ * so the centered mark's margin comes OFF the pixel coordinate before the
+ * division into viewBox units. (Adding the pixel-valued margin onto the
+ * unit-valued result was the bug behind the all-transparent 1024px icon —
+ * and a fully transparent ICO is what Windows paints as a black square.)
  */
 function render(size, ss, scale, subpaths, fill) {
   const [fr, fg, fb] = [parseInt(fill.slice(1, 3), 16), parseInt(fill.slice(3, 5), 16), parseInt(fill.slice(5, 7), 16)]
   const big = size * ss
   const out = Buffer.alloc(size * size * 4)
-  // The viewBox is 50 units; `scale * size` pixels of canvas map onto it.
+  // The viewBox is 50 units; `scale * big` pixels of canvas map onto it.
   const pixelPerUnit = (scale * big) / 50
-  const origin = (big - scale * big) / 2
+  const marginPixels = (big - scale * big) / 2
+  // Scanline edges: each carries its y span, so one sample row tests only the
+  // edges that straddle it instead of every edge in every subpath.
+  const edges = []
+  for (const polyline of subpaths) {
+    for (let i = 0; i < polyline.length - 1; i += 1) {
+      const a = polyline[i]
+      const b = polyline[i + 1]
+      if (a.y === b.y) continue
+      edges.push({ top: Math.min(a.y, b.y), bottom: Math.max(a.y, b.y), a, b })
+    }
+  }
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
       let hits = 0
       for (let sy = 0; sy < ss; sy += 1) {
+        const pointY = ((y * ss + sy + 0.5) - marginPixels) / pixelPerUnit
+        const row = pointY < 0 || pointY > 50 ? [] : edges.filter(e => e.top <= pointY && pointY < e.bottom)
         for (let sx = 0; sx < ss; sx += 1) {
-          const pointX = origin + (x * ss + sx + 0.5) / pixelPerUnit
-          const pointY = origin + (y * ss + sy + 0.5) / pixelPerUnit
-          // Nonzero winding: accumulate signed crossings over every subpath.
+          const pointX = ((x * ss + sx + 0.5) - marginPixels) / pixelPerUnit
+          if (pointX < 0 || pointX > 50) continue
+          // Nonzero winding: accumulate signed crossings for this row.
           let winding = 0
-          for (const polyline of subpaths) {
-            for (let i = 0; i < polyline.length - 1; i += 1) {
-              const a = polyline[i]
-              const b = polyline[i + 1]
-              if (a.y <= pointY) {
-                if (b.y > pointY && (b.x - a.x) * (pointY - a.y) - (pointX - a.x) * (b.y - a.y) > 0) winding += 1
-              } else if (b.y <= pointY && (b.x - a.x) * (pointY - a.y) - (pointX - a.x) * (b.y - a.y) < 0) {
-                winding -= 1
-              }
+          for (const e of row) {
+            const { a, b } = e
+            const crossing = (b.x - a.x) * (pointY - a.y) - (pointX - a.x) * (b.y - a.y)
+            if (a.y <= pointY ? b.y > pointY && crossing > 0 : b.y <= pointY && crossing < 0) {
+              winding += a.y <= pointY ? 1 : -1
             }
           }
           if (winding !== 0) hits += 1

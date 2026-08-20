@@ -54,6 +54,17 @@ function withEnv<T>(name: string, value: string | undefined, action: () => T): T
   }
 }
 
+function withNodeVersion<T>(version: string, action: () => T): T {
+  const descriptor = Object.getOwnPropertyDescriptor(process.versions, 'node')
+  if (descriptor === undefined) throw new Error('process.versions.node descriptor is unavailable')
+  Object.defineProperty(process.versions, 'node', { ...descriptor, value: version })
+  try {
+    return action()
+  } finally {
+    Object.defineProperty(process.versions, 'node', descriptor)
+  }
+}
+
 describe('gate graph validation', () => {
   it.each([
     'ci-primary',
@@ -81,6 +92,25 @@ describe('gate graph validation', () => {
     const ids = withPnpmEntrypoint(() => gatesForMode('doc-sync').map(subject => subject.id))
 
     expect(ids).toContain('public-repository-links')
+  })
+
+  it('starts the longest documentation gates before short checks', () => {
+    const ids = withPnpmEntrypoint(() => gatesForMode('doc-sync').map(subject => subject.id))
+
+    expect(ids.slice(0, 5)).toEqual([
+      'docs-site-build',
+      'doc-typecheck',
+      'doc-graphs',
+      'scoped-events',
+      'cordis-catalog',
+    ])
+  })
+
+  it('runs the complete build only once in check-all', () => {
+    const ids = withPnpmEntrypoint(() => gatesForMode('check-all').map(subject => subject.id))
+
+    expect(ids).toContain('build')
+    expect(ids).not.toContain('build:web')
   })
 
   it.each(['ci-primary', 'ci-static', 'check-all'] as const)(
@@ -313,6 +343,14 @@ describe('Node compatibility graph', () => {
         'scripts/vitest-environment.compat.spec.ts',
       ],
     })
+  })
+
+  it('reuses the complete build for the Node 22 built CLI smoke', () => {
+    const subject = withNodeVersion('22.19.0', () => withPnpmEntrypoint(() => gatesForMode('node-compat')))
+
+    expect(subject.map(item => item.id)).toContain('build')
+    expect(subject.map(item => item.id)).not.toContain('build:web')
+    expect(subject.find(item => item.id === 'cli-lazy-search-startup-smoke')?.needs).toEqual(['build'])
   })
 })
 

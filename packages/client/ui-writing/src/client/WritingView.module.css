@@ -652,7 +652,10 @@
 .preview textarea.blockEditor,
 .codeReader textarea.blockEditor {
   position: absolute;
-  z-index: 1;
+  /* Above the code banner's sticky z-index 6: the overlay covers the whole
+     block, banner included, and a sticky header underneath would otherwise
+     sit on top of the editor over the block's first lines. */
+  z-index: 20;
   box-sizing: border-box;
   margin: 0;
   padding: 2px 6px;
