@@ -62,9 +62,17 @@ function label(configDir: string): string {
   return configDir === '' ? '默认应用' : configDir
 }
 
-/** 一个消费者的身份：订阅哪个 EventKey、以哪个应用的身份。 */
-function consumerKey(eventKey: string, configDir: string): string {
-  return `${eventKey} @ ${label(configDir)}`
+/**
+ * 一个消费者的身份：订阅哪个 EventKey、以哪个应用的身份、事件从哪来。
+ *
+ * 事件来源也算身份的一部分，否则改了 `eventCommand` 对**已经在跑**的消费者
+ * 毫无影响——名字没变，对齐那一步就认为它还是那一个，于是继续跑老的来源，
+ * 而页面上写着新的。
+ */
+function consumerKey(eventKey: string, configDir: string, command: string): string {
+  return command === ''
+    ? `${eventKey} @ ${label(configDir)}`
+    : `${eventKey} @ ${label(configDir)} ← ${command}`
 }
 
 /** 探 dsh 在不在。桌面壳判断"要不要自己拉运行时"用的是同一套。 */
@@ -217,9 +225,14 @@ class Bridge {
     const cards = this.cardActionSources()
     await this.resolveIdentities([...new Set([...events, ...cards])])
 
+    const command = this.config.eventCommand.trim()
     const wanted = new Map<string, { eventKey: string; configDir: string }>()
-    for (const configDir of events) wanted.set(consumerKey(MESSAGE_EVENT, configDir), { eventKey: MESSAGE_EVENT, configDir })
-    for (const configDir of cards) wanted.set(consumerKey(CARD_EVENT, configDir), { eventKey: CARD_EVENT, configDir })
+    for (const configDir of events) {
+      wanted.set(consumerKey(MESSAGE_EVENT, configDir, command), { eventKey: MESSAGE_EVENT, configDir })
+    }
+    for (const configDir of cards) {
+      wanted.set(consumerKey(CARD_EVENT, configDir, command), { eventKey: CARD_EVENT, configDir })
+    }
 
     for (const [key, consumer] of this.consumers) {
       if (wanted.has(key)) continue
@@ -228,7 +241,6 @@ class Bridge {
       // 会把新应用的订阅一起拖三秒。
       void consumer.stop().then(() => { log(`不再订阅 ${key}`) })
     }
-    const command = this.config.eventCommand.trim()
     for (const [key, spec] of wanted) {
       if (this.consumers.has(key)) continue
       const consumer: EventConsumer = new EventConsumer(spec.eventKey, {
