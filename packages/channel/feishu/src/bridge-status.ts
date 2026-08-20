@@ -11,15 +11,10 @@
  * @module @deepseek-ai/dsh-feishu/bridge-status
  */
 
+import type { BridgeStatusView } from './types.ts'
+export type { BridgeStatusView } from './types.ts'
 import type { BridgeSummary } from './protocol.ts'
 
-/** 设置页要显示的那点东西。 */
-export interface BridgeStatusView {
-  /** 桥接连上没有。没连上时下面的现状是空的。 */
-  readonly connected: boolean
-  /** 桥接现在的样子；没连上，或者对面是个老桥接，就没有。 */
-  readonly bridge?: BridgeSummary
-}
 
 /** 握手带来的桥接现状。插件写，设置页读。 */
 export class BridgeStatus {

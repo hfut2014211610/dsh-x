@@ -24,6 +24,15 @@
  * @module @deepseek-ai/dsh-feishu/auth
  */
 
+import type { AuthProfile } from './types.ts'
+export type { AuthProfile } from './types.ts'
+import type {
+  AuthChallenge, AuthIdentity, AuthProgress, AuthStatus, AuthUserIdentity,
+} from './types.ts'
+// Re-exported so this module stays the place the rest of the package reads
+// them from; the declarations live in types.ts because the Remote boundary
+// needs a public non-root subpath to name them by.
+export type { AuthChallenge, AuthIdentity, AuthProgress, AuthStatus, AuthUserIdentity } from './types.ts'
 /**
  * One optional field: present when the value is, absent when it is not.
  *
@@ -174,17 +183,6 @@ function tailOf(output: string): string | undefined {
   return lines.at(-1)
 }
 
-/** 一份可以在这一页上管理的 lark-cli profile。 */
-export interface AuthProfile {
-  /** 绝对路径。 */
-  readonly configDir: string
-  /** 目录名；`~/.lark-cli` 本身叫 default。 */
-  readonly name: string
-  /** 这个目录绑的应用；还没绑就没有。 */
-  readonly appId?: string
-  /** 是不是 dsh 自己那份。 */
-  readonly owned: boolean
-}
 
 /** 一次 lark-cli 调用的结果。 */
 interface CliResult {
@@ -350,68 +348,6 @@ export async function discoverProfiles(): Promise<AuthProfile[]> {
   return [...seen.values()]
 }
 
-/** 一个身份现在的样子。 */
-export interface AuthIdentity {
-  /** lark-cli 自己的措辞：`ready` / `needs_refresh` / `missing` …… */
-  readonly status: string
-  readonly available: boolean
-  readonly message: string
-}
-
-/** 用户身份，扫码授权得到的那一个。 */
-export interface AuthUserIdentity extends AuthIdentity {
-  readonly openId?: string
-  readonly userName?: string
-  readonly tokenStatus?: string
-  /** 已授予的 scope，按空格拆开。 */
-  readonly scopes: readonly string[]
-  readonly expiresAt?: string
-  readonly refreshExpiresAt?: string
-}
-
-/** 这台机器上某一份 profile 的飞书登录态。 */
-export interface AuthStatus {
-  /** 这份状态说的是哪个目录。原样回给页面，省得它自己去记。 */
-  readonly configDir: string
-  /** lark-cli 在不在。不在的话下面全是空的，页面只能先让人去装。 */
-  readonly installed: boolean
-  /**
-   * 这份 profile 绑没绑应用。
-   *
-   * 没绑跟没登录是两件事：没绑要先 `lark-cli config init` 申请/绑定一个应用，
-   * 没登录才轮到扫码。dsh 自己那份一开始必然是没绑的。
-   */
-  readonly configured: boolean
-  /** lark-cli 自己给的下一步提示，没绑的时候有。 */
-  readonly configHint?: string
-  readonly appId?: string
-  readonly brand?: string
-  /** 当前生效的身份（`user` / `bot`）。 */
-  readonly identity?: string
-  /**
-   * 机器人身份。**扫码给不了它权限**——bot 的 scope 只能在开发者后台开通，
-   * 所以页面对它只能展示状态，不能提供按钮。
-   */
-  readonly bot?: AuthIdentity
-  readonly user?: AuthUserIdentity
-  /** 读不出来时的原因。 */
-  readonly error?: string
-}
-
-/** 一次设备码授权的起点。 */
-export interface AuthChallenge {
-  /** 原样透传，绝不改动（编码、拼接、加空格都不行）。 */
-  readonly verificationUrl: string
-  /** 二维码 PNG 的 data URI；生成失败就没有，页面还有链接可用。 */
-  readonly qrDataUrl?: string
-}
-
-/** 授权走到哪一步。 */
-export type AuthProgress =
-  | { readonly phase: 'idle' }
-  | { readonly phase: 'waiting'; readonly challenge: AuthChallenge }
-  | { readonly phase: 'granted' }
-  | { readonly phase: 'failed'; readonly message: string }
 
 function identityOf(value: unknown): AuthIdentity | undefined {
   const source = record(value)

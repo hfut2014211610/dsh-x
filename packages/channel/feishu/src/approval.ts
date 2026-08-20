@@ -13,8 +13,9 @@
 
 import { randomUUID } from 'node:crypto'
 
-/** `ctx.approval` 认的结论。 */
-export type ApprovalOutcome = 'allowed-once' | 'rejected' | 'cancelled'
+// `ctx.approval` 的结论类型归 user-approval 所有；本地再声明一个同名类型会
+// 在公共 API 目录里跟它撞名，而且这里少一个 'unavailable'，是同名不同义。
+import type { ApprovalOutcome } from '@deepseek-ai/dsh-user-approval/types'
 
 /** 一次等着人点的审批。 */
 interface Pending {

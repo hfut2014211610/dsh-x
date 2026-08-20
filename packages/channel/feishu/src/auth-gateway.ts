@@ -11,31 +11,18 @@
  * @module @deepseek-ai/dsh-feishu/auth-gateway
  */
 
+import type { DomainList, LogoutOutcome, ProfileList } from './types.ts'
+export type { AuthProfile, DomainList, LogoutOutcome, ProfileList } from './types.ts'
 import type { Context } from '@deepseek-ai/cordis'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import {
   AUTH_DOMAINS, LarkAuth, discoverProfiles, dshConfigDir,
-  type AuthProfile, type AuthProgress, type AuthStatus,
+  type AuthProgress, type AuthStatus,
 } from './auth.ts'
 import type { BridgeStatus, BridgeStatusView } from './bridge-status.ts'
 
-/** 退出登录的结果。 */
-export interface LogoutOutcome {
-  readonly loggedOut: boolean
-  readonly message?: string
-}
 
-/** 页面渲染权限勾选框需要的那份清单。 */
-export interface DomainList {
-  readonly domains: readonly string[]
-}
 
-/** 这台机器上可以管理的 profile。 */
-export interface ProfileList {
-  readonly profiles: readonly AuthProfile[]
-  /** dsh 自己那份的目录；不指定 configDir 时作用的就是它。 */
-  readonly owned: string
-}
 
 /** 浏览器这一侧能调到的扫码登录动作。 */
 export class FeishuAuthGateway extends TypertRemoteService {
