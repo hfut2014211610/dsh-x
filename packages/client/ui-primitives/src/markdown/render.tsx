@@ -16,8 +16,8 @@
  * may add node types this renderer has no mapping for.
  */
 
-import { Fragment, createElement } from 'react'
-import type { Key, ReactNode } from 'react'
+import { Fragment, cloneElement, createElement, isValidElement } from 'react'
+import type { Key, ReactElement, ReactNode } from 'react'
 import type * as Md from 'mdast'
 import type {} from 'mdast-util-math'
 import { normalizeUri } from 'micromark-util-sanitize-uri'
@@ -133,6 +133,42 @@ export interface MarkdownRenderContext {
   readonly footnoteOrder: string[]
   /** References rendered per identifier; drives the section's back-reference count. */
   readonly footnoteCounts: Map<string, number>
+  /**
+   * Stamp each top-level block with the source offsets it was parsed from.
+   *
+   * Off by default, and the DOM is byte-identical when it is: the parity
+   * fixtures pin this renderer's output against the pipeline it replaced, and
+   * an attribute that pipeline never emitted would be drift. It is on only
+   * where a caller renders a document it also owns the source of.
+   */
+  readonly sourcePositions?: boolean
+}
+
+/**
+ * Stamp a rendered top-level block with the source range behind it.
+ *
+ * The mdast node knows where in the text it came from and the DOM does not,
+ * which leaves anything reading back from the rendered document — an editor
+ * showing the same file in a reading view, wanting to know which lines the
+ * reader just clicked — with nothing to map through.
+ *
+ * Only a host element takes them: a fragment has no element to carry them,
+ * and a component would receive them as props it never declared. Display
+ * math, raw HTML, and fenced code render as those, so they stay unmarked and
+ * a caller has to have an answer for a block with no range.
+ * @param element - the rendered block, or null when the node rendered nothing.
+ * @param node - the mdast node it came from.
+ * @returns the element, stamped when it can carry the attributes.
+ */
+function withSourceRange(element: ReactNode, node: Md.RootContent): ReactNode {
+  const start = node.position?.start.offset
+  const end = node.position?.end.offset
+  if (start === undefined || end === undefined) return element
+  if (!isValidElement(element) || typeof element.type !== 'string') return element
+  return cloneElement(element as ReactElement<Record<string, unknown>>, {
+    'data-md-start': start,
+    'data-md-end': end,
+  })
 }
 
 /**
@@ -148,7 +184,10 @@ export function renderBlocks(
   context: MarkdownRenderContext,
 ): ReactNode[] {
   return blocks
-    .map(block => renderNode(block.node, block.key, context))
+    .map((block) => {
+      const element = renderNode(block.node, block.key, context)
+      return context.sourcePositions === true ? withSourceRange(element, block.node) : element
+    })
     .filter(element => element !== null)
 }
 

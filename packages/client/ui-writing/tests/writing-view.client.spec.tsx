@@ -303,6 +303,50 @@ describe('WritingView', () => {
     expect(b.load).not.toHaveBeenCalled()
   })
 
+  // The reading view is where a typo gets noticed, and noticing one used to
+  // mean leaving the reading view, finding the line again, and coming back.
+  it('edits the block that was clicked, without leaving the preview', async () => {
+    const b = setup()
+    openByPath(b.view, 'docs/plan.md')
+    const preview = await b.view.findByLabelText('文档预览')
+
+    const paragraph = preview.querySelector('p[data-md-start]')
+    if (paragraph === null) throw new Error('the preview rendered no block carrying its source range')
+    fireEvent.click(paragraph)
+
+    // The source of that block, not of the document.
+    const block = await b.view.findByLabelText(zh['block.label']) as HTMLTextAreaElement
+    expect(block.value).toBe('初始内容')
+
+    fireEvent.change(block, { target: { value: '改过的内容' } })
+    fireEvent.keyDown(block, { key: 'Enter', ctrlKey: true })
+
+    await waitFor(() => {
+      expect(b.view.getByLabelText('文档预览').textContent).toContain('改过的内容')
+    })
+    // Spliced into the draft rather than replacing it: the heading above is
+    // still there, and the document now has unsaved changes.
+    expect(b.view.getByLabelText('文档预览').textContent).toContain('简介')
+    expect(b.view.getByText(zh['status.dirty'])).toBeTruthy()
+  })
+
+  it('drops the block edit on Escape, leaving the draft alone', async () => {
+    const b = setup()
+    openByPath(b.view, 'docs/plan.md')
+    const preview = await b.view.findByLabelText('文档预览')
+
+    const paragraph = preview.querySelector('p[data-md-start]')
+    if (paragraph === null) throw new Error('the preview rendered no block carrying its source range')
+    fireEvent.click(paragraph)
+    const block = await b.view.findByLabelText(zh['block.label']) as HTMLTextAreaElement
+    fireEvent.change(block, { target: { value: '不要这一版' } })
+    fireEvent.keyDown(block, { key: 'Escape' })
+
+    await waitFor(() => { expect(b.view.queryByLabelText(zh['block.label'])).toBeNull() })
+    expect(b.view.getByLabelText('文档预览').textContent).toContain('初始内容')
+    expect(b.view.getByLabelText('文档预览').textContent).not.toContain('不要这一版')
+  })
+
   it('closes onto the neighbour, and empties the editor on the last tab', async () => {
     const b = setup()
     openByPath(b.view, 'docs/plan.md')

@@ -663,6 +663,7 @@
 }
 
 .preview {
+  position: relative;
   --dsh-scrollbar-thumb: var(--dsw-alias-scrollbar-bg-l2);
   --dsh-scrollbar-thumb-hover: var(--dsw-alias-scrollbar-hover-l2);
 
@@ -673,6 +674,29 @@
   padding: 54px max(44px, calc((100% - 760px) / 2)) 120px;
   line-height: 1.82;
 }
+
+/* The block editor sits over the block it edits, inside the scrolling article
+   rather than the viewport, so it travels with the document. The page stays
+   rendered underneath and parsed once — a reference defined in another block
+   keeps resolving while this one is open. */
+.blockEditor {
+  position: absolute;
+  z-index: 1;
+  box-sizing: border-box;
+  margin: 0;
+  padding: 2px 6px;
+  border: 1px solid var(--dsw-alias-brand-primary);
+  border-radius: 6px;
+  outline: none;
+  background: var(--dsw-alias-bg-base);
+  color: var(--dsw-alias-label-primary);
+  font-family: var(--dsw-font-family-mono, ui-monospace, monospace);
+  font-size: 13px;
+  line-height: 1.7;
+  resize: none;
+  white-space: pre-wrap;
+}
+
 
 /* The code reader: full-bleed rather than the prose measure, because code is
    read by its indentation and a 760px column would wrap what the author

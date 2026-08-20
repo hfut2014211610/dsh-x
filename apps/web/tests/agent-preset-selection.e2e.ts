@@ -344,6 +344,25 @@ describe('web e2e: agent-preset selection', () => {
     const outlineSnapshot = await captureStableAria(page, '[class*="editorHeader"]', scaffold.workspaceCwd)
     await compareOrRefreshGolden(WRITING_OUTLINE_EXPECTED, outlineSnapshot, MODE)
 
+    // Editing from the reading view. Only a real browser proves the half that
+    // matters: the overlay is positioned from the block's own box inside the
+    // scrolling article, and jsdom lays nothing out, so every measurement
+    // there is zero and every assertion about them is vacuous.
+    const firstBlock = page.locator('[data-md-start]').first()
+    await firstBlock.click()
+    const blockEditor = page.getByRole('textbox', { name: 'Edit this block as source' })
+    await blockEditor.waitFor({ timeout: 15_000 })
+    // Both boxes measured after the click: clicking scrolls the block into
+    // view, and a box read before that is against a scroll position the
+    // article has since left.
+    const blockBox = await firstBlock.boundingBox()
+    const editorBox = await blockEditor.boundingBox()
+    if (blockBox === null || editorBox === null) throw new Error('the block editor did not lay out over its block')
+    expect(Math.abs(editorBox.y - blockBox.y)).toBeLessThan(24)
+    expect(Math.abs(editorBox.x - blockBox.x)).toBeLessThan(24)
+    await page.keyboard.press('Escape')
+    await expect.poll(async () => blockEditor.count()).toBe(0)
+
     await page.getByRole('button', { name: 'Edit', exact: true }).click()
     const editor = page.getByRole('textbox', { name: 'Document editor' })
     await page.getByRole('button', { name: /Final target/ }).click()

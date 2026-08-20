@@ -16,6 +16,35 @@ describe('MessageText', () => {
 })
 
 describe('MarkdownText', () => {
+  // A caller that owns the source and shows it in a reading view needs to get
+  // back from a rendered block to the lines behind it. Nothing in the DOM said
+  // where a block came from, and the mdast node knew all along.
+  const positioned = [
+    '# Heading',
+    '',
+    'A paragraph.',
+    '',
+    '> A quote.',
+    '',
+  ].join('\n')
+
+  it('marks each top-level block with the source range behind it', () => {
+    const { container } = render(<MarkdownText text={positioned} sourcePositions />)
+
+    const ranges = [...container.querySelectorAll('[data-md-start]')].map(element => positioned.slice(
+      Number(element.getAttribute('data-md-start')),
+      Number(element.getAttribute('data-md-end')),
+    ))
+    expect(ranges).toEqual(['# Heading', 'A paragraph.', '> A quote.'])
+  })
+
+  // The parity fixtures pin this renderer against the pipeline it replaced, so
+  // an attribute that pipeline never emitted has to stay off unless asked for.
+  it('emits no source attributes unless the caller asks for them', () => {
+    const { container } = render(<MarkdownText text={positioned} />)
+    expect(container.querySelector('[data-md-start]')).toBeNull()
+  })
+
   it('renders CommonMark and GFM elements as semantic DOM', () => {
     const markdown = [
       '# Heading',

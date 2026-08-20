@@ -30,6 +30,7 @@ function renderSettled(
   text: string,
   codeLabels: MarkdownCodeLabels | undefined,
   fileMentions: MarkdownFileMentions | undefined,
+  sourcePositions: boolean,
 ): ReactNode[] {
   const root = parseGfmWithMath(text)
   const targets = createReferenceTargets()
@@ -41,6 +42,7 @@ function renderSettled(
     targets,
     footnoteOrder: [],
     footnoteCounts: new Map(),
+    sourcePositions,
   }
   const blocks = wrapBlockChildren(
     renderBlocks(root.children.map((node, index) => ({ node, key: index })), context),
@@ -153,24 +155,35 @@ class StreamingRenderer {
  * relative links, and unsafe protocols are disabled, while absolute HTTP(S)
  * images render directly.
  */
-export const MarkdownText = memo(function MarkdownText({ text, streaming = false, codeLabels, fileMentions }: {
+export const MarkdownText = memo(function MarkdownText({
+  text, streaming = false, codeLabels, fileMentions, sourcePositions = false,
+}: {
   text: string
   streaming?: boolean
   codeLabels?: MarkdownCodeLabels | undefined
   fileMentions?: MarkdownFileMentions | undefined
+  /**
+   * Mark each top-level block with the source offsets it came from, for a
+   * caller that owns the text and needs to read back from the rendering.
+   *
+   * Settled renders only. A streaming message's blocks freeze into cached
+   * elements whose offsets are into a document still being written, and
+   * nothing edits an assistant reply mid-stream anyway.
+   */
+  sourcePositions?: boolean
 }) {
   const streamRef = useRef<StreamingRenderer | null>(null)
   const streamLabelsRef = useRef<MarkdownCodeLabels | undefined>(codeLabels)
   const children = useMemo(() => {
     if (!streaming) {
       streamRef.current = null
-      return renderSettled(text, codeLabels, fileMentions)
+      return renderSettled(text, codeLabels, fileMentions, sourcePositions)
     }
     if (streamRef.current === null || streamLabelsRef.current !== codeLabels) {
       streamRef.current = new StreamingRenderer(codeLabels)
       streamLabelsRef.current = codeLabels
     }
     return streamRef.current.render(text)
-  }, [text, streaming, codeLabels, fileMentions])
+  }, [text, streaming, codeLabels, fileMentions, sourcePositions])
   return <div className={css.markdown}>{children}</div>
 })

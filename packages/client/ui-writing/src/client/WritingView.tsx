@@ -1,7 +1,7 @@
 /** Focused document editor used by writing sessions. */
 
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
-import type { FormEvent, ReactNode } from 'react'
+import type { FormEvent, MouseEvent, ReactNode } from 'react'
 import type { ConvViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
   IconBrowseOutline16,
@@ -297,6 +297,24 @@ interface ParkedDocument {
   entries: readonly DocumentOutlineEntry[]
 }
 
+/**
+ * One block of the preview, opened for editing over where it is rendered.
+ *
+ * The offsets are into the draft the overlay was opened against, and the
+ * geometry is the rendered block's own box inside the scrolling article — so
+ * the overlay scrolls with the document instead of being pinned to a viewport
+ * position the reader has already moved away from.
+ */
+interface BlockEdit {
+  start: number
+  end: number
+  text: string
+  top: number
+  left: number
+  width: number
+  height: number
+}
+
 function parentDirectory(path: string): string {
   const normalized = path.replaceAll('\\', '/')
   const separator = normalized.lastIndexOf('/')
@@ -446,6 +464,9 @@ export function WritingView({
   // during the render the switch already causes.
   const [openPaths, setOpenPaths] = useState<readonly string[]>([])
   const parkedRef = useRef(new Map<string, ParkedDocument>())
+  const [blockEdit, setBlockEdit] = useState<BlockEdit | null>(null)
+  const blockEditRef = useRef<BlockEdit | null>(blockEdit)
+  blockEditRef.current = blockEdit
   const treeFilter = useMemo(() => buildTreeFilter(pathInput, directories), [pathInput, directories])
   const markdown = format === 'markdown'
   const editorRef = useRef<HTMLTextAreaElement>(null)
@@ -702,6 +723,64 @@ export function WritingView({
       return
     }
     restore(next, held)
+  }
+
+  /**
+   * Open the source of the block that was clicked, over the block itself.
+   *
+   * The reading view is where a typo gets noticed, and until now noticing one
+   * meant leaving the reading view, finding the line again, and coming back.
+   * The renderer marks each top-level block with the offsets it was parsed
+   * from, so the click already knows which characters it is about.
+   *
+   * The editor is an overlay rather than a replacement: the document stays
+   * rendered underneath and parsed once, so a reference or footnote defined
+   * in another block keeps resolving while one block is being edited.
+   */
+  const openBlockEditor = (event: MouseEvent<HTMLElement>) => {
+    if (!markdown || blockEdit !== null) return
+    const article = previewRef.current
+    const block = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-md-start]')
+    if (article === null || block === null || block === undefined) return
+    // Selecting text is reading, not editing; taking the selection away to
+    // open an editor would make the preview impossible to quote from.
+    if ((window.getSelection()?.toString() ?? '') !== '') return
+    const start = Number(block.dataset.mdStart)
+    const end = Number(block.dataset.mdEnd)
+    if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return
+    setBlockEdit({
+      start,
+      end,
+      text: draft.slice(start, end),
+      top: block.offsetTop,
+      left: block.offsetLeft,
+      width: block.offsetWidth,
+      height: block.offsetHeight,
+    })
+  }
+
+  /**
+   * Splice the edited block back into the draft and close the overlay.
+   *
+   * Read through the ref, not the closure: cancelling unmounts the textarea,
+   * and a browser that blurs the element on its way out would otherwise reach
+   * this with the edit Escape just threw away.
+   */
+  const commitBlockEdit = () => {
+    const edit = blockEditRef.current
+    if (edit === null) return
+    blockEditRef.current = null
+    setBlockEdit(null)
+    const next = draft.slice(0, edit.start) + edit.text + draft.slice(edit.end)
+    if (next === draft) return
+    setDraft(next)
+    setStatus(next === savedContentRef.current ? 'saved' : 'dirty')
+  }
+
+  /** Close the overlay without applying it. */
+  const cancelBlockEdit = () => {
+    blockEditRef.current = null
+    setBlockEdit(null)
   }
 
   const togglePanel = (next: Panel) => {
@@ -991,8 +1070,32 @@ export function WritingView({
                 ref={previewRef}
                 className={format === 'code' ? css.codeReader : css.preview}
                 aria-label={t('preview.label')}
+                onClick={openBlockEditor}
               >
-                {format === 'markdown' && <MarkdownText text={draft} />}
+                {format === 'markdown' && <MarkdownText text={draft} sourcePositions />}
+                {blockEdit !== null && (
+                  <textarea
+                    autoFocus
+                    className={css.blockEditor}
+                    style={{
+                      top: blockEdit.top,
+                      left: blockEdit.left,
+                      width: blockEdit.width,
+                      minHeight: blockEdit.height,
+                    }}
+                    aria-label={t('block.label')}
+                    value={blockEdit.text}
+                    onChange={(event) => { setBlockEdit({ ...blockEdit, text: event.target.value }) }}
+                    onBlur={commitBlockEdit}
+                    onKeyDown={(event) => {
+                      if (event.key === 'Escape') { event.preventDefault(); cancelBlockEdit() }
+                      if (event.key === 'Enter' && (event.metaKey || event.ctrlKey)) {
+                        event.preventDefault()
+                        commitBlockEdit()
+                      }
+                    }}
+                  />
+                )}
                 {format === 'code' && (
                   <CodeBlock
                     code={draft}
