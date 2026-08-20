@@ -212,7 +212,7 @@ SVG 导出含完整 `viewBox` 与基础字体声明（`font-family: system-ui, s
 |---|---|
 | LLM 生成的 JSON 节点坐标重叠 | prompt 中强调"坐标从上到下递增，组件之间保留 8px 间距"，渲染层不做自动布局；`render-svg.ts` 对超出 `viewport` 边界的节点渲染橙色警告框而非静默溢出 |
 | 复杂修改指令导致整体 JSON 格式破损 | `schema.ts` 验证失败自动重试一次（错误信息回填 prompt）；两次失败返回 `WIREFRAME_SCHEMA_ERROR`，不存盘 |
-| client module `inject` 字段过多导致发现失败 | `dsh-x-ui-wireframe` 所需 inject 共 4 项：`ctx`、`settings`、`rpc.wireframe`、`session`，参照 `dsh-x-ui-model-hub` 格式声明 |
+| client module `inject` 字段过多导致发现失败 | `dsh-x-ui-wireframe` 所需 inject 共 4 项：`ctx`、`settings`、`rpc.wireframe`、`session`，参照 `packages/client/ui-model-hub`（当时叫 `dsh-x-ui-model-hub`）格式声明 |
 | SVG 文字在不同系统字体回退不一致 | 只用 `font-family: system-ui` 加绝对 `font-size`，不依赖字体度量 |
 | 多会话并发修改同一 wireframe | `store.ts` 写入前校验 `version`，过期写入（传入 version ≠ 当前 version）返回 `STALE_VERSION`，不覆盖 |
 | Settings 页枚举全部 wireframe（无 workspace 隔离） | 该插件是单用户个人工具，`~/.dsh/wireframes/` 不做 workspace 隔离，RPC gateway 暴露当前用户全部原型图；如未来需要隔离，可在 `WireframeDoc` 增加 `workspaceId` 字段并在 gateway 过滤 |

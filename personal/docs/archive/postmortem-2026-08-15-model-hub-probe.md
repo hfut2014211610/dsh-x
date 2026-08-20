@@ -54,4 +54,4 @@
 ## 结论记到了哪里
 
 - [插件开发指南](../guides/plugin-guide.md) §3：compat 按协议过滤、endpoints 按协议覆盖、reconcile 失败期间读路径要对活注册表兜底；§6：请求抓包进调试工具箱。
-- `personal/plugins/dsh-x-model-hub/README.md`：编译规则 4（端点按协议）与 5（compat 按协议）、探活的 ROUTE_NOT_LIVE 语义。
+- [`packages/llm/model-hub/README.zh.md`](../../../packages/llm/model-hub/README.zh.md)（复盘当时它还在 `personal/plugins/dsh-x-model-hub/`）：编译规则 4（端点按协议）与 5（compat 按协议）、探活的 ROUTE_NOT_LIVE 语义。

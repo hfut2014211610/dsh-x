@@ -1,5 +1,0 @@
-# 自挂载 bundle patch：`dsh plugin --profile <name> add <本包路径>` 安装后按此声明自动挂载。
-# 以包名引用——client module 的发现规则要求从 profile 的 node_modules 按包名解析。
-- insert:
-    - id: dsh-x-ui-model-hub
-      name: '@personal/dsh-x-ui-model-hub'

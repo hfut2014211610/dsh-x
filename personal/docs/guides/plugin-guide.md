@@ -81,22 +81,22 @@ export function apply(ctx: Context, config: Config): void {
 ### 凭证（API Key 等秘密值）
 
 - 配置文档里只放**引用**（环境变量风格命名，`/^[A-Za-z_][A-Za-z0-9_]*$/`）；值由凭证 seam 管理：注入 `credentials` 服务后用 `ctx.credentials.set(credentialRef(ref), value)` / `describe(ref)` / `unset(ref)`（`@deepseek-ai/dsh-credentials`），本地落盘 `~/.dsh/.credentials.yaml`，消费方每次操作时 `resolve`（改密钥免重启）。
-- **教训（真实踩过）**：用户会把 Key 本体贴进"引用名"字段。你自己命名空间的 schema 放行任意字符串，但 `role('credential-ref')` 的校验在**编译目标命名空间**（如 `llm-pi-ai`）拒绝它 → 页面显示保存成功、路由却永远生成不出来。对策：网关在写目标命名空间前用 `credentialRef()` 预检并返回明文错误；表单提供密码输入框代存凭证、自动派生引用名 `<供应商键大写>_API_KEY`（参考 dsh-x-model-hub 的 `prepareProviderEntry` / `deriveKeyRef`）。
+- **教训（真实踩过）**：用户会把 Key 本体贴进"引用名"字段。你自己命名空间的 schema 放行任意字符串，但 `role('credential-ref')` 的校验在**编译目标命名空间**（如 `llm-pi-ai`）拒绝它 → 页面显示保存成功、路由却永远生成不出来。对策：网关在写目标命名空间前用 `credentialRef()` 预检并返回明文错误；表单提供密码输入框代存凭证、自动派生引用名 `<供应商键大写>_API_KEY`（参考 [`packages/llm/model-hub`](../../../packages/llm/model-hub/) 的 `prepareProviderEntry` / `deriveKeyRef`）。
 - 顺序：先 `credentials.set` 再写配置文档——写文档触发的 reconcile 紧接着就要解析这个引用。
 
 ### 跨命名空间写入的失败要回显到 UI
 
 往别的插件的命名空间写配置（典型：编译输出）会被对方的 `validate` 拒（`settings-rejected`）。写在 `onChange` 链路上时，catch 里只打日志 = UI 永远显示"保存成功但什么都没发生"（真实踩过）。把最近一次失败记到模块级状态，让 `getDoc` 类读接口带出来，页面顶部挂横幅。
 
-- 失败挂着期间，**活注册表停在旧状态、与配置文档脱节**：凡是按文档解析出名字再去调运行时的读路径（如探活按编译路由名发请求），都要先对活注册表（`ctx.llm.listProviders()`）核对，对未生效的名字直接回"未生效 + 待处理的失败原因"，否则用户看到的是下游抛出的晦涩错误（如 `NO_ADAPTER`），而不是真正的配置问题（参考 dsh-x-model-hub 的 `resolveProbeRoutes`，真实踩过）。
+- 失败挂着期间，**活注册表停在旧状态、与配置文档脱节**：凡是按文档解析出名字再去调运行时的读路径（如探活按编译路由名发请求），都要先对活注册表（`ctx.llm.listProviders()`）核对，对未生效的名字直接回"未生效 + 待处理的失败原因"，否则用户看到的是下游抛出的晦涩错误（如 `NO_ADAPTER`），而不是真正的配置问题（参考 `packages/llm/model-hub` 的 `resolveProbeRoutes`，真实踩过）。
 - 编译输出要**按接收方的校验规则过滤继承字段**，不能整张供应商默认表透传到每条派生路由：llm-pi-ai 的 `compat.thinkingFormat`/`supportsReasoningEffort` 只存在于 openai-completions，透传到 anthropic-messages 组会让整段编译被拒（真实踩过）。
-- **端点路径约定随 SDK 而不同**：openai 系把 baseURL 当前缀（`{baseURL}/chat/completions`），Anthropic SDK 会自己在 baseURL 后拼 `/v1/messages`。同一网关开两种协议时端点往往不同（如 OpenAI 在 `/v1`、Anthropic 在根），所以"供应商 = 一个端点"的抽象需要按协议覆盖出口（dsh-x-model-hub 的 `endpoints` 字段）；直接把带 `/v1` 的 baseURL 给 anthropic 路由会打成 `/v1/v1/messages` 吃 404（真实踩过，完整复盘见 [postmortem-2026-08-15-model-hub-probe.md](../archive/postmortem-2026-08-15-model-hub-probe.md)）。
+- **端点路径约定随 SDK 而不同**：openai 系把 baseURL 当前缀（`{baseURL}/chat/completions`），Anthropic SDK 会自己在 baseURL 后拼 `/v1/messages`。同一网关开两种协议时端点往往不同（如 OpenAI 在 `/v1`、Anthropic 在根），所以"供应商 = 一个端点"的抽象需要按协议覆盖出口（`packages/llm/model-hub` 的 `endpoints` 字段）；直接把带 `/v1` 的 baseURL 给 anthropic 路由会打成 `/v1/v1/messages` 吃 404（真实踩过，完整复盘见 [postmortem-2026-08-15-model-hub-probe.md](../archive/postmortem-2026-08-15-model-hub-probe.md)）。
 
 ### 事件
 
 - waterfall 监听器**必须 `await next()`** 再返回替换值；直接 return 会短路整条链。
 - 改 LLM 请求配置（provider/model/temperature/...）的正统拦截点是 `agent/request`；`llm/stream` 的请求已深冻结且有不变量校验，不能改。
-- 请求失败恢复的正统挂点是 `agent/request-error`：返回 `{kind:'retry'}` 且不调 `next()` = 接管恢复；调 `next()` = 委派下游。跨供应商降级 = 该事件决策 + `agent/request` 在重发尝试上替换 provider（参考 dsh-x-model-hub）。监听器按挂载序执行：base bundle 的 llm-retry 先花当前路由的重试预算，耗尽才轮到你。
+- 请求失败恢复的正统挂点是 `agent/request-error`：返回 `{kind:'retry'}` 且不调 `next()` = 接管恢复；调 `next()` = 委派下游。跨供应商降级 = 该事件决策 + `agent/request` 在重发尝试上替换 provider（参考 `packages/llm/model-hub`）。监听器按挂载序执行：base bundle 的 llm-retry 先花当前路由的重试预算，耗尽才轮到你。
 - **个人插件不要自造会话事件类型**：读侧只认生成的 `KNOWN_SESSION_EVENT_TYPES` 目录（packages/core/session/src/known-event-types.ts，由 scripts/gen-persistence-catalog.ts 生成，不扫 personal/），未知且非 `ignorable` 的事件会让整份会话日志在读取侧被拒；而 `session.append` 没有打 ignorable 标记的入口。用现有事件承载事实（`llm/retry` 记失败、`request/header reason:change` 记路由切换）。
 - `ctx.inject(['service'], cb)` 处理可选依赖；**inject 纤维的错误被框架收容**——重要的初始化失败要自己 `ctx.logger.error`，别指望启动中止。
 - pi-ai 凭证语义（影响错误码）：`apiKeyEnv` 省略 → 交给 pi-ai 环境自发现，自定义路由会以 `PI_AI_ERROR`（"No API key for provider"）失败；引用已设置但解析不出值 → `MISSING_CREDENTIAL`；值格式非法 → `INVALID_CREDENTIAL`。做降级/诊断时三类码要分开对待。

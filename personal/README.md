@@ -14,7 +14,7 @@
 - `plugins/dsh-x-model-tuning/` — 每模型采样默认值插件（temperature/maxTokens/stop/reasoningEffort + `/model-tuning` 命令）。加载方式与配置参考见该目录 README 与 `cordis.patch.yml`。
 - `plugins/dsh-x-feishu/` — **飞书通道**：单聊发一句就干活，群里 @ 一下就接活，过程落在卡片上。宿主半边加一张连接器设置卡（`packages/client/ui-settings-connectors/`），桥接进程在 `bridge/`。
 - 模型中心已经进入正式 workspace：宿主包见 [`packages/llm/model-hub/`](../packages/llm/model-hub/README.zh.md)，设置页见 [`packages/client/ui-model-hub/`](../packages/client/ui-model-hub/README.zh.md)，Web bundle 默认注册，无需从本目录安装。
-  `plugins/dsh-x-model-hub/` 与 `plugins/dsh-x-ui-model-hub/` 是毕业前的旧副本，两边源码已分叉；`~/.dsh/profiles/headless` 的 lockfile 仍链着旧副本，删除前需要先确认没有 profile 在用。
+  毕业前的两份旧副本已于 2026-08-20 删除，`headless` profile 也改指毕业后的包。
 - `scripts/dump-session.ts` — 会话日志查看工具（`.jsonl.zstd` 分帧解压，可按事件类型过滤）。
 - `probe/` — 锚定条件的本地测量工装：`anchored-standard` 的轨迹收益在这里从"继承来的证据"变成本机数字，结果落在 `probe/results/`。
 - `docs/guides/plugin-guide.md` — **插件开发指南**：两类插件的创建/注册/页面新增全流程、schemastery 与加载机制的坑、调试工具箱。写新插件前必读。

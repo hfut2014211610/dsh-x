@@ -8,11 +8,9 @@
 
 | # | 事项 | 状态 | 落点 |
 |---|---|---|---|
-| L | 两个 runtime 同时写一份会话日志 | 待做，**已定位到具体那行** | 窗口在 `coordinator.ts:943`：`isPreparedSourceCurrent` 读一次 revision，然后 `commitRepair` 写。中间那一瞬另一个进程追加了，就是 #G。同文件 `:981` 说明了保护为什么只在进程内——它问的是 `this.ctx.sessions`，另一个进程的会话它看不见。详见笔记 |
 | 9 | UED 预览支持标注组件 / 加入对话；层叠元素可选中被遮挡项 | ⏸ 需定范围（大件） | iframe 是 `allow-scripts` 且不与 `allow-same-origin` 同列，宿主拿不到里面的 DOM。要注入受控拾取脚本 + postMessage，且不能破坏现有隔离断言 |
-| N | `test:web` 在 Windows 上过不去 | 🟡 断言那半已修 | 直接断言工具目录的两个文件（`shipped-composition`、`web-agent-presets`）已改成认平台，本机全绿。剩下的是**重放夹具**那一类：录制时模型调的是 `bash`，win32 上目录里没有这个名字，于是「unknown tool」。要治得让这条 lane 把 shell 钉死成 POSIX 那只——而 shell 的选择在 preset 里，scaffold 的 patch 够不着 preset 子树 |
+| N | `test:web` 在 Windows 上过不去 | **保持现状（你定的）** | 直接断言工具目录的两个文件已改成认平台；剩下 14 个是重放夹具——录制时模型调 `bash`，win32 目录里没这个名字。**本机 `test:web` 的红不构成信号**，别拿它判断回归 |
 | O | 安装包不带 `personal/` | 待做 | `scripts/release/families.ts:311` 只 glob `packages/*/*/package.json` 与 `apps/*/package.json`。飞书通道、model-tuning 装完就没有 |
-| Q | `personal/plugins/` 下两份模型中心旧副本 | ⏸ 卡在迁移 | **`headless` profile 正在用旧副本**（它的 `dsh.profile.bundles` 里就有），删了会直接坏掉。`web` profile 不受影响（走 web-app bundle 里毕业后的那个）。两边插件名同为 `dsh-x-model-hub`、settings 段同为 `dsh-x-model-hub:`，所以**不需要迁移设置**；但毕业后的包没有 `cordis.patch.yml`，当不了 bundle，headless 得改用 `dsh plugin --profile headless add`。这是动你本机 profile，等你点头 |
 
 ## 部分完成
 
@@ -50,6 +48,8 @@
 | M | 写作模式沙箱围栏漏洞 `674d487be1` | `.docx`/`.xlsx` 编辑路径绕过围栏直接 `node:fs` 写 |
 | P | 打包速度优化 `a1228e7841` | 并发打包 + `--reuse-runtime`；完整 97s / 桌面 40s |
 | V | 版本方案：上游版本号 + fork 后缀 `b1945091dc` | 224 个 manifest 与上游一致；fork 身份在 `electron-builder.yml` |
+| L | 两个 runtime 同时写一份会话日志 `462b3b3a51` | 按你说的走钝刀：`dsh-host-instance-lock` 在 `$DSH_HOME` 留一份 claim，第二个 runtime 直接拒绝启动（走 `ctx.appExit`，不是抛异常——抛了只会让这一个条目失败、其余照常起来）。claim 只在它记的 pid 还活着时算数，断电留下的字条会被接管。一次性命令不挂这个 bundle，不受影响
+| Q | 清掉模型中心旧副本 | 两份都删了；`headless` profile 改指 `@deepseek-ai/dsh-model-hub`（毕业后的包没有 cordis.patch.yml，当不了 bundle，所以进了 profile 自己的 patch 层），`--dump-config` 验过能组合。settings 段照旧是 `dsh-x-model-hub:`——那是插件自己声明的命名空间，跟条目 id 无关
 | B | 关于菜单 + 更新入口 `038cde540f` `65e0446907` `dd87238950` | 窗口菜单栏「帮助 → 检查更新 / 关于」（之前挂的是 Electron 默认那个开发菜单，带 Reload 和 DevTools）；关于说清窗口背后是哪个 dsh；更新日志取自 release 自己的 notes，截断 12 行进「有新版本」对话框 |
 | K | 插件挂了自救 `c20d926567` `168238882b` | 两半：被杀掉的桥接留下的 lark-cli 消费者下次启动回收（pid + EventKey 双证据）；开关还开着但 fiber 失败的条目自动 off→on 拉起，十分钟内三次、退避到一分钟，然后停手并说明 |
 | T | 飞书端到端 | ✅ 用户实测通了（2026-08-20）。dsh 侧的出站身份、桥接配置、连接器卡片见本会话前半段 |

@@ -1,9 +1,0 @@
-{
-  "extends": "../../../tsconfig.base.client.json",
-  "compilerOptions": {
-    "composite": false,
-    "noEmit": true,
-    "noUncheckedIndexedAccess": false
-  },
-  "include": ["src", "tests", "vitest.config.ts", "tsdown.config.ts"]
-}
