@@ -1,13 +1,15 @@
 // Generates the desktop shell's icons (build/icon.png 1024px, assets/tray.png
-// 32px) from signed-distance fields with supersampling — no binary design
-// tool needed, and the visual is reviewable in code. Run from apps/desktop:
+// 32px) from the product mark — the whale path of website/public/favicon.svg,
+// parsed and scanline-filled with supersampling, so no binary design tool is
+// needed and the visual is reviewable in code. Run from apps/desktop:
 //   node scripts/generate-icons.mjs
 import { deflateSync } from 'node:zlib'
-import { mkdirSync, writeFileSync } from 'node:fs'
+import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 
 const here = dirname(fileURLToPath(import.meta.url))
+const repoRoot = join(here, '..', '..', '..')
 
 /** PNG encoder (RGBA8, filter 0). */
 function crc32(buf) {
@@ -46,98 +48,112 @@ function encodePng(size, rgba) {
   ])
 }
 
-/** Rounded-box SDF in unit space: `half` = half extent, `radius` = corner radius. */
-function roundedBox(x, y, half, radius) {
-  return roundedExtentBox(x, y, half, half, radius)
+/** The mark: the favicon's single path (M/C/Z only), in its 50×50 viewBox. */
+function markPath() {
+  const svg = readFileSync(join(repoRoot, 'website', 'public', 'favicon.svg'), 'utf8')
+  const d = /d="([^"]+)"/.exec(svg)?.[1]
+  const fill = /<path[^>]*fill="(#[0-9A-Fa-f]{6})"/.exec(svg)?.[1]
+  if (d === undefined || fill === undefined) throw new Error('favicon.svg no longer carries one filled path')
+  const commands = new Set(d.match(/[A-Za-z]/g) ?? [])
+  for (const command of commands) {
+    if (command !== 'M' && command !== 'C' && command !== 'Z') {
+      throw new Error(`favicon.svg grew a path command this rasterizer does not read: ${command}`)
+    }
+  }
+  return { d, fill }
 }
 
-/** Rounded-box SDF with independent half extents — capsules need `hy << hx`. */
-function roundedExtentBox(x, y, hx, hy, radius) {
-  const qx = Math.abs(x) - (hx - radius)
-  const qy = Math.abs(y) - (hy - radius)
-  const ox = Math.max(qx, 0)
-  const oy = Math.max(qy, 0)
-  return Math.hypot(ox, oy) + Math.min(Math.max(qx, qy), 0) - radius
+/** Parse the M/C/Z path into subpaths of flattened polylines. */
+function parseSubpaths(d) {
+  const tokens = d.match(/[MCZ]|-?\d+(?:\.\d+)?(?:e-?\d+)?/g) ?? []
+  const subpaths = []
+  let polyline = []
+  let cursor = { x: 0, y: 0 }
+  let start = { x: 0, y: 0 }
+  let index = 0
+  const number = () => Number(tokens[index += 1])
+  while (index < tokens.length) {
+    const token = tokens[index]
+    if (token === 'M') {
+      if (polyline.length > 0) subpaths.push(polyline)
+      cursor = { x: number(), y: number() }
+      start = cursor
+      polyline = [cursor]
+    } else if (token === 'C') {
+      const c1 = { x: number(), y: number() }
+      const c2 = { x: number(), y: number() }
+      const end = { x: number(), y: number() }
+      // Fixed 32 subdivisions: the mark is rendered at ≥32px, so a segment is
+      // always shorter than a pixel step's supersample budget.
+      for (let step = 1; step <= 32; step += 1) {
+        const t = step / 32
+        const u = 1 - t
+        polyline.push({
+          x: u * u * u * cursor.x + 3 * u * u * t * c1.x + 3 * u * t * t * c2.x + t * t * t * end.x,
+          y: u * u * u * cursor.y + 3 * u * u * t * c1.y + 3 * u * t * t * c2.y + t * t * t * end.y,
+        })
+      }
+      cursor = end
+    } else if (token === 'Z') {
+      polyline.push(start)
+      cursor = start
+    }
+    index += 1
+  }
+  if (polyline.length > 0) subpaths.push(polyline)
+  return subpaths
 }
 
-/** One diagonal bar of the X, centered, rotated to `angle`. */
-function bar(px, py, angle, halfLen, thickness) {
-  const c = Math.cos(-angle)
-  const s = Math.sin(-angle)
-  const x = px * c - py * s
-  const y = px * s + py * c
-  return roundedExtentBox(x, y, halfLen, thickness / 2, thickness / 2)
-}
-
-const lerp = (a, b, t) => a + (b - a) * t
-const smoothstep = (edge0, edge1, x) => {
-  const t = Math.min(Math.max((x - edge0) / (edge1 - edge0), 0), 1)
-  return t * t * (3 - 2 * t)
-}
-const hex = value => [(value >>> 16) & 0xFF, (value >>> 8) & 0xFF, value & 0xFF]
-const mix = ([r1, g1, b1], [r2, g2, b2], t) => [lerp(r1, r2, t), lerp(g1, g2, t), lerp(b1, b2, t)]
-
-/** Gradient stops: bright periwinkle over deep indigo, diagonal. */
-const TOP = hex(0x8FB0FF)
-const BOTTOM = hex(0x2440C8)
-const X_SHADOW = hex(0x14267A)
-
-/** Renders `size`×`size` RGBA with `ss`× supersampling. */
-function render(size, ss) {
+/**
+ * Render `size`×`size` RGBA with `ss`× supersampling: the mark centered at
+ * `scale` of the canvas, nonzero-winding filled, on full transparency.
+ */
+function render(size, ss, scale, subpaths, fill) {
+  const [fr, fg, fb] = [parseInt(fill.slice(1, 3), 16), parseInt(fill.slice(3, 5), 16), parseInt(fill.slice(5, 7), 16)]
   const big = size * ss
   const out = Buffer.alloc(size * size * 4)
-      const halfLen = 0.315
-      const thickness = 0.072
+  // The viewBox is 50 units; `scale * size` pixels of canvas map onto it.
+  const pixelPerUnit = (scale * big) / 50
+  const origin = (big - scale * big) / 2
   for (let y = 0; y < size; y += 1) {
     for (let x = 0; x < size; x += 1) {
-      let r = 0
-      let g = 0
-      let b = 0
-      let a = 0
+      let hits = 0
       for (let sy = 0; sy < ss; sy += 1) {
         for (let sx = 0; sx < ss; sx += 1) {
-          const px = ((x * ss + sx + 0.5) / big) - 0.5
-          const py = ((y * ss + sy + 0.5) / big) - 0.5
-          const plate = roundedBox(px, py, 0.44, 0.115)
-          const plateA = 1 - smoothstep(-1 / big, 1 / big, plate)
-          if (plateA === 0) continue
-          // Diagonal gradient plus a soft gloss from the upper left.
-          const grad = Math.min(Math.max(px + py + 1, 0), 2) / 2
-          let color = mix(TOP, BOTTOM, grad)
-          const gloss = (1 - smoothstep(0, 0.55, Math.hypot(px + 0.14, py + 0.18))) * 0.16
-          color = mix(color, [255, 255, 255], gloss)
-          // A thin inner edge light keeps the plate from looking flat.
-          const rim = (1 - smoothstep(0.004, 0.016, Math.abs(plate + 0.016))) * 0.22
-          color = mix(color, [255, 255, 255], rim)
-          // The X: soft drop shadow beneath, then the white bars.
-          const shadow = bar(px - 0.006, py - 0.008, Math.PI / 4, halfLen, thickness)
-          const mark = Math.min(
-            bar(px, py, Math.PI / 4, halfLen, thickness),
-            bar(px, py, -Math.PI / 4, halfLen, thickness),
-          )
-          const shadowA = (1 - smoothstep(-1 / big, 1 / big, shadow)) * 0.45
-          color = mix(color, X_SHADOW, shadowA)
-          const markA = 1 - smoothstep(-1 / big, 1 / big, mark)
-          color = mix(color, [255, 255, 255], markA)
-          r += color[0] * plateA
-          g += color[1] * plateA
-          b += color[2] * plateA
-          a += plateA * 255
+          const pointX = origin + (x * ss + sx + 0.5) / pixelPerUnit
+          const pointY = origin + (y * ss + sy + 0.5) / pixelPerUnit
+          // Nonzero winding: accumulate signed crossings over every subpath.
+          let winding = 0
+          for (const polyline of subpaths) {
+            for (let i = 0; i < polyline.length - 1; i += 1) {
+              const a = polyline[i]
+              const b = polyline[i + 1]
+              if (a.y <= pointY) {
+                if (b.y > pointY && (b.x - a.x) * (pointY - a.y) - (pointX - a.x) * (b.y - a.y) > 0) winding += 1
+              } else if (b.y <= pointY && (b.x - a.x) * (pointY - a.y) - (pointX - a.x) * (b.y - a.y) < 0) {
+                winding -= 1
+              }
+            }
+          }
+          if (winding !== 0) hits += 1
         }
       }
-      const samples = ss * ss
-      const o = (y * size + x) * 4
-      out[o] = Math.round(r / samples)
-      out[o + 1] = Math.round(g / samples)
-      out[o + 2] = Math.round(b / samples)
-      out[o + 3] = Math.round(a / samples)
+      if (hits > 0) {
+        const o = (y * size + x) * 4
+        out[o] = fr
+        out[o + 1] = fg
+        out[o + 2] = fb
+        out[o + 3] = Math.round((hits / (ss * ss)) * 255)
+      }
     }
   }
   return out
 }
 
+const { d, fill } = markPath()
+const subpaths = parseSubpaths(d)
 mkdirSync(join(here, '..', 'build'), { recursive: true })
 mkdirSync(join(here, '..', 'assets'), { recursive: true })
-writeFileSync(join(here, '..', 'build', 'icon.png'), encodePng(1024, render(1024, 3)))
-writeFileSync(join(here, '..', 'assets', 'tray.png'), encodePng(32, render(32, 4)))
-console.log('icons written: build/icon.png (1024), assets/tray.png (32)')
+writeFileSync(join(here, '..', 'build', 'icon.png'), encodePng(1024, render(1024, 2, 0.92, subpaths, fill)))
+writeFileSync(join(here, '..', 'assets', 'tray.png'), encodePng(32, render(32, 4, 0.9, subpaths, fill)))
+console.log('icons written from the favicon mark: build/icon.png (1024), assets/tray.png (32)')

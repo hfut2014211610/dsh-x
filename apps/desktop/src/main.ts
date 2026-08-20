@@ -585,7 +585,7 @@ function installApplicationMenu(): void {
   Menu.setApplicationMenu(Menu.buildFromTemplate(appMenuTemplate({
     about: () => { void showAbout() },
     checkUpdates: () => { void checkUpdates(true) },
-    quit: () => { quit(); app.quit() },
+    quit: () => { quit() },
   }) as Parameters<typeof Menu.buildFromTemplate>[0]))
 }
 
@@ -632,6 +632,11 @@ function showWindow(): void {
 }
 
 function quit(): void {
+  // Re-entrancy guard: this both backs the tray Quit item and rides
+  // `before-quit`, and its own `app.quit()` re-enters it through that event —
+  // an unguarded second pass re-ran the tree kill and the note removal, and a
+  // quit loop there is the app never leaving.
+  if (quitting) return
   quitting = true
   if (restartTimer !== undefined) {
     clearTimeout(restartTimer)
@@ -639,7 +644,9 @@ function quit(): void {
   }
   stopHealthWatch?.()
   stopHealthWatch = undefined
-  sidecar?.kill()
+  const runtime = sidecar
+  sidecar = undefined
+  runtime?.kill()
   // Synchronous on purpose: `before-quit` gives no chance to await, and a note
   // left behind would make the next launch hunt a pid this quit already killed.
   try {
@@ -658,6 +665,14 @@ function quit(): void {
     void shell.openPath(installer)
   }
   app.quit()
+  // The runtime is already down and the note removed, so nothing legitimate
+  // remains to wait for; a quit that has not completed by now is stuck on
+  // something this shell cannot see, and the tray's Quit promise is that the
+  // app is GONE. Leaving the timer armed is the guarantee.
+  setTimeout(() => {
+    log('graceful quit stalled; forcing exit')
+    process.exit(0)
+  }, 3000)
 }
 
 app.on('web-contents-created', (_event, contents) => {
