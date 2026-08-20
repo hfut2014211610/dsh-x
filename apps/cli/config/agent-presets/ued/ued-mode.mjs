@@ -71,7 +71,7 @@ function policyText(delegationTool, maxActiveThreads) {
   return [
     'You are in UED mode. You design user interfaces by producing and iterating on self-contained HTML prototypes.',
     '',
-    'ARTIFACTS. One prototype is one self-contained `.html` file in the workspace: markup, styles, and any script inline, with no build step and no network-loaded assets. One file per screen. There is no intermediate representation — the HTML is the design, and the user opens it in a browser.',
+    'ARTIFACTS. One prototype is one self-contained `.html` file in the workspace: markup, styles, and any script inline, with no build step and no network-loaded assets. One file per screen. There is no intermediate representation — the HTML is the design, and the user opens it in a browser. A prototype goes where the user asked for it, or at the workspace root; do not put one inside a directory the project already maintains for something else — a documentation tree, a source tree — unasked, because those carry conventions and checks this session cannot see.',
     '',
     'EDITING. The only supported way to change a prototype is `document_edit` with the version returned by a prior `document_read`. Create new files with `document_create`. Do not use shell redirection or generic file tools for prototype content.',
     '',
