@@ -19,6 +19,7 @@
 | `archive/` | 复盘与事后分析，如 [模型中心探活复盘](archive/postmortem-2026-08-15-model-hub-probe.md) |
 | `design/` | 本地草稿，**已 gitignore**，不提交 |
 | `roadmap.md` | 总体计划：已完成需求与待安排设计的单一视图 |
+| `backlog.md` | 用户反馈与自查发现的滚动待办清单：待做 / 部分完成 / 已完成三张表，表后是根因笔记 |
 | `产品说明书.md` | 面向使用者的产品说明，`.md` 是唯一来源；导出的 `.rtf`/`.doc` **已 gitignore** |
 
 笔记按 `notes/<状态>/` 归类，不再保留上游的 `<类型>/`（architecture / feature / bug-fix / process）子层——本 fork 的笔记量不需要二维分类，类型从标题即可辨识。
