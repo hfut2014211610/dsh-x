@@ -22,8 +22,9 @@ export type ConnectorsKey =
   | 'feishu.appId.label' | 'feishu.appId.hint'
   | 'feishu.eventCommand.label' | 'feishu.eventCommand.hint'
   | 'feishu.status.title' | 'feishu.status.mode' | 'feishu.status.app' | 'feishu.status.user'
+  | 'feishu.status.scopes'
   | 'feishu.status.bridge' | 'feishu.status.bridgeOn' | 'feishu.status.bridgeOff'
-  | 'feishu.action.reregister' | 'feishu.action.hideSetup'
+  | 'feishu.action.reconfigure' | 'feishu.action.hideSetup'
   | 'feishu.action.reset' | 'feishu.action.resetConfirm'
   | 'feishu.settings.title'
   | 'feishu.workspace.label' | 'feishu.workspace.hint'
@@ -79,7 +80,7 @@ export const en: Record<ConnectorsKey, string> = {
   'auth.loading': 'Reading…',
   'auth.reload': 'Read again',
   'auth.absent': 'lark-cli is not on this machine. Install it with npm i -g @larksuite/cli.',
-  'auth.scopes': 'permissions',
+  'auth.scopes': 'granted',
   'auth.domains': 'Permissions to grant',
   'auth.scan': 'Scan to authorize',
   'auth.scanning': 'Fetching the code…',
@@ -104,14 +105,15 @@ export const en: Record<ConnectorsKey, string> = {
   'feishu.appId.hint': 'The Feishu app those events belong to.',
   'feishu.eventCommand.label': 'Event command',
   'feishu.eventCommand.hint': 'Stands in for `lark-cli event consume`; the event key is appended. It must print one JSON event per line.',
-  'feishu.status.title': 'Connection',
-  'feishu.status.mode': 'Through',
+  'feishu.status.title': 'Status',
+  'feishu.status.mode': 'Method',
   'feishu.status.app': 'App',
-  'feishu.status.user': 'You',
-  'feishu.status.bridge': 'Bridge',
-  'feishu.status.bridgeOn': 'running',
-  'feishu.status.bridgeOff': 'not running',
-  'feishu.action.reregister': 'Register again',
+  'feishu.status.user': 'Authorized as',
+  'feishu.status.scopes': 'Permissions',
+  'feishu.status.bridge': 'Bridge process',
+  'feishu.status.bridgeOn': 'Running',
+  'feishu.status.bridgeOff': 'Not running',
+  'feishu.action.reconfigure': 'Change how it connects',
   'feishu.action.hideSetup': 'Done',
   'feishu.action.reset': 'Sign out and clear',
   'feishu.action.resetConfirm': 'Tap again to confirm',
@@ -182,7 +184,7 @@ export const zh: Record<ConnectorsKey, string> = {
   'auth.loading': '正在读…',
   'auth.reload': '重新读',
   'auth.absent': '这台机器上没有 lark-cli。用 npm i -g @larksuite/cli 装上。',
-  'auth.scopes': '项权限',
+  'auth.scopes': '项',
   'auth.domains': '要开通的权限',
   'auth.scan': '扫码授权',
   'auth.scanning': '正在取二维码…',
@@ -207,15 +209,16 @@ export const zh: Record<ConnectorsKey, string> = {
   'feishu.appId.hint': '那些事件属于哪个飞书应用。',
   'feishu.eventCommand.label': '事件命令',
   'feishu.eventCommand.hint': '替代 `lark-cli event consume`，事件键追加在最后。它要一行一条 JSON 事件地往外打。',
-  'feishu.status.title': '接入情况',
-  'feishu.status.mode': '走的是',
+  'feishu.status.title': '接入状态',
+  'feishu.status.mode': '接入方式',
   'feishu.status.app': '应用',
-  'feishu.status.user': '你',
-  'feishu.status.bridge': '桥接',
-  'feishu.status.bridgeOn': '在跑',
-  'feishu.status.bridgeOff': '没在跑',
-  'feishu.action.reregister': '重新注册',
-  'feishu.action.hideSetup': '好了',
+  'feishu.status.user': '授权账号',
+  'feishu.status.scopes': '已授权权限',
+  'feishu.status.bridge': '桥接进程',
+  'feishu.status.bridgeOn': '运行中',
+  'feishu.status.bridgeOff': '未运行',
+  'feishu.action.reconfigure': '更改接入方式',
+  'feishu.action.hideSetup': '完成',
   'feishu.action.reset': '注销配置',
   'feishu.action.resetConfirm': '再点一次确认',
   'feishu.settings.title': '会话设置',

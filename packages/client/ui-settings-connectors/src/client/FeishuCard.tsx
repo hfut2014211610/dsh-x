@@ -129,11 +129,15 @@ export function FeishuCard(props: FeishuCardProps) {
             </FactRow>
             {mode === 'direct' && user !== undefined
               ? (
-                <FactRow label={t('feishu.status.user')}>
-                  {user.userName ?? user.openId ?? ''}
-                  <span className={css.authCount}>{user.scopes.length}</span>
-                  {t('auth.scopes')}
-                </FactRow>
+                <>
+                  <FactRow label={t('feishu.status.user')}>
+                    {user.userName ?? user.openId ?? ''}
+                  </FactRow>
+                  <FactRow label={t('feishu.status.scopes')}>
+                    <span className={css.authCount}>{user.scopes.length}</span>
+                    {t('auth.scopes')}
+                  </FactRow>
+                </>
               )
               : null}
             <FactRow label={t('feishu.status.bridge')}>
@@ -144,7 +148,7 @@ export function FeishuCard(props: FeishuCardProps) {
             </p>
             <div className={css.authActions}>
               <button type="button" className={css.discard} onClick={props.reopenSetup}>
-                {t(state.setupOpen ? 'feishu.action.hideSetup' : 'feishu.action.reregister')}
+                {t(state.setupOpen ? 'feishu.action.hideSetup' : 'feishu.action.reconfigure')}
               </button>
               <button
                 type="button"

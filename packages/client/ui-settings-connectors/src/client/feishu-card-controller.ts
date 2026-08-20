@@ -273,7 +273,9 @@ export class FeishuCardController {
     const mode = this.form.field('mode').text
     if (mode === 'direct') {
       const status = this.auth.store.getSnapshot().status
-      return status?.configured === true && status.user !== undefined
+      // 一项权限都没有就是没授权过。`config init` 建完应用之后 lark-cli 已经
+      // 有了一条 0 权限的用户记录，只看"有没有账号"会把授权那一步整个藏掉。
+      return status?.configured === true && (status.user?.scopes.length ?? 0) > 0
     }
     if (mode === 'bridge') {
       return this.form.field('appId').text.trim() !== ''

@@ -407,6 +407,7 @@ describe('FeishuCard', () => {
   const ready: Partial<FeishuCardState> = {
     ready: true,
     mode: field('direct'),
+    auth: { ...signedIn, status: { ...signedIn.status, user: { ...signedIn.status?.user, scopes: ['im:message'] } } } as FeishuAuthState,
     bridge: { connected: true, bridge: { apps: ['/lark/dsh'], dmMode: 'disabled', dmAllowed: 0, groupsAllowed: 0, requireMention: true } },
   }
 
@@ -502,6 +503,27 @@ describe('FeishuCard', () => {
       expect(screen.getByRole('link', { name: zh['auth.openLink'] })).toBeTruthy()
     })
 
+    // `config init` 建完应用之后 lark-cli 已经有一条 0 权限的用户记录。只看
+    // "有没有账号"的话，卡片会认为接好了，把授权那一步整个藏掉——而那正是
+    // 下一步要做的事。
+    it('建完应用还没授权，不算接好', () => {
+      const bound = {
+        ...signedIn,
+        status: {
+          installed: true,
+          configured: true,
+          appId: 'cli_new',
+          user: { status: 'ready', available: true, message: '', scopes: [] },
+        },
+      } as FeishuAuthState
+
+      render(<FeishuCard {...cardProps({ mode: field('direct'), auth: bound, ready: false })} />)
+      open()
+
+      expect(screen.getByRole('button', { name: zh['auth.scan'] })).toBeTruthy()
+      expect(screen.queryByText(zh['feishu.status.title'])).toBeNull()
+    })
+
     it('选哪条路要写进设置', () => {
       const edit = vi.fn()
       render(<FeishuCard {...cardProps({}, { edit })} />)
@@ -532,8 +554,20 @@ describe('FeishuCard', () => {
 
       expect(screen.getByText(zh['feishu.status.title'])).toBeTruthy()
       expect(screen.getByText(zh['feishu.status.bridgeOn'])).toBeTruthy()
-      expect(screen.getByRole('button', { name: zh['feishu.action.reregister'] })).toBeTruthy()
+      expect(screen.getByRole('button', { name: zh['feishu.action.reconfigure'] })).toBeTruthy()
       expect(screen.getByRole('button', { name: zh['feishu.action.reset'] })).toBeTruthy()
+    })
+
+    // 两条路本质不冲突，A 接完了也得能改去 B——所以那个动作叫「更改接入方式」，
+    // 而且两边的配置各自留着，来回切不丢东西。
+    it('接好了也能回去改接入方式', () => {
+      const reopenSetup = vi.fn()
+      render(<FeishuCard {...cardProps(ready, { reopenSetup })} />)
+      open()
+
+      fireEvent.click(screen.getByRole('button', { name: zh['feishu.action.reconfigure'] }))
+
+      expect(reopenSetup).toHaveBeenCalled()
     })
 
     it('接入那一段收起来了，除非自己点开', () => {
