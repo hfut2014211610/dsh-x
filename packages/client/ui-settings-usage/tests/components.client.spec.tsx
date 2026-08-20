@@ -2,7 +2,7 @@
 /** Section rendering: summary strip, the day-dot heatmap, the per-model table, and failure/empty states. */
 import { cleanup, fireEvent, render, screen, waitFor, within } from '@testing-library/react'
 import { afterEach, describe, expect, it, vi } from 'vitest'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-web-react'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-ui-renderer/src/client/bind.ts'
 import { UsageSection, dayTooltip } from '../src/client/UsageSection.tsx'
 import type { UsageSectionInjected } from '../src/client/UsageSection.tsx'
 import { UsageSettingsStore } from '../src/client/store.ts'

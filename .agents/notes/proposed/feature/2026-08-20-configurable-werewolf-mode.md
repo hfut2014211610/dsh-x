@@ -20,7 +20,7 @@ Each seat has one durable logical `BotActor`. Every bot decision starts a fresh 
 
 Rules are configuration over trusted registries. A rule set names registered role types, phase types, and victory-condition types and supplies their validated options. Adding a registered role to a deck is configuration-only. Adding a role with new mechanics requires a plugin that registers the role and any new phase implementation, after which rule sets can use it without changing the core engine. Configuration never contains JavaScript, selectors, callbacks, or an expression language.
 
-The feature extends the documented Session-event, subagent, Typert remote, and `conversation.view` mechanisms rather than changing `agent-loop`. Session events are the durable facts, the Web Client owns the game interaction surface, and fresh `spawn` children support persona, tool filtering, depth limits, and structured output; see [the architecture map](../../../docs/architecture.md), [the subagent contract](../../../docs/subsystems/subagent.md), and [the Web Client architecture](../../../packages/client/README.md).
+The feature extends the documented Session-event, subagent, Typert remote, and `conversation.view` mechanisms rather than changing `agent-loop`. Session events are the durable facts, the Web Client owns the game interaction surface, and fresh `spawn` children support persona, tool filtering, depth limits, and structured output; see [the architecture map](../../../../docs/architecture.md), [the subagent contract](../../../../docs/subsystems/subagent.md), and [the Web Client architecture](../../../../packages/client/README.md).
 
 ## Scope and non-goals
 
@@ -67,16 +67,19 @@ interface WerewolfRuleSetInputV1 {
   playerCount: number
   deck: Array<{
     role: string
+    roleVersion: number
     count: number
     options?: JsonValue
   }>
   cycle: {
-    setup?: Array<{ phase: string; options?: JsonValue }>
-    night: Array<{ phase: string; options?: JsonValue }>
-    day: Array<{ phase: string; options?: JsonValue }>
+    setup?: Array<{ phase: string; phaseVersion: number; options?: JsonValue }>
+    night: Array<{ phase: string; phaseVersion: number; options?: JsonValue }>
+    day: Array<{ phase: string; phaseVersion: number; options?: JsonValue }>
   }
   victory: Array<{
     condition: string
+    conditionVersion: number
+    priority: number
     options?: JsonValue
   }>
   policies: {
@@ -89,15 +92,15 @@ interface WerewolfRuleSetInputV1 {
 }
 ```
 
-`schemaVersion` versions the configuration fields. `revision` versions one named rule set. The pair `{ id, revision }` is immutable after registration. The config parser rejects unknown keys, unsafe integers, empty decks, non-positive counts, duplicate phase occurrences that the phase type does not declare repeatable, and policy values outside the closed unions.
+`schemaVersion` versions the configuration fields. `revision` versions one named rule set. The pair `{ id, revision }` is immutable after registration. Every role, phase, and victory reference names an exact positive definition version; there is no implicit latest-version selection. The config parser rejects unknown keys, unsafe integers, empty decks, non-positive counts, duplicate phase occurrences that the phase type does not declare repeatable, and policy values outside the closed unions.
 
 The compiled rule set must satisfy all of these conditions:
 
 - deck counts sum exactly to `playerCount`;
-- every role, phase, and victory-condition identifier resolves to one registered definition;
+- every role, phase, and victory-condition identifier and version resolves to one registered definition;
 - every options value passes the owning definition's parser;
 - every phase requirement is satisfiable by at least one role in the deck unless the phase explicitly allows an always-skipped result;
-- at least one victory condition is present, and two conditions cannot return conflicting winners at the same configured priority;
+- at least one victory condition is present, priorities are safe non-negative integers, and exact duplicate condition/version/priority entries are rejected;
 - every public label and every model-visible limit is bounded by plugin configuration; and
 - the normalized rule set is plain JSON and has a stable SHA-256 digest.
 
@@ -124,7 +127,16 @@ interface CompiledWerewolfRole {
   faction: string
   publicName: string
   initialRoleState: JsonValue
+  phaseBindings: WerewolfRolePhaseBinding[]
   projectPrivateKnowledge(input: RoleKnowledgeInput): JsonValue
+}
+
+interface WerewolfRolePhaseBinding {
+  phaseId: string
+  phaseVersion: number
+  required: boolean
+  kind: string
+  options: JsonValue
 }
 
 interface WerewolfPhaseDefinition {
@@ -132,9 +144,13 @@ interface WerewolfPhaseDefinition {
   version: number
   repeatable?: boolean
   parseOptions(value: JsonValue | undefined): JsonValue
+  parseRoleBinding(binding: WerewolfRolePhaseBinding): JsonValue
   compile(input: {
     options: JsonValue
-    roles: readonly CompiledWerewolfRole[]
+    participants: ReadonlyArray<{
+      role: CompiledWerewolfRole
+      binding: JsonValue
+    }>
   }): CompiledWerewolfPhase
 }
 
@@ -149,13 +165,33 @@ interface WerewolfVictoryConditionDefinition {
   id: string
   version: number
   parseOptions(value: JsonValue | undefined): JsonValue
-  evaluate(input: VictoryEvaluationInput): GameResult | null
+  evaluate(input: VictoryEvaluationInput): WerewolfVictoryClaimV1 | null
+}
+
+type WerewolfVictoryOutcomeV1 =
+  | { kind: 'faction'; factionId: string }
+  | { kind: 'tie' }
+
+interface WerewolfVictoryClaimV1 {
+  outcome: WerewolfVictoryOutcomeV1
+  evidence: JsonValue
+}
+
+interface WerewolfGameResultV1 {
+  outcome: WerewolfVictoryOutcomeV1 | { kind: 'aborted' }
+  evidence: Array<{
+    source: 'condition' | 'max-days' | 'human-abort'
+    conditionId?: string
+    conditionVersion?: number
+    priority?: number
+    data: JsonValue
+  }>
 }
 ```
 
-`PhaseOpenResult` is either `skip` or an immutable action plan. The action plan lists actors, execution mode (`parallel-private` or `seat-order-public`), bot action JSON Schema, optional human form fields, legal targets, and visibility. `PhaseResolution` contains declarative eliminations, prevention records, resource replacements, role-state replacements, private knowledge notices, public announcements, and vote records. The core applies those records in a fixed order and rejects references to an unknown game, player, phase, action, or role-state owner.
+`PhaseOpenResult` is either `skip` or an immutable action plan. The action plan lists actors, execution mode (`parallel-private` or `seat-order-public`), bot action JSON Schema, optional human form fields, legal targets, and visibility. A role joins an existing phase only through an exact-version `phaseBindings` entry. The rule compiler requires every `required` binding to have a matching phase occurrence and may ignore an unused optional binding. The owning phase parses each matching binding, rejects unsupported `kind` or options during rule compilation, and receives only the parsed participant records when it compiles. It never switches on third-party role ids. `PhaseResolution` contains declarative eliminations, prevention records, resource replacements, role-state replacements, private knowledge notices, public announcements, and vote records. The core applies those records in a fixed order and rejects references to an unknown game, player, phase, action, or role-state owner.
 
-A new role that only changes deck count or registered options needs a rule-set config change. A new role that participates in an existing phase registers a role definition and uses that phase's supported options. A role with a new action window registers both a role definition and a phase definition, then adds that phase to the configured cycle. A new victory mechanic registers a victory-condition definition. None of these changes modifies the core phase loop.
+A new role that only changes deck count or registered options needs a rule-set config change. A new role that participates in an existing phase registers a role definition whose compiled `phaseBindings` uses a `kind` and options supported by that exact phase version. A role with a new action window registers both a role definition and a phase definition, binds them, then adds that phase to the configured cycle. A new victory mechanic registers a victory-condition definition. None of these changes modifies the core phase loop.
 
 ### Classic rule set
 
@@ -169,29 +205,43 @@ displayName: Quick 7-player game
 playerCount: 7
 deck:
   - role: wolf
+    roleVersion: 1
     count: 2
   - role: seer
+    roleVersion: 1
     count: 1
   - role: witch
+    roleVersion: 1
     count: 1
     options:
       antidoteUses: 1
       poisonUses: 1
       selfSave: first-night-only
   - role: villager
+    roleVersion: 1
     count: 3
 cycle:
   night:
     - phase: night.wolf-kill
+      phaseVersion: 1
     - phase: night.seer-inspect
+      phaseVersion: 1
     - phase: night.witch
+      phaseVersion: 1
   day:
     - phase: day.announce
+      phaseVersion: 1
     - phase: day.discussion
+      phaseVersion: 1
     - phase: day.vote
+      phaseVersion: 1
 victory:
   - condition: faction-elimination
+    conditionVersion: 1
+    priority: 10
   - condition: wolf-parity
+    conditionVersion: 1
+    priority: 10
 policies:
   voteTie: revote-once
   wolfTie: seeded-random
@@ -204,11 +254,13 @@ policies:
 
 One Session may have at most one active game. A finished or aborted game remains in the log, and a later `start` creates a new `GameId`. Forking a Session creates an alternate game timeline in the forked Session; it does not join or mutate the source Session's game.
 
-The runtime serializes every state-changing operation for one live Agent. Each external request carries an idempotency id and `expectedGameRevision`. The runtime first returns the prior result for a repeated id, otherwise rejects a stale revision, folds the current state, validates the action, appends events, and auto-advances until the next human action, game end, pause, or cancellation checkpoint.
+The runtime serializes every state-changing operation for one live Agent. Each mutation carries a caller-generated UUID `requestId` and `expectedGameRevision`. Its durable idempotency key is `{ sessionId, method, requestId }`; the committed event also stores a digest of the normalized mutation payload. `game-started`, `human-action`, `game-resumed`, and terminal `game-ended` own the keys for `start`, `submitAction`, `resume`, and `abortGame` respectively. On restart the reducer rebuilds the key index from those events. Repeating the same key and digest performs no transition and returns the current authorized projection; reusing a key with a different digest is an idempotency conflict. A new key with a stale expected revision is rejected. Otherwise the runtime folds current state, validates, appends events, and auto-advances until the next human action, game end, pause, or cancellation checkpoint.
 
-Each cycle walks the recorded phase lists in order. A phase may skip when it has no eligible living actor or its role resources make it inactive. The runtime evaluates configured victory conditions after setup and after every resolved phase that may alter living players, factions, or a condition-owned role state. Exactly one non-null winner is accepted; conflicting winners pause the game as an invariant failure.
+Each cycle walks the recorded phase lists in order. A phase may skip when it has no eligible living actor or its role resources make it inactive. The runtime evaluates configured victory conditions after setup and after every resolved phase that may alter living players, factions, or a condition-owned role state. Lower numeric `priority` wins: the runtime selects the lowest priority containing any non-null claim. Outcome equivalence uses the stable key `faction:<factionId>` or `tie`; equal keys combine evidence, while different keys at that selected priority pause the game as an invariant failure. Lower-priority conditions are then irrelevant. This dynamic conflict cannot be rejected during rule compilation because it depends on live state. When the configured `maxDays` finishes without another result, the engine emits `{ kind: 'tie' }` with `max-days` evidence after the final day cycle. `abortGame` alone emits `{ kind: 'aborted' }`; victory plugins cannot return it.
 
-`parallel-private` phases create all independent bot requests from one source game revision, await them under the configured concurrency limit, and append accepted decisions in seat order. Bots do not observe sibling decisions from that phase. `seat-order-public` phases run one actor at a time; each later observation includes earlier public speech. Human action requests stop automatic advancement and expose a generic form derived from the phase definition.
+`parallel-private` phases create all independent bot requests from one source game revision, await them under the configured concurrency limit, and append one `werewolf/bot-decision` event whose entries are ordered by seat. Bots do not observe sibling decisions from that phase. `seat-order-public` phases run one actor at a time and append one-entry decision events; each later observation includes earlier public speech. Human action requests stop automatic advancement and expose a generic form derived from the phase definition.
+
+When the human and bots participate in the same `parallel-private` phase, the runtime collects and commits the hidden `werewolf/human-action` first, then starts all bot requests from the resulting revision. Bot observation projection excludes that pending human action, so commit order does not disclose it. The eventual `phase-resolved` event references the human action id and every bot `DecisionId`. A restart after the human commit therefore resumes only the missing bot batch.
 
 ## Durable game events
 
@@ -219,14 +271,18 @@ interface WerewolfSessionEventMap {
   'werewolf/game-started': WerewolfGameStarted
   'werewolf/phase-opened': WerewolfPhaseOpened
   'werewolf/human-action': WerewolfHumanAction
+  'werewolf/bot-attempt-failed': WerewolfBotAttemptFailed
   'werewolf/bot-decision': WerewolfBotDecision
   'werewolf/phase-resolved': WerewolfPhaseResolved
   'werewolf/game-paused': WerewolfGamePaused
+  'werewolf/game-resumed': WerewolfGameResumed
   'werewolf/game-ended': WerewolfGameEnded
 }
 ```
 
-Every payload starts with `{ version, gameId, gameRevision }`. State-changing revisions are contiguous and increase by one. Phase events additionally carry a stable `PhaseInstanceId`; action events carry a stable `DecisionId` or `HumanActionId`. `game-ended` is terminal for that `GameId`, while `game-paused` retains a resumable phase and typed reason.
+Every payload starts with `{ version, gameId, gameRevision }`. State-changing revisions are contiguous and increase by one. Phase events additionally carry a stable `PhaseInstanceId`; each bot decision entry carries a stable `DecisionId`, and each human action event carries a stable `HumanActionId`. `game-ended` is terminal for that `GameId`, while `game-paused` retains a resumable phase and typed reason.
+
+`WerewolfBotDecision` carries the source game revision and one or more ordered decision entries. A sequential public phase appends one entry; a parallel private phase appends every accepted or trustee entry in one Session event. The single synchronous `Session.append()` is the atomic batch boundary, so the design does not require a new multi-event transaction API.
 
 `werewolf/game-started` contains the shuffled roster, full secret role assignment, initial role state, human player id, immutable bot profiles, random seed state, normalized rule set, and definition versions. This makes one Session sufficient for replay and recovery. The normal UI and bot observation projectors hide unauthorized fields, but a local user who reads raw Session storage can inspect secrets; version 1 does not claim adversarial anti-cheat.
 
@@ -302,7 +358,7 @@ Bot profile assignment is deterministic from the game seed and immutable for the
 
 Belief updates may name only current roster members other than the actor. Priority targets must be current roster members but need not remain alive between decisions; the next prompt labels stale targets and the model may revise them. Commitment settlement may reference only active commitment ids. Unknown ids, duplicate updates, oversized strings, excessive array items, and fields outside the schema reject the decision result.
 
-Every accepted `werewolf/bot-decision` stores the prior context revision, accepted action, public speech when present, the validated delta, and the full computed `contextAfter`. The full snapshot makes each decision an independent context checkpoint, while the delta explains the permitted change. The event invariant recomputes `contextAfter` from the preceding checkpoint and delta and rejects disagreement.
+Every decision entry stores the prior context revision, accepted action, public speech when present, the validated delta, and the full computed `contextAfter`. The full snapshot makes each decision an independent context checkpoint, while the delta explains the permitted change. The event invariant recomputes each `contextAfter` from that actor's preceding checkpoint and delta and rejects disagreement.
 
 ### Decision request and response
 
@@ -342,13 +398,13 @@ interface BotDecisionEnvelopeV1 {
 
 The child persona fixes seat identity, immutable profile, game conduct, information-isolation rules, and the instruction to return only the structured result without hidden reasoning. Public speech is quoted as untrusted in-game data. The child receives `toolFilter: { allow: [] }`, an absolute depth limit that prevents descendants, configured provider/model/max tokens, the phase's object-rooted output schema, and the parent operation's cancellation signal.
 
-The runtime accepts a result only when all of these values still match: `DecisionId`, `GameId`, phase instance, source game revision, actor, and prior context revision. It validates the phase action before the context delta. An invalid action cannot update context. After validation it re-enters the per-game serial queue, repeats the revision checks, computes `contextAfter`, and appends one event. A late or duplicate child result is disposed and cannot alter the log.
+The runtime accepts a result only when all of these values still match: `DecisionId`, `GameId`, phase instance, source game revision, actor, and prior context revision. It validates the phase action before the context delta. An invalid action cannot update context. A sequential phase re-enters the per-game serial queue, repeats the checks, computes `contextAfter`, and appends a one-entry event. A parallel coordinator holds validated detached results only in memory; after every actor settles, it re-enters the queue once, rechecks the source game revision and every actor context revision, computes all contexts, and appends one ordered batch event. A late or duplicate child result is disposed and cannot alter the log.
 
 Retries use the same logical `DecisionId`, a new attempt number, and a fresh child Session. No failed attempt changes bot context. The retry prompt includes only a concise validation diagnostic, not the prior child's unrestricted output. After the configured retry limit, `auto-action` selects a legal action with the recorded seeded PRNG and applies an engine-authored context delta noting the trustee action; `pause-game` appends `werewolf/game-paused`. Both outcomes remain visible facts rather than silent degradation.
 
 ## Human interaction and presentation
 
-This mode is UI-only. It does not register slash commands, reuse the Chat composer, parse natural-language instructions, or provide a command fallback. The game view is the sole supported start, action, resume, and exit surface. Chat may remain another session tab, but text entered there never changes Werewolf state.
+This mode is UI-only. It does not register slash commands, reuse the Chat composer, parse natural-language instructions, or provide a command fallback. The game view is the sole supported start, action, resume, and abort-game surface. Chat may remain another session tab, but text entered there never changes Werewolf state.
 
 ### Dedicated conversation view
 
@@ -363,11 +419,17 @@ interface WerewolfRemoteV1 {
   getView(input: {
     sessionId: SessionId
   }): Promise<WerewolfHumanViewV1>
+  getReplay(input: {
+    sessionId: SessionId
+    gameId: GameId
+    cursor?: string
+  }): Promise<WerewolfReplayPageV1>
   start(input: {
     sessionId: SessionId
     requestId: string
     expectedGameRevision: 0
     ruleSetId: string
+    ruleSetRevision: number
     humanSeatPreference?: number
   }): Promise<WerewolfHumanViewV1>
   submitAction(input: {
@@ -382,7 +444,7 @@ interface WerewolfRemoteV1 {
     requestId: string
     expectedGameRevision: number
   }): Promise<WerewolfHumanViewV1>
-  abort(input: {
+  abortGame(input: {
     sessionId: SessionId
     requestId: string
     expectedGameRevision: number
@@ -391,6 +453,8 @@ interface WerewolfRemoteV1 {
 ```
 
 The namespace forwards a lightweight `werewolf/view-invalidated` event carrying only `sessionId`, `gameId`, and the new revision. The client subscribes before the first read, ignores events for other Sessions, and refreshes through `getView()`. Connection reset also triggers a refresh. The invalidation event never carries secret game fields, so authorization remains in one Host projector.
+
+Every handler resolves `sessionId` through the existing Gateway and Session access policy and rejects an unknown, unavailable, or non-top-level Session. Requests never accept a `playerId`: `werewolf/game-started` binds exactly one `humanPlayerId`, and every later projection and action derives that identity from the active game. In version 1, any loopback same-origin client already authorized to operate that Session acts as this one human. Calling the Typert method outside the rendered view has the same local authority and does not create a multiplayer identity boundary; online play remains out of scope.
 
 ### Human-authorized projection
 
@@ -448,7 +512,10 @@ interface WerewolfHumanViewV1 {
       text: string
     }>
     result: null | {
-      outcome: 'village' | 'wolves' | 'tie' | 'aborted'
+      outcome:
+        | { kind: 'faction'; factionId: string; factionName: string }
+        | { kind: 'tie' }
+        | { kind: 'aborted' }
       title: string
       summary: string
       revealedRoles: Array<{ playerId: PlayerId; roleName: string }>
@@ -497,9 +564,27 @@ interface HumanActionFormV1 {
   allowPass: boolean
   fields: HumanActionFieldV1[]
 }
+
+type WerewolfReplayViewV1 = Omit<
+  NonNullable<WerewolfHumanViewV1['game']>,
+  'actionForm' | 'live'
+>
+
+interface WerewolfReplayPageV1 {
+  version: 1
+  gameId: GameId
+  frames: Array<{
+    revision: number
+    checkpoint: 'phase' | 'action' | 'resolution' | 'result'
+    view: WerewolfReplayViewV1
+  }>
+  nextCursor?: string
+}
 ```
 
 `live` is transient presentation state and does not affect replay. All other game fields derive from committed events. The Host may return a new `WerewolfHumanViewV1` version later, but it rejects a client version it cannot serve rather than partially omitting fields.
+
+`getReplay()` is available only for an ended or aborted game. It folds committed events on the Host and returns bounded pages of full authorized checkpoints; its opaque cursor is scoped to the requested `GameId` and last returned revision. A historical frame applies the human's entitlement at that revision, so later role revelation does not leak backward into an earlier frame. The result frame contains the configured faction outcome and final public role revelation. The browser never receives bot contexts, child prompts, or raw event payloads.
 
 Phase definitions expose an optional versioned `HumanActionFormV1`. The closed field kinds are text, boolean, single-choice, multi-choice, and player-target. Each field carries a stable id, localized label key, required flag, limits, and options; player-target options carry seat, display name, alive state, and disabled reason. A role needing a new presentation kind must first add a typed parser, shared renderer, keyboard behavior, screen-reader semantics, and replay fixture. Rule configuration cannot supply HTML, CSS, executable callbacks, or arbitrary component names.
 
@@ -507,7 +592,7 @@ Phase definitions expose an optional versioned `HumanActionFormV1`. The closed f
 
 The same view owns eight explicit product states:
 
-1. **Lobby.** Show rule-set cards, player and role summary, difficulty estimate, and a primary `Start game` action. Selecting a rule set reveals its role counts, phase order, tie policy, and human-death policy before starting. Invalid or unavailable rule sets are disabled with the Host validation reason.
+1. **Lobby.** Show cards keyed by the exact `{ id, revision }` rule-set pair, player and role summary, difficulty estimate, and a primary `Start game` action. Selecting a rule set reveals its role counts, phase order, tie policy, and human-death policy before starting. Invalid or unavailable rule sets are disabled with the Host validation reason.
 2. **Role reveal.** Present the human role, faction, private teammates, ability, and resource limits behind a deliberate `Reveal role` interaction, followed by `I am ready`. This prevents a newly opened screen or nearby observer from immediately exposing the role. Reduced-motion mode uses the same two-step interaction without a flip animation.
 3. **Table.** Render the player seats around an elliptical table, the phase/day header above it, the public timeline at the left, the human role and resources at the right, and the phase action area below. Seat state shows alive, dead, speaking, selected, voted, and publicly revealed conditions through icon, text, and style rather than color alone.
 4. **Night focus.** Dim public table chrome without hiding seat labels. The bottom action sheet explains the current ability, eligible targets, resources to be consumed, and the exact confirmation result. Other bots appear as `Thinking` only when their phase progress is safe to reveal; the UI never identifies a hidden night actor.
@@ -516,7 +601,7 @@ The same view owns eight explicit product states:
 7. **Spectator.** When the human dies under the `spectate` policy, disable all private actions, retain only knowledge already entitled at death, keep the public timeline live, and label unrevealed roles as unknown until the result event.
 8. **Result and replay.** Reveal every role, winner, decisive events, and the human's survival and vote summary. Provide `Review game` and `New game` UI actions. Review mode scrubs only committed public and human-entitled projections by day and phase; it never displays bot continuity contexts, child prompts, or raw secret events.
 
-Starting, submitting, resuming, and exiting all use a confirmation-safe mutation pattern: disable the initiating control for its request, keep the last confirmed projection visible, and replace it only with a response whose revision is not older. A stale revision response triggers one refresh and leaves the user's draft or selected target available when it is still legal. Network failure shows an inline retry action; it does not optimistically advance the phase.
+Starting, submitting, resuming, and aborting a game all use a confirmation-safe mutation pattern: disable the initiating control for its request, keep the last confirmed projection visible, and replace it only with a response whose revision is not older. A stale revision response triggers one refresh and leaves the user's draft or selected target available when it is still legal. Network failure shows an inline retry action; it does not optimistically advance the phase.
 
 ### Desktop and mobile layout
 
@@ -561,12 +646,13 @@ interface Config {
     model?: string
     maxTokens?: number
   }
-  defaultRuleSet: string
+  defaultRuleSet: { id: string; revision: number }
   ruleSets: WerewolfRuleSetInputV1[]
   maxConcurrentBots: number
   botDecisionTimeoutMs: number
   botRetryLimit: number
   botFailurePolicy: 'auto-action' | 'pause-game'
+  replayPageSize: number
   contextLimits: {
     memorySummaryChars: number
     beliefBasisChars: number
@@ -581,7 +667,7 @@ interface Config {
 }
 ```
 
-The bundle may provide reviewed defaults, but the runtime reads only the resolved `Config`. `botAgent` omission deliberately inherits the parent agent's provider and model through the existing subagent request contract. Model temperature and route-wide tuning remain owned by the existing model-tuning layer rather than a Werewolf-specific duplicate.
+The bundle may provide reviewed defaults, but the runtime reads only the resolved `Config`. `defaultRuleSet` must resolve to one exact registered pair during plugin load. `botAgent` omission deliberately inherits the parent agent's provider and model through the existing subagent request contract. Model temperature and route-wide tuning remain owned by the existing model-tuning layer rather than a Werewolf-specific duplicate.
 
 Rule-set `policies` control game behavior; top-level `Config` controls deployment resources, failure handling, and reviewed UI defaults. A rule set therefore replays identically under its recorded policy snapshot, while an operator can change future concurrency, timeout, model route, retry, context-size limits, and presentation defaults without inventing a new game variant. Per-user presentation preferences override only `ui` defaults and never enter game events.
 
@@ -589,11 +675,11 @@ Rule-set `policies` control game behavior; top-level `Config` controls deploymen
 
 Game start validates the selected rule set, referenced definitions, provider capabilities, context limits, parent Agent, and absence of another active game before appending any Werewolf event. A failure leaves no partial game.
 
-Each external operation and automatic phase drive obeys one caller signal until an event commits. Cancellation aborts active child runs, disposes every published run, and leaves the last committed phase resumable. An event that already committed remains authoritative even when the caller disconnects immediately afterwards.
+Each external operation and automatic phase drive obeys one caller signal until an event commits. Cancellation aborts active child runs and disposes every published run. If the process remains live and an opened phase is incomplete, the runtime appends `game-paused` with reason `cancelled`; after an unclean process stop, loading an active incomplete phase derives a non-durable `interrupted` pause until `resume` is called. An event that already committed remains authoritative even when the caller disconnects immediately afterwards.
 
-Sequential public phases append each accepted speech before starting the next actor, so resume continues at the first missing seat. Parallel private phases append no partial batch while children run; after all children settle, accepted or fallback decisions append in seat order. A crash before the batch commit may repeat model calls but cannot duplicate an accepted decision because `DecisionId` and context revision are checked on resume.
+Sequential public phases append each accepted speech before starting the next actor, so resume continues at the first missing seat. Parallel private phases append no partial batch while children run; after all children settle, one decision event commits accepted or fallback entries in seat order. A crash before that append may repeat model calls, while a crash after it replays the committed batch and proceeds to phase resolution; `DecisionId` and context revision checks prevent a second accepted decision.
 
-`game-paused` records typed reasons including `bot-failure`, `unsupported-definition`, `invariant-failure`, and `operator-request`. `resume` revalidates the recorded rule snapshot and current provider capabilities, then continues from the recorded phase. `quit` records a terminal `aborted` result and never deletes events or child Sessions.
+Every failed child attempt appends log-only `werewolf/bot-attempt-failed` with `DecisionId`, attempt number, retry epoch, child Session id, and exact failure category; it changes neither game revision nor bot context. Attempts are contiguous within one retry epoch. `game-paused` records typed reasons including `bot-failure`, `cancelled`, `unsupported-definition`, `invariant-failure`, and `operator-request`. `resume` appends `game-resumed`, increments the retry epoch, revalidates the rule snapshot, invariants, and provider capabilities, and continues the same phase and unfinished `DecisionId` values with a fresh configured retry budget. A process restart alone does not reset that budget. Unsupported-definition and invariant failures remain paused until revalidation succeeds. `abortGame` records a terminal `aborted` result and never deletes events or child Sessions.
 
 Child result failures resolve through the subagent result contract. Provider setup rejection, result rejection, timeout, invalid structured output, illegal action, invalid context delta, and disposal failure remain distinguishable diagnostics. User-visible text may group them as a trustee or paused bot, but logs and tests retain the exact category.
 
@@ -643,17 +729,18 @@ Independent stages may land as a deliberate PR stack, but every published branch
 
 ## Acceptance criteria
 
-- The lobby can select two registered rule sets with different decks, role options, phase sequences, tie policies, and victory conditions without changing engine code, and invalid references or cross-field invariants disable start before the first game event.
-- A test-only role and phase plugin can register a new mechanic, appear in a rule set, collect a legal action, resolve declarative effects, replay the result without invoking the plugin, and resume only while its recorded definition version is available.
+- The lobby can select two exact `{ id, revision }` rule-set pairs with different decks, role options, phase sequences, tie policies, and victory conditions without changing engine code. Role, phase, condition, and rule-set versions never select latest implicitly; invalid references or cross-field invariants disable start before the first game event.
+- A test-only role can join an existing exact phase version through a validated `phaseBindings` entry. A separate role and phase plugin can register a new mechanic, collect a legal action, resolve declarative effects and a non-classic faction result, replay without invoking the plugin, and resume only while every recorded definition version is available.
 - Every logical bot has an immutable profile and independent `BotContinuityContextV1`; decision `N` atomically records its action, delta, and computed context revision `N`, and decision `N + 1` receives that exact context while every sibling bot context is unchanged.
+- A parallel private phase commits all bot entries in one `werewolf/bot-decision` append. Tests cover all-bot and human-plus-bot phases, cancellation before the batch, restart after a human action, restart after the batch, and prove that no sibling private action enters another bot's observation.
 - Bot context contains no unrestricted reasoning transcript. Invalid context references, unknown fields, over-limit text, illegal commitment transitions, and mismatched recomputed snapshots reject the decision without changing game or context state.
 - Each bot prompt contains only authorized private knowledge, public state, legal actions, and its own context. Tests prove a villager cannot see role assignment, a seer sees only completed investigations, a wolf sees only entitled teammates, and no bot receives another bot's context.
 - Bot children use a provider that enforces structured output, persona, empty tool allowlist, and depth limit. Missing capability fails game start; bots cannot call game, Session, shell, file, Web, command, or subagent tools.
-- The classic `quick-7` composition can complete village win, wolf win, tie, human death with spectating, retry/fallback, pause/resume, quit, cancellation, process restart, and Session fork scenarios with deterministic rule outcomes.
-- Duplicate human requests, duplicate child results, late child results, stale game revisions, stale context revisions, invalid targets, dead actors, exhausted resources, and events after game end cannot produce a second state transition.
+- The classic `quick-7` composition can complete village win, wolf win, tie, human death with spectating, retry/fallback, pause/resume with a new retry epoch, abort-game, cancellation, process restart, and Session fork scenarios with deterministic rule outcomes.
+- Duplicate mutation keys with the same digest return a current projection without a second transition; key reuse with a different digest fails. Duplicate child results, late child results, stale game revisions, stale context revisions, invalid targets, dead actors, exhausted resources, and events after game end also cannot produce a second state transition.
 - Lobby, role reveal, night action, day discussion, vote, spectator, pause/resume, result, review, and new-game flows work entirely inside the dedicated `werewolf` view. The plugin registers no slash command, and Chat text cannot mutate game state.
 - View actions do not create a parent model request. Child model requests and outputs remain reconstructable from their child Session logs, and the parent Session retains every accepted domain decision.
-- Initial load, invalidation refresh, connection reset, process restart, and Session fork produce the same `WerewolfHumanViewV1` for the same committed events. The UI reveals only the human player's entitled private view and never folds raw secret events in the browser.
+- Initial load, invalidation refresh, connection reset, process restart, and Session fork produce the same `WerewolfHumanViewV1` for the same committed events. Paged `getReplay()` returns the same authorized historical frames with no backward secret leakage. The UI reveals only the human player's entitled private view and never folds raw secret events in the browser.
 - Desktop, intermediate, and 390-pixel snapshots cover deterministic seat layout, sticky phase status, side-panel or bottom-sheet action forms, covered role reveal, and result replay. Keyboard-only play, screen-reader phase announcements, reduced motion, focus restoration, non-color status cues, and WCAG AA contrast pass client tests.
 - The implementation includes focused package tests, invariant rejection cases, a scripted-provider integration, a keyless assembled product snapshot, client refresh, replay and accessibility tests, updated TypeScript and Python SDK expected outputs, bilingual package and subsystem documentation, generated artifacts, and applicable pre-push checks.
 

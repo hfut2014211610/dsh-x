@@ -11,7 +11,7 @@
 
 import { useEffect, useState } from 'react'
 import { Button, IconPlusOutline16, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-web-react'
+import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { en } from './locales.ts'
 import { routeNameFor } from './store.ts'
 import type { ModelHubState, ModelHubStore } from './store.ts'

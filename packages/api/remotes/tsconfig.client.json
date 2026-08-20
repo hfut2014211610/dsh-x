@@ -24,6 +24,12 @@
       "path": "../../credentials/credentials"
     },
     {
+      "path": "../../context/file-reference"
+    },
+    {
+      "path": "../../context/session-reference"
+    },
+    {
       "path": "../../extensions/cordis-host-runner"
     },
     {

@@ -1,4 +1,4 @@
-# Agent Note：可配置的单机狼人杀模式
+# Agent Note: 可配置的单机狼人杀模式
 
 Status: proposed
 
@@ -20,7 +20,7 @@ fresh one-shot 子代理适合隔离单次决策，并能返回结构化结果�
 
 规则是可信注册表之上的数据配置。规则集引用已注册的角色类型、阶段类型和胜利条件类型，并提供经过校验的选项。把一个已注册角色加入牌组只需修改配置。引入带新机制的角色需要插件注册该角色以及必要的新阶段实现；注册完成后，规则集无需修改核心引擎即可使用。配置中不得出现 JavaScript、选择器、回调或表达式语言。
 
-该功能扩展现有的 Session 事件、子代理、Typert remote 和 `conversation.view` 机制，不修改 `agent-loop`。Session 事件是持久事实，Web Client 独占游戏交互界面，fresh `spawn` 子代理提供 persona、工具过滤、深度限制和结构化输出；参见[架构图](../../../docs/architecture.md)、[子代理约定](../../../docs/subsystems/subagent.md)和 [Web Client 架构](../../../packages/client/README.md)。
+该功能扩展现有的 Session 事件、子代理、Typert remote 和 `conversation.view` 机制，不修改 `agent-loop`。Session 事件是持久事实，Web Client 独占游戏交互界面，fresh `spawn` 子代理提供 persona、工具过滤、深度限制和结构化输出；参见[架构图](../../../../docs/architecture.md)、[子代理约定](../../../../docs/subsystems/subagent.md)和 [Web Client 架构](../../../../packages/client/README.md)。
 
 ## 范围与非目标
 
@@ -67,16 +67,19 @@ interface WerewolfRuleSetInputV1 {
   playerCount: number
   deck: Array<{
     role: string
+    roleVersion: number
     count: number
     options?: JsonValue
   }>
   cycle: {
-    setup?: Array<{ phase: string; options?: JsonValue }>
-    night: Array<{ phase: string; options?: JsonValue }>
-    day: Array<{ phase: string; options?: JsonValue }>
+    setup?: Array<{ phase: string; phaseVersion: number; options?: JsonValue }>
+    night: Array<{ phase: string; phaseVersion: number; options?: JsonValue }>
+    day: Array<{ phase: string; phaseVersion: number; options?: JsonValue }>
   }
   victory: Array<{
     condition: string
+    conditionVersion: number
+    priority: number
     options?: JsonValue
   }>
   policies: {
@@ -89,15 +92,15 @@ interface WerewolfRuleSetInputV1 {
 }
 ```
 
-`schemaVersion` 对配置字段做版本化，`revision` 对同名规则集做版本化。`{ id, revision }` 组合注册后不可改变。配置解析器拒绝未知键、不安全整数、空牌组、非正数数量、阶段类型未声明为可重复却出现的重复阶段，以及封闭联合之外的策略值。
+`schemaVersion` 对配置字段做版本化，`revision` 对同名规则集做版本化。`{ id, revision }` 组合注册后不可改变。每个角色、阶段和胜利条件引用都指定准确的正整数定义版本，不存在隐式选择最新版本。配置解析器拒绝未知键、不安全整数、空牌组、非正数数量、阶段类型未声明为可重复却出现的重复阶段，以及封闭联合之外的策略值。
 
 编译后的规则集必须满足以下全部条件：
 
 - 牌组数量总和严格等于 `playerCount`；
-- 每个角色、阶段和胜利条件标识符都能解析到已注册定义；
+- 每个角色、阶段和胜利条件标识符及版本都能解析到已注册定义；
 - 每个选项值都通过所属定义的解析器；
 - 每个阶段要求至少能由牌组中的一个角色满足，除非该阶段明确允许始终跳过；
-- 至少配置一个胜利条件，同一配置优先级上的两个条件不能返回冲突获胜方；
+- 至少配置一个胜利条件，priority 是安全的非负整数，并拒绝 condition/version/priority 完全重复的 entry；
 - 每个公开标签和每个模型可见限制都受插件配置约束；以及
 - 规范化规则集是普通 JSON，并具有稳定的 SHA-256 摘要。
 
@@ -124,7 +127,16 @@ interface CompiledWerewolfRole {
   faction: string
   publicName: string
   initialRoleState: JsonValue
+  phaseBindings: WerewolfRolePhaseBinding[]
   projectPrivateKnowledge(input: RoleKnowledgeInput): JsonValue
+}
+
+interface WerewolfRolePhaseBinding {
+  phaseId: string
+  phaseVersion: number
+  required: boolean
+  kind: string
+  options: JsonValue
 }
 
 interface WerewolfPhaseDefinition {
@@ -132,9 +144,13 @@ interface WerewolfPhaseDefinition {
   version: number
   repeatable?: boolean
   parseOptions(value: JsonValue | undefined): JsonValue
+  parseRoleBinding(binding: WerewolfRolePhaseBinding): JsonValue
   compile(input: {
     options: JsonValue
-    roles: readonly CompiledWerewolfRole[]
+    participants: ReadonlyArray<{
+      role: CompiledWerewolfRole
+      binding: JsonValue
+    }>
   }): CompiledWerewolfPhase
 }
 
@@ -149,13 +165,33 @@ interface WerewolfVictoryConditionDefinition {
   id: string
   version: number
   parseOptions(value: JsonValue | undefined): JsonValue
-  evaluate(input: VictoryEvaluationInput): GameResult | null
+  evaluate(input: VictoryEvaluationInput): WerewolfVictoryClaimV1 | null
+}
+
+type WerewolfVictoryOutcomeV1 =
+  | { kind: 'faction'; factionId: string }
+  | { kind: 'tie' }
+
+interface WerewolfVictoryClaimV1 {
+  outcome: WerewolfVictoryOutcomeV1
+  evidence: JsonValue
+}
+
+interface WerewolfGameResultV1 {
+  outcome: WerewolfVictoryOutcomeV1 | { kind: 'aborted' }
+  evidence: Array<{
+    source: 'condition' | 'max-days' | 'human-abort'
+    conditionId?: string
+    conditionVersion?: number
+    priority?: number
+    data: JsonValue
+  }>
 }
 ```
 
-`PhaseOpenResult` 只能是 `skip` 或不可变动作计划。动作计划列出行动者、执行模式（`parallel-private` 或 `seat-order-public`）、Bot 动作 JSON Schema、可选真人表单字段、合法目标和可见性。`PhaseResolution` 包含声明式淘汰、保护记录、资源替换、角色状态替换、私密知识通知、公开公告和投票记录。核心按固定顺序应用这些记录，并拒绝指向未知游戏、玩家、阶段、动作或角色状态所有者的引用。
+`PhaseOpenResult` 只能是 `skip` 或不可变动作计划。动作计划列出行动者、执行模式（`parallel-private` 或 `seat-order-public`）、Bot 动作 JSON Schema、可选真人表单字段、合法目标和可见性。角色只能通过指定准确版本的 `phaseBindings` entry 加入已有阶段。规则编译器要求每个 `required` binding 都有匹配的阶段 occurrence，未使用的 optional binding 可以忽略。所属阶段在规则编译时解析每个匹配 binding，拒绝不支持的 `kind` 或选项，并在自身编译时只接收解析后的参与者记录；它绝不根据第三方角色 id 分支。`PhaseResolution` 包含声明式淘汰、保护记录、资源替换、角色状态替换、私密知识通知、公开公告和投票记录。核心按固定顺序应用这些记录，并拒绝指向未知游戏、玩家、阶段、动作或角色状态所有者的引用。
 
-仅改变牌组数量或已注册选项的新角色只需要规则集配置改动。参与已有阶段的新角色注册角色定义并使用该阶段支持的选项。具有新行动窗口的角色同时注册角色定义和阶段定义，再把该阶段加入配置周期。新的胜利机制注册胜利条件定义。以上扩展均不修改核心阶段循环。
+仅改变牌组数量或已注册选项的新角色只需要规则集配置改动。参与已有阶段的新角色注册角色定义，并让编译后的 `phaseBindings` 使用该准确阶段版本支持的 `kind` 和选项。具有新行动窗口的角色同时注册角色定义和阶段定义、把两者绑定，再把该阶段加入配置周期。新的胜利机制注册胜利条件定义。以上扩展均不修改核心阶段循环。
 
 ### 经典规则集
 
@@ -169,29 +205,43 @@ displayName: Quick 7-player game
 playerCount: 7
 deck:
   - role: wolf
+    roleVersion: 1
     count: 2
   - role: seer
+    roleVersion: 1
     count: 1
   - role: witch
+    roleVersion: 1
     count: 1
     options:
       antidoteUses: 1
       poisonUses: 1
       selfSave: first-night-only
   - role: villager
+    roleVersion: 1
     count: 3
 cycle:
   night:
     - phase: night.wolf-kill
+      phaseVersion: 1
     - phase: night.seer-inspect
+      phaseVersion: 1
     - phase: night.witch
+      phaseVersion: 1
   day:
     - phase: day.announce
+      phaseVersion: 1
     - phase: day.discussion
+      phaseVersion: 1
     - phase: day.vote
+      phaseVersion: 1
 victory:
   - condition: faction-elimination
+    conditionVersion: 1
+    priority: 10
   - condition: wolf-parity
+    conditionVersion: 1
+    priority: 10
 policies:
   voteTie: revote-once
   wolfTie: seeded-random
@@ -204,11 +254,13 @@ policies:
 
 一个 Session 同时最多只有一局活跃游戏。已结束或中止的游戏继续保留在日志中，之后再次开始会创建新的 `GameId`。fork Session 会在 fork 后的 Session 中创建另一条游戏时间线，不会加入或修改源 Session 的游戏。
 
-运行时串行处理一个活跃 Agent 上的所有状态变更操作。每个外部请求都携带幂等 id 和 `expectedGameRevision`。运行时先为重复 id 返回既有结果，否则拒绝过期修订，然后折叠当前状态、校验动作、追加事件，并自动推进，直到下一次真人操作、游戏结束、暂停或取消检查点。
+运行时串行处理一个活跃 Agent 上的所有状态变更操作。每个 mutation 都携带调用方生成的 UUID `requestId` 和 `expectedGameRevision`。持久幂等键是 `{ sessionId, method, requestId }`，提交事件还保存规范化 mutation payload 的摘要。`game-started`、`human-action`、`game-resumed` 和终止 `game-ended` 分别拥有 `start`、`submitAction`、`resume` 与 `abortGame` 的键。进程重启后，reducer 从这些事件重建键索引。相同键和摘要的重复请求不产生状态转换，并返回当前授权投影；相同键配不同摘要属于幂等冲突。新键携带过期 expected revision 时直接拒绝。其余请求折叠当前状态、校验、追加事件，并自动推进，直到下一次真人操作、游戏结束、暂停或取消检查点。
 
-每个周期按记录顺序遍历阶段列表。当没有符合条件的存活行动者，或角色资源使阶段不再生效时，阶段可以跳过。运行时在 setup 之后，以及每个可能改变存活玩家、阵营或胜利条件自有角色状态的阶段结算后，评估已配置胜利条件。只允许一个非 null 结果；冲突获胜方会以不变量失败暂停游戏。
+每个周期按记录顺序遍历阶段列表。当没有符合条件的存活行动者，或角色资源使阶段不再生效时，阶段可以跳过。运行时在 setup 之后，以及每个可能改变存活玩家、阵营或胜利条件自有角色状态的阶段结算后，评估已配置胜利条件。较小的数值 `priority` 优先：运行时选择第一个包含非 null claim 的最低优先级。outcome 等价性使用稳定 key `faction:<factionId>` 或 `tie`；相同 key 合并 evidence，该选中优先级上出现不同 key 时以不变量失败暂停；之后不再考虑更低优先级条件。动态冲突依赖实时状态，规则编译阶段不能拒绝。配置的 `maxDays` 完成且仍没有其他结果时，引擎在最后一个白天周期后产生带 `max-days` evidence 的 `{ kind: 'tie' }`。只有 `abortGame` 能产生 `{ kind: 'aborted' }`，胜利插件不能返回它。
 
-`parallel-private` 阶段从同一个源游戏修订创建全部相互独立的 Bot 请求，在配置的并发限制内等待它们结束，再按座位顺序追加已接受决策。同一阶段内，Bot 不会看到其他 Bot 的决策。`seat-order-public` 阶段逐个运行行动者，后续行动者的观察中包含之前的公开发言。需要真人操作时，自动推进暂停，并暴露由阶段定义生成的通用表单。
+`parallel-private` 阶段从同一个源游戏修订创建全部相互独立的 Bot 请求，在配置的并发限制内等待它们结束，再追加一个按座位排列 entries 的 `werewolf/bot-decision` 事件。同一阶段内，Bot 不会看到其他 Bot 的决策。`seat-order-public` 阶段逐个运行行动者并追加单 entry 决策事件，后续行动者的观察中包含之前的公开发言。需要真人操作时，自动推进暂停，并暴露由阶段定义生成的通用表单。
+
+真人与 Bot 共同参与同一个 `parallel-private` 阶段时，运行时先收集并提交隐藏的 `werewolf/human-action`，再从所得修订启动全部 Bot 请求。Bot 观察投影排除这条待结算真人动作，因此提交顺序不会泄露它。最终 `phase-resolved` 事件引用真人动作 id 和每个 Bot 的 `DecisionId`。在真人提交后重启时，只恢复缺失的 Bot 批次。
 
 ## 持久游戏事件
 
@@ -219,14 +271,18 @@ interface WerewolfSessionEventMap {
   'werewolf/game-started': WerewolfGameStarted
   'werewolf/phase-opened': WerewolfPhaseOpened
   'werewolf/human-action': WerewolfHumanAction
+  'werewolf/bot-attempt-failed': WerewolfBotAttemptFailed
   'werewolf/bot-decision': WerewolfBotDecision
   'werewolf/phase-resolved': WerewolfPhaseResolved
   'werewolf/game-paused': WerewolfGamePaused
+  'werewolf/game-resumed': WerewolfGameResumed
   'werewolf/game-ended': WerewolfGameEnded
 }
 ```
 
-每个 payload 都以 `{ version, gameId, gameRevision }` 开头。会改变状态的修订必须连续并逐次加一。阶段事件额外携带稳定的 `PhaseInstanceId`，动作事件携带稳定的 `DecisionId` 或 `HumanActionId`。`game-ended` 对该 `GameId` 是终止事件，`game-paused` 则保留可恢复阶段和类型化原因。
+每个 payload 都以 `{ version, gameId, gameRevision }` 开头。会改变状态的修订必须连续并逐次加一。阶段事件额外携带稳定的 `PhaseInstanceId`，每个 Bot 决策 entry 携带稳定的 `DecisionId`，每个真人动作事件携带稳定的 `HumanActionId`。`game-ended` 对该 `GameId` 是终止事件，`game-paused` 则保留可恢复阶段和类型化原因。
+
+`WerewolfBotDecision` 携带源游戏修订和一个或多个有序决策 entry。串行公开阶段追加一个 entry；并行私有阶段把全部已接受或托管 entry 放在同一个 Session 事件中追加。单次同步 `Session.append()` 就是原子批次边界，因此该设计不要求新增多事件事务 API。
 
 `werewolf/game-started` 包含洗牌后的玩家表、完整秘密角色分配、初始角色状态、真人玩家 id、不可变 Bot profile、随机种子状态、规范化规则集和定义版本。这样一个 Session 就足以完成回放与恢复。普通 UI 和 Bot 观察投影器会隐藏无权访问的字段，但能直接读取本地 Session 存储的用户仍可查看秘密；版本 1 不承诺对抗性防作弊。
 
@@ -302,7 +358,7 @@ Bot profile 根据游戏种子确定性分配，并在整局内不可变；模�
 
 判断更新只能引用当前玩家表中除行动者外的成员。优先目标必须属于当前玩家表，但在两次决策之间可以已经死亡；下一次 prompt 会标记过期目标，模型可以修改。commitment 结算只能引用活跃 commitment id。未知 id、重复更新、超长字符串、数组项过多以及 schema 外字段都会让决策结果被拒绝。
 
-每个已接受的 `werewolf/bot-decision` 都记录上一版上下文修订、已接受动作、可选公开发言、经校验的 delta 和完整计算结果 `contextAfter`。完整快照让每次决策成为独立上下文检查点，delta 则解释允许发生的变化。事件不变量根据前一个检查点和 delta 重新计算 `contextAfter`，并拒绝任何不一致。
+每个决策 entry 都记录上一版上下文修订、已接受动作、可选公开发言、经校验的 delta 和完整计算结果 `contextAfter`。完整快照让每次决策成为独立上下文检查点，delta 则解释允许发生的变化。事件不变量根据该行动者的前一个检查点和 delta 重新计算各自的 `contextAfter`，并拒绝任何不一致。
 
 ### 决策请求与响应
 
@@ -342,13 +398,13 @@ interface BotDecisionEnvelopeV1 {
 
 子代理 persona 固定座位身份、不可变 profile、游戏行为规则、信息隔离规则，以及只返回结构化结果且不输出隐藏推理的指令。公开发言作为不可信游戏数据引用。子代理接收 `toolFilter: { allow: [] }`、阻止继续派生子代理的绝对深度限制、已配置 provider/model/max tokens、当前阶段的对象根输出 schema，以及父操作的取消 signal。
 
-只有以下值仍全部匹配时，运行时才接受结果：`DecisionId`、`GameId`、阶段实例、源游戏修订、行动者和上一版上下文修订。它先校验阶段动作，再校验上下文 delta；非法动作不能更新上下文。校验结束后重新进入单局串行队列，再次检查修订、计算 `contextAfter`，最后追加一个事件。迟到或重复的子代理结果会被 dispose，不能修改日志。
+只有以下值仍全部匹配时，运行时才接受结果：`DecisionId`、`GameId`、阶段实例、源游戏修订、行动者和上一版上下文修订。它先校验阶段动作，再校验上下文 delta；非法动作不能更新上下文。串行阶段重新进入单局串行队列，再次检查、计算 `contextAfter` 并追加单 entry 事件。并行协调器只在内存中保存已校验的分离结果；全部行动者结束后只进入队列一次，重新检查源游戏修订和每个行动者的上下文修订，计算全部上下文，再追加一个有序批次事件。迟到或重复的子代理结果会被 dispose，不能修改日志。
 
 重试沿用同一个逻辑 `DecisionId`，增加 attempt 编号，并创建新的子 Session。失败尝试不会修改 Bot 上下文。重试 prompt 只包含简短校验诊断，不包含上一个子代理不受约束的输出。超过配置的重试次数后，`auto-action` 使用已记录的种子 PRNG 选择合法动作，并应用由引擎生成、注明托管动作的上下文 delta；`pause-game` 则追加 `werewolf/game-paused`。两种结果都是可见事实，不会静默降级。
 
 ## 真人交互与呈现
 
-该模式只通过 UI 操作。它不注册斜杠命令、不复用 Chat 输入框、不解析自然语言指令，也不提供命令兜底。游戏视图是唯一受支持的开始、行动、恢复和退出入口。Chat 可以继续作为 Session 的另一个 tab，但其中输入的文字永远不能改变狼人杀状态。
+该模式只通过 UI 操作。它不注册斜杠命令、不复用 Chat 输入框、不解析自然语言指令，也不提供命令兜底。游戏视图是唯一受支持的开始、行动、恢复和中止本局入口。Chat 可以继续作为 Session 的另一个 tab，但其中输入的文字永远不能改变狼人杀状态。
 
 ### 专用会话视图
 
@@ -363,11 +419,17 @@ interface WerewolfRemoteV1 {
   getView(input: {
     sessionId: SessionId
   }): Promise<WerewolfHumanViewV1>
+  getReplay(input: {
+    sessionId: SessionId
+    gameId: GameId
+    cursor?: string
+  }): Promise<WerewolfReplayPageV1>
   start(input: {
     sessionId: SessionId
     requestId: string
     expectedGameRevision: 0
     ruleSetId: string
+    ruleSetRevision: number
     humanSeatPreference?: number
   }): Promise<WerewolfHumanViewV1>
   submitAction(input: {
@@ -382,7 +444,7 @@ interface WerewolfRemoteV1 {
     requestId: string
     expectedGameRevision: number
   }): Promise<WerewolfHumanViewV1>
-  abort(input: {
+  abortGame(input: {
     sessionId: SessionId
     requestId: string
     expectedGameRevision: number
@@ -391,6 +453,8 @@ interface WerewolfRemoteV1 {
 ```
 
 该 namespace 转发轻量 `werewolf/view-invalidated` 事件，其中只包含 `sessionId`、`gameId` 和新修订。client 在首次读取前完成订阅，忽略其他 Session 的事件，并通过 `getView()` 刷新。连接重置也会触发刷新。失效事件不携带秘密游戏字段，因此授权逻辑始终集中在一个 Host 投影器中。
+
+每个 handler 都通过现有 Gateway 与 Session 访问策略解析 `sessionId`，并拒绝未知、不可用或非顶层 Session。请求从不接受 `playerId`：`werewolf/game-started` 绑定唯一 `humanPlayerId`，之后每个投影和动作都从活跃游戏派生该身份。版本 1 中，任何已经获准操作该 Session 的 loopback same-origin client 都代表这个唯一真人。绕过渲染视图直接调用 Typert 方法具有相同的本地权限，不会产生多人身份边界；在线玩法不在范围内。
 
 ### 真人授权投影
 
@@ -448,7 +512,10 @@ interface WerewolfHumanViewV1 {
       text: string
     }>
     result: null | {
-      outcome: 'village' | 'wolves' | 'tie' | 'aborted'
+      outcome:
+        | { kind: 'faction'; factionId: string; factionName: string }
+        | { kind: 'tie' }
+        | { kind: 'aborted' }
       title: string
       summary: string
       revealedRoles: Array<{ playerId: PlayerId; roleName: string }>
@@ -497,9 +564,27 @@ interface HumanActionFormV1 {
   allowPass: boolean
   fields: HumanActionFieldV1[]
 }
+
+type WerewolfReplayViewV1 = Omit<
+  NonNullable<WerewolfHumanViewV1['game']>,
+  'actionForm' | 'live'
+>
+
+interface WerewolfReplayPageV1 {
+  version: 1
+  gameId: GameId
+  frames: Array<{
+    revision: number
+    checkpoint: 'phase' | 'action' | 'resolution' | 'result'
+    view: WerewolfReplayViewV1
+  }>
+  nextCursor?: string
+}
 ```
 
 `live` 是瞬时展示状态，不影响回放；其余游戏字段都来自已提交事件。Host 未来可以提供新版 `WerewolfHumanViewV1`，但如果无法服务某个 client 版本，必须明确拒绝，不能只漏掉部分字段。
+
+`getReplay()` 只对已结束或中止游戏可用。它在 Host 上折叠已提交事件，并按配置上限返回完整授权检查点分页；不透明 cursor 只属于请求的 `GameId` 和上一页最后修订。历史帧按当时修订应用真人权限，因此之后公开的角色不会反向泄露到更早帧。结果帧包含已配置阵营结果和最终公开身份。浏览器不会收到 Bot 上下文、子代理 prompt 或原始事件 payload。
 
 阶段定义可暴露带版本的 `HumanActionFormV1`。封闭字段类型为 text、boolean、single-choice、multi-choice 和 player-target。每个字段都携带稳定 id、本地化 label key、是否必填、限制和选项；player-target 选项携带座位、展示名、存活状态和禁用原因。需要新展示类型的角色必须先增加类型化解析器、共享 renderer、键盘行为、屏幕阅读器语义和回放 fixture。规则配置不能提供 HTML、CSS、可执行回调或任意组件名。
 
@@ -507,7 +592,7 @@ interface HumanActionFormV1 {
 
 同一个视图拥有八个明确的产品状态：
 
-1. **大厅。** 展示规则集卡片、玩家与角色摘要、难度估计和主操作 `开始游戏`。选中规则集后，在开始前展示角色数量、阶段顺序、平票策略和真人死亡策略。无效或不可用规则集处于禁用状态，并显示 Host 校验原因。
+1. **大厅。** 展示以准确 `{ id, revision }` 规则集组合为 key 的卡片、玩家与角色摘要、难度估计和主操作 `开始游戏`。选中规则集后，在开始前展示角色数量、阶段顺序、平票策略和真人死亡策略。无效或不可用规则集处于禁用状态，并显示 Host 校验原因。
 2. **身份揭示。** 先通过明确的 `揭示身份` 交互，再展示真人角色、阵营、私有队友、能力和资源限制，随后提供 `我已了解`。这样新打开的屏幕或旁观者不会立即看到身份。减弱动画模式保留相同的两步交互，但不播放翻牌动画。
 3. **游戏桌。** 玩家座位围绕椭圆桌排列，阶段/天数标题位于上方，公开时间线在左，真人身份和资源在右，阶段操作区在下。座位以图标、文字和样式共同表达存活、死亡、发言中、已选择、已投票和公开身份状态，而不是只靠颜色。
 4. **夜间聚焦。** 压暗公开桌面装饰，但不隐藏座位标签。底部操作 sheet 说明当前能力、可选目标、即将消耗的资源和确认后的准确结果。只有在不会泄露信息时才显示其他 Bot 的 `思考中` 状态；UI 绝不指出隐藏的夜间行动者。
@@ -516,7 +601,7 @@ interface HumanActionFormV1 {
 7. **观战。** 真人按 `spectate` 策略死亡后，禁用所有私有动作，只保留死亡时已经有权知道的信息，继续实时显示公开时间线；未公开角色在结果事件之前始终标记为未知。
 8. **结算与回顾。** 展示全部角色、获胜方、关键事件以及真人的存活和投票摘要。提供 `复盘本局` 和 `再来一局` UI 操作。复盘模式按天和阶段浏览已提交的公开投影及真人有权查看的投影，绝不显示 Bot 连续性上下文、子代理 prompt 或原始秘密事件。
 
-开始、提交、恢复和退出都采用可安全确认的变更模式：请求期间禁用发起操作，保持最后确认投影可见，只使用修订号不更旧的响应替换它。过期修订响应触发一次刷新；当草稿或目标选择仍然合法时保留它。网络失败显示内联重试操作，不会乐观推进阶段。
+开始、提交、恢复和中止本局都采用可安全确认的变更模式：请求期间禁用发起操作，保持最后确认投影可见，只使用修订号不更旧的响应替换它。过期修订响应触发一次刷新；当草稿或目标选择仍然合法时保留它。网络失败显示内联重试操作，不会乐观推进阶段。
 
 ### 桌面与移动端布局
 
@@ -561,12 +646,13 @@ interface Config {
     model?: string
     maxTokens?: number
   }
-  defaultRuleSet: string
+  defaultRuleSet: { id: string; revision: number }
   ruleSets: WerewolfRuleSetInputV1[]
   maxConcurrentBots: number
   botDecisionTimeoutMs: number
   botRetryLimit: number
   botFailurePolicy: 'auto-action' | 'pause-game'
+  replayPageSize: number
   contextLimits: {
     memorySummaryChars: number
     beliefBasisChars: number
@@ -581,7 +667,7 @@ interface Config {
 }
 ```
 
-bundle 可以提供经过评审的默认值，但运行时只能读取解析后的 `Config`。省略 `botAgent` 时，通过现有子代理请求约定明确继承父代理的 provider 和 model。模型 temperature 及路由级调优继续由现有模型调优层负责，不在狼人杀中重复实现。
+bundle 可以提供经过评审的默认值，但运行时只能读取解析后的 `Config`。`defaultRuleSet` 必须在插件加载时解析到准确的已注册组合。省略 `botAgent` 时，通过现有子代理请求约定明确继承父代理的 provider 和 model。模型 temperature 及路由级调优继续由现有模型调优层负责，不在狼人杀中重复实现。
 
 规则集 `policies` 控制游戏行为，顶层 `Config` 控制部署资源、失败处理和经过评审的 UI 默认值。因此，一份规则集在记录的策略快照下能一致回放；运维方也能调整后续游戏的并发、超时、模型路由、重试、上下文大小和呈现默认值，而无需虚构新的玩法变体。每个用户的呈现偏好只覆盖 `ui` 默认值，永远不进入游戏事件。
 
@@ -589,11 +675,11 @@ bundle 可以提供经过评审的默认值，但运行时只能读取解析后�
 
 游戏开始前校验所选规则集、引用定义、provider 能力、上下文限制、父 Agent，以及当前没有另一局活跃游戏；只有全部通过后才能追加狼人杀事件。失败不会留下半局游戏。
 
-每个外部操作和自动阶段推进在事件提交前都遵守同一个调用方 signal。取消会中止活跃子代理调用、dispose 所有已发布 run，并让最后提交的阶段保持可恢复。即使调用方在事件提交后立即断开连接，已提交事件仍是权威事实。
+每个外部操作和自动阶段推进在事件提交前都遵守同一个调用方 signal。取消会中止活跃子代理调用并 dispose 所有已发布 run。如果进程仍存活且已开启阶段尚未完成，运行时追加原因是 `cancelled` 的 `game-paused`；进程非正常停止后，加载活跃未完成阶段会派生非持久的 `interrupted` 暂停状态，直到调用 `resume`。即使调用方在事件提交后立即断开连接，已提交事件仍是权威事实。
 
-串行公开阶段在启动下一个行动者之前先追加每条已接受发言，因此恢复会从第一个缺失座位继续。并行私有阶段在子代理运行时不追加部分批次；全部结束后，按座位顺序追加已接受决策或兜底决策。批次提交前崩溃可能重复模型调用，但恢复时会检查 `DecisionId` 和上下文修订，因此不会重复已接受决策。
+串行公开阶段在启动下一个行动者之前先追加每条已接受发言，因此恢复会从第一个缺失座位继续。并行私有阶段在子代理运行时不追加部分批次；全部结束后，一个决策事件按座位顺序提交已接受或兜底 entry。该 append 之前崩溃可能重复模型调用，之后崩溃则会回放已提交批次并继续阶段结算；`DecisionId` 和上下文修订检查会阻止第二次接受决策。
 
-`game-paused` 记录 `bot-failure`、`unsupported-definition`、`invariant-failure`、`operator-request` 等类型化原因。`resume` 重新校验已记录规则快照和当前 provider 能力，再从已记录阶段继续。`quit` 记录终止性的 `aborted` 结果，不删除事件或子 Session。
+每次子代理失败都会追加 log-only `werewolf/bot-attempt-failed`，其中包含 `DecisionId`、attempt 编号、retry epoch、子 Session id 和准确失败类别；它既不改变游戏修订，也不改变 Bot 上下文。同一个 retry epoch 内的 attempt 必须连续。`game-paused` 记录 `bot-failure`、`cancelled`、`unsupported-definition`、`invariant-failure`、`operator-request` 等类型化原因。`resume` 追加 `game-resumed`、递增 retry epoch、重新校验规则快照、不变量和 provider 能力，并在新的配置重试预算下继续相同阶段及未完成的 `DecisionId`。仅进程重启不会重置预算。unsupported-definition 和 invariant failure 在重新校验成功前保持暂停。`abortGame` 记录终止性的 `aborted` 结果，不删除事件或子 Session。
 
 子代理结果失败遵循 subagent result contract。provider 初始化拒绝、结果拒绝、超时、无效结构化输出、非法动作、无效上下文 delta 和 dispose 失败必须保留为可区分诊断。面向用户的文字可以把它们归纳为 Bot 托管或暂停，但日志与测试要保留准确类别。
 
@@ -643,17 +729,18 @@ Bot 连续性上下文属于私有策略数据，UI 不得渲染。它可以包�
 
 ## 验收标准
 
-- 大厅能够选择两份牌组、角色选项、阶段顺序、平票策略和胜利条件不同的已注册规则集，无需修改引擎代码；无效引用或跨字段不变量会在首个游戏事件前禁用开始操作。
-- 测试角色与阶段插件能够注册新机制、出现在规则集中、收集合法动作、结算声明式效果，并在不调用插件的情况下回放结果；只有记录的定义版本仍可用时才能恢复。
+- 大厅能够选择两份牌组、角色选项、阶段顺序、平票策略和胜利条件不同的准确 `{ id, revision }` 规则集组合，无需修改引擎代码。角色、阶段、条件和规则集版本都不能隐式选择最新版本；无效引用或跨字段不变量会在首个游戏事件前禁用开始操作。
+- 测试角色能够通过已校验 `phaseBindings` entry 加入准确的已有阶段版本。另一组测试角色与阶段插件能够注册新机制、收集合法动作、结算声明式效果和非经典阵营结果，并在不调用插件的情况下回放；只有全部已记录定义版本仍可用时才能恢复。
 - 每个逻辑 Bot 都有不可变 profile 和独立 `BotContinuityContextV1`；决策 `N` 原子记录动作、delta 和计算得到的上下文修订 `N`，决策 `N + 1` 收到这份准确上下文，同时其他 Bot 上下文保持不变。
+- 并行私有阶段通过一次 `werewolf/bot-decision` append 提交全部 Bot entry。测试覆盖纯 Bot、真人加 Bot、批次前取消、真人动作后重启和批次后重启，并证明任何同级私有动作都不会进入另一个 Bot 的观察。
 - Bot 上下文不包含不受限制的推理记录。无效上下文引用、未知字段、超限文本、非法 commitment 转换和重新计算不匹配都会拒绝决策，且不改变游戏或上下文状态。
 - 每个 Bot prompt 只包含有权获知的私有信息、公开状态、合法动作及自身上下文。测试证明平民看不到角色分配，预言家只能看到已完成查验，狼人只能看到有权获知的队友，任何 Bot 都不能收到其他 Bot 的上下文。
 - Bot 子代理使用能够执行结构化输出、persona、空工具 allowlist 和深度限制的 provider。缺少能力时游戏开始失败；Bot 不能调用游戏、Session、shell、文件、Web、命令或子代理工具。
-- 经典 `quick-7` composition 能确定性完成好人胜、狼人胜、平局、真人死亡后观战、重试/兜底、暂停/恢复、退出、取消、进程重启和 Session fork 场景。
-- 重复真人请求、重复子代理结果、迟到子代理结果、过期游戏修订、过期上下文修订、无效目标、死亡行动者、耗尽资源和游戏结束后事件都不能产生第二次状态转换。
+- 经典 `quick-7` composition 能确定性完成好人胜、狼人胜、平局、真人死亡后观战、重试/兜底、使用新 retry epoch 暂停/恢复、中止本局、取消、进程重启和 Session fork 场景。
+- 摘要相同的重复 mutation key 返回当前投影，不产生第二次转换；同一 key 配不同摘要时失败。重复子代理结果、迟到子代理结果、过期游戏修订、过期上下文修订、无效目标、死亡行动者、耗尽资源和游戏结束后事件也不能产生第二次状态转换。
 - 大厅、身份揭示、夜间行动、白天讨论、投票、观战、暂停/恢复、结算、回顾和新游戏流程都完全在专用 `werewolf` 视图中完成。插件不注册斜杠命令，Chat 文本不能改变游戏状态。
 - 视图操作不会创建父模型请求。子模型请求与输出可从各子 Session 日志重建，父 Session 保存每个已接受的领域决策。
-- 首次加载、失效刷新、连接重置、进程重启和 Session fork 对同一组已提交事件生成相同的 `WerewolfHumanViewV1`。UI 只揭示真人有权查看的私有视图，浏览器绝不折叠原始秘密事件。
+- 首次加载、失效刷新、连接重置、进程重启和 Session fork 对同一组已提交事件生成相同的 `WerewolfHumanViewV1`。分页 `getReplay()` 返回相同授权历史帧，不会向前反向泄密。UI 只揭示真人有权查看的私有视图，浏览器绝不折叠原始秘密事件。
 - 桌面、中间宽度和 390 像素快照覆盖确定性座位布局、粘性阶段状态、侧栏或 bottom-sheet 动作表单、遮盖式身份揭示和结算回顾。纯键盘游玩、屏幕阅读器阶段播报、减弱动画、焦点恢复、非颜色状态提示和 WCAG AA 对比度通过 client 测试。
 - 实现包含聚焦包测试、不变量拒绝用例、脚本化 provider 集成、无密钥组装产品快照、client 刷新/回放/可访问性测试、更新后的 TypeScript 与 Python SDK 预期输出、双语包与子系统文档、生成产物和适用 pre-push 检查。
 

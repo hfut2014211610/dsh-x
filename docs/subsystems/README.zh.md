@@ -38,6 +38,7 @@
 | [skills.md](skills.md) | skill（技能）服务：发现优先级、`SkillSummary`/`SkillDefinition`、会话前缀目录、面向模型的 `skill` 加载 |
 | [compaction.md](compaction.md) | 压缩（compaction）seam：`compaction/*` 会话事件、`CompactionResult`、`CompactionEngine` 接口 |
 | [subagent.md](subagent.md) | subagent seam：命名提供方注册表、`SubagentStartRequest`/`Result`/`Run`、启动时与运行时能力拆分 |
+| [agent-team.md](agent-team.md) | Agent Teams：隐式 Lead 身份、具名 continuable teammate、持久 peer mailbox 与共享任务 DAG |
 | [web.md](web.md) | Web 访问 seam：`WebSearchRequest`/`Result`、`WebFetchRequest`/`Result`、`WebFetchBody`、提供方可用性、`WebError` |
 | [writing.md](writing.md) | 写作模式：文档能力词汇、`ctx.documents`、`documents/changed` 与 `writing` preset 表面 |
 | [spill.md](spill.md) | spill 存储 seam：`SaveTextSpill`、`SpillOwner`/`SpillSource`、`SpillRef`、品牌类型 `SpillLocator` |

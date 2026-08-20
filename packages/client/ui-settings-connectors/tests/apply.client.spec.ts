@@ -5,20 +5,24 @@ import { describe, expect, it, vi } from 'vitest'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import { TestRemote, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
-import { SettingsScopeBinder } from '@deepseek-ai/dsh-client-ui-settings/client'
+import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
+import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
+import { SettingsSchemaService } from '@deepseek-ai/dsh-client-ui-settings/src/client/schema.ts'
+import { SettingsScopeBinder } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-scope.ts'
+import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { apply, inject } from '../src/client/index.ts'
 import type { ConnectorsSectionInjected } from '../src/client/ConnectorsSection.tsx'
 import type { FeishuCardFace } from '../src/client/feishu-card-controller.ts'
 
-// The service reads its initial locale from the browser; these specs assert
-// the shipped Chinese copy, so they state the browser they assume.
-usePinnedBrowserLanguages('zh-CN')
-
 async function bench() {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
-  ctx.provide('locale', new LocaleRuntime(ctx))
+  // These specs assert the shipped Chinese copy. There is no jsdom `window`
+  // in this lane, so browser-language detection never runs and the locale
+  // comes from FALLBACK_LOCALE (en): state the asserted locale explicitly.
+  const locale = new LocaleRuntime(ctx)
+  locale.setLocale('zh')
+  ctx.provide('locale', locale)
   const describeSettings = vi.fn(() => Promise.resolve({ rpcId: 's', result: { ok: false, error: {} } }))
   // The card binds its scope through the Settings surface's service, and
   // forwarded host events reach it through the same `$dispatch` handoff the
@@ -31,7 +35,13 @@ async function bench() {
     api: { settings: { describe: describeSettings } },
     rpc: { call: rpcCall },
   } as never)
-  await ctx.plugin(SettingsScopeBinder).await()
+  // The Settings surface constructs its scope service in its own fiber; the
+  // same construction here gives the card the `settingsScope` service.
+  const connection = ctx.get('connection') as { api: Pick<IApiClient, 'settings'>; isLoopback: boolean }
+  new SettingsScopeBinder(ctx, {
+    mirror: new SettingsDescribeMirror(connection.api, connection.isLoopback ? 'host' : 'memory'),
+    schema: new SettingsSchemaService(ctx),
+  })
   // The card's switch reads the plugin tree and writes it; both namespaces are
   // separate services, so a fiber that declares them waits for both.
   const listPlugins = vi.fn(() => Promise.resolve({ ok: true, value: { entries: [] } }))

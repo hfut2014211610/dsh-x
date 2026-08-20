@@ -8,13 +8,10 @@ import { describe, expect, it, vi } from 'vitest'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import { TestRemote, usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
+import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject } from '../src/client/index.ts'
 import type { UedViewInjected } from '../src/client/UedView.tsx'
 
-// The service reads its initial locale from the browser; these specs assert
-// the shipped Chinese copy, so they state the browser they assume.
-usePinnedBrowserLanguages('zh-CN')
 
 type PreferredView = (sessionId: string) => string | null
 type CompanionView = (sessionId: string, activeViewId: string) => { id: string; label: string } | null
@@ -22,7 +19,12 @@ type CompanionView = (sessionId: string, activeViewId: string) => { id: string; 
 async function bench(sessions: Record<string, { agentPreset?: string }> = {}) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
-  ctx.provide('locale', new LocaleRuntime(ctx))
+  // These specs assert the shipped Chinese copy. There is no jsdom `window`
+  // in this lane, so browser-language detection never runs and the locale
+  // comes from FALLBACK_LOCALE (en): state the asserted locale explicitly.
+  const locale = new LocaleRuntime(ctx)
+  locale.setLocale('zh')
+  ctx.provide('locale', locale)
   ctx.provide('sessions', { list: { getSnapshot: () => ({ byId: sessions }) } } as never)
   const remote = new TestRemote(ctx)
   const list = vi.fn(() => Promise.resolve({ ok: true, value: { entries: [] } }))

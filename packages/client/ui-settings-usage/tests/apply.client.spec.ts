@@ -4,18 +4,17 @@ import { describe, expect, it } from 'vitest'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
-import { usePinnedBrowserLanguages } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject, refreshIfLoaded } from '@deepseek-ai/dsh-client-ui-settings-usage/client'
 import { UsageSection } from '../src/client/UsageSection.tsx'
-
-// The service reads its initial locale from the browser; these specs assert
-// the shipped Chinese copy, so they state the browser they assume.
-usePinnedBrowserLanguages('zh-CN')
 
 async function bench(): Promise<{ ctx: Context; slots: SlotRegistry; locale: LocaleRuntime }> {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   const locale = new LocaleRuntime(ctx)
+  // These specs assert the shipped Chinese copy. There is no jsdom `window`
+  // in this lane, so browser-language detection never runs and the locale
+  // comes from FALLBACK_LOCALE (en): state the asserted locale explicitly.
+  locale.setLocale('zh')
   ctx.provide('locale', locale)
   // The apply path only captures the wire face; no call leaves this fake
   // until the section actually loads.

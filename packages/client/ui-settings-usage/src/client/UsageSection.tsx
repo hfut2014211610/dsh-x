@@ -12,7 +12,7 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import { Button, IconRefreshOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-web-react'
+import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageSettingsState, UsageSettingsStore } from './store.ts'
 import type { DayUsage, ModelUsageRow, UsageRange } from './view-model.ts'
 import {
