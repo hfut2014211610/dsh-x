@@ -2,7 +2,7 @@
 
 本 fork 已完成需求与待安排设计的单一视图。每项指向 [`notes/`](README.md#目录结构) 下的设计笔记；笔记是决策与验收标准的权威来源，本文只做索引与状态。
 
-最后整理：2026-08-19。
+最后整理：2026-08-20。
 
 ## 已完成
 
@@ -13,6 +13,7 @@
 | **实机反馈修复轮** — 启动不再冻结主进程（同步 spawn 移出绘制线程、安装版优先自带运行时）、加载页重做（跟随系统主题、分阶段进度、日志默认收起）、伴随栏拖宽驱动共享属性使 composer 同步、伴随栏横向溢出归零、产物自动在预览/编辑器中打开、每种格式都有阅读视图 | `apps/desktop/`、`packages/client/ui-{conversation,writing,ued}/` | [笔记](notes/implemented/2026-08-19-desktop-and-workspace-feedback-round.md) |
 | **桌面生命周期归属与应用内升级** — 安装版不再附着外部实例、退出即关停；跨启动回收孤儿运行时（pid + origin 双证据）；退出与「活着但不应答」按同一故障处理，滚动窗口重启预算；自建升级链路（GitHub API 发现、tag 任意位置读版本、sha512 校验、退出时装） | `apps/desktop/` | [笔记](notes/implemented/2026-08-19-desktop-lifecycle-and-updates.md) |
 | **写作模式** — `documents` 能力族、文档工具、`writing` preset、浏览器写作 UI | `packages/writing/{documents,documents-local,tool-documents,writing-mode}`、`packages/client/ui-writing/`、`apps/cli/config/agent-presets/writing/` | [笔记](notes/proposed/2026-08-17-writing-mode.md) ⚠️ 状态待订正 |
+| **写作视图 2026-08-20 一轮** — 打开即是文档而不是文件浏览器（工具栏默认折起，目录列举也随之不再预取）；多标签，切走的那份连未保存草稿一起留着，切回来不重读文件；预览里点一块就地改它的源文 | `packages/client/ui-writing/`、`packages/client/ui-primitives/`（一处默认关闭的上游开关） | [笔记](notes/implemented/2026-08-20-markdown-source-positions.md) |
 | **用量统计** — 每请求模型 token 用量折叠为会话投影、`/usage` 报告命令、设置页模型用量面板 | 跨 `packages/`，Web 设置面 | [笔记](notes/implemented/2026-08-14-usage-stats-session-projection-and-command.md) |
 | **anchored-standard 预设** — 请求 #1 锚定 Minimal 双工具零注入条件，首次durable 回复或工具调用后提升为按需解锁的常驻工具集；相位由 durable 会话事件推导，压缩边界重入受控相位 | `apps/cli/config/agent-presets/anchored-standard/` | [笔记](notes/implemented/2026-08-17-anchored-standard-preset.md) |
 | **锚定条件测量工装与近距离引导行** — 相位契约检查、按观测条件分组的全量会话对比、受控 2×2 付费重放；`session-guide` 行默认关闭 | `personal/probe/`、`apps/cli/config/agent-presets/anchored-standard/session-guide.mjs` | [笔记](notes/implemented/2026-08-18-anchor-probe-and-session-guide.md) |
