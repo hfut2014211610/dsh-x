@@ -385,15 +385,6 @@ describe('web e2e: agent-preset selection', () => {
     await page.keyboard.press('Escape')
     await expect.poll(async () => blockEditor.count()).toBe(0)
 
-    await page.getByRole('button', { name: 'Edit', exact: true }).click()
-    const editor = page.getByRole('textbox', { name: 'Document editor' })
-    await page.getByRole('button', { name: /Final target/ }).click()
-    await expect.poll(() => editor.evaluate(element => element.scrollTop)).toBeGreaterThan(0)
-    expect(await editor.evaluate((element) => {
-      if (!(element instanceof HTMLTextAreaElement)) throw new Error('Document editor is not a textarea')
-      return element.value.slice(element.selectionStart, element.selectionEnd)
-    })).toBe('Final target')
-
     // Two documents open at once. The strip is the only thing on screen that
     // says the first one is still there, and going back to it has to be a
     // switch rather than a re-read — a re-read is what used to lose the draft.
@@ -408,10 +399,9 @@ describe('web e2e: agent-preset selection', () => {
     await strip.getByRole('tab', { name: OUTLINE_DOCUMENT }).click()
     await expect.poll(async () => strip.getByRole('tab', { name: OUTLINE_DOCUMENT }).getAttribute('aria-selected'))
       .toBe('true')
-    await expect.poll(async () => editor.evaluate((element) => {
-      if (!(element instanceof HTMLTextAreaElement)) throw new Error('Document editor is not a textarea')
-      return element.value.includes('Final target')
-    })).toBe(true)
+    // The tab comes back to the reading view, and the draft it holds — not a
+    // fresh file read — is what renders.
+    await expect.poll(async () => preview.textContent()).toContain('Final target')
 
     // The assistant column starts at whatever the CSS default resolves to for
     // this viewport and the separator owns it from there. Only a real browser

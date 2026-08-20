@@ -72,7 +72,6 @@ function hasReadingView(format: DocumentFormat): boolean {
 }
 
 type Panel = 'document' | 'outline' | 'search'
-type ViewMode = 'edit' | 'preview'
 type SaveStatus = 'idle' | 'loading' | 'dirty' | 'saving' | 'saved' | 'external' | 'conflict' | 'error'
 type DirectoryState = {
   readonly status: 'loading' | 'ready' | 'error'
@@ -284,15 +283,14 @@ function documentName(path: string, untitled: string): string {
  *
  * The active document lives in the component's own state — this is the copy
  * taken when someone switches away, so switching back gives them what they
- * left rather than what the file says now: an unsaved draft, the reading
- * position implied by the view mode, and the version the edits are against.
+ * left rather than what the file says now: an unsaved draft and the version
+ * the edits are against.
  */
 interface ParkedDocument {
   draft: string
   savedContent: string
   version: string
   format: DocumentFormat
-  viewMode: ViewMode
   status: SaveStatus
   entries: readonly DocumentOutlineEntry[]
 }
@@ -457,7 +455,6 @@ export function WritingView({
   const [directories, setDirectories] = useState<ReadonlyMap<string, DirectoryState>>(() => new Map())
   const [expandedDirectories, setExpandedDirectories] = useState<ReadonlySet<string>>(() => new Set(['']))
   const [format, setFormat] = useState<DocumentFormat>('text')
-  const [viewMode, setViewMode] = useState<ViewMode>('edit')
   // The tab strip's order, oldest first. The buffers behind the inactive ones
   // are a ref rather than state: they change on every switch and nothing in
   // the tree renders from them except the unsaved dot, which the strip reads
@@ -471,7 +468,6 @@ export function WritingView({
   const markdown = format === 'markdown'
   const editorRef = useRef<HTMLTextAreaElement>(null)
   const previewRef = useRef<HTMLElement>(null)
-  const pendingSelectionRef = useRef<{ start: number; end: number } | null>(null)
   const currentPathRef = useRef(currentPath)
   const draftRef = useRef(draft)
   const savedContentRef = useRef(savedContent)
@@ -502,9 +498,9 @@ export function WritingView({
   // captured state would change identity every render, and `loadDocument`
   // depends on it — which would re-subscribe the change listener each time.
   const activeRef = useRef<ParkedDocument>({
-    draft, savedContent, version, format, viewMode, status, entries,
+    draft, savedContent, version, format, status, entries,
   })
-  activeRef.current = { draft, savedContent, version, format, viewMode, status, entries }
+  activeRef.current = { draft, savedContent, version, format, status, entries }
 
   /** Hold the active document's buffer under its path, if there is one. */
   const park = useCallback(() => {
@@ -521,7 +517,6 @@ export function WritingView({
     setSavedContent(held.savedContent)
     setVersion(held.version)
     setFormat(held.format)
-    setViewMode(held.viewMode)
     setStatus(held.status)
     setEntries(held.entries)
   }, [])
@@ -582,11 +577,6 @@ export function WritingView({
     setSavedContent(result.content)
     setVersion(result.version)
     setFormat(result.format)
-    // Opening a document is a reading act far more often than an editing one,
-    // so every format that HAS a reading view opens in it. The exception is a
-    // format with nothing better to show than its own source, which is what an
-    // editor already is.
-    if (normalizedPath !== currentPathRef.current) setViewMode(hasReadingView(result.format) ? 'preview' : 'edit')
     setEntries(await outline(normalizedPath))
     setStatus(source === 'external' ? 'external' : 'saved')
     if (source === 'manual') setPanel(null)
@@ -638,14 +628,6 @@ export function WritingView({
     void loadDocument(change.path, 'external')
   }), [loadDocument, subscribeChanged])
 
-  useEffect(() => {
-    if (viewMode !== 'edit' || pendingSelectionRef.current === null) return
-    const selection = pendingSelectionRef.current
-    pendingSelectionRef.current = null
-    const editor = editorRef.current
-    if (editor !== null) focusEditorSelection(editor, selection)
-  }, [viewMode])
-
   const handleSave = async () => {
     if (currentPath === '' || status === 'saving') return
     setError(null)
@@ -682,22 +664,18 @@ export function WritingView({
   }
 
   const jumpToOutline = (entry: DocumentOutlineEntry) => {
-    if (markdown && viewMode === 'preview' && entry.kind === 'heading') {
+    if (markdown && entry.kind === 'heading') {
       const index = markdownHeadingIndex(draft, entry)
       const heading = index === null ? undefined : previewRef.current?.querySelectorAll<HTMLElement>('h1, h2, h3, h4, h5, h6')[index]
       if (heading !== undefined && previewRef.current !== null) revealPreviewHeading(previewRef.current, heading)
       return
     }
+    // Only the text format shows the whole-source editor; other formats edit
+    // through the reading view, where an outline entry has no source seat.
     const selection = selectionForOutline(draft, entry)
     if (selection === null) return
-    pendingSelectionRef.current = selection
-    if (viewMode === 'edit') {
-      pendingSelectionRef.current = null
-      const editor = editorRef.current
-      if (editor !== null) focusEditorSelection(editor, selection)
-      return
-    }
-    setViewMode('edit')
+    const editor = editorRef.current
+    if (editor !== null) focusEditorSelection(editor, selection)
   }
 
   /**
@@ -722,7 +700,6 @@ export function WritingView({
       setSavedContent('')
       setVersion('')
       setFormat('text')
-      setViewMode('edit')
       setEntries([])
       setStatus('idle')
       setError(null)
@@ -749,7 +726,7 @@ export function WritingView({
    * in another block keeps resolving while one block is being edited.
    */
   const openBlockEditor = (event: MouseEvent<HTMLElement>) => {
-    if (!markdown || blockEdit !== null) return
+    if ((format !== 'markdown' && format !== 'code') || blockEdit !== null) return
     const article = previewRef.current
     const block = (event.target as HTMLElement | null)?.closest<HTMLElement>('[data-md-start]')
     if (article === null || block === null || block === undefined) return
@@ -766,14 +743,18 @@ export function WritingView({
     const box = block.offsetWidth === 0 && block.offsetHeight === 0
       ? block.firstElementChild instanceof HTMLElement ? block.firstElementChild : block
       : block
+    // The whole-file mark sits on the article itself, and the article's own
+    // box is the scroll clip; the editor has to cover everything that scrolls,
+    // or the tail of a long file would stay readable underneath the overlay.
+    const height = box === article ? article.scrollHeight : box.offsetHeight
     setBlockEdit({
       start,
       end,
       text: draft.slice(start, end),
       top: box.offsetTop,
       left: box.offsetLeft,
-      width: box.offsetWidth,
-      height: box.offsetHeight,
+      width: box === article ? article.scrollWidth : box.offsetWidth,
+      height,
     })
   }
 
@@ -977,24 +958,6 @@ export function WritingView({
             <strong title={currentPath || undefined}>{title}</strong>
           </div>
           <div className={css.editorActions}>
-            {hasReadingView(format) && (
-              <div className={css.modeSwitch} role="group" aria-label={t('mode.label')}>
-                <button
-                  type="button"
-                  aria-pressed={viewMode === 'edit'}
-                  onClick={() => { setViewMode('edit') }}
-                >
-                  {t('mode.edit')}
-                </button>
-                <button
-                  type="button"
-                  aria-pressed={viewMode === 'preview'}
-                  onClick={() => { setViewMode('preview') }}
-                >
-                  {t('mode.preview')}
-                </button>
-              </div>
-            )}
             <span className={css.status} data-status={status} title={version || undefined}>
               {status === 'conflict' || status === 'error'
                 ? <IconWarningOutline16 />
@@ -1082,13 +1045,18 @@ export function WritingView({
         )}
 
         <div className={css.paper}>
-          {hasReadingView(format) && viewMode === 'preview'
+          {hasReadingView(format)
             ? (
               <article
                 ref={previewRef}
                 className={format === 'code' ? css.codeReader : css.preview}
                 aria-label={t('preview.label')}
                 onClick={openBlockEditor}
+                // The code reader carries no per-block marks, so the whole file
+                // is one editable block: a click anywhere opens the source over
+                // the reader. Markdown blocks carry their own marks instead.
+                data-md-start={format === 'code' ? 0 : undefined}
+                data-md-end={format === 'code' ? draft.length : undefined}
               >
                 {format === 'markdown' && <MarkdownText text={draft} sourcePositions />}
                 {blockEdit !== null && (

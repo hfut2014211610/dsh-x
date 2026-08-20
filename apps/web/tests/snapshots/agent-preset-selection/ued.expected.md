@@ -29,6 +29,8 @@
       - button "Desktop"
       - button "Tablet"
       - button "Phone"
+    - button "Annotate an element":
+      - img
     - button "Reload":
       - img
     - iframe

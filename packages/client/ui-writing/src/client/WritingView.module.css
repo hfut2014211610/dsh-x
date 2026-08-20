@@ -465,39 +465,6 @@
   gap: 5px;
 }
 
-.modeSwitch {
-  display: inline-flex;
-  align-items: center;
-  height: 30px;
-  margin-right: 5px;
-  padding: 2px;
-  border: 1px solid var(--dsw-alias-border-l2);
-  border-radius: 8px;
-  background: var(--dsw-alias-bg-module-platform);
-}
-
-.modeSwitch button {
-  height: 26px;
-  padding: 0 10px;
-  border: 0;
-  border-radius: 6px;
-  color: var(--dsw-alias-label-tertiary);
-  background: transparent;
-  font: inherit;
-  font-size: 12px;
-  cursor: pointer;
-}
-
-.modeSwitch button:hover,
-.modeSwitch button[aria-pressed='true'] {
-  color: var(--dsw-alias-label-primary);
-  background: var(--dsw-alias-interactive-bg-hover-solid);
-}
-
-.modeSwitch button[aria-pressed='true'] {
-  color: var(--dsw-alias-state-business-primary);
-}
-
 .status {
   gap: 5px;
   margin-right: 4px;
@@ -678,8 +645,12 @@
 /* The block editor sits over the block it edits, inside the scrolling article
    rather than the viewport, so it travels with the document. The page stays
    rendered underneath and parsed once — a reference defined in another block
-   keeps resolving while this one is open. */
-.blockEditor {
+   keeps resolving while this one is open. The selector carries the reading
+   view's class on purpose: `.paper textarea` sets a transparent editor
+   background at lower cost than this rule, and a lone class would lose that
+   cascade to it. */
+.preview textarea.blockEditor,
+.codeReader textarea.blockEditor {
   position: absolute;
   z-index: 1;
   box-sizing: border-box;

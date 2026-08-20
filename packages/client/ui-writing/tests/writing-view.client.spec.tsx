@@ -300,10 +300,13 @@ describe('WritingView', () => {
   it('keeps the first document open, and hands its unsaved draft back', async () => {
     const b = setup()
     openByPath(b.view, 'docs/plan.md')
-    await b.view.findByLabelText('文档预览')
-    fireEvent.click(b.view.getByRole('button', { name: zh['mode.edit'] }))
-    const editor = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
-    fireEvent.change(editor, { target: { value: '还没保存的改动' } })
+    const preview = await b.view.findByLabelText('文档预览')
+    const paragraph = preview.querySelector('p[data-md-start]')
+    if (paragraph === null) throw new Error('the preview rendered no block carrying its source range')
+    fireEvent.click(paragraph)
+    const block = await b.view.findByLabelText(zh['block.label']) as HTMLTextAreaElement
+    fireEvent.change(block, { target: { value: '还没保存的改动' } })
+    fireEvent.keyDown(block, { key: 'Enter', ctrlKey: true })
 
     openFilesPanel(b.view)
     openByPath(b.view, 'docs/result.md')
@@ -315,9 +318,10 @@ describe('WritingView', () => {
     expect(within(tabs).getByLabelText(zh['tabs.dirty'])).toBeTruthy()
 
     b.load.mockClear()
-    fireEvent.click(within(tabs).getByRole('tab', { name: /plan\.md/ }))
-    const back = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
-    expect(back.value).toBe('还没保存的改动')
+    fireEvent.click(within(tabs).getByRole('tab', { name: /plan.md/ }))
+    const back = await b.view.findByLabelText('文档预览')
+    // The block edit came back with the tab, not the file's old content.
+    expect(back.textContent).toContain('还没保存的改动')
     // Re-reading the file is the one thing that would have lost the draft.
     expect(b.load).not.toHaveBeenCalled()
   })
@@ -406,9 +410,11 @@ describe('WritingView', () => {
     // Highlighted, not dumped: the grammar hint comes from the extension.
     expect(reader.querySelector('pre')).toBeTruthy()
 
-    fireEvent.click(b.view.getByRole('button', { name: '编辑' }))
-    const editor = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
-    expect(editor.value).toContain('export const answer = 42')
+    // The whole file is one editable block: a click opens the source over the
+    // reader, so the reading view never has to be left to change the file.
+    fireEvent.click(reader)
+    const block = await b.view.findByLabelText(zh['block.label']) as HTMLTextAreaElement
+    expect(block.value).toBe('export const answer = 42' + String.fromCharCode(10))
   })
 
   it('reads an extracted Word document as prose rather than through the editor', async () => {
@@ -442,7 +448,6 @@ describe('WritingView', () => {
 
     const editor = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
     expect(editor.value).toBe('just words')
-    expect(b.view.queryByRole('group', { name: '视图模式' })).toBeNull()
   })
 
   it('opens, edits, saves, and protects a dirty draft from an external change', async () => {
@@ -451,22 +456,24 @@ describe('WritingView', () => {
 
     const preview = await b.view.findByLabelText('文档预览')
     expect(preview.textContent).toContain('初始内容')
-    fireEvent.click(b.view.getByRole('button', { name: '编辑' }))
-    let editor = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
-    await waitFor(() => { expect(editor.value).toBe('# 简介\n\n初始内容') })
-    fireEvent.change(editor, { target: { value: '# 简介\n\n手工修改' } })
+    const paragraph = preview.querySelector('p[data-md-start]')
+    if (paragraph === null) throw new Error('the preview rendered no block carrying its source range')
+    const editBlock = (text: string): void => {
+      fireEvent.click(paragraph)
+      const block = b.view.getByLabelText(zh['block.label']) as HTMLTextAreaElement
+      fireEvent.change(block, { target: { value: text } })
+      fireEvent.keyDown(block, { key: 'Enter', ctrlKey: true })
+    }
+    editBlock('手工修改')
     expect(b.view.getByText('有未保存修改')).toBeTruthy()
-    fireEvent.click(b.view.getByRole('button', { name: '预览' }))
     expect(b.view.getByLabelText('文档预览').textContent).toContain('手工修改')
-    fireEvent.click(b.view.getByRole('button', { name: '编辑' }))
-    editor = b.view.getByLabelText('文档编辑器') as HTMLTextAreaElement
     fireEvent.click(b.view.getByRole('button', { name: '保存' }))
     await waitFor(() => {
       expect(b.save).toHaveBeenCalledWith('docs/plan.md', 'v1', '# 简介\n\n手工修改')
       expect(b.view.getByText('已保存')).toBeTruthy()
     })
 
-    fireEvent.change(editor, { target: { value: '# 简介\n\n尚未保存的第二次修改' } })
+    editBlock('尚未保存的第二次修改')
     act(() => {
       b.changed()?.({
         sessionId: SID,
@@ -477,7 +484,7 @@ describe('WritingView', () => {
       })
     })
     expect(b.view.getByText('检测到外部修改')).toBeTruthy()
-    expect(editor.value).toContain('尚未保存')
+    expect(b.view.getByLabelText('文档预览').textContent).toContain('尚未保存')
 
     b.load.mockResolvedValueOnce({
       path: 'docs/plan.md',
@@ -487,10 +494,10 @@ describe('WritingView', () => {
       truncated: false,
     })
     fireEvent.click(b.view.getByText('重新载入'))
-    await waitFor(() => { expect(editor.value).toContain('模型修改后的内容') })
+    await waitFor(() => { expect(b.view.getByLabelText('文档预览').textContent).toContain('模型修改后的内容') })
   })
 
-  it('searches documents, navigates duplicate outline headings in preview and edit modes, and opens a second window', async () => {
+  it('searches documents, navigates duplicate outline headings in the preview, and opens a second window', async () => {
     const secondEntry: DocumentOutlineEntry = {
       id: 'heading:intro-2',
       kind: 'heading',
@@ -524,12 +531,6 @@ describe('WritingView', () => {
     fireEvent.click(outlineButtons[1]!)
     expect(b.view.getByLabelText('文档预览')).toBe(preview)
     expect(preview.scrollTop).toBe(776)
-
-    fireEvent.click(b.view.getByRole('button', { name: '编辑' }))
-    fireEvent.click(outlineButtons[1]!)
-    const editor = await b.view.findByLabelText('文档编辑器') as HTMLTextAreaElement
-    expect(editor.selectionStart).toBe(13)
-    expect(editor.selectionEnd).toBe(15)
 
     const open = vi.fn()
     vi.stubGlobal('open', open)

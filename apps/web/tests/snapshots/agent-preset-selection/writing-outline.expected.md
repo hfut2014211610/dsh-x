@@ -1,8 +1,5 @@
 - text: Writing /
 - strong: outline-navigation.md
-- group "Document display mode":
-  - button "Edit"
-  - button "Preview" [pressed]
 - img
 - text: Saved
 - button "Reload":

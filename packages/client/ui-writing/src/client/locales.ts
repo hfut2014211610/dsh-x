@@ -15,7 +15,7 @@ export type WritingKey =
   | 'tree.label' | 'tree.heading' | 'tree.loading' | 'tree.empty' | 'tree.error' | 'tree.truncated' | 'tree.refresh'
   | 'outline.empty' | 'search.input' | 'search.placeholder' | 'search.empty'
   | 'editor.label' | 'editor.placeholder' | 'conflict.message'
-  | 'mode.label' | 'mode.edit' | 'mode.preview' | 'preview.label'
+  | 'preview.label'
   | 'action.close' | 'action.reload' | 'action.retry' | 'action.newWindow'
   | 'action.save' | 'action.saving' | 'action.copy' | 'action.copied'
   | 'status.idle' | 'status.loading' | 'status.dirty' | 'status.saving'
@@ -62,9 +62,6 @@ export const zh: Record<WritingKey, string> = {
   'search.empty': '输入关键词搜索工作区文档。',
   'editor.label': '文档编辑器',
   'editor.placeholder': '从左侧打开一个文档，或在这里开始写作。',
-  'mode.label': '文档显示模式',
-  'mode.edit': '编辑',
-  'mode.preview': '预览',
   'preview.label': '文档预览',
   'conflict.message': '文档已被模型或其他窗口修改。当前草稿尚未覆盖，可重新载入最新版本。',
   'action.close': '关闭',
@@ -120,9 +117,6 @@ export const en: Record<WritingKey, string> = {
   'search.empty': 'Enter a query to search workspace documents.',
   'editor.label': 'Document editor',
   'editor.placeholder': 'Open a document from the left, or start writing here.',
-  'mode.label': 'Document display mode',
-  'mode.edit': 'Edit',
-  'mode.preview': 'Preview',
   'preview.label': 'Document preview',
   'conflict.message': 'The document changed in the assistant or another window. Your draft is preserved; reload to use the latest version.',
   'action.close': 'Close',
