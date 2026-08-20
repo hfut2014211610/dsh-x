@@ -1461,6 +1461,35 @@ export interface HubModelFallback {
 
 来源：[`packages/llm/model-hub/src/compile.ts:109`](../packages/llm/model-hub/src/compile.ts)
 
+<a id="deepseek-aidsh-model-tuning"></a>
+
+## `@deepseek-ai/dsh-model-tuning`
+
+```ts config-catalog
+/** Plugin configuration: tuning entries keyed by `provider/model`. */
+export interface Config {
+  /** Tuning entries; the key's first slash separates provider route from model id. */
+  profiles?: Record<string, ModelTuning>
+}
+
+/** Sampling defaults applied to every request to the entry's model. */
+export interface ModelTuning {
+  /** Sampling temperature, 0..2. */
+  temperature?: number
+  /** Per-request output cap; wins over the adapter's configured default. */
+  maxTokens?: number
+  /** Stop sequences; an absent (schema-materialized empty) list carries no opinion. */
+  stop?: string[]
+  /** Reasoning effort as a canonical level; the owning adapter maps it to the wire spelling. */
+  reasoningEffort?: ReasoningEffortLevel
+}
+
+/** Canonical level spelling accepted by {@link ModelTuning.reasoningEffort}. */
+export type ReasoningEffortLevel = (typeof REASONING_EFFORTS)[number]
+```
+
+来源：[`packages/llm/model-tuning/src/index.ts:61`](../packages/llm/model-tuning/src/index.ts)
+
 <a id="deepseek-aidsh-permission-presets"></a>
 
 ## `@deepseek-ai/dsh-permission-presets`

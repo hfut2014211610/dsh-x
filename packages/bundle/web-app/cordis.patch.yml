@@ -97,6 +97,12 @@
     - id: model-hub
       name: '@deepseek-ai/dsh-model-hub'
 
+    # Per-model sampling defaults, the surface llm-pi-ai deliberately leaves
+    # out. An empty profiles map is dormant: the waterfall listener matches
+    # nothing and every request passes through untouched.
+    - id: model-tuning
+      name: '@deepseek-ai/dsh-model-tuning'
+
     # Resolve bind host, SSH launch, and display once at boot, then mount the
     # matching dual-face directory picker. Mount -native or -browse directly in
     # an overlay to pin the interaction.

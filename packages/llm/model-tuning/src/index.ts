@@ -184,9 +184,12 @@ function renderProfiles(profiles: Readonly<Record<string, ModelTuning>>): string
     return 'model-tuning 当前没有配置任何条目。用法：/model-tuning set <provider/model> <字段> <值>，字段：' + FIELD_NAMES.join(' / ')
   }
   const lines = keys.map((key) => {
-    const entry = profiles[key]!
+    // Read through rather than asserting: the keys came from this very object,
+    // but the index signature does not know that and the repository forbids
+    // saying so with a non-null assertion.
+    const entry = profiles[key] ?? {}
     const parts = FIELD_NAMES
-      .filter(field => entry[field] !== undefined && !(field === 'stop' && entry.stop!.length === 0))
+      .filter(field => entry[field] !== undefined && !(field === 'stop' && (entry.stop?.length ?? 0) === 0))
       .map(field => `${field}=${field === 'stop' ? JSON.stringify(entry.stop) : String(entry[field])}`)
     return `${key}: ${parts.length === 0 ? '（空条目）' : parts.join('  ')}`
   })

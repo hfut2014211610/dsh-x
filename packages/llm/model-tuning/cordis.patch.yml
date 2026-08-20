@@ -1,0 +1,11 @@
+# Mounted by the Web bundle; this file is what a profile-local install would
+# apply instead. The `config:` block is the composition base — a user's
+# `settings.yaml` `dsh-x-model-tuning:` section merges over it by key.
+- insert:
+    - id: model-tuning
+      name: '@deepseek-ai/dsh-model-tuning'
+      config:
+        profiles:
+          # deepseek/deepseek-chat:
+          #   temperature: 0.6
+          #   maxTokens: 8192

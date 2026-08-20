@@ -40,14 +40,14 @@ describe('Config schema', () => {
 
 describe('assertWellFormedKeys', () => {
   it('accepts provider/model keys, including model ids with slashes', () => {
-    expect(() => assertWellFormedKeys({ profiles: { 'deepseek/deepseek-chat': {}, 'gw/openai/gpt-5': {} } })).not.toThrow()
-    expect(() => assertWellFormedKeys({})).not.toThrow()
+    expect(() => { assertWellFormedKeys({ profiles: { 'deepseek/deepseek-chat': {}, 'gw/openai/gpt-5': {} } }) }).not.toThrow()
+    expect(() => { assertWellFormedKeys({}) }).not.toThrow()
   })
 
   it('rejects keys without both sides, naming the key', () => {
-    expect(() => assertWellFormedKeys({ profiles: { 'no-slash': {} } })).toThrow(/"no-slash"/)
-    expect(() => assertWellFormedKeys({ profiles: { '/model': {} } })).toThrow(/"\/model"/)
-    expect(() => assertWellFormedKeys({ profiles: { 'provider/': {} } })).toThrow(/"provider\/"/)
+    expect(() => { assertWellFormedKeys({ profiles: { 'no-slash': {} } }) }).toThrow(/"no-slash"/)
+    expect(() => { assertWellFormedKeys({ profiles: { '/model': {} } }) }).toThrow(/"\/model"/)
+    expect(() => { assertWellFormedKeys({ profiles: { 'provider/': {} } }) }).toThrow(/"provider\/"/)
   })
 })
 
@@ -112,9 +112,11 @@ describe('runModelTuningCommand', () => {
 
   it('lists entries on the bare form', async () => {
     const result = await runModelTuningCommand('', { 'deepseek/deepseek-chat': { temperature: 0.6 } }, undefined)
-    expect(result).toEqual({ kind: 'success', text: expect.stringContaining('deepseek/deepseek-chat') })
+    expect(result.kind).toBe('success')
+    expect(result.text).toContain('deepseek/deepseek-chat')
     const empty = await runModelTuningCommand('  ', {}, undefined)
-    expect(empty).toEqual({ kind: 'success', text: expect.stringContaining('没有配置') })
+    expect(empty.kind).toBe('success')
+    expect(empty.text).toContain('没有配置')
   })
 
   it('writes a parsed set op through the settings seam', async () => {
@@ -151,7 +153,8 @@ describe('runModelTuningCommand', () => {
 
   it('refuses writes when the settings seam is absent', async () => {
     const result = await runModelTuningCommand('set a/b temperature 1', {}, undefined)
-    expect(result).toEqual({ kind: 'error', text: expect.stringContaining('settings') })
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('settings')
   })
 
   it('surfaces a settings rejection as an error result', async () => {
@@ -161,6 +164,7 @@ describe('runModelTuningCommand', () => {
       },
     }
     const result = await runModelTuningCommand('set a/b temperature 1', {}, settings)
-    expect(result).toEqual({ kind: 'error', text: expect.stringContaining('settings-rejected') })
+    expect(result.kind).toBe('error')
+    expect(result.text).toContain('settings-rejected')
   })
 })
