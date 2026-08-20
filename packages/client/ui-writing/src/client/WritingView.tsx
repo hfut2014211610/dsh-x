@@ -748,14 +748,21 @@ export function WritingView({
     const start = Number(block.dataset.mdStart)
     const end = Number(block.dataset.mdEnd)
     if (!Number.isFinite(start) || !Number.isFinite(end) || end <= start) return
+    // A block whose render could not carry the attributes itself — a fenced
+    // code block, display math — is marked through a `display: contents`
+    // wrapper. The wrapper generates no box on purpose, so the box to cover is
+    // the thing inside it.
+    const box = block.offsetWidth === 0 && block.offsetHeight === 0
+      ? block.firstElementChild instanceof HTMLElement ? block.firstElementChild : block
+      : block
     setBlockEdit({
       start,
       end,
       text: draft.slice(start, end),
-      top: block.offsetTop,
-      left: block.offsetLeft,
-      width: block.offsetWidth,
-      height: block.offsetHeight,
+      top: box.offsetTop,
+      left: box.offsetLeft,
+      width: box.offsetWidth,
+      height: box.offsetHeight,
     })
   }
 

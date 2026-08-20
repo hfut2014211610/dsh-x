@@ -80,6 +80,12 @@ async function seedOutlineDocument(workspaceCwd: string): Promise<void> {
     '',
     'The outline must reveal this heading.',
     '',
+    // A fence renders as a component, so it is the block that needs the
+    // no-box wrapper to be reachable from a click at all.
+    '```ts',
+    'const fenced = true',
+    '```',
+    '',
   ].join('\n'))
 }
 
@@ -360,6 +366,22 @@ describe('web e2e: agent-preset selection', () => {
     if (blockBox === null || editorBox === null) throw new Error('the block editor did not lay out over its block')
     expect(Math.abs(editorBox.y - blockBox.y)).toBeLessThan(24)
     expect(Math.abs(editorBox.x - blockBox.x)).toBeLessThan(24)
+    await page.keyboard.press('Escape')
+    await expect.poll(async () => blockEditor.count()).toBe(0)
+
+    // The fence: marked through a wrapper that generates no box, so the
+    // overlay has to fall through to the box inside it. Getting this wrong
+    // parks the editor at the top of the article with zero width, which is
+    // only visible in a browser that lays anything out.
+    const fence = page.locator('[data-md-start]').filter({ has: page.locator('pre') }).last()
+    await fence.click()
+    await blockEditor.waitFor({ timeout: 15_000 })
+    const fenceBox = await fence.locator('> *').first().boundingBox()
+    const overFence = await blockEditor.boundingBox()
+    if (fenceBox === null || overFence === null) throw new Error('the fence editor did not lay out over its block')
+    expect(await blockEditor.inputValue()).toBe('```ts\nconst fenced = true\n```')
+    expect(Math.abs(overFence.y - fenceBox.y)).toBeLessThan(24)
+    expect(overFence.width).toBeGreaterThan(100)
     await page.keyboard.press('Escape')
     await expect.poll(async () => blockEditor.count()).toBe(0)
 

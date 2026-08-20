@@ -21,23 +21,38 @@ import type { MarkdownRenderContext } from './render.tsx'
 /**
  * Stamp one rendered block with the source range behind it.
  *
- * Only a host element takes the attributes: a fragment has no element to
- * carry them, and a component would receive props it never declared. Fenced
- * code, display math, and raw HTML render as those, so they stay unmarked and
- * a caller has to have an answer for a block with no range.
+ * A host element takes the attributes directly. A fenced code block or a
+ * display-math node renders as a component or a fragment, which has no
+ * element to put them on and no props declared for them, so those get a
+ * wrapper — `display: contents`, so it generates no box and the layout is the
+ * same one the block had without it. The wrapper has no box to measure
+ * either, which is why a caller reading geometry off a marked block has to
+ * fall through to its first child.
+ *
+ * A block that renders as a bare string — raw HTML, which stays literal — is
+ * left alone: wrapping a text node would change how adjacent literal text
+ * coalesces, which is exactly what the parity fixtures pin.
  * @param element - the rendered block.
  * @param node - the mdast node it came from.
- * @returns the element, stamped when it can carry the attributes.
+ * @param key - the block's stream-stable render key.
+ * @returns the element, marked with its range where that is possible.
  */
-function withSourceRange(element: ReactNode, node: Md.RootContent): ReactNode {
+function withSourceRange(element: ReactNode, node: Md.RootContent, key: number): ReactNode {
   const start = node.position?.start.offset
   const end = node.position?.end.offset
   if (start === undefined || end === undefined) return element
-  if (!isValidElement(element) || typeof element.type !== 'string') return element
-  return cloneElement(element as ReactElement<Record<string, unknown>>, {
-    'data-md-start': start,
-    'data-md-end': end,
-  })
+  if (!isValidElement(element)) return element
+  if (typeof element.type === 'string') {
+    return cloneElement(element as ReactElement<Record<string, unknown>>, {
+      'data-md-start': start,
+      'data-md-end': end,
+    })
+  }
+  return (
+    <div key={key} style={{ display: 'contents' }} data-md-start={start} data-md-end={end}>
+      {element}
+    </div>
+  )
 }
 
 /**
@@ -61,7 +76,7 @@ export function renderBlocksWithSource(
   for (const [key, node] of nodes.entries()) {
     const [element] = renderBlocks([{ node, key }], context)
     if (element === undefined) continue
-    rendered.push(withSourceRange(element, node))
+    rendered.push(withSourceRange(element, node, key))
   }
   return rendered
 }

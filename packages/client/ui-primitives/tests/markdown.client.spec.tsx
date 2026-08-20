@@ -38,6 +38,25 @@ describe('MarkdownText', () => {
     expect(ranges).toEqual(['# Heading', 'A paragraph.', '> A quote.'])
   })
 
+  // A fence renders as a component and math as a fragment, so neither has an
+  // element of its own to hold the attributes. Skipping them would leave the
+  // block people most want to edit unreachable, so they get a wrapper that
+  // generates no box — the layout is the one the block had without it.
+  it('marks a block whose render has no element to carry the attributes', () => {
+    const fenced = ['```ts', 'const a = 1', '```', '', 'After.'].join('\n')
+    const { container } = render(<MarkdownText text={fenced} sourcePositions />)
+
+    const marked = [...container.querySelectorAll('[data-md-start]')]
+    const ranges = marked.map(element => fenced.slice(
+      Number(element.getAttribute('data-md-start')),
+      Number(element.getAttribute('data-md-end')),
+    ))
+    expect(ranges).toEqual(['```ts\nconst a = 1\n```', 'After.'])
+    // The wrapper is there to be found by a click, not to lay anything out.
+    expect((marked[0] as HTMLElement).style.display).toBe('contents')
+    expect(marked[0]?.querySelector('pre')).toBeTruthy()
+  })
+
   // The parity fixtures pin this renderer against the pipeline it replaced, so
   // an attribute that pipeline never emitted has to stay off unless asked for.
   it('emits no source attributes unless the caller asks for them', () => {
