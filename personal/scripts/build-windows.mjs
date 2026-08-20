@@ -113,8 +113,9 @@ const packFamily = async (memberDirs, destination) => {
 
 console.log('[build-windows] 1/6 building lib, web, and the desktop shell')
 if (!skipBuild) {
-  run('pnpm', ['run', 'build:lib'])
-  run('pnpm', ['run', 'build:web'])
+  // 完整构建而不是 build:lib+build:web 分步：rc.8 起客户端门禁要求消费方
+  // 先有 .dsh-build/client-build-environment.json，只有根 build 会写它。
+  run('pnpm', ['run', 'build'])
 }
 run('npx', ['tsc', '-b', 'apps/desktop/tsconfig.json'])
 
