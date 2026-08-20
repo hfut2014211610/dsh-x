@@ -19,7 +19,7 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, shell, Tray } from 'electron'
-import { aboutMessage } from './about.ts'
+import { aboutMessage, releaseDetail } from './about.ts'
 import { ensureBundledRuntime } from './bundled-runtime.ts'
 import { DEFAULT_PROBE_ORIGIN, discoverRuntime } from './discovery.ts'
 import { DEFAULT_HEALTH_OPTIONS, startHealthWatch } from './health.ts'
@@ -503,7 +503,7 @@ async function checkUpdates(announce: boolean): Promise<void> {
       defaultId: 0,
       cancelId: 1,
       message: `DeepSeek Harness ${found.version} is available`,
-      detail: `You are running ${feed.currentVersion}. The update downloads in the background and installs when you quit.`,
+      detail: releaseDetail(feed.currentVersion, found.notes),
     })
     if (offer.response !== 0) return
     log(`downloading update ${found.version}`)

@@ -52,7 +52,16 @@ export interface UpdaterDeps {
 export type UpdateCheck =
   | { status: 'current'; detail: string }
   | { status: 'unavailable'; detail: string }
-  | { status: 'available'; version: string; assetName: string; assetUrl: string; releaseUrl: string; detail: string }
+  | {
+    status: 'available'
+    version: string
+    assetName: string
+    assetUrl: string
+    releaseUrl: string
+    detail: string
+    /** The release's own notes, as published. Empty when the release has none. */
+    notes: string
+  }
 
 /** A downloaded, verified installer. */
 export interface DownloadedUpdate {
@@ -148,9 +157,11 @@ export function sha512FromChannel(channel: string, assetName: string): string | 
 interface ReleaseAsset { name: string; url: string }
 
 /** Narrow the release JSON without trusting any of its shape. */
-function readRelease(payload: unknown): { tag: string; htmlUrl: string; assets: ReleaseAsset[] } | undefined {
+function readRelease(
+  payload: unknown,
+): { tag: string; htmlUrl: string; notes: string; assets: ReleaseAsset[] } | undefined {
   if (typeof payload !== 'object' || payload === null) return undefined
-  const { tag_name: tag, html_url: htmlUrl, assets } = payload as Record<string, unknown>
+  const { tag_name: tag, html_url: htmlUrl, body: notes, assets } = payload as Record<string, unknown>
   if (typeof tag !== 'string' || tag === '') return undefined
   if (!Array.isArray(assets)) return undefined
   const narrowed: ReleaseAsset[] = []
@@ -159,7 +170,12 @@ function readRelease(payload: unknown): { tag: string; htmlUrl: string; assets: 
     const { name, browser_download_url: url } = asset as Record<string, unknown>
     if (typeof name === 'string' && typeof url === 'string') narrowed.push({ name, url })
   }
-  return { tag, htmlUrl: typeof htmlUrl === 'string' ? htmlUrl : '', assets: narrowed }
+  return {
+    tag,
+    htmlUrl: typeof htmlUrl === 'string' ? htmlUrl : '',
+    notes: typeof notes === 'string' ? notes : '',
+    assets: narrowed,
+  }
 }
 
 /**
@@ -214,6 +230,7 @@ export async function checkForUpdate(feed: UpdateFeed, deps: UpdaterDeps): Promi
     assetUrl: asset.url,
     releaseUrl: release.htmlUrl,
     detail: `${version} is available (running ${feed.currentVersion})`,
+    notes: release.notes,
   }
 }
 

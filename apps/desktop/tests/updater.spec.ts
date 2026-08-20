@@ -14,6 +14,7 @@ const FEED: UpdateFeed = { repository: 'owner/repo', currentVersion: '0.3.1', pl
 const RELEASE = {
   tag_name: 'dsh-v0.4.0',
   html_url: 'https://github.com/owner/repo/releases/tag/dsh-v0.4.0',
+  body: '- the tray remembers where it was\n- startup no longer blocks',
   assets: [
     { name: 'DeepSeek Harness 0.4.0.exe', browser_download_url: 'https://example.invalid/portable.exe' },
     { name: 'DeepSeek Harness Setup 0.4.0.exe', browser_download_url: 'https://example.invalid/setup.exe' },
@@ -209,5 +210,32 @@ describe('downloadUpdate', () => {
       download: async (_url, _target, onProgress) => { onProgress(5, 10); onProgress(10, 10); return 10 },
     }), received => seen.push(received))
     expect(seen).toEqual([5, 10])
+  })
+})
+
+describe('release notes', () => {
+  // The notes were in the payload all along and the narrowing dropped them,
+  // so the offer dialog had nothing to say about what the update contained.
+  it('carries the release body through to the caller', async () => {
+    const found = await checkForUpdate(FEED, deps())
+
+    expect(found.status).toBe('available')
+    if (found.status !== 'available') return
+    expect(found.notes).toContain('the tray remembers where it was')
+  })
+
+  // A release with no notes is ordinary, not an error: it must narrow to an
+  // empty string rather than failing the whole check.
+  it('reads a release with no body as no notes', async () => {
+    const found = await checkForUpdate(FEED, deps({
+      fetchImpl: async () => new Response(
+        JSON.stringify({ ...RELEASE, body: undefined }),
+        { status: 200, headers: { 'content-type': 'application/json' } },
+      ),
+    }))
+
+    expect(found.status).toBe('available')
+    if (found.status !== 'available') return
+    expect(found.notes).toBe('')
   })
 })

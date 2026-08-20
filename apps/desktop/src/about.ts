@@ -66,3 +66,30 @@ export function aboutMessage(facts: AboutFacts): AboutMessage {
     detail: rows.join('\n'),
   }
 }
+
+/** How many lines of a release's notes the update dialog shows before eliding. */
+const RELEASE_NOTES_LINES = 12
+
+/**
+ * The body of the update offer: what you are on, what happens if you say yes,
+ * and what changed.
+ *
+ * The notes are the release's own, not a file in the tree — the release is
+ * what the person is being offered, and a changelog committed at some other
+ * moment describes some other build. They are capped because a dialog is not
+ * a document: a release whose notes run for pages would push the buttons off
+ * a short screen, and the button is the thing the dialog is for.
+ * @param current - the version now running.
+ * @param notes - the release's published notes, possibly empty.
+ * @returns the dialog's detail text.
+ */
+export function releaseDetail(current: string, notes: string): string {
+  const head = `You are running ${current}. The update downloads in the background and installs when you quit.`
+  const trimmed = notes.trim()
+  if (trimmed === '') return head
+  const lines = trimmed.split('\n')
+  const shown = lines.slice(0, RELEASE_NOTES_LINES).join('\n')
+  return lines.length > RELEASE_NOTES_LINES
+    ? `${head}\n\n${shown}\n…`
+    : `${head}\n\n${shown}`
+}

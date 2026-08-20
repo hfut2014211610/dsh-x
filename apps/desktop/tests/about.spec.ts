@@ -3,7 +3,7 @@
 // one that started its own, and this is the only place that difference is
 // ever said out loud.
 import { describe, expect, it } from 'vitest'
-import { aboutMessage } from '../src/about.ts'
+import { aboutMessage, releaseDetail } from '../src/about.ts'
 
 const VERSIONS = { electron: '33.2.0', chrome: '130.0.6723.44', node: '20.18.0' }
 
@@ -44,5 +44,36 @@ describe('aboutMessage', () => {
     expect(about.detail).toContain('still being discovered')
     expect(about.detail).toContain('Electron 33.2.0')
     expect(about.detail).not.toContain('Serving')
+  })
+})
+
+describe('releaseDetail', () => {
+  // "What changed" is a question people ask exactly when they are being asked
+  // to take an update, and the dialog that asks had no answer in it.
+  it('carries the release notes under what the update will do', () => {
+    const detail = releaseDetail('0.3.1', '- fixed the tray\n- faster startup')
+
+    expect(detail).toContain('You are running 0.3.1')
+    expect(detail).toContain('installs when you quit')
+    expect(detail).toContain('- fixed the tray')
+    expect(detail).toContain('- faster startup')
+  })
+
+  it('says only what the update does when the release published no notes', () => {
+    expect(releaseDetail('0.3.1', '   \n  ')).toBe(
+      'You are running 0.3.1. The update downloads in the background and installs when you quit.',
+    )
+  })
+
+  // A dialog is not a document. The button is what the dialog is for, and a
+  // release with pages of notes would push it off a short screen.
+  it('elides notes long enough to bury the buttons', () => {
+    const long = Array.from({ length: 40 }, (_, index) => `line ${String(index + 1)}`).join('\n')
+
+    const detail = releaseDetail('0.3.1', long)
+
+    expect(detail).toContain('line 12')
+    expect(detail).not.toContain('line 13')
+    expect(detail.endsWith('…')).toBe(true)
   })
 })
