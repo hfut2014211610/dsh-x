@@ -19,7 +19,7 @@
  * 并且盯着它变（见 `src/bridge-config.ts`）。桥接不向 dsh 要配置，因为它得在
  * dsh 不在的时候顶上——文件在 dsh 挂了以后还在，RPC 不在。
  *
- * 只依赖 node 内置和 lark-cli 子进程，**不 import 任何 dsh 包**——桥接能当兜底
+ * 只依赖 node 内置和 lark-cli 子进程，**不 import 任何 dsh 包**（`tests/bridge-isolation.spec.ts` 盯着这条）——桥接能当兜底
  * 的前提就是它不跟着 dsh 一起崩。这条一旦破例，兜底就不成立了。
  *
  * 运行：`node --import tsx/esm bridge/main.ts`
