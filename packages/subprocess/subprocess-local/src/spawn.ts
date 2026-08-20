@@ -350,6 +350,9 @@ export function spawnSubprocess(spec: SubprocessSpawnSpec, internals: SpawnInter
   const child = spawn(program, args, {
     cwd: spec.cwd,
     env,
+    // A console-less parent (the desktop sidecar, a detached bridge) would
+    // otherwise flash a console window for every console-subsystem child.
+    windowsHide: true,
     stdio: [
       stdinMode === 'ignore' ? 'ignore' : 'pipe',
       outMode === 'inherit' ? 'inherit' : 'pipe',

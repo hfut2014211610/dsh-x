@@ -22,7 +22,7 @@ export interface ProcessTreeDeps {
 /** Real collaborators for the running process. */
 const hostProcessTreeDeps: ProcessTreeDeps = {
   platform: process.platform,
-  taskkill: (args) => { spawnSync('taskkill', args) },
+  taskkill: (args) => { spawnSync('taskkill', args, { windowsHide: true }) },
   signalProcess: (pid, signal) => { process.kill(pid, signal) },
 }
 
@@ -79,10 +79,13 @@ export function spawnRuntimeProcess(spec: RuntimeSpawn, args: readonly string[])
     // or a path with spaces (`DeepSeek Harness.exe`, an APPDATA username)
     // splits mid-path. The quoted shim name still resolves through PATHEXT.
     const quoted = [spec.command, ...argv].map(value => `"${value.replaceAll('"', '""')}"`).join(' ')
+    // The shell wrapper is a console process; without windowsHide the packaged
+    // app would sit next to a cmd window for the whole runtime session.
     const child: ChildProcess = spawn(quoted, {
       shell: true,
       env: { ...process.env, ...spec.env },
       stdio: ['ignore', 'pipe', 'pipe'],
+      windowsHide: true,
     })
     return adaptProcess(child, lineListeners, exitListeners)
   }

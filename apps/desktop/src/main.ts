@@ -154,7 +154,7 @@ async function reapPreviousRuntime(): Promise<void> {
     killTree: (pid) => {
       killProcessTree(pid, {
         platform: process.platform,
-        taskkill: (args) => { spawnSync('taskkill', args) },
+        taskkill: (args) => { spawnSync('taskkill', args, { windowsHide: true }) },
         signalProcess: (target, signal) => { process.kill(target, signal) },
       })
     },
@@ -198,7 +198,7 @@ async function connect(): Promise<void> {
           // the main process — and with it the loading screen reporting on it —
           // for the whole of the first run.
           const run = (command: string, args: readonly string[]): Promise<void> => new Promise((resolve, reject) => {
-            const child = spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'] })
+            const child = spawn(command, args, { stdio: ['ignore', 'ignore', 'pipe'], windowsHide: true })
             let stderr = ''
             let settled = false
             const finish = (error?: Error): void => {
@@ -259,6 +259,7 @@ async function connect(): Promise<void> {
       const child = spawn(command, args, {
         shell: process.platform === 'win32',
         stdio: ['ignore', 'pipe', 'ignore'],
+        windowsHide: true,
       })
       let stdout = ''
       let settled = false

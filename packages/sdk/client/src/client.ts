@@ -207,6 +207,7 @@ export class HarnessClient {
       cwd: this.options.cwd,
       env: this.options.env ?? process.env,
       stdio: ['pipe', 'pipe', 'pipe'],
+      windowsHide: true,
     })
     this.child = child
     child.once('error', (error) => {

@@ -89,6 +89,9 @@ export async function larkApi(
     const { stdout } = await run(invocation.file, [...invocation.args], {
       timeout: CALL_TIMEOUT_MS,
       maxBuffer: 8 * 1024 * 1024,
+      // 桥接常被无控制台地驻留（开机自启、桌面壳拉起），出站调用不藏窗口的话
+      // 每次发消息、更新卡片都会闪一个 cmd 窗。
+      windowsHide: true,
       env: { ...process.env, ...larkCliEnvironment(configDir) },
     })
     const parsed: unknown = stdout.trim() === '' ? {} : JSON.parse(stdout)

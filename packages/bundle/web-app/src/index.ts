@@ -179,6 +179,9 @@ function spawnBrowserLauncher(url: string): ChildProcess {
   ], {
     env: scrubbedParentEnv(),
     stdio: ['ignore', 'inherit', 'pipe'],
+    // The helper is a console-subsystem child; a console-less parent (a service
+    // deployment) would flash a window for its whole lifetime.
+    windowsHide: true,
   })
 }
 

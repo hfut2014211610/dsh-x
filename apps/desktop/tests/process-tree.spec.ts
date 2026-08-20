@@ -1,5 +1,33 @@
-import { describe, expect, it } from 'vitest'
-import { killProcessTree } from '../src/process-tree.ts'
+import { EventEmitter } from 'node:events'
+import { PassThrough } from 'node:stream'
+import { describe, expect, it, vi } from 'vitest'
+import { killProcessTree, spawnRuntimeProcess } from '../src/process-tree.ts'
+
+const spawnCalls = vi.hoisted((): Array<{ command: string; options: Record<string, unknown> }> => [])
+vi.mock('node:child_process', async (importOriginal) => {
+  const actual = await importOriginal<typeof import('node:child_process')>()
+  // The win32 call site passes only (command, options); POSIX passes (command, args, options).
+  const fake = (
+    command: string,
+    argsOrOptions: readonly string[] | Record<string, unknown> | undefined,
+    maybeOptions: Record<string, unknown> | undefined,
+  ) => {
+    const options = Array.isArray(argsOrOptions) ? maybeOptions : argsOrOptions
+    spawnCalls.push({ command, options: { ...(options ?? {}) } })
+    const child = new EventEmitter() as EventEmitter & {
+      pid: number
+      stdout: PassThrough
+      stderr: PassThrough
+      kill: () => void
+    }
+    child.pid = 1618
+    child.stdout = new PassThrough()
+    child.stderr = new PassThrough()
+    child.kill = () => {}
+    return child
+  }
+  return { ...actual, spawn: fake } as unknown as typeof actual
+})
 
 /** Deps recording every kill delivery. */
 function recorder(platform: NodeJS.Platform, signalError?: Error) {
@@ -61,5 +89,16 @@ describe('killProcessTree', () => {
       taskkill: () => { throw new Error('posix never taskkills') },
       signalProcess: () => { throw new Error('EPERM') },
     }) }).toThrow('EPERM')
+  })
+})
+
+describe('spawnRuntimeProcess', () => {
+  // The win32 path resolves a PATH `dsh` through a shell wrapper; POSIX spawns
+  // the shebang directly and never allocates a console.
+  it.runIf(process.platform === 'win32')('hides the shell wrapper console so the app never sits next to a cmd window', () => {
+    spawnRuntimeProcess({ command: 'dsh', args: [] }, ['web'])
+    const last = spawnCalls.at(-1)
+    expect(last?.options.shell).toBe(true)
+    expect(last?.options.windowsHide).toBe(true)
   })
 })

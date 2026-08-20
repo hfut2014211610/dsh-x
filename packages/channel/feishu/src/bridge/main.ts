@@ -448,7 +448,9 @@ class Bridge {
       }
       const { command, args, cwd } = this.config.launch
       log(`拉起 dsh：${command} ${args.join(' ')}`)
-      const child = spawn(command, [...args], { cwd, detached: true, stdio: 'ignore', shell: process.platform === 'win32' })
+      // windowsHide 必须带上：detached 在 Windows 上给子进程自己的控制台，不藏
+      // 的话拉起 dsh 会凭空弹一个 cmd 窗。
+      const child = spawn(command, [...args], { cwd, detached: true, stdio: 'ignore', shell: process.platform === 'win32', windowsHide: true })
       child.unref()
     } catch (error: unknown) {
       log(`拉不起来：${error instanceof Error ? error.message : String(error)}`)
