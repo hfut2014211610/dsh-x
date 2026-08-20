@@ -12,7 +12,7 @@
 | **桌面 packed runtime 与安装包发布** — 安装包内嵌由该 release tag 自身构建的运行时，首启解压到 userData，校验和门控 | `scripts/release/`、`apps/desktop/electron-builder.yml` | [笔记](notes/implemented/2026-08-17-desktop-packed-runtime.md) |
 | **实机反馈修复轮** — 启动不再冻结主进程（同步 spawn 移出绘制线程、安装版优先自带运行时）、加载页重做（跟随系统主题、分阶段进度、日志默认收起）、伴随栏拖宽驱动共享属性使 composer 同步、伴随栏横向溢出归零、产物自动在预览/编辑器中打开、每种格式都有阅读视图 | `apps/desktop/`、`packages/client/ui-{conversation,writing,ued}/` | [笔记](notes/implemented/2026-08-19-desktop-and-workspace-feedback-round.md) |
 | **桌面生命周期归属与应用内升级** — 安装版不再附着外部实例、退出即关停；跨启动回收孤儿运行时（pid + origin 双证据）；退出与「活着但不应答」按同一故障处理，滚动窗口重启预算；自建升级链路（GitHub API 发现、tag 任意位置读版本、sha512 校验、退出时装） | `apps/desktop/` | [笔记](notes/implemented/2026-08-19-desktop-lifecycle-and-updates.md) |
-| **写作模式** — `documents` 能力族、文档工具、`writing` preset、浏览器写作 UI | `packages/writing/{documents,documents-local,tool-documents,writing-mode}`、`packages/client/ui-writing/`、`apps/cli/config/agent-presets/writing/` | [笔记](notes/proposed/2026-08-17-writing-mode.md) ⚠️ 状态待订正 |
+| **写作模式** — `documents` 能力族、文档工具、`writing` preset、浏览器写作 UI | `packages/writing/{documents,documents-local,tool-documents,writing-mode}`、`packages/client/ui-writing/`、`apps/cli/config/agent-presets/writing/` | [笔记](notes/implemented/2026-08-17-writing-mode.md) |
 | **写作视图 2026-08-20 一轮** — 打开即是文档而不是文件浏览器（工具栏默认折起，目录列举也随之不再预取）；多标签，切走的那份连未保存草稿一起留着，切回来不重读文件；预览里点一块就地改它的源文 | `packages/client/ui-writing/`、`packages/client/ui-primitives/`（一处默认关闭的上游开关） | [笔记](notes/implemented/2026-08-20-markdown-source-positions.md) |
 | **用量统计** — 每请求模型 token 用量折叠为会话投影、`/usage` 报告命令、设置页模型用量面板 | 跨 `packages/`，Web 设置面 | [笔记](notes/implemented/2026-08-14-usage-stats-session-projection-and-command.md) |
 | **anchored-standard 预设** — 请求 #1 锚定 Minimal 双工具零注入条件，首次durable 回复或工具调用后提升为按需解锁的常驻工具集；相位由 durable 会话事件推导，压缩边界重入受控相位 | `apps/cli/config/agent-presets/anchored-standard/` | [笔记](notes/implemented/2026-08-17-anchored-standard-preset.md) |
@@ -112,6 +112,6 @@ Phase 6（发布加固）中属于升级义务的那一半已经落地，见上�
 
 ## 状态订正待办
 
-- **写作模式笔记状态**：[`notes/proposed/2026-08-17-writing-mode.md`](notes/proposed/2026-08-17-writing-mode.md) 仍标 `Status: proposed`，但提案的全部包（`documents`、`documents-local`、`tool-documents`、`writing-mode`、`client/ui-writing`）与 `writing` preset 均已存在于工作区（提交 `07ab6d0926`）。应改为 `Status: implemented` 并移入 `notes/implemented/`，同时核对提案验收标准是否逐条满足。
+- ~~**写作模式笔记状态**~~：已订正并移入 [`notes/implemented/`](notes/implemented/2026-08-17-writing-mode.md)。九条验收标准逐条核过；第九条缺的那一半（组装后的写作会话没有任何断言）本轮补上了，见笔记的「落地情况」一节。
 - ~~**`personal/README.md` 文档路径**~~：已订正。同一轮把索引补齐——`plugins/dsh-x-feishu/` 与 `probe/` 此前不在正文里，指向上游 `docs/architecture.md` 的那处也改成了显式的仓库根相对链接（这份 README 里裸写的 `docs/` 一律指 `personal/docs/`）。
 - **`personal/plugins/` 下两份模型中心旧副本**：`dsh-x-model-hub/` 与 `dsh-x-ui-model-hub/` 在毕业进 `packages/` 之后没删，两边源码已分叉；`~/.dsh/profiles/headless` 的 lockfile 还链着旧副本。删之前要确认没有 profile 在用，因此没有顺手处理。

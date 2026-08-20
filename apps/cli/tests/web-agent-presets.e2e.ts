@@ -471,6 +471,33 @@ describe('the shipped Web composition', () => {
     }
   })
 
+  it('composes `writing` from the document tools and nothing else', async () => {
+    const handle = await ctx.agents.create({
+      sessionId: SessionId('preset-writing'),
+      setup: agentCtx => ctx.agentPresets.mount(agentCtx, 'writing').then(() => undefined),
+    })
+    try {
+      // The EXACT catalog. The preset's product claim is that a writing
+      // session pays for document work and nothing else — no shell, no web, no
+      // generic file tools — and the whole claim is invisible until a coding
+      // row leaks back in and nothing fails.
+      const assembly = await ctx.systemPrompt.assemble({ scope: handle.agent })
+      expect(assembly.tools.map(tool => tool.name).sort()).toEqual([
+        'document_create', 'document_edit', 'document_outline', 'document_read', 'document_search',
+      ])
+
+      // The policy section carries what the tools cannot: that document_edit
+      // is the only supported way to change a document, and that a new one
+      // does not get filed into a tree the project maintains for something
+      // else — the manual that broke this repository's own doc gates.
+      const policy = assembly.sections.find(section => section.name === 'writing:policy')
+      expect(policy?.text).toContain('document_edit')
+      expect(policy?.text).toContain('workspace root')
+    } finally {
+      await handle.dispose()
+    }
+  })
+
   it('composes `ued` from the document tools plus one continuable fork route', async () => {
     const handle = await ctx.agents.create({
       sessionId: SessionId('preset-ued'),

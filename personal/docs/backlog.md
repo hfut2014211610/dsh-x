@@ -2,7 +2,7 @@
 
 滚动记录。编号沿用最早提出的顺序，新增项接着排字母。**只看清单的话看下面两张表就够了。**
 
-最后整理：2026-08-20。
+最后整理：2026-08-20（第二轮）。
 
 ## 待做
 
@@ -13,9 +13,7 @@
 | 9 | UED 预览支持标注组件 / 加入对话；层叠元素可选中被遮挡项 | ⏸ 需定范围（大件） | iframe 是 `allow-scripts` 且不与 `allow-same-origin` 同列，宿主拿不到里面的 DOM。要注入受控拾取脚本 + postMessage，且不能破坏现有隔离断言 |
 | N | `test:web` 在 Windows 上过不去 | 待做 | 15 个文件红，一条根因：本机 shipped composition 给 `pwsh`，golden 期望 `bash`。为 POSIX 写的测试撞 win32，不是回归 |
 | O | 安装包不带 `personal/` | 待做 | `scripts/release/families.ts:311` 只 glob `packages/*/*/package.json` 与 `apps/*/package.json`。飞书通道、model-tuning 装完就没有 |
-| Q | `personal/plugins/` 下两份模型中心旧副本 | 待做 | `dsh-x-model-hub/`、`dsh-x-ui-model-hub/` 毕业进 `packages/` 后没删，源码已分叉；`~/.dsh/profiles/headless` 的 lockfile 还链着旧的。删前需确认没 profile 在用 |
-| R | 写作模式笔记状态订正 | 待做 | `notes/proposed/2026-08-17-writing-mode.md` 仍标 `proposed`，包与 preset 全在。要改 `implemented` 并逐条核九条验收标准 |
-| S | 围栏代码块 / 展示公式 / 裸 HTML 在预览里改不了 | 待做 | #C 的已知缺口：这三类渲染成组件或 Fragment，没有元素能挂 `data-md-*`。补围栏代码要给 `CodeBlock` 加两个它没声明的 prop |
+| Q | `personal/plugins/` 下两份模型中心旧副本 | ⏸ 卡在迁移 | **`headless` profile 正在用旧副本**（它的 `dsh.profile.bundles` 里就有），删了会直接坏掉。`web` profile 不受影响（走 web-app bundle 里毕业后的那个）。两边插件名同为 `dsh-x-model-hub`、settings 段同为 `dsh-x-model-hub:`，所以**不需要迁移设置**；但毕业后的包没有 `cordis.patch.yml`，当不了 bundle，headless 得改用 `dsh plugin --profile headless add`。这是动你本机 profile，等你点头 |
 | T | 飞书端到端未通 | ⏸ 已交给你的 codex | 消息能收到（日志里 6 条被 `group-not-allowed` 挡下），差准入名单 + 卡片回调订阅。三方入口要的是**一条命令**，不是命名管道路径 |
 | U | A/B 两种飞书接入模式能否同时生效 | 待你定 | 你说过「本质不冲突」。真要身份走 A、事件来源走 B，得把 `mode` 拆成两个独立维度 |
 
@@ -23,10 +21,8 @@
 
 | # | 事项 | 已做的 | 还差的 |
 |---|---|---|---|
-| A | 写作产物落进 `docs/` 撞坏仓库门禁 | 文档搬进 `personal/docs/`，链接改对；`verify-md-links` / `verify-translation-pairing` 全绿 | **落点规则没改**——产物仍会落进会话 cwd，下次照样可能落进受管目录 |
 | B | 加「关于」菜单，呈现更新日志 + 版本更新操作 | 桌面托盘有「关于」了：版本、运行时版本与来源、附着还是自起、窗口指向的 origin | **web 端入口没有**；**更新日志没有**（托盘另有一条「检查更新」，但不在「关于」里） |
-| C | 合并预览与编辑窗口，在预览状态下直接编辑 | 预览里点一块就地改它的源文，Cmd/Ctrl+Enter 或点开落定，Esc 丢弃 | 「**弱化代码性、强调内容**」那半没做——改的仍是 Markdown 源文，不是所见即所得 |
-| D | 写作 / UED 默认不展开文件目录 | 写作视图默认折起工具栏，目录列举随之不再预取 | **「有新产物或加载到历史产物后自动展示」没做**（要接 #8 的跟随状态机）；**UED 侧没动** |
+| C | 合并预览与编辑窗口，在预览状态下直接编辑 | 点一块就地改它的源文（`8dc3293d17`），围栏代码与展示公式也可点（`42b22d1223`）；Cmd/Ctrl+Enter 或点开落定，Esc 丢弃 | 「**弱化代码性、强调内容**」那半没做——改的仍是 Markdown 源文，不是所见即所得 |
 
 ## 已完成
 
@@ -51,6 +47,9 @@
 | M | 写作模式沙箱围栏漏洞 `674d487be1` | `.docx`/`.xlsx` 编辑路径绕过围栏直接 `node:fs` 写 |
 | P | 打包速度优化 `a1228e7841` | 并发打包 + `--reuse-runtime`；完整 97s / 桌面 40s |
 | V | 版本方案：上游版本号 + fork 后缀 `b1945091dc` | 224 个 manifest 与上游一致；fork 身份在 `electron-builder.yml` |
+| A | 写作产物落进受管目录 `75c7056c24` | `writing` 与 `ued` 的 policy 现在说了产物落哪：用户指定处或工作区根，不进项目自有的文档树/源码树 |
+| D | 写作 / UED 默认不展开文件目录 `e62eda2bb8` `dd52743cda` | 写作面板默认折起，第一份非人工打开的产物到达时自己出来；设计栏在有原型前干脆不存在 |
+| R | 写作模式笔记状态订正 `HEAD` | 九条验收逐条核过并写进笔记；第九条缺的那半——组装后的写作会话零断言——本轮补上了 |
 
 ---
 
@@ -86,6 +85,7 @@
 - 标位置的代码进了 `source-positions.tsx` —— 上游永远不会有这个文件，新文件不会冲突。
 - 留在上游文件上的只有 `MarkdownText.tsx` 的一条 import、一个参数、一个分支。
 - 开关默认关，默认 DOM 一字节没变——`render.tsx` 的 parity fixture 是拿它跟被替换掉的 react-markdown 管线逐字节比对的，无条件加属性就是漂移。
+- 围栏代码块与展示公式渲染成组件与 Fragment，没有元素能挂属性，于是走一个 `display: contents` 的包装元素——它不生成盒子，布局与没有它时一致，代价是读几何量要穿到里面那一层。裸 HTML 仍不标：它渲染成裸字符串，包起来会改变相邻字面文本的合并方式，而那正是 parity fixture 钉的东西。
 
 取舍全文见[笔记](notes/implemented/2026-08-20-markdown-source-positions.md)。
 

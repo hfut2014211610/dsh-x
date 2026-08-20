@@ -1,6 +1,6 @@
 # Agent Note: 面向文档编写与修订的写作模式
 
-Status: proposed
+Status: implemented
 
 ## 问题
 
@@ -211,6 +211,24 @@ interface ConversationViewRegistry {
 - `document_edit` 通过 `documents/changed` 更新所有打开的窗口，并在文件状态更新时返回 `DOCUMENT_STALE_VERSION`，而不是覆盖新状态。
 - `.docx` 和 `.xlsx` 文件可打开、生成大纲、搜索，并支持上文声明的适配器限定编辑；不支持的构造以结构化错误码失败，绝不静默损坏文件。
 - 单元、GUI、快照和目录门禁覆盖新包及组装后的写作会话 transcript。
+
+## 落地情况（2026-08-20 逐条核对）
+
+提案的全部包与 `writing` preset 在提交 `07ab6d0926` 已存在。九条验收标准逐条核过，八条成立，第九条本轮补齐了缺的那一半：
+
+| 验收 | 结论 |
+|---|---|
+| 恰好五个文档工具 + `writing:policy`，看不到 shell/web/通用文件工具 | ✅ **本轮才有断言**——`ued` 早就钉了精确目录，`writing` 一直只出现在预设花名册里。现在 `apps/cli/tests/web-agent-presets.e2e.ts` 也钉了它 |
+| 写作视图是这类会话的默认视图，tab 选择持久 | ✅ `ui-writing` 注册 preferred view |
+| txt / Markdown / 代码往返无损 | ✅ `documents-local` 单测覆盖 |
+| 搜索：文件名 + 内容命中，支持中文，可在工作区与独立窗口打开 | ✅ `document_search` + 视图的搜索面板与「在新窗口打开」 |
+| 右侧栏文档树 + 大纲，大纲节点跳到精确位置 | ✅ `selectionForOutline` / `markdownHeadingIndex`，web e2e 断言过滚动位置 |
+| 行/段/章节切片可引用进 composer | ✅ `@doc` 输入源已注册 |
+| `document_edit` 发 `documents/changed`，陈旧版本返回 `DOCUMENT_STALE_VERSION` | ✅ |
+| `.docx`/`.xlsx` 可打开、生成大纲、搜索、受限编辑；不支持的构造以结构化错误码失败 | ✅ 生成侧见 `43197c3349`；编辑侧的围栏漏洞见 `674d487be1` |
+| 单元、GUI、快照与目录门禁覆盖新包及组装后的写作会话 transcript | ⚠️ **本轮补齐**。此前组装后的写作会话没有任何断言。`documents` 与 `writing-mode` 仍无单测，但一个是接口包、一个是二十行的 section 注册，没有可断言的行为 |
+
+落地后新增、提案里没有的东西：多标签、预览里就地编辑、工具栏默认折起、产物落点政策。见 [backlog](../../backlog.md)。
 
 ## 风险
 
