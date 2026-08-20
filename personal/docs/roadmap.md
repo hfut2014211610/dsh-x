@@ -112,4 +112,5 @@ Phase 6（发布加固）中属于升级义务的那一半已经落地，见上�
 ## 状态订正待办
 
 - **写作模式笔记状态**：[`notes/proposed/2026-08-17-writing-mode.md`](notes/proposed/2026-08-17-writing-mode.md) 仍标 `Status: proposed`，但提案的全部包（`documents`、`documents-local`、`tool-documents`、`writing-mode`、`client/ui-writing`）与 `writing` preset 均已存在于工作区（提交 `07ab6d0926`）。应改为 `Status: implemented` 并移入 `notes/implemented/`，同时核对提案验收标准是否逐条满足。
-- **`personal/README.md` 文档路径**：正文以 `docs/plugin-guide.md`、`docs/postmortem-2026-08-15-model-hub-probe.md` 指代，实际路径已是 `docs/guides/plugin-guide.md`、`docs/archive/postmortem-2026-08-15-model-hub-probe.md`。这两处是代码跨度而非链接，门禁不覆盖，需手工订正。
+- ~~**`personal/README.md` 文档路径**~~：已订正。同一轮把索引补齐——`plugins/dsh-x-feishu/` 与 `probe/` 此前不在正文里，指向上游 `docs/architecture.md` 的那处也改成了显式的仓库根相对链接（这份 README 里裸写的 `docs/` 一律指 `personal/docs/`）。
+- **`personal/plugins/` 下两份模型中心旧副本**：`dsh-x-model-hub/` 与 `dsh-x-ui-model-hub/` 在毕业进 `packages/` 之后没删，两边源码已分叉；`~/.dsh/profiles/headless` 的 lockfile 还链着旧副本。删之前要确认没有 profile 在用，因此没有顺手处理。

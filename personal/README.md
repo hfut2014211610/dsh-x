@@ -5,16 +5,19 @@
 ## 原则
 
 - **fork 的其余部分只跟踪上游**（`git fetch upstream && git merge upstream/master`，永远 fast-forward）。上游不会新增 `personal/` 顶层目录，因此合并零冲突。
-- 个性化优先走插件与配置，不打上游补丁。官方扩展点足够覆盖绝大多数需求（见 `docs/architecture.md` 的 "Where new behavior goes"）。
+- 个性化优先走插件与配置，不打上游补丁。官方扩展点足够覆盖绝大多数需求（见仓库根的 [`docs/architecture.md`](../docs/architecture.md) 的 "Where new behavior goes"）。
 - 本目录不进 pnpm workspace、不改根 `package.json` / `pnpm-workspace.yaml` / `AGENTS.md` 等上游文件。插件经仓库根 tsconfig paths 解析 `@deepseek-ai/*` 导入，与源码启动（`pnpm dsh`，tsx）共享模块实例，无需安装步骤。
 
 ## 内容
 
 - `plugins/dsh-x-model-tuning/` — 每模型采样默认值插件（temperature/maxTokens/stop/reasoningEffort + `/model-tuning` 命令）。加载方式与配置参考见该目录 README 与 `cordis.patch.yml`。
+- `plugins/dsh-x-feishu/` — **飞书通道**：单聊发一句就干活，群里 @ 一下就接活，过程落在卡片上。宿主半边加一张连接器设置卡（`packages/client/ui-settings-connectors/`），桥接进程在 `bridge/`。
 - 模型中心已经进入正式 workspace：宿主包见 [`packages/llm/model-hub/`](../packages/llm/model-hub/README.zh.md)，设置页见 [`packages/client/ui-model-hub/`](../packages/client/ui-model-hub/README.zh.md)，Web bundle 默认注册，无需从本目录安装。
+  `plugins/dsh-x-model-hub/` 与 `plugins/dsh-x-ui-model-hub/` 是毕业前的旧副本，两边源码已分叉；`~/.dsh/profiles/headless` 的 lockfile 仍链着旧副本，删除前需要先确认没有 profile 在用。
 - `scripts/dump-session.ts` — 会话日志查看工具（`.jsonl.zstd` 分帧解压，可按事件类型过滤）。
-- `docs/plugin-guide.md` — **插件开发指南**：两类插件的创建/注册/页面新增全流程、schemastery 与加载机制的坑、调试工具箱。写新插件前必读。
-- `docs/postmortem-2026-08-15-model-hub-probe.md` — **探活连环报错复盘**：compat 透传致编译整段被拒、Anthropic SDK 双 /v1、网关流式崩溃分类学，及"curl 对照/抓包/最小复现/文档-注册表比对"调试方法论与探活结果速查表。
+- `probe/` — 锚定条件的本地测量工装：`anchored-standard` 的轨迹收益在这里从"继承来的证据"变成本机数字，结果落在 `probe/results/`。
+- `docs/guides/plugin-guide.md` — **插件开发指南**：两类插件的创建/注册/页面新增全流程、schemastery 与加载机制的坑、调试工具箱。写新插件前必读。
+- `docs/archive/postmortem-2026-08-15-model-hub-probe.md` — **探活连环报错复盘**：compat 透传致编译整段被拒、Anthropic SDK 双 /v1、网关流式崩溃分类学，及"curl 对照/抓包/最小复现/文档-注册表比对"调试方法论与探活结果速查表。
 - `model-config.example.yaml` — `settings.yaml` 片段模板：官方段（协议/上下文/思考）、hub 段（供应商+模型分离）、tuning 段（采样默认值）。
 
 ## 加载方式
