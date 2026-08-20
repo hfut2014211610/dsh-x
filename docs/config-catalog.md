@@ -807,6 +807,29 @@ export interface Config {
 
 Source: [`packages/host/frontend-static/src/index.ts:28`](../packages/host/frontend-static/src/index.ts)
 
+<a id="deepseek-aidsh-host-instance-lock"></a>
+
+## `@deepseek-ai/dsh-host-instance-lock`
+
+```ts config-catalog
+/** Plugin config: which home to guard, under what name, and whether to guard at all. */
+export interface Config {
+  /** Harness home; defaults to `$DSH_HOME` or `~/.dsh`. */
+  dshHome?: string
+  /** The profile name a refusal reports, so the message names something real. */
+  profile?: string
+  /**
+   * Refuse to start when another live runtime holds the home.
+   *
+   * On by default. Off is for a deployment that genuinely wants two runtimes
+   * on one home and accepts what that does to a shared session log.
+   */
+  enforce?: boolean
+}
+```
+
+Source: [`packages/host/instance-lock/src/index.ts:37`](../packages/host/instance-lock/src/index.ts)
+
 <a id="deepseek-aidsh-host-plugin-control"></a>
 
 ## `@deepseek-ai/dsh-host-plugin-control`

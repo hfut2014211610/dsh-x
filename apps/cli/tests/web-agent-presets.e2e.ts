@@ -86,6 +86,11 @@ async function bootWeb(
     // back on the next run, so a stored document from any other build decides
     // this test's boot. Same reason the settings row above is pinned.
     { id: 'storage-json', config: { root: storageRoot } },
+    // The instance lock's home defaults to , which here is the
+    // developer's own — and this file boots several contexts, so it would both
+    // write into a real harness home and have them claim it from each other.
+    // Pinned for the same reason the two rows above are.
+    { id: 'instance-lock', config: { dshHome: dirname(settingsFile), profile: 'test' } },
     // Host rows with side effects outside this process: a bound port, a served
     // asset tree, a telemetry exporter. `api-gateway` and `directory-picker`
     // stay ENABLED on purpose — the api-proxy is the host row that injects

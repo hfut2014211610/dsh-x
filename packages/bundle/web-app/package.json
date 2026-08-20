@@ -94,6 +94,7 @@
     "@deepseek-ai/dsh-host-directory-picker-browse": "workspace:^",
     "@deepseek-ai/dsh-host-directory-picker-native": "workspace:^",
     "@deepseek-ai/dsh-host-plugin-control": "workspace:^",
+    "@deepseek-ai/dsh-host-instance-lock": "workspace:^",
     "@deepseek-ai/dsh-host-plugin-inventory": "workspace:^",
     "@deepseek-ai/dsh-host-webserver": "workspace:^",
     "@deepseek-ai/dsh-message-feedback": "workspace:^",

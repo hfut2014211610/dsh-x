@@ -114,6 +114,16 @@
     - id: plugin-control
       name: '@deepseek-ai/dsh-host-plugin-control'
 
+    # One runtime per harness home. Two of them share the session directory,
+    # whose logs carry one sequence each and take no lock, so the second one
+    # does not collide loudly — it interleaves numbering. Refuses to start
+    # rather than managing the overlap; a one-shot command never boots this
+    # bundle and is unaffected.
+    - id: instance-lock
+      name: '@deepseek-ai/dsh-host-instance-lock'
+      config:
+        profile: web
+
     # The API gateway: the transport-agnostic dispatch face every client shape
     # shares. The base layer's agent-default-model service owns the default model.
     - id: api-gateway
