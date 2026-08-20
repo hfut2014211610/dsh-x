@@ -41,6 +41,7 @@ worktrees/
 
 # Desktop shell: electron-builder output and the release-assembled bundled runtime.
 apps/desktop/release/
+apps/desktop/release-*/
 apps/desktop/resources/
 
 # Local release-packaging workspace (personal/scripts/build-windows.mjs).
@@ -52,3 +53,8 @@ apps/desktop/resources/
 
 # Personal design docs (local drafts, not committed).
 personal/docs/design/
+
+# Word/RTF exports of personal/docs sources — regenerate from the .md, do not commit.
+personal/docs/**/*.rtf
+personal/docs/**/*.doc
+personal/docs/**/*.docx
