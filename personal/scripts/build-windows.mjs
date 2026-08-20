@@ -113,9 +113,10 @@ const packFamily = async (memberDirs, destination) => {
 
 console.log('[build-windows] 1/6 building lib, web, and the desktop shell')
 if (!skipBuild) {
-  // 完整构建而不是 build:lib+build:web 分步：rc.8 起客户端门禁要求消费方
-  // 先有 .dsh-build/client-build-environment.json，只有根 build 会写它。
-  run('pnpm', ['run', 'build'])
+  // official 完整构建而不是 build:lib+build:web 分步：rc.8 起客户端门禁要求
+  // 消费方先有 .dsh-build/client-build-environment.json，且 packed 运行时的
+  // release verify 只认 official profile 的记录——只有 build:official 会写。
+  run('pnpm', ['run', 'build:official'])
 }
 run('npx', ['tsc', '-b', 'apps/desktop/tsconfig.json'])
 

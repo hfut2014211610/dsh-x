@@ -66,10 +66,10 @@ jobs:
         shell: pwsh
         run: |
           pnpm run desktop:prepare
-          # A complete root build, not build:lib+build:web: client consumers
-          # require the .dsh-build client build record only the full build
-          # writes.
-          pnpm run build
+          # The official-profile complete build, not build:lib+build:web: the
+          # packed runtime's release verify requires the .dsh-build client
+          # build record only this build writes, with the official profile.
+          pnpm run build:official
           npx tsc -b apps/desktop/tsconfig.json
 
       - name: Assemble the bundled dsh runtime archive
@@ -164,10 +164,10 @@ jobs:
       - name: Build the shell and its runtime inputs
         run: |
           pnpm run desktop:prepare
-          # A complete root build, not build:lib+build:web: client consumers
-          # require the .dsh-build client build record only the full build
-          # writes.
-          pnpm run build
+          # The official-profile complete build, not build:lib+build:web: the
+          # packed runtime's release verify requires the .dsh-build client
+          # build record only this build writes, with the official profile.
+          pnpm run build:official
           npx tsc -b apps/desktop/tsconfig.json
 
       - name: Assemble the bundled dsh runtime archive
@@ -243,7 +243,7 @@ jobs:
       - name: Build and package
         run: |
           pnpm run desktop:prepare
-          pnpm run build
+          pnpm run build:official
           npx tsc -b apps/desktop/tsconfig.json
           stage="$RUNNER_TEMP/dsh-runtime-stage"
           npm install --prefix "$stage" --omit=dev "@deepseek-ai/dsh@latest"
