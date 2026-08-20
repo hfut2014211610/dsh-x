@@ -4,12 +4,12 @@ Status: implemented
 
 ## 问题
 
-1. **托盘图标是个蓝底白 X 的占位图**。`apps/desktop/scripts/generate-icons.mjs` 用 SDF 手绘的就是这个 X，应用图标（`build/icon.png`）同理。用户要求应用图标与托盘图标统一使用 `website/public/favicon.svg` 的鲸鱼标志。
+1. **托盘图标是空白的**。根因不在图像内容：electron-builder 的 `files` 列表从来没装 `assets/tray.png`，asar 里没有这个文件，`nativeImage.createFromPath` 拿到空图。应用图标（`build/icon.png`）倒是有内容，但那也是 `generate-icons.mjs` 用 SDF 手绘的蓝底白 X 占位图。用户要求应用图标与托盘图标统一使用 `website/public/favicon.svg` 的鲸鱼标志。
 2. **从托盘 Quit 之后应用卡死不退出**。
 
 ## 决策
 
-**图标从 favicon 的路径直接栅格化，仍然零二进制工具依赖**。脚本读 `website/public/favicon.svg` 的唯一一条 `<path>`（只有 M/C/Z 三种命令，nonzero 填充），把贝塞尔曲线固定 32 段拍平成折线，超采样扫描线填充，输出 `build/icon.png`（1024）与 `assets/tray.png`（32），背景全透明。脚本对路径命令集有断言：favicon 将来若长出 `A`（圆弧）等命令，重新生成会失败报错而不是悄悄画错。electron-builder 在 Windows 侧继续从 `icon.png` 推导安装器图标。
+**两件事一起修**：`files` 列表加上 `assets/tray.png`（并注释为什么它必须在 asar 里）；图像本体从 favicon 的路径直接栅格化，仍然零二进制工具依赖。脚本读 `website/public/favicon.svg` 的唯一一条 `<path>`（只有 M/C/Z 三种命令，nonzero 填充），把贝塞尔曲线固定 32 段拍平成折线，超采样扫描线填充，输出 `build/icon.png`（1024）与 `assets/tray.png`（32），背景全透明。脚本对路径命令集有断言：favicon 将来若长出 `A`（圆弧）等命令，重新生成会失败报错而不是悄悄画错。electron-builder 在 Windows 侧继续从 `icon.png` 推导安装器图标。
 
 **Quit 卡死按两道防线修**：
 
@@ -20,5 +20,6 @@ Status: implemented
 
 | 事项 | 状态 |
 |---|---|
+| 版本号 | 顺带把 `extraMetadata.version` 提到 `0.1.0-rc.8-x.0.5`：合并后基线是 rc.8，且应用内更新按版本比较，验收包必须能和昨天的 x.0.4 区分 |
 | 卡死的原始复现 | 无法在本机稳定无头复现；重入缺陷是真实的代码路径，兜底保证最坏情况 3 秒内退出，验收时以实际表现为准 |
 | 图标风格 | 不再有圆角底板，鲸鱼直接立在透明底上，与网站一致 |

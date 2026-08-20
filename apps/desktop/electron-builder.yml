@@ -18,7 +18,7 @@ productName: DeepSeek Harness
 # packaged manifest, so it is what `app.getVersion()` reports, what the
 # installer filenames carry, and what the update check compares.
 extraMetadata:
-  version: 0.1.0-rc.7-x.0.4
+  version: 0.1.0-rc.8-x.0.5
 # Where the in-app update check looks. Without this electron-builder infers the
 # target from the package manifest's `repository`, which is UPSTREAM — every
 # installed app would then check releases that never carry this fork's builds.
@@ -37,6 +37,9 @@ files:
   - preload.cjs
   - loading.html
   - loading.js
+  # The tray reads this out of the asar at runtime; leave it out and the
+  # nativeImage is empty, which is the blank-tray failure this entry fixed.
+  - assets/tray.png
 extraResources:
   # The bundled runtime ships as ONE archive: this electron-builder build
   # strips node_modules from resource copies entirely (a supply-chain rule),
