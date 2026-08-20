@@ -141,6 +141,25 @@ describe('WritingView', () => {
     expect(b.list).toHaveBeenCalled()
   })
 
+  // The panel starts closed because a tree of nothing is worth nobody's
+  // screen. The moment the session writes something, that stops being true.
+  it('brings the tree out when the session writes its first document', async () => {
+    const b = setup({ panelClosed: true })
+    expect(b.view.queryByRole('tree', { name: zh['tree.label'] })).toBeNull()
+
+    act(() => {
+      b.changed()?.({
+        sessionId: SID,
+        path: 'docs/新建产物.md',
+        baseVersion: null,
+        version: 'v1',
+        patches: null,
+      } as unknown as DocumentChange)
+    })
+
+    expect(await b.view.findByRole('tree', { name: zh['tree.label'] })).toBeTruthy()
+  })
+
   // The sidebar's top field used to take a path and open it. As a filter it
   // answers the far more common question — where is that file — without
   // making someone click through folders to ask it.

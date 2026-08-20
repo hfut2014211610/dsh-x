@@ -80,10 +80,29 @@ describe('UedView', () => {
     expect(screen.queryByRole('button', { name: 'notes.md' })).toBeNull()
   })
 
-  it('says the folder is empty rather than showing a bare list', async () => {
+  // A design session that has produced nothing yet used to spend a third of
+  // its width on a rail whose only content was the word "empty".
+  // The rail with a prototype in it is the first test in this file; this is
+  // the other half — a workspace with nothing in it yet gets no rail at all,
+  // and no separator to drag one out of.
+  it('keeps the rail away until the session has a prototype', async () => {
     renderView({ list: vi.fn(() => Promise.resolve(listing([]))) })
 
+    await screen.findByText(en['preview.none'])
+    expect(screen.queryByRole('complementary', { name: en['files.label'] })).toBeNull()
+    expect(screen.queryByText(en['files.empty'])).toBeNull()
+    expect(screen.queryByRole('separator', { name: en['files.resize'] })).toBeNull()
+  })
+
+  // A subdirectory that is empty keeps its rail: the way back out is in it,
+  // and "nothing here" is the answer to a question the person just asked.
+  it('keeps an empty subfolder listed, with the way back up', async () => {
+    const list = vi.fn((path?: string) => Promise.resolve(path === undefined ? ROOT : listing([])))
+    renderView({ list })
+
+    fireEvent.click(await screen.findByRole('button', { name: 'pages' }))
     expect(await screen.findByText(en['files.empty'])).toBeTruthy()
+    expect(screen.getByRole('button', { name: en['files.up'] })).toBeTruthy()
   })
 
   it('reports why the listing failed', async () => {
@@ -327,7 +346,10 @@ describe('UedView', () => {
 
     // No translate, no list, no load: the view must still mount, because a
     // composition that failed to inject them is a wiring bug, not a crash.
-    expect(screen.getByLabelText('files.label')).toBeTruthy()
-    expect(screen.getByText('files.loading')).toBeTruthy()
+    // Nothing can be listed without a list callback, so the rail stays away
+    // for the same reason it does before the first prototype.
+    expect(screen.getByLabelText('preview.label')).toBeTruthy()
+    expect(screen.getByText('preview.none')).toBeTruthy()
+    expect(screen.queryByLabelText('files.label')).toBeNull()
   })
 })

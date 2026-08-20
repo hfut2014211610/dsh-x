@@ -494,6 +494,8 @@ export function WritingView({
    * longer just watching.
    */
   const following = useRef(true)
+  /** Whether the tree has already been brought out for the first artifact. */
+  const treeRevealed = useRef(false)
   draftRef.current = draft
   savedContentRef.current = savedContent
   // Mirrored every render so parking has nothing to close over: a `park` that
@@ -588,6 +590,15 @@ export function WritingView({
     setEntries(await outline(normalizedPath))
     setStatus(source === 'external' ? 'external' : 'saved')
     if (source === 'manual') setPanel(null)
+    // A tree of nothing is worth nobody's screen, which is why the panel
+    // starts closed. A document arriving without anyone asking for it — the
+    // session just wrote one, or reopened one it wrote before — is the first
+    // evidence there is something to navigate, so the tree comes out then.
+    // Once per mount: a panel someone closed stays closed.
+    if (source === 'external' && !treeRevealed.current) {
+      treeRevealed.current = true
+      setPanel('document')
+    }
   }, [load, loadDirectory, outline, park, restore])
 
   useEffect(() => {

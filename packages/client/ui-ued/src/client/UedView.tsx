@@ -187,70 +187,87 @@ export function UedView({
   const directories = listing.entries.filter(entry => entry.kind === 'directory')
   const prototypes = listing.entries.filter(entry => entry.kind === 'file' && isPreviewable(entry.name))
 
-  return (
-    <div className={css.root} style={{ gridTemplateColumns: `${String(railWidth)}px auto minmax(0, 1fr)` }}>
-      <aside className={css.files} aria-label={label('files.label')}>
-        <header className={css.filesHeader}>
-          <span className={css.filesTitle}>{label('files.label')}</span>
-          <button
-            type="button"
-            className={css.iconButton}
-            aria-label={label('files.refresh')}
-            onClick={() => { void refreshListing(directory) }}
-          >
-            <IconRefreshOutline16 />
-          </button>
-        </header>
-        <div className={css.crumb}>{directory === '' ? '/' : `/${directory}`}</div>
-        {directory !== '' && (
-          <button
-            type="button"
-            className={css.row}
-            onClick={() => { setDirectory(parentOf(directory)) }}
-          >
-            <IconChevronRightOutline14 className={css.up} />
-            <span>{label('files.up')}</span>
-          </button>
-        )}
-        {listing.status === 'loading' && <p className={css.hint}>{label('files.loading')}</p>}
-        {listing.status === 'error' && (
-          <p className={css.error}><IconWarningOutline16 /> {listing.error ?? label('files.error')}</p>
-        )}
-        {listing.status === 'ready' && directories.map(entry => (
-          <button
-            key={entry.path}
-            type="button"
-            className={css.row}
-            onClick={() => { setDirectory(entry.path) }}
-          >
-            <IconFolderClose16 className={css.rowFolder} />
-            <span>{entry.name}</span>
-          </button>
-        ))}
-        {listing.status === 'ready' && prototypes.map(entry => (
-          <button
-            key={entry.path}
-            type="button"
-            className={entry.path === selected ? `${css.row} ${css.rowActive}` : css.row}
-            aria-pressed={entry.path === selected}
-            onClick={() => { open(entry.path) }}
-          >
-            <IconCodeOutline16 className={css.rowFile} />
-            <span>{entry.name}</span>
-          </button>
-        ))}
-        {listing.status === 'ready' && directories.length === 0 && prototypes.length === 0 && (
-          <p className={css.hint}>{label('files.empty')}</p>
-        )}
-      </aside>
+  // A design session that has produced nothing yet had a rail holding a third
+  // of the width to say so. It comes out with the first prototype, and while
+  // the listing is still in flight it stays away rather than appearing and
+  // withdrawing. Inside a subdirectory the rail stays whatever it holds — the
+  // way back up is in it — and a listing that failed keeps it to say why.
+  const railEmpty = directory === ''
+    && listing.status !== 'error'
+    && directories.length === 0
+    && prototypes.length === 0
 
-      <ResizeHandle
-        width={railWidth}
-        min={RAIL_MIN}
-        max={RAIL_MAX}
-        onResize={setRailWidth}
-        label={label('files.resize')}
-      />
+  return (
+    <div
+      className={css.root}
+      style={{ gridTemplateColumns: railEmpty ? 'minmax(0, 1fr)' : `${String(railWidth)}px auto minmax(0, 1fr)` }}
+    >
+      {!railEmpty && (
+        <aside className={css.files} aria-label={label('files.label')}>
+          <header className={css.filesHeader}>
+            <span className={css.filesTitle}>{label('files.label')}</span>
+            <button
+              type="button"
+              className={css.iconButton}
+              aria-label={label('files.refresh')}
+              onClick={() => { void refreshListing(directory) }}
+            >
+              <IconRefreshOutline16 />
+            </button>
+          </header>
+          <div className={css.crumb}>{directory === '' ? '/' : `/${directory}`}</div>
+          {directory !== '' && (
+            <button
+              type="button"
+              className={css.row}
+              onClick={() => { setDirectory(parentOf(directory)) }}
+            >
+              <IconChevronRightOutline14 className={css.up} />
+              <span>{label('files.up')}</span>
+            </button>
+          )}
+          {listing.status === 'loading' && <p className={css.hint}>{label('files.loading')}</p>}
+          {listing.status === 'error' && (
+            <p className={css.error}><IconWarningOutline16 /> {listing.error ?? label('files.error')}</p>
+          )}
+          {listing.status === 'ready' && directories.map(entry => (
+            <button
+              key={entry.path}
+              type="button"
+              className={css.row}
+              onClick={() => { setDirectory(entry.path) }}
+            >
+              <IconFolderClose16 className={css.rowFolder} />
+              <span>{entry.name}</span>
+            </button>
+          ))}
+          {listing.status === 'ready' && prototypes.map(entry => (
+            <button
+              key={entry.path}
+              type="button"
+              className={entry.path === selected ? `${css.row} ${css.rowActive}` : css.row}
+              aria-pressed={entry.path === selected}
+              onClick={() => { open(entry.path) }}
+            >
+              <IconCodeOutline16 className={css.rowFile} />
+              <span>{entry.name}</span>
+            </button>
+          ))}
+          {listing.status === 'ready' && directories.length === 0 && prototypes.length === 0 && (
+            <p className={css.hint}>{label('files.empty')}</p>
+          )}
+        </aside>
+      )}
+
+      {!railEmpty && (
+        <ResizeHandle
+          width={railWidth}
+          min={RAIL_MIN}
+          max={RAIL_MAX}
+          onResize={setRailWidth}
+          label={label('files.resize')}
+        />
+      )}
 
       <section className={css.stage} aria-label={label('preview.label')}>
         <header className={css.stageHeader}>
