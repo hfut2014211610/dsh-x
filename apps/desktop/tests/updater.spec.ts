@@ -168,6 +168,7 @@ describe('downloadUpdate', () => {
     assetUrl: 'https://example.invalid/setup.exe',
     releaseUrl: 'https://example.invalid/release',
     detail: '',
+    notes: '',
   }
   const CHANNEL = 'files:\n  - url: DeepSeek%20Harness%20Setup%200.4.0.exe\n    sha512: Z29vZA==\n'
 
