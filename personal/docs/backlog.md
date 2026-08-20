@@ -9,13 +9,11 @@
 | # | 事项 | 状态 | 落点 |
 |---|---|---|---|
 | L | DSH_HOME 写锁：第二个 runtime 该拒绝启动，而不是让后来者去杀先到者 | 待做 | 是 #G 的病根。会话 JSONL 写入侧**没有**跨进程保护，#G 的修复只补了读取侧 |
-| K | 插件挂了如何自救 | 待做 | off→on 能复活（已钉测试）；难点是死掉的插件留下的 lark-cli event consumer 孤儿，同 `owned-runtime.ts` 套路 |
+| K | 插件挂了如何自救 | 🟡 孤儿那半已修 | 被直接杀掉的桥接留下的 lark-cli 消费者现在下次启动会被回收（`c20d926567`，pid + EventKey 双证据）。剩下的是**插件本身**的自救：意图记住了、退避重启还没做，现在还是要人去设置页 off→on |
 | 9 | UED 预览支持标注组件 / 加入对话；层叠元素可选中被遮挡项 | ⏸ 需定范围（大件） | iframe 是 `allow-scripts` 且不与 `allow-same-origin` 同列，宿主拿不到里面的 DOM。要注入受控拾取脚本 + postMessage，且不能破坏现有隔离断言 |
-| N | `test:web` 在 Windows 上过不去 | 待做 | 15 个文件红，一条根因：本机 shipped composition 给 `pwsh`，golden 期望 `bash`。为 POSIX 写的测试撞 win32，不是回归 |
+| N | `test:web` 在 Windows 上过不去 | 🟡 断言那半已修 | 直接断言工具目录的两个文件（`shipped-composition`、`web-agent-presets`）已改成认平台，本机全绿。剩下的是**重放夹具**那一类：录制时模型调的是 `bash`，win32 上目录里没有这个名字，于是「unknown tool」。要治得让这条 lane 把 shell 钉死成 POSIX 那只——而 shell 的选择在 preset 里，scaffold 的 patch 够不着 preset 子树 |
 | O | 安装包不带 `personal/` | 待做 | `scripts/release/families.ts:311` 只 glob `packages/*/*/package.json` 与 `apps/*/package.json`。飞书通道、model-tuning 装完就没有 |
 | Q | `personal/plugins/` 下两份模型中心旧副本 | ⏸ 卡在迁移 | **`headless` profile 正在用旧副本**（它的 `dsh.profile.bundles` 里就有），删了会直接坏掉。`web` profile 不受影响（走 web-app bundle 里毕业后的那个）。两边插件名同为 `dsh-x-model-hub`、settings 段同为 `dsh-x-model-hub:`，所以**不需要迁移设置**；但毕业后的包没有 `cordis.patch.yml`，当不了 bundle，headless 得改用 `dsh plugin --profile headless add`。这是动你本机 profile，等你点头 |
-| T | 飞书端到端未通 | ⏸ 已交给你的 codex | 消息能收到（日志里 6 条被 `group-not-allowed` 挡下），差准入名单 + 卡片回调订阅。三方入口要的是**一条命令**，不是命名管道路径 |
-| U | A/B 两种飞书接入模式能否同时生效 | 待你定 | 你说过「本质不冲突」。真要身份走 A、事件来源走 B，得把 `mode` 拆成两个独立维度 |
 
 ## 部分完成
 
@@ -23,6 +21,12 @@
 |---|---|---|---|
 | B | 加「关于」菜单，呈现更新日志 + 版本更新操作 | 桌面托盘有「关于」了：版本、运行时版本与来源、附着还是自起、窗口指向的 origin | **web 端入口没有**；**更新日志没有**（托盘另有一条「检查更新」，但不在「关于」里） |
 | C | 合并预览与编辑窗口，在预览状态下直接编辑 | 点一块就地改它的源文（`8dc3293d17`），围栏代码与展示公式也可点（`42b22d1223`）；Cmd/Ctrl+Enter 或点开落定，Esc 丢弃 | 「**弱化代码性、强调内容**」那半没做——改的仍是 Markdown 源文，不是所见即所得 |
+
+## 搁置
+
+| # | 事项 | 为什么搁置 |
+|---|---|---|
+| U | A/B 两种飞书接入模式同时生效（身份走 A、事件来源走 B） | 用户 2026-08-20 决定暂不考虑。真要做得把 `mode` 拆成两个独立维度，动配置结构 |
 
 ## 已完成
 
@@ -47,6 +51,7 @@
 | M | 写作模式沙箱围栏漏洞 `674d487be1` | `.docx`/`.xlsx` 编辑路径绕过围栏直接 `node:fs` 写 |
 | P | 打包速度优化 `a1228e7841` | 并发打包 + `--reuse-runtime`；完整 97s / 桌面 40s |
 | V | 版本方案：上游版本号 + fork 后缀 `b1945091dc` | 224 个 manifest 与上游一致；fork 身份在 `electron-builder.yml` |
+| T | 飞书端到端 | ✅ 用户实测通了（2026-08-20）。dsh 侧的出站身份、桥接配置、连接器卡片见本会话前半段 |
 | A | 写作产物落进受管目录 `75c7056c24` | `writing` 与 `ued` 的 policy 现在说了产物落哪：用户指定处或工作区根，不进项目自有的文档树/源码树 |
 | D | 写作 / UED 默认不展开文件目录 `e62eda2bb8` `dd52743cda` | 写作面板默认折起，第一份非人工打开的产物到达时自己出来；设计栏在有原型前干脆不存在 |
 | R | 写作模式笔记状态订正 `HEAD` | 九条验收逐条核过并写进笔记；第九条缺的那半——组装后的写作会话零断言——本轮补上了 |
