@@ -32,9 +32,17 @@ const FILE_REFERENCE_PROMPT = fileURLToPath(new URL(
  * `mcp_*` servers spawn outside `ctx.shell`. The composition Agent Note owns the
  * rationale and its sources.
  */
+/**
+ * The shell tool the shipped composition actually mounts here: `tool-bash` on
+ * POSIX, `tool-pwsh` on Windows, chosen by the bundle row's own
+ * `process.platform` guard. Asserting the literal `bash` asserts the host
+ * rather than the product.
+ */
+const SHELL_TOOL = process.platform === 'win32' ? 'pwsh' : 'bash'
+
 const EXPECTED_TOOLS = [
   'ask_user_question',
-  'bash',
+  SHELL_TOOL,
   'create_goal',
   'edit',
   'exit_plan_mode',
@@ -88,7 +96,7 @@ it('assembles the shipped Web catalog, file-reference guidance, and confined acc
   })
   try {
     const names = ctx.tools.schemas(handle.agent).map(schema => schema.name).sort()
-    expect(names.filter(name => !RIPGREP_TOOLS.includes(name))).toEqual(EXPECTED_TOOLS)
+    expect(names.filter(name => !RIPGREP_TOOLS.includes(name))).toEqual([...EXPECTED_TOOLS].sort())
     // The packaged ripgrep binary ships with the dependency, so the pair is a
     // fixed roster member on every host.
     expect(names.filter(name => RIPGREP_TOOLS.includes(name))).toEqual(RIPGREP_TOOLS)
@@ -142,9 +150,11 @@ it('lets a preset producer reach the background-job registry', async () => {
     const started = await ctx.tools.execute({
       signal,
       callId: CallId('shipped-bash-background'),
-      name: 'bash',
+      name: SHELL_TOOL,
       arguments: {
-        command: 'printf SHIPPED_BACKGROUND_OK',
+        // `echo` rather than `printf`: both shells have it, and the assertion
+        // below only needs the marker to appear in the collected output.
+        command: 'echo SHIPPED_BACKGROUND_OK',
         description: 'shipped background probe',
         run_in_background: true,
       },
@@ -152,7 +162,7 @@ it('lets a preset producer reach the background-job registry', async () => {
     })
     expect({ isError: started.isError, content: started.content }).toEqual({
       isError: false,
-      content: [{ type: 'text', text: 'started background job bash-1' }],
+      content: [{ type: 'text', text: `started background job ${SHELL_TOOL}-1` }],
     })
 
     // The controller reads what the producer started: same registry, one
@@ -166,7 +176,7 @@ it('lets a preset producer reach the background-job registry', async () => {
     })
     expect(listed.isError).toBe(false)
     expect(listed.content).toEqual([
-      { type: 'text', text: expect.stringContaining('bash-1 [bash]') as unknown as string },
+      { type: 'text', text: expect.stringContaining(`${SHELL_TOOL}-1 [${SHELL_TOOL}]`) as unknown as string },
     ])
 
     // The full round trip: the output a host-plane producer wrote is collected
@@ -175,7 +185,7 @@ it('lets a preset producer reach the background-job registry', async () => {
       signal,
       callId: CallId('shipped-task-output'),
       name: 'job_output',
-      arguments: { job_id: 'bash-1', wait: true },
+      arguments: { job_id: `${SHELL_TOOL}-1`, wait: true },
       agent: handle.agent,
     })
     expect(collected.isError).toBe(false)
