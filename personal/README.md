@@ -6,6 +6,7 @@
 
 - **fork 的其余部分只跟踪上游**（`git fetch upstream && git merge upstream/master`，永远 fast-forward）。上游不会新增 `personal/` 顶层目录，因此合并零冲突。
 - 个性化优先走插件与配置，不打上游补丁。官方扩展点足够覆盖绝大多数需求（见仓库根的 [`docs/architecture.md`](../docs/architecture.md) 的 "Where new behavior goes"）。
+  **已知例外一处**：`packages/client/ui-primitives` 的 Markdown 渲染器加了一个默认关闭的 `sourcePositions` 开关，因为预览里直接编辑需要知道点到的块对应源文哪几个字符，而没有任何扩展点能给出这个。取舍与代价见[笔记](docs/notes/implemented/2026-08-20-markdown-source-positions.md)。
 - 本目录不进 pnpm workspace、不改根 `package.json` / `pnpm-workspace.yaml` / `AGENTS.md` 等上游文件。插件经仓库根 tsconfig paths 解析 `@deepseek-ai/*` 导入，与源码启动（`pnpm dsh`，tsx）共享模块实例，无需安装步骤。
 
 ## 内容
