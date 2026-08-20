@@ -376,14 +376,17 @@ describe('ChoiceField', () => {
 })
 
 describe('FeishuCard', () => {
-  const state: FeishuCardState = {
+  const base: FeishuCardState = {
     ...settled,
     plugin: running,
     auth: signedIn,
-    access: field('own'),
-    profile: field(''),
-    authFolded: false,
     bridge: { connected: false },
+    ready: false,
+    mode: field(''),
+    profileId: field('dsh'),
+    appId: field(''),
+    eventCommand: field(''),
+    workspace: field(''),
     presetId: field('ued'),
     density: field('standard'),
     flushMs: field('2500'),
@@ -395,24 +398,22 @@ describe('FeishuCard', () => {
     requireMention: field('true'),
     staleMs: field('600000'),
     reach: 'nobody',
+    settingsOpen: false,
+    setupOpen: false,
+    confirmingReset: false,
   }
 
-  /** 一个连上的桥接：订着两个应用。 */
-  const attached = {
-    connected: true,
-    bridge: {
-      apps: ['/home/me/.lark-cli', '/home/me/.lark-cli/agent-bus'],
-      dmMode: 'disabled',
-      dmAllowed: 0,
-      groupsAllowed: 0,
-      requireMention: true,
-    },
+  /** 接好了的样子：走 direct，扫过码，桥接也在跑。 */
+  const ready: Partial<FeishuCardState> = {
+    ready: true,
+    mode: field('direct'),
+    bridge: { connected: true, bridge: { apps: ['/lark/dsh'], dmMode: 'disabled', dmAllowed: 0, groupsAllowed: 0, requireMention: true } },
   }
 
   function cardProps(over: Partial<FeishuCardState>, actions: Record<string, unknown> = {}): FeishuCardProps {
     return {
       t,
-      useFeishuCard: (selector: (value: FeishuCardState) => unknown) => selector({ ...state, ...over }),
+      useFeishuCard: (selector: (value: FeishuCardState) => unknown) => selector({ ...base, ...over }),
       edit: vi.fn(),
       resetField: vi.fn(),
       readPresence: vi.fn(),
@@ -421,162 +422,150 @@ describe('FeishuCard', () => {
       selectDomain: vi.fn(),
       beginAuth: vi.fn(),
       cancelAuth: vi.fn(),
-      logout: vi.fn(),
-      toggleAuth: vi.fn(),
+      reopenSetup: vi.fn(),
+      toggleSettings: vi.fn(),
+      reset: vi.fn(),
       save: vi.fn(),
       discard: vi.fn(),
       ...actions,
     } as unknown as FeishuCardProps
   }
 
-  it('edits every field its own-app setup shows', () => {
-    const edit = vi.fn()
-    render(<FeishuCard {...cardProps({}, { edit })} />)
-    open()
-
-    fireEvent.change(screen.getByLabelText(zh['feishu.presetId.label']), { target: { value: 'writing' } })
-    fireEvent.change(screen.getByLabelText(zh['feishu.density.label']), { target: { value: 'detailed' } })
-    fireEvent.change(screen.getByLabelText(zh['feishu.flushMs.label']), { target: { value: '4000' } })
-    fireEvent.change(screen.getByLabelText(zh['feishu.approvalTimeoutMs.label']), { target: { value: '60000' } })
-    fireEvent.change(screen.getByLabelText(zh['feishu.endpoint.label']), { target: { value: '\\\\.\\pipe\\x' } })
-    fireEvent.change(screen.getByLabelText(zh['feishu.dmMode.label']), { target: { value: 'open' } })
-    fireEvent.change(screen.getByLabelText(zh['feishu.groupAllowlist.label']), { target: { value: 'oc_a\noc_b' } })
-    fireEvent.change(screen.getByLabelText(zh['feishu.requireMention.label']), { target: { value: 'false' } })
-
-    expect(edit.mock.calls).toEqual([
-      ['presetId', 'writing'],
-      ['density', 'detailed'],
-      ['flushMs', '4000'],
-      ['approvalTimeoutMs', '60000'],
-      ['endpoint', '\\\\.\\pipe\\x'],
-      ['dmMode', 'open'],
-      ['groupAllowlist', 'oc_a\noc_b'],
-      ['requireMention', 'false'],
-    ])
-  })
-
-  it('resets every field back to the composition layer', () => {
-    const resetField = vi.fn()
-    // 顺序就是屏幕上的顺序：先身份，再「谁能用」，最后「会话怎么跑」。
-    const names = [
-      'profile',
-      'dmMode', 'dmAllowlist', 'groupAllowlist', 'requireMention', 'staleMs',
-      'presetId', 'density', 'flushMs', 'approvalTimeoutMs', 'endpoint',
-    ] as const
-    const overridden = Object.fromEntries(names.map(name => [name, { ...state[name], overridden: true }]))
-    render(<FeishuCard {...cardProps(overridden, { resetField })} />)
-    open()
-
-    for (const button of screen.getAllByRole('button', { name: zh.reset })) fireEvent.click(button)
-
-    expect(resetField.mock.calls.flat()).toEqual([...names])
-  })
-
-  describe('两条接入方式', () => {
-    // 复用时 dsh 只是那条 socket 上的一个消费端：不报身份、不声明订阅、不配置
-    // 对面。这一页因此一个要填的东西都没有。
-    it('复用时什么都不用填', () => {
-      render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: attached })} />)
+  // 还没接入时摆一屏参数，等于让人调一个还不存在的东西；而常规那条路
+  // （自己的应用、扫个码）会被只跟另一条有关的选项埋掉。
+  describe('还没接入', () => {
+    it('只问怎么接，别的都不摆', () => {
+      render(<FeishuCard {...cardProps({})} />)
       open()
 
-      expect(screen.queryByLabelText(zh['feishu.profile.label'])).toBeNull()
-      expect(screen.queryByLabelText(zh['feishu.dmMode.label'])).toBeNull()
+      expect(screen.getAllByRole('radio')).toHaveLength(2)
+      expect(screen.queryByText(zh['feishu.settings.title'])).toBeNull()
+      expect(screen.queryByText(zh['feishu.status.title'])).toBeNull()
+      expect(screen.queryByLabelText(zh['feishu.profileId.label'])).toBeNull()
     })
 
-    it('单独申请要说清用哪份 profile', () => {
-      render(<FeishuCard {...cardProps({ access: field('own') })} />)
+    it('选了直接接入才问用哪个 profile', () => {
+      render(<FeishuCard {...cardProps({ mode: field('direct') })} />)
       open()
 
-      expect(screen.getByLabelText(zh['feishu.profile.label'])).toBeTruthy()
+      expect(screen.getByLabelText(zh['feishu.profileId.label'])).toBeTruthy()
+      expect(screen.queryByLabelText(zh['feishu.appId.label'])).toBeNull()
     })
 
-    it('那份 profile 的选项来自宿主找到的那几份', () => {
+    it('选了第三方桥接才问 app id 和事件命令', () => {
+      render(<FeishuCard {...cardProps({ mode: field('bridge') })} />)
+      open()
+
+      expect(screen.getByLabelText(zh['feishu.appId.label'])).toBeTruthy()
+      expect(screen.getByLabelText(zh['feishu.eventCommand.label'])).toBeTruthy()
+      expect(screen.queryByLabelText(zh['feishu.profileId.label'])).toBeNull()
+    })
+
+    it('选哪条路要写进设置', () => {
       const edit = vi.fn()
       render(<FeishuCard {...cardProps({}, { edit })} />)
       open()
 
-      fireEvent.change(screen.getByLabelText(zh['feishu.profile.label']), {
-        target: { value: '/home/me/.lark-cli' },
-      })
+      fireEvent.click(screen.getByRole('radio', { name: new RegExp(zh['feishu.mode.bridge']) }))
 
-      expect(edit).toHaveBeenCalledWith('profile', '/home/me/.lark-cli')
+      expect(edit).toHaveBeenCalledWith('mode', 'bridge')
     })
 
-    it('选另一条要写进设置', () => {
-      const edit = vi.fn()
-      render(<FeishuCard {...cardProps({}, { edit })} />)
+    // 扫码只属于「自己的应用」那条路；第三方那条根本没有可扫的东西。
+    it('扫码那一段只跟着直接接入出现', () => {
+      render(<FeishuCard {...cardProps({ mode: field('direct') })} />)
       open()
+      expect(screen.getByText(zh['auth.domains'])).toBeTruthy()
+      cleanup()
 
-      fireEvent.click(screen.getByRole('radio', { name: new RegExp(zh['feishu.access.reuse']) }))
-
-      expect(edit).toHaveBeenCalledWith('access', 'reuse')
-    })
-
-    // 写一个跑着的桥接永远不会读的设置，比不给这个控件更糟，所以那些字段不是
-    // 置灰，是根本没有——只把桥接自己报的规矩说出来。
-    it('复用时只报桥接现在的规矩', () => {
-      render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: attached })} />)
+      render(<FeishuCard {...cardProps({ mode: field('bridge') })} />)
       open()
-
-      expect(screen.queryByLabelText(zh['feishu.groupAllowlist.label'])).toBeNull()
-      expect(screen.getByText(zh['feishu.reach.byBridge'])).toBeTruthy()
-    })
-
-    it('单独申请时准入是可以改的', () => {
-      render(<FeishuCard {...cardProps({ access: field('own') })} />)
-      open()
-
-      expect(screen.getByLabelText(zh['feishu.dmMode.label'])).toBeTruthy()
-      expect(screen.queryByText(zh['feishu.reach.byBridge'])).toBeNull()
-    })
-
-    it('复用时把登录那一段收起来，但留着入口', () => {
-      const toggleAuth = vi.fn()
-      render(<FeishuCard {...cardProps({ access: field('reuse'), authFolded: true }, { toggleAuth })} />)
-      open()
-
       expect(screen.queryByText(zh['auth.domains'])).toBeNull()
-      fireEvent.click(screen.getByRole('button', { name: zh['auth.unfold'] }))
-
-      expect(toggleAuth).toHaveBeenCalled()
     })
   })
 
-  describe('桥接现在什么样', () => {
-    it('没连上就说没连上，别的都不摆', () => {
-      render(<FeishuCard {...cardProps({ access: field('reuse') })} />)
+  describe('接好了', () => {
+    it('摆状态，收起设置，给两个动作', () => {
+      render(<FeishuCard {...cardProps(ready)} />)
       open()
 
-      expect(screen.getByText(zh['feishu.bridge.offline'])).toBeTruthy()
-      expect(screen.queryByText(zh['feishu.bridge.apps'])).toBeNull()
+      expect(screen.getByText(zh['feishu.status.title'])).toBeTruthy()
+      expect(screen.getByText(zh['feishu.status.bridgeOn'])).toBeTruthy()
+      expect(screen.getByRole('button', { name: zh['feishu.action.reregister'] })).toBeTruthy()
+      expect(screen.getByRole('button', { name: zh['feishu.action.reset'] })).toBeTruthy()
     })
 
-    it('连上了就把它订着什么摆出来', () => {
-      render(<FeishuCard {...cardProps({ access: field('reuse'), bridge: attached })} />)
+    it('接入那一段收起来了，除非自己点开', () => {
+      render(<FeishuCard {...cardProps(ready)} />)
+      open()
+      expect(screen.queryByRole('radio')).toBeNull()
+      cleanup()
+
+      render(<FeishuCard {...cardProps({ ...ready, setupOpen: true })} />)
+      open()
+      expect(screen.getAllByRole('radio')).toHaveLength(2)
+    })
+
+    it('会话设置默认折着，点开才有', () => {
+      render(<FeishuCard {...cardProps(ready)} />)
+      open()
+      expect(screen.getByText(zh['feishu.settings.title'])).toBeTruthy()
+      expect(screen.queryByLabelText(zh['feishu.workspace.label'])).toBeNull()
+      cleanup()
+
+      render(<FeishuCard {...cardProps({ ...ready, settingsOpen: true })} />)
+      open()
+      expect(screen.getByLabelText(zh['feishu.workspace.label'])).toBeTruthy()
+      expect(screen.getByLabelText(zh['feishu.dmMode.label'])).toBeTruthy()
+    })
+
+    it('展开之后每个字段都能改', () => {
+      const edit = vi.fn()
+      render(<FeishuCard {...cardProps({ ...ready, settingsOpen: true }, { edit })} />)
       open()
 
-      expect(screen.getByText(zh['feishu.bridge.apps'])).toBeTruthy()
-      expect(screen.getByText('/home/me/.lark-cli/agent-bus')).toBeTruthy()
+      fireEvent.change(screen.getByLabelText(zh['feishu.workspace.label']), { target: { value: 'D:\\proj' } })
+      fireEvent.change(screen.getByLabelText(zh['feishu.dmMode.label']), { target: { value: 'open' } })
+
+      expect(edit.mock.calls).toEqual([['workspace', 'D:\\proj'], ['dmMode', 'open']])
     })
 
-  })
+    // 注销要把飞书那边的登录态也退掉，而设置页不该弹系统对话框问人，所以
+    // 第一次点只是待命。
+    it('注销要点两次', () => {
+      const reset = vi.fn()
+      render(<FeishuCard {...cardProps(ready, { reset })} />)
+      open()
+      fireEvent.click(screen.getByRole('button', { name: zh['feishu.action.reset'] }))
+      expect(reset).toHaveBeenCalledTimes(1)
+      cleanup()
 
-  // 默认拒绝是不出声的：模式是"只认名单"而名单是空的，渠道开着、授权也给了、
-  // 桥接也连上了，就是没有人能用。这一行是唯一说破它的地方。
-  describe('谁能用', () => {
-    it('谁都用不了要说出来', () => {
-      render(<FeishuCard {...cardProps({ reach: 'nobody' })} />)
+      render(<FeishuCard {...cardProps({ ...ready, confirmingReset: true })} />)
+      open()
+      expect(screen.getByRole('button', { name: zh['feishu.action.resetConfirm'] })).toBeTruthy()
+    })
+
+    // 默认拒绝是不出声的：渠道开着、授权也给了、桥接也在跑，就是没人能用。
+    it('没人能用要说破', () => {
+      render(<FeishuCard {...cardProps({ ...ready, reach: 'nobody' })} />)
       open()
 
       expect(screen.getByText(zh['feishu.reach.nobody'])).toBeTruthy()
     })
 
-    it('通了也说一声，免得人不确定改没改对', () => {
-      render(<FeishuCard {...cardProps({ reach: 'both' })} />)
+    it('通了也说一声', () => {
+      render(<FeishuCard {...cardProps({ ...ready, reach: 'both' })} />)
       open()
 
       expect(screen.getByText(zh['feishu.reach.both'])).toBeTruthy()
       expect(screen.queryByText(zh['feishu.reach.nobody'])).toBeNull()
+    })
+
+    it('桥接没在跑要看得出来', () => {
+      render(<FeishuCard {...cardProps({ ...ready, bridge: { connected: false } })} />)
+      open()
+
+      expect(screen.getByText(zh['feishu.status.bridgeOff'])).toBeTruthy()
     })
   })
 })

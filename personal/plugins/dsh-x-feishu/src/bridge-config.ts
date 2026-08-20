@@ -32,8 +32,8 @@ const NOTE_KEY = '//'
 
 /** 写进文件的那句话：告诉打开它的人这不是手改的地方。 */
 const NOTE = '由 dsh 的「设置 → 连接器 → 飞书」写出，桥接只读。手改这里的 endpoint / '
-  + 'eventEndpoint / eventConfigDirs / cardActionConfigDirs / policy / probeOrigin 会在下次保存时被盖掉；'
-  + 'launch 与 botOpenIds 不归设置页管，改了会留着。'
+  + 'eventEndpoint / eventConfigDirs / cardActionConfigDirs / eventCommand / policy / probeOrigin '
+  + '会在下次保存时被盖掉；launch 与 botOpenIds 不归设置页管，改了会留着。'
 
 /** 桥接怎么把不在的 dsh 拉起来。装机时定一次，不归设置页管。 */
 export interface BridgeLaunch {
@@ -55,6 +55,13 @@ export interface BridgeConfig {
   readonly eventConfigDirs: readonly string[]
   /** 卡片回调已在开发者后台订阅的应用；空数组表示与 {@link eventConfigDirs} 相同。 */
   readonly cardActionConfigDirs: readonly string[]
+  /**
+   * 替代 `lark-cli event consume` 的命令；空串表示照常 spawn lark-cli。
+   *
+   * 别的进程已经独占了那个 EventKey 时用它把事件引过来——一个 EventKey 只允许
+   * 一个消费者，抢不过就只能接一根管子。事件键作为最后一个参数追加。
+   */
+  readonly eventCommand: string
   /** 准入策略。 */
   readonly policy: AccessPolicy
   /**
@@ -76,7 +83,8 @@ export interface BridgeConfig {
  */
 export type PublishedBridgeFields = Pick<
   BridgeConfig,
-  'endpoint' | 'eventEndpoint' | 'eventConfigDirs' | 'cardActionConfigDirs' | 'policy' | 'probeOrigin'
+  'endpoint' | 'eventEndpoint' | 'eventConfigDirs' | 'cardActionConfigDirs'
+  | 'eventCommand' | 'policy' | 'probeOrigin'
 >
 
 /** 一次读取的结果。 */
@@ -100,6 +108,7 @@ export const DEFAULT_BRIDGE_CONFIG: BridgeConfig = {
   eventEndpoint: defaultEventRelayEndpoint(),
   eventConfigDirs: [],
   cardActionConfigDirs: [],
+  eventCommand: '',
   policy: DEFAULT_POLICY,
   botOpenIds: {},
   probeOrigin: 'http://127.0.0.1:13080',
@@ -189,6 +198,7 @@ export function normalizeBridgeConfig(parsed: unknown): BridgeConfig {
     eventEndpoint: text(record.eventEndpoint, DEFAULT_BRIDGE_CONFIG.eventEndpoint),
     eventConfigDirs: uniqueList(record.eventConfigDirs),
     cardActionConfigDirs: uniqueList(record.cardActionConfigDirs),
+    eventCommand: text(record.eventCommand, ''),
     policy: policyOf(record.policy),
     botOpenIds: botOpenIdsOf(record),
     probeOrigin: text(record.probeOrigin, DEFAULT_BRIDGE_CONFIG.probeOrigin),
@@ -251,6 +261,7 @@ export async function publishBridgeConfig(
     eventEndpoint: fields.eventEndpoint,
     eventConfigDirs: [...fields.eventConfigDirs],
     cardActionConfigDirs: [...fields.cardActionConfigDirs],
+    eventCommand: fields.eventCommand,
     policy: {
       dmMode: fields.policy.dmMode,
       dmAllowlist: [...fields.policy.dmAllowlist],

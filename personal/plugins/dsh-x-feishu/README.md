@@ -22,65 +22,64 @@
 
 ## 配置
 
-先选一条路（`access`），要填的东西差别很大：
+一切都在 dsh 的「设置 → 连接器 → 飞书」，或者等价的 `$DSH_HOME/settings.yaml`。
+桥接自己没有界面，它那份 `~/.dsh-x-feishu/config.json` 由插件写出，只读、并且盯着
+文件变——改完不用重起桥接。
 
-| | `own`——用 dsh 自己的应用 | `reuse`——复用已经在跑的桥接 |
+第一个问题是**接没接入**（`mode`）。还没接的时候卡片上只有两条路：
+
+| | `direct`——用 dsh 自己的飞书应用 | `bridge`——第三方桥接 |
 |---|---|---|
-| 桥接归谁 | dsh 的 | 别人的 |
-| 谁写 `~/.dsh-x-feishu/config.json` | dsh（一保存就写） | **谁都不写**，dsh 一个字都不碰 |
-| 订阅名单、准入名单在哪定 | 这一页 | 桥接那边 |
-| dsh 这一页要填什么 | 用哪份 profile + 准入名单 | **什么都不用填** |
+| 要填什么 | 一个 profile 名（默认 `dsh`） | app id + 替代 `lark-cli event consume` 的命令 |
+| 怎么接完 | 扫码授权 | 填完就算 |
+| 谁持有事件订阅 | 桥接自己 spawn lark-cli | 你给的那条命令 |
+| 推荐 | 是 | 高级用法，一般用不上 |
 
-复用时 dsh 就是那条 socket 上的一个消费端：连上去、收桥接给的、回话用被搭话的
-那个机器人。它不报身份、不声明订阅、不配置对面——桥接订了什么就给它什么。
+接好之后卡片只摆状态和两个动作（重新注册、注销配置），会话设置默认折起来。
 
 ```yaml
 # $DSH_HOME/settings.yaml
 dsh-x-feishu:
-  access: own           # own | reuse
-  profile: ''           # dsh 自己那个飞书应用；留空 = ~/.lark-cli/dsh-x。reuse 下只影响扫码授权
+  mode: direct          # '' 还没接入 | direct | bridge
+  profileId: dsh        # direct：用哪个 lark-cli profile，落在 ~/.lark-cli/dsh
+  appId: ''             # bridge：那些事件属于哪个飞书应用
+  eventCommand: ''      # bridge：替代 `lark-cli event consume` 的命令
 
-  # dsh 这一侧，两条路都有
-  endpoint: ''          # 连桥接的本地 socket，留空用平台默认
-  presetId: standard    # 飞书开的会话用哪个 agent 预设，留空用部署默认
+  # 会话设置（卡片上默认折叠）
+  workspace: ''         # 飞书开的会话落在哪个目录；留空落在 $DSH_HOME/feishu
+  presetId: standard    # 用哪个 agent 预设，留空用部署默认
   density: standard     # compact | standard | detailed
   flushMs: 2500
   approvalTimeoutMs: 300000
+  endpoint: ''          # 连桥接的本地 socket，留空用平台默认
 
-  # 准入。默认拒绝：名单不填谁都用不了。只有 own 会写到桥接那份配置里
+  # 谁能用。默认拒绝：名单不填谁都用不了
   dmMode: allowlist     # open | allowlist | disabled
   dmAllowlist: []       # 装 open_id
   groupAllowlist: []    # 装 chat_id，空 = 一个群都不放行
   requireMention: true
   staleMs: 600000
-
-  probeOrigin: ''       # 桥接探这个地址判断 dsh 在不在，留空用本进程自己的地址
 ```
 
 `~/.dsh-x-feishu/config.json` 里 `launch`（dsh 不在时用什么命令拉起来）和 `botOpenIds`
-（每个应用的机器人 open_id 手工覆盖）永远不归设置页管，`own` 模式写的时候也原样留着。
+（每个应用的机器人 open_id 手工覆盖）不归设置页管，写的时候原样留着。`mode` 还是空的
+时候一个字都不写——什么都没定，写下去只会让桥接按一份空配置起来。
 
-### 出站身份跟着入站走
+### 会话落在哪
 
-桥接可以同时订好几个飞书应用。事件从哪个应用进来，回它的消息、卡片就以那个应用的
-身份发——这不是讲究：卡片只能由发它的那个应用改，身份错了连进度都刷不动；机器人
-open_id 也是一个应用一个，拿 A 的去判 B 的 @，判出来永远是「没 @ 我」。
+`workspace` 留空时会话跑在 `$DSH_HOME/feishu`。那不是一个注册过的工作区，所以这些
+会话出现在「未分组」下——一条从聊天软件进来的消息，默认不该往你手上的项目里写东西。
+要它进某个项目，把那个目录填进去。
 
-所以 dsh 不需要声明自己是谁：`message` / `card-action` 帧带 `source` 字段说明这句话
-从哪个应用进来，桥接按会话记着，出站现查。relay 帧里也有同一个字段，别的订阅方
-要回话同样得以那个应用的身份回。
+### 第三方桥接怎么接
 
-### 单应用与多应用
+`eventCommand` 替代的是桥接原本要跑的 `lark-cli event consume <key> --as bot`。桥接会
+把事件键追加在你那条命令后面，整条交给 shell 跑，然后按行读 stdout 的 NDJSON。别的
+进程已经独占了那个 EventKey 时用它把事件引过来——一个 EventKey 只允许一个消费者。
 
-`own` 时桥接只订 dsh 自己那一个应用，`~/.dsh-x-feishu/config.json` 由这一页写出。
-
-`reuse` 时订阅表是桥接主人写的，可以有好几个应用——同一个群里有多个独立机器人时，
-飞书只把「@某机器人」的消息投给那个机器人所属的应用，所以桥接对每个应用各持有一份
-订阅，再汇进同一条 relay。同一应用 + EventKey 仍然只能有一个 consumer，而且全部归
-桥接所有；别的组件连 relay，不要自己起 `lark-cli event consume`。
-
-**注意**：桥接把过了准入的消息一律转给 socket 上那个 dsh。如果同一个应用还有别的
-agent 从 relay 读并且也会回话，那一句话会被答两次——要缩范围就改桥接的订阅名单。
+出站还是走 lark-cli：`appId` 用来在本机找回对应的 profile，回话、发卡片都以那个应用的
+身份发。事件从哪个应用进来，回它的就是谁——卡片只能由发它的那个应用改，身份错了连
+进度都刷不动。
 
 ## 跑起来
 

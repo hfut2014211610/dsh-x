@@ -9,25 +9,25 @@
  * 持有那唯一的消费者，dsh 反过来当它的客户端，就不需要任何交接、互斥和心跳。
  * socket 连着就等于 dsh 活着。
  *
- * 接入方式有两条，配置的分工跟着它走：
+ * 接入方式两条，{@link Config.mode} 说的就是它：
  *
- * - `own`——桥接就是 dsh 的，所以它那份配置也在这里：下面的字段一保存就写成
- *   `~/.dsh-x-feishu/config.json`，桥接只管读（见 `bridge-config.ts`）。
- * - `reuse`——桥接是别人已经在跑的，**dsh 一个字都不往那份配置里写**。它订哪些
- *   应用、放行谁，是桥接主人的事；dsh 只在连上时报一句「我是哪个飞书应用」。
+ * - `direct`——dsh 自己申请一个飞书应用，扫码授权就能用。桥接也就是 dsh 的，
+ *   所以它那份配置由这里写成 `~/.dsh-x-feishu/config.json`（见 `bridge-config.ts`）。
+ * - `bridge`——事件由别的进程供给，填一个替代 `lark-cli event consume` 的命令。
+ *   高级用法，一般用不上。
  *
- * `reuse` 下 dsh 只是一个消费端：桥接订了什么就给它什么，回话的身份按会话查回来，
- * 所以它连"我是谁"都不用说。
+ * 空串表示还没接入，卡片上只摆这两条路，别的一概不显示。
  *
  * ```yaml
  * # $DSH_HOME/settings.yaml
  * dsh-x-feishu:
- *   access: own           # own = dsh 自己的应用 | reuse = 复用别人的桥接
- *   profile: ''           # dsh 自己那个飞书应用；留空 = ~/.lark-cli/dsh-x
- *   endpoint: ''          # 留空用平台默认（win32 命名管道 / POSIX unix socket）
+ *   mode: direct          # '' 还没接入 | direct | bridge
+ *   profileId: dsh        # direct：用哪个 lark-cli profile
+ *   appId: ''             # bridge：那个飞书应用的 app id
+ *   eventCommand: ''      # bridge：替代 `lark-cli event consume` 的命令
+ *   workspace: ''         # 飞书开的会话落在哪个工作区，留空落在未分组
  *   presetId: standard    # 飞书开的会话用哪个 agent 预设
- *   density: standard     # compact | standard | detailed
- *   dmMode: allowlist     # 只有 own 才写出去；reuse 时这条归桥接
+ *   dmMode: allowlist     # 谁能私聊
  *   groupAllowlist: []    # 放行哪些群，装 chat_id
  * ```
  *
@@ -44,9 +44,10 @@ import type {} from '@deepseek-ai/dsh-user-approval'
 import type {} from '@deepseek-ai/dsh-storage-domain'
 import { BridgeClient } from './client.ts'
 import { FeishuAuthGateway } from './auth-gateway.ts'
+import { join } from 'node:path'
 import { DEFAULT_BRIDGE_CONFIG, bridgeConfigPath, publishBridgeConfig } from './bridge-config.ts'
 import { BridgeStatus } from './bridge-status.ts'
-import { dshConfigDir } from './auth.ts'
+import { DEFAULT_PROFILE_ID, dshHome, resolveConfigDir } from './auth.ts'
 import { defaultEventRelayEndpoint } from '../bridge/relay.ts'
 import { SessionRouter } from './router.ts'
 import { RunQueue } from './queue.ts'
@@ -70,14 +71,38 @@ const NS = settingsNamespace('dsh-x-feishu')
 /** 依赖。`agentPresets` 是可选的——没有预设组合的部署照样能跑。 */
 export const inject = ['agents', 'agentDefaultModel', 'sessions', 'storageDomain']
 
-/**
- * 插件配置。
- *
- * {@link Config.access} 决定后半截算谁的：`own` 时桥接就是 dsh 的，准入策略由这里
- * 写成 `~/.dsh-x-feishu/config.json`；`reuse` 时桥接是别人的，那几项只在这里放着，
- * 一个字都不写出去。
- */
+/** 插件配置。 */
 export interface Config {
+  /**
+   * 接入方式。空串表示还没接入——那时卡片上只有两条路可选，别的都不显示。
+   *
+   * `direct` 是常规路：dsh 自己一个飞书应用，扫码授权。`bridge` 是高级路：
+   * 事件由别的进程供给，dsh 只管消费。
+   */
+  mode: '' | 'direct' | 'bridge'
+  /**
+   * `direct`：用哪个 lark-cli profile，写名字不写路径，落在 `~/.lark-cli/<id>`。
+   *
+   * 单独一份、不跟环境默认共用：默认那份先到先得，谁跑过 `config init` 就是谁的，
+   * 而授权、退出登录都会改到它。
+   */
+  profileId: string
+  /** `bridge`：事件来自哪个飞书应用，写 app id。出站要按它找回本机的 profile。 */
+  appId: string
+  /**
+   * `bridge`：替代 `lark-cli event consume <key> --as bot` 的命令。
+   *
+   * 桥接会 spawn 它并按行读 NDJSON，事件键作为最后一个参数追加。别的进程已经
+   * 独占了那个 EventKey 时，用它把事件引过来——一个 EventKey 只允许一个消费者。
+   */
+  eventCommand: string
+  /**
+   * 飞书开的会话落在哪个工作区，写目录。
+   *
+   * 留空落在 `$DSH_HOME/feishu`——它不是注册过的工作区，所以这些会话会出现在
+   * 「未分组」下，不会混进你手上的项目里。
+   */
+  workspace: string
   /** 桥接的本地端点；留空用平台默认。 */
   endpoint: string
   /** 飞书开的会话用哪个 agent 预设；留空用部署默认。 */
@@ -88,22 +113,7 @@ export interface Config {
   flushMs: number
   /** 审批卡片等人点的上限。 */
   approvalTimeoutMs: number
-  /**
-   * 接入方式。
-   *
-   * `own`——dsh 有自己的飞书应用，桥接也就是它的，下面的准入策略由 dsh 写出去。
-   * `reuse`——复用别人已经在跑的桥接，dsh 不碰它那份配置，只报自己是谁。
-   */
-  access: 'own' | 'reuse'
-  /**
-   * dsh 自己那个飞书应用，写 lark-cli 的 profile 目录；留空表示
-   * `~/.lark-cli/dsh-x`。
-   *
-   * `own` 下它是桥接要订的那一个。`reuse` 下桥接订什么不归 dsh 管、回话的身份
-   * 也是按会话查回来的，所以那条路上它只决定"扫码授权动的是哪份 profile"。
-   */
-  profile: string
-  /** 单聊准入：`open` 谁都能用，`allowlist` 只认名单，`disabled` 一律不理。只有 `own` 写出去。 */
+  /** 单聊准入：`open` 谁都能用，`allowlist` 只认名单，`disabled` 一律不理。 */
   dmMode: 'open' | 'allowlist' | 'disabled'
   /** 单聊白名单，装 open_id。 */
   dmAllowlist: string[]
@@ -123,8 +133,11 @@ export const Config = z.object({
   density: z.union([z.const('compact'), z.const('standard'), z.const('detailed')]).default('standard'),
   flushMs: z.natural().default(2500),
   approvalTimeoutMs: z.natural().default(300_000),
-  access: z.union([z.const('own'), z.const('reuse')]).default('own'),
-  profile: z.string().default(''),
+  mode: z.union([z.const(''), z.const('direct'), z.const('bridge')]).default(''),
+  profileId: z.string().default(DEFAULT_PROFILE_ID),
+  appId: z.string().default(''),
+  eventCommand: z.string().default(''),
+  workspace: z.string().default(''),
   dmMode: z.union([z.const('open'), z.const('allowlist'), z.const('disabled')]).default('allowlist'),
   dmAllowlist: z.array(z.string()).default([]),
   groupAllowlist: z.array(z.string()).default([]),
@@ -187,31 +200,35 @@ export function apply(ctx: Context, config: Config): void {
     const declared = source().endpoint
     return declared === '' ? defaultEndpoint() : declared
   }
+  /** dsh 用的那份 lark-cli profile 目录。扫码授权、订阅、出站都认它。 */
+  const identity = (): string => resolveConfigDir(source().profileId)
+
   /**
-   * dsh 自己那个飞书应用。
+   * 飞书开的会话落在哪个目录。
    *
-   * `own` 下它是桥接要订的那一个，也是扫码授权动的那一个。`reuse` 下桥接订什么
-   * 不归 dsh 管，回话的身份也是按会话查回来的，所以这个值只剩下"扫码授权作用在
-   * 哪份 profile"这一层意思。留空都表示 dsh 自己那份。
+   * 留空给一个**不是注册过的工作区**的目录，这些会话就落在「未分组」下——一条
+   * 从聊天软件进来的消息，默认不该往你手上的项目里写东西。
    */
-  const identity = (): string => {
-    const declared = source().profile.trim()
-    return declared === '' ? dshConfigDir() : declared
+  const workspace = (): string => {
+    const declared = source().workspace.trim()
+    return declared === '' ? join(dshHome(), 'feishu') : declared
   }
 
-  // 只有 own 才写桥接那份配置：那种情况下桥接就是 dsh 的，而它没有界面也没有
-  // 设置服务，配置只能从这里去。reuse 时桥接是别人已经在跑的，它订哪些应用、
-  // 放行谁都是它主人的事，dsh 一个字都不写——要说的那一句在握手里说。
+  // 桥接没有界面也没有设置服务，它要的每一项都是人在这一页上决定的事，所以
+  // 由这里写出去。还没接入时不写——那时什么都还没定，写下去只会让桥接按一份
+  // 空配置起来。
   const publish = (): void => {
     const current = source()
-    if (current.access !== 'own') return
+    if (current.mode === '') return
     publishBridgeConfig({
       endpoint: endpoint(),
       eventEndpoint: defaultEventRelayEndpoint(),
-      // 就订 dsh 自己这一个。写成具体目录而不是留空，是因为留空在桥接那边意味着
-      // "跟着环境默认走"，而这台机器上的环境默认往往是别的工具的应用。
+      // 写成具体目录而不是留空：留空在桥接那边意味着"跟着环境默认走"，而这台
+      // 机器上的环境默认往往是别的工具的应用。
       eventConfigDirs: [identity()],
       cardActionConfigDirs: [],
+      // 事件换个来源。`direct` 下留空，桥接照常 spawn lark-cli。
+      eventCommand: current.mode === 'bridge' ? current.eventCommand.trim() : '',
       policy: {
         dmMode: current.dmMode,
         dmAllowlist: current.dmAllowlist,
@@ -279,7 +296,7 @@ export function apply(ctx: Context, config: Config): void {
       ctx: scoped,
       router,
       sink,
-      cwd: process.cwd(),
+      cwd: workspace,
       // 没选预设时读出 undefined，让驱动走部署默认。
       presetId: () => source().presetId === '' ? undefined : source().presetId,
       render: () => ({ density: source().density, argPreview: 80 }),

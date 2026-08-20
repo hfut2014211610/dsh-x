@@ -1,25 +1,24 @@
 /**
  * The Feishu channel's card.
  *
- * Three questions, in the order someone setting this up actually asks them:
- * where the messages come from, who is allowed to send them, and how a session
- * behaves once one starts.
+ * One question decides the whole layout: is this set up or not.
  *
- * The first is an either/or, and which branch you are on decides how much of
- * the rest is yours. Running dsh's own app means the bridge is dsh's too, so
- * this page owns its configuration. Reading from a bridge someone else runs
- * means almost none of it is: dsh says which app it is and nothing else, and
- * what the bridge subscribes to and lets through is shown as reported rather
- * than offered for editing. A control that writes a setting the running bridge
- * will never read is worse than no control.
+ * Not set up — two ways in and nothing else. Showing the knobs before the
+ * channel exists asks people to tune something that is not running yet, and
+ * the ordinary path (its own app, scan a code) gets buried among options that
+ * only matter to the other one.
+ *
+ * Set up — a status line, the settings folded away, and the two actions that
+ * undo it. A working channel needs no explaining; what it needs is a way to
+ * see it is working and a way out.
  */
 
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  BranchField, ChoiceField, ConnectorCard, FactRow, FieldGroup, ListField, OptionField, ValueField,
+  BranchField, ChoiceField, ConnectorCard, FactRow, FieldGroup, ListField, ValueField,
 } from './ConnectorCard.tsx'
 import { FeishuAuthPanel } from './FeishuAuthPanel.tsx'
-import type { FeishuAccess, FeishuCardFace, FeishuCardState } from './feishu-card-controller.ts'
+import type { FeishuCardFace, FeishuCardState, FeishuMode } from './feishu-card-controller.ts'
 import type { ConnectorsKey } from './locales.ts'
 import type {} from './slot-contract.ts'
 import css from './ConnectorCard.module.css'
@@ -45,9 +44,9 @@ const MENTION: ReadonlyArray<{ value: string; labelKey: ConnectorsKey }> = [
 ]
 
 /** The two ways in, ordinary one first. */
-const ACCESS: ReadonlyArray<{ value: FeishuAccess; nameKey: ConnectorsKey; whyKey: ConnectorsKey }> = [
-  { value: 'own', nameKey: 'feishu.access.own', whyKey: 'feishu.access.ownWhy' },
-  { value: 'reuse', nameKey: 'feishu.access.reuse', whyKey: 'feishu.access.reuseWhy' },
+const MODES: ReadonlyArray<{ value: FeishuMode; nameKey: ConnectorsKey; whyKey: ConnectorsKey }> = [
+  { value: 'direct', nameKey: 'feishu.mode.direct', whyKey: 'feishu.mode.directWhy' },
+  { value: 'bridge', nameKey: 'feishu.mode.bridge', whyKey: 'feishu.mode.bridgeWhy' },
 ]
 
 /** Which line says who can reach the channel as configured. */
@@ -58,14 +57,10 @@ const REACH: Record<FeishuCardState['reach'], ConnectorsKey> = {
   both: 'feishu.reach.both',
 }
 
-/**
- * The controls this card edits — the section fields, and only those. Named
- * separately from the card state because that also carries what is read but
- * never written: the plugin's presence, the sign-in panel, the bridge's report.
- */
+/** The controls this card edits — the section fields, and only those. */
 type FeishuField =
+  | 'mode' | 'profileId' | 'appId' | 'eventCommand' | 'workspace'
   | 'presetId' | 'density' | 'flushMs' | 'approvalTimeoutMs' | 'endpoint'
-  | 'access' | 'profile'
   | 'dmMode' | 'dmAllowlist' | 'groupAllowlist' | 'requireMention' | 'staleMs'
 
 /** Props the renderer binds for the Feishu card. */
@@ -83,8 +78,8 @@ export function FeishuCard(props: FeishuCardProps) {
   const { t } = props
   const state = props.useFeishuCard(snapshot => snapshot)
   const disabled = !state.writable
-  const access: FeishuAccess = state.access.text === 'reuse' ? 'reuse' : 'own'
-  const summary = state.bridge.bridge
+  const mode = state.mode.text
+  const user = state.auth.status?.user
   const field = (name: FeishuField) => ({
     t,
     disabled,
@@ -92,14 +87,8 @@ export function FeishuCard(props: FeishuCardProps) {
     onEdit: (text: string) => { props.edit(name, text) },
     onReset: () => { props.resetField(name) },
   })
-  // The profiles the host found, with dsh's own carrying the empty value so
-  // "not set" and "dsh's own" stay the same answer everywhere.
-  const profiles = state.auth.profiles.map(profile => ({
-    value: profile.owned ? '' : profile.configDir,
-    label: profile.owned
-      ? `${profile.name} · ${t('feishu.profile.own')}`
-      : profile.appId === undefined ? profile.name : `${profile.name} · ${profile.appId}`,
-  }))
+  // 接好了就不再摆接入那一段，除非人自己点开——除非它压根还没接好。
+  const showSetup = !state.ready || state.setupOpen
   return (
     <ConnectorCard
       t={t}
@@ -108,161 +97,189 @@ export function FeishuCard(props: FeishuCardProps) {
       absentKey="feishu.absent"
       state={state}
       presence={state.plugin}
+      runningKey={state.ready ? 'state.on' : 'state.unset'}
       onReadPresence={props.readPresence}
       onOpen={props.readAuth}
       onSetEnabled={props.setEnabled}
       onSave={props.save}
       onDiscard={props.discard}
-      auth={state.authFolded
+      auth={showSetup && mode === 'direct'
         ? (
-          <section className={css.auth}>
-            <h4 className={css.authHeading}>{t('auth.heading')}</h4>
-            <div className={css.folded}>
-              <p className={css.foldedWhy}>{t('auth.foldedReuse')}</p>
-              <button type="button" className={css.discard} onClick={props.toggleAuth}>
-                {t('auth.unfold')}
+          <FeishuAuthPanel
+            t={t}
+            state={state.auth}
+            onSelect={props.selectDomain}
+            onBegin={props.beginAuth}
+            onCancel={props.cancelAuth}
+            onReload={props.readAuth}
+          />
+        )
+        : undefined}
+    >
+      {state.ready
+        ? (
+          <FieldGroup t={t} titleKey="feishu.status.title">
+            <FactRow label={t('feishu.status.mode')}>
+              {t(mode === 'direct' ? 'feishu.mode.direct' : 'feishu.mode.bridge')}
+            </FactRow>
+            <FactRow label={t('feishu.status.app')}>
+              <code className={css.reason}>
+                {mode === 'direct' ? state.auth.status?.appId ?? '' : state.appId.text}
+              </code>
+            </FactRow>
+            {mode === 'direct' && user !== undefined
+              ? (
+                <FactRow label={t('feishu.status.user')}>
+                  {user.userName ?? user.openId ?? ''}
+                  <span className={css.authCount}>{user.scopes.length}</span>
+                  {t('auth.scopes')}
+                </FactRow>
+              )
+              : null}
+            <FactRow label={t('feishu.status.bridge')}>
+              {t(state.bridge.connected ? 'feishu.status.bridgeOn' : 'feishu.status.bridgeOff')}
+            </FactRow>
+            <p className={state.reach === 'nobody' ? css.absent : css.hint} role="status">
+              {t(REACH[state.reach])}
+            </p>
+            <div className={css.authActions}>
+              <button type="button" className={css.discard} onClick={props.reopenSetup}>
+                {t(state.setupOpen ? 'feishu.action.hideSetup' : 'feishu.action.reregister')}
+              </button>
+              <button
+                type="button"
+                className={state.confirmingReset ? css.save : css.discard}
+                disabled={disabled}
+                onClick={props.reset}
+              >
+                {t(state.confirmingReset ? 'feishu.action.resetConfirm' : 'feishu.action.reset')}
               </button>
             </div>
-          </section>
+          </FieldGroup>
         )
-        : (
+        : null}
+
+      {showSetup
+        ? (
           <>
-            <FeishuAuthPanel
+            <BranchField
               t={t}
-              state={state.auth}
-              onSelect={props.selectDomain}
-              onBegin={props.beginAuth}
-              onCancel={props.cancelAuth}
-              onLogout={props.logout}
-              onReload={props.readAuth}
+              labelKey="feishu.mode.label"
+              options={MODES}
+              value={mode}
+              disabled={disabled}
+              onChange={(value) => { props.edit('mode', value) }}
             />
-            {access === 'reuse'
+            {/* 选了才摆对应的那一组。没选之前这张卡片上只有上面那两个选项。 */}
+            {mode === 'direct'
               ? (
-                <div className={css.folded}>
-                  <p className={css.foldedWhy} />
-                  <button type="button" className={css.discard} onClick={props.toggleAuth}>
-                    {t('auth.fold')}
-                  </button>
-                </div>
+                <ValueField
+                  {...field('profileId')}
+                  labelKey="feishu.profileId.label"
+                  hintKey="feishu.profileId.hint"
+                />
+              )
+              : null}
+            {mode === 'bridge'
+              ? (
+                <>
+                  <ValueField
+                    {...field('appId')}
+                    labelKey="feishu.appId.label"
+                    hintKey="feishu.appId.hint"
+                  />
+                  <ValueField
+                    {...field('eventCommand')}
+                    labelKey="feishu.eventCommand.label"
+                    hintKey="feishu.eventCommand.hint"
+                  />
+                </>
               )
               : null}
           </>
-        )}
-    >
-      <BranchField
-        t={t}
-        labelKey="feishu.access.label"
-        options={ACCESS}
-        value={access}
-        disabled={disabled}
-        onChange={(value) => { props.edit('access', value) }}
-      />
-
-      {/* Reuse asks nothing: dsh is a consumer on that socket, so the only
-          thing to show is what the bridge is currently doing. Own app needs the
-          one field that says which app the bridge subscribes to and a scan
-          authorizes. */}
-      {access === 'reuse'
-        ? (
-          <FieldGroup t={t} titleKey="feishu.bridge.title" leadKey="feishu.bridge.lead">
-            {!state.bridge.connected || summary === undefined
-              ? <p className={css.absent} role="status">{t('feishu.bridge.offline')}</p>
-              : (
-                <FactRow label={t('feishu.bridge.apps')}>
-                  <span className={css.factList}>
-                    {summary.apps.map(app => <code className={css.reason} key={app}>{app}</code>)}
-                  </span>
-                </FactRow>
-              )}
-          </FieldGroup>
         )
-        : (
-          <OptionField
-            {...field('profile')}
-            labelKey="feishu.profile.label"
-            hintKey="feishu.profile.hint"
-            options={profiles}
-          />
-        )}
+        : null}
 
-      <FieldGroup t={t} titleKey="feishu.reach.title" leadKey="feishu.reach.lead">
-        {/* The standing answer, above the knobs that produce it. Deny-by-default
-            is silent otherwise: allowlist mode with an empty list is a channel
-            that is switched on, authorized, connected, and unusable. */}
-        <p className={state.reach === 'nobody' ? css.absent : css.hint} role="status">
-          {t(REACH[state.reach])}
-        </p>
-        {/* Reused bridges enforce their owner's rule, so this side reports it
-            rather than offering controls that would write a setting the running
-            bridge is never going to read. */}
-        {access === 'reuse'
-          ? <p className={css.hint}>{t('feishu.reach.byBridge')}</p>
-          : (
-            <>
-              <ChoiceField
-                {...field('dmMode')}
-                labelKey="feishu.dmMode.label"
-                hintKey="feishu.dmMode.hint"
-                choices={DM_MODES}
-              />
-              <ListField
-                {...field('dmAllowlist')}
-                labelKey="feishu.dmAllowlist.label"
-                hintKey="feishu.dmAllowlist.hint"
-                rows={2}
-              />
-              <ListField
-                {...field('groupAllowlist')}
-                labelKey="feishu.groupAllowlist.label"
-                hintKey="feishu.groupAllowlist.hint"
-                rows={2}
-              />
-              <ChoiceField
-                {...field('requireMention')}
-                labelKey="feishu.requireMention.label"
-                hintKey="feishu.requireMention.hint"
-                choices={MENTION}
-              />
-              <ValueField
-                {...field('staleMs')}
-                labelKey="feishu.staleMs.label"
-                hintKey="feishu.staleMs.hint"
-                numeric
-              />
-            </>
-          )}
-      </FieldGroup>
-
-      <FieldGroup t={t} titleKey="feishu.behaviour.title">
-        <ValueField
-          {...field('presetId')}
-          labelKey="feishu.presetId.label"
-          hintKey="feishu.presetId.hint"
-        />
-        <ChoiceField
-          {...field('density')}
-          labelKey="feishu.density.label"
-          hintKey="feishu.density.hint"
-          choices={DENSITIES}
-        />
-        <ValueField
-          {...field('flushMs')}
-          labelKey="feishu.flushMs.label"
-          hintKey="feishu.flushMs.hint"
-          numeric
-        />
-        <ValueField
-          {...field('approvalTimeoutMs')}
-          labelKey="feishu.approvalTimeoutMs.label"
-          hintKey="feishu.approvalTimeoutMs.hint"
-          numeric
-        />
-        <ValueField
-          {...field('endpoint')}
-          labelKey="feishu.endpoint.label"
-          hintKey="feishu.endpoint.hint"
-        />
-      </FieldGroup>
+      {/* 接好了才谈怎么跑。默认折起来：装完就能用，调它是后来的事。 */}
+      {state.ready
+        ? (
+          <section className={css.group}>
+            <button type="button" className={css.foldHead} onClick={props.toggleSettings}>
+              <span className={css.groupHeading}>{t('feishu.settings.title')}</span>
+              <span className={css.foldMark}>{t(state.settingsOpen ? 'collapse' : 'expand')}</span>
+            </button>
+            {state.settingsOpen
+              ? (
+                <>
+                  <ValueField
+                    {...field('workspace')}
+                    labelKey="feishu.workspace.label"
+                    hintKey="feishu.workspace.hint"
+                  />
+                  <ValueField
+                    {...field('presetId')}
+                    labelKey="feishu.presetId.label"
+                    hintKey="feishu.presetId.hint"
+                  />
+                  <ChoiceField
+                    {...field('dmMode')}
+                    labelKey="feishu.dmMode.label"
+                    hintKey="feishu.dmMode.hint"
+                    choices={DM_MODES}
+                  />
+                  <ListField
+                    {...field('dmAllowlist')}
+                    labelKey="feishu.dmAllowlist.label"
+                    hintKey="feishu.dmAllowlist.hint"
+                    rows={2}
+                  />
+                  <ListField
+                    {...field('groupAllowlist')}
+                    labelKey="feishu.groupAllowlist.label"
+                    hintKey="feishu.groupAllowlist.hint"
+                    rows={2}
+                  />
+                  <ChoiceField
+                    {...field('requireMention')}
+                    labelKey="feishu.requireMention.label"
+                    hintKey="feishu.requireMention.hint"
+                    choices={MENTION}
+                  />
+                  <ChoiceField
+                    {...field('density')}
+                    labelKey="feishu.density.label"
+                    hintKey="feishu.density.hint"
+                    choices={DENSITIES}
+                  />
+                  <ValueField
+                    {...field('flushMs')}
+                    labelKey="feishu.flushMs.label"
+                    hintKey="feishu.flushMs.hint"
+                    numeric
+                  />
+                  <ValueField
+                    {...field('approvalTimeoutMs')}
+                    labelKey="feishu.approvalTimeoutMs.label"
+                    hintKey="feishu.approvalTimeoutMs.hint"
+                    numeric
+                  />
+                  <ValueField
+                    {...field('staleMs')}
+                    labelKey="feishu.staleMs.label"
+                    hintKey="feishu.staleMs.hint"
+                    numeric
+                  />
+                  <ValueField
+                    {...field('endpoint')}
+                    labelKey="feishu.endpoint.label"
+                    hintKey="feishu.endpoint.hint"
+                  />
+                </>
+              )
+              : null}
+          </section>
+        )
+        : null}
     </ConnectorCard>
   )
 }

@@ -56,27 +56,51 @@ function larkRoot(): string {
   return join(homedir(), '.lark-cli')
 }
 
+/** dsh 默认用的那个 profile 名。 */
+export const DEFAULT_PROFILE_ID = 'dsh'
+
+/**
+ * dsh 自己的家目录。
+ *
+ * 自己算而不是 import 那个包：这一层要跟桥接共用，而桥接不 import 任何 dsh 包。
+ * 规则与宿主一致——`DSH_HOME` 优先，否则 `~/.dsh`。
+ * @returns 绝对路径。
+ */
+export function dshHome(): string {
+  const declared = process.env.DSH_HOME?.trim()
+  return declared !== undefined && declared !== '' ? declared : join(homedir(), '.dsh')
+}
+
 /**
  * dsh 自己那份 profile 的目录。
  *
  * 单独一份，不跟环境默认共用：默认那份先到先得，谁跑过 `lark-cli config init`
  * 就是谁的，而这一页的每个动作都会改到它。
- * @returns `~/.lark-cli/dsh-x`。
+ * @returns `~/.lark-cli/dsh`。
  */
 export function dshConfigDir(): string {
-  return join(larkRoot(), 'dsh-x')
+  return join(larkRoot(), DEFAULT_PROFILE_ID)
 }
 
 /**
- * 把请求里的目录解析成真正要用的那个。
+ * 把请求解析成真正要用的那个目录。
  *
- * 空串落到 dsh 自己那份，**不落到环境默认**。这是唯一的收口：只要每条命令都
- * 经过它，就不存在"忘了指定于是改了别人的应用"这条路。
- * @param requested - 调用方指定的目录，空串表示没指定。
+ * 收三种写法：空串落到 dsh 自己那份（**不落到环境默认**）；一个不带分隔符的
+ * 名字当 profile id，落到 `~/.lark-cli/<id>`；带分隔符的当绝对路径原样用。
+ * 这是唯一的收口——只要每条命令都经过它，就不存在"忘了指定于是改了别人的
+ * 应用"这条路。
+ * @param requested - 目录、profile id，或空串。
  * @returns 要写进 `LARKSUITE_CLI_CONFIG_DIR` 的绝对路径。
  */
 export function resolveConfigDir(requested: string): string {
-  return requested.trim() === '' ? dshConfigDir() : requested.trim()
+  const value = requested.trim()
+  if (value === '') return dshConfigDir()
+  // 带分隔符的当路径，原样用。
+  if (value.includes('/') || value.includes('\\')) return value
+  // 剩下的当 profile 名。名字里只收这几类字符，`.` 与 `..` 一并挡掉——一个
+  // 设置项不该有办法把目录指到 `~/.lark-cli` 外面去。
+  const named = /^[A-Za-z0-9._-]+$/.test(value) && value !== '.' && value !== '..'
+  return named ? join(larkRoot(), value) : dshConfigDir()
 }
 
 /** 一份可以在这一页上管理的 lark-cli profile。 */

@@ -1,4 +1,11 @@
-/** The Feishu connector's staged form over the `dsh-x-feishu` settings namespace. */
+/**
+ * The Feishu connector's staged form over the `dsh-x-feishu` settings namespace.
+ *
+ * The card asks one question first — is this channel set up or not — because
+ * everything else only makes sense on one side of that answer. Before setup
+ * there are two ways in and nothing else; after it there is a status line, the
+ * knobs folded away, and the two actions that undo it.
+ */
 
 import type { SettingsScope, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
 import {
@@ -32,18 +39,17 @@ export const FEISHU_DENSITIES = ['compact', 'standard', 'detailed'] as const
 /** Direct-message access modes the bridge takes, in display order. */
 export const FEISHU_DM_MODES = ['open', 'allowlist', 'disabled'] as const
 
-/** The two ways in, ordinary one first. */
-export const FEISHU_ACCESS = ['own', 'reuse'] as const
+/** The two ways in; the empty string is "not set up yet". */
+export const FEISHU_MODES = ['', 'direct', 'bridge'] as const
 
 /**
- * How this deployment gets its Feishu events.
+ * How this deployment reaches Feishu.
  *
- * `own` — dsh has its own Feishu app, and the bridge is dsh's, so this page
- * owns the bridge's configuration too. `reuse` — the bridge is already running
- * for other agents; dsh writes none of its configuration and only tells it
- * which app dsh is.
+ * `direct` — dsh has its own Feishu app and you scan to authorize it.
+ * `bridge` — events come from another process, through a command that stands
+ * in for `lark-cli event consume`. Advanced; most deployments want `direct`.
  */
-export type FeishuAccess = 'own' | 'reuse'
+export type FeishuMode = 'direct' | 'bridge'
 
 /** What the bridge reports about itself over the live connection. */
 export interface BridgeSummaryView {
@@ -69,6 +75,16 @@ export interface BridgeStatusView {
 
 /** The channel fields this card edits. */
 export interface FeishuSettings {
+  /** Which way in; empty means not set up. */
+  mode?: string
+  /** `direct`: which lark-cli profile dsh uses, by name. */
+  profileId?: string
+  /** `bridge`: the Feishu app the events belong to. */
+  appId?: string
+  /** `bridge`: the command that stands in for `lark-cli event consume`. */
+  eventCommand?: string
+  /** Directory a session opened from Feishu runs in. */
+  workspace?: string
   /** Local socket to the bridge process; empty takes the platform default. */
   endpoint?: string
   /** Agent preset a session opened from Feishu runs. */
@@ -79,10 +95,6 @@ export interface FeishuSettings {
   flushMs?: number
   /** How long an approval card waits for a tap, in milliseconds. */
   approvalTimeoutMs?: number
-  /** Whether dsh runs its own Feishu app or reads from a bridge someone else runs. */
-  access?: string
-  /** dsh's own Feishu app: the lark-cli profile directory. */
-  profile?: string
   /** Direct-message access mode. */
   dmMode?: string
   /** Who may open a direct message, by open_id. */
@@ -101,14 +113,20 @@ export interface FeishuCardState extends ConnectorFormState {
   plugin: ConnectorPresenceState
   /** Sign-in state, the QR in flight, and what a scan would grant. */
   auth: FeishuAuthState
-  /** Which of the two setups this card is showing. */
-  access: ConnectorFieldState
-  /** dsh's own Feishu app. */
-  profile: ConnectorFieldState
-  /** Whether the sign-in section is folded away, which reuse does by default. */
-  authFolded: boolean
   /** Whether the bridge is there and what it reports; only read, never written. */
   bridge: BridgeStatusView
+  /** Whether this channel is set up. Everything on the card hangs off it. */
+  ready: boolean
+  /** Which way in is chosen; empty until one is. */
+  mode: ConnectorFieldState
+  /** `direct`: the lark-cli profile name. */
+  profileId: ConnectorFieldState
+  /** `bridge`: the Feishu app id. */
+  appId: ConnectorFieldState
+  /** `bridge`: the stand-in for `lark-cli event consume`. */
+  eventCommand: ConnectorFieldState
+  /** Where a session opened from Feishu runs. */
+  workspace: ConnectorFieldState
   /** Agent preset field. */
   presetId: ConnectorFieldState
   /** Card density field. */
@@ -131,15 +149,21 @@ export interface FeishuCardState extends ConnectorFormState {
   staleMs: ConnectorFieldState
   /** One line saying who can actually reach the channel as configured right now. */
   reach: 'nobody' | 'dm-only' | 'group-only' | 'both'
+  /** Whether the folded settings are open. */
+  settingsOpen: boolean
+  /** Whether the setup controls are showing again on a set-up channel. */
+  setupOpen: boolean
+  /** Whether the next tap on the sign-out button performs it. */
+  confirmingReset: boolean
 }
 
 /**
  * Who can reach a channel, given a direct-message mode, whether anyone is on
  * the DM list, and whether any group is served.
  *
- * The same question is answered from two sources — the draft settings while
- * dsh owns the bridge, and the bridge's own report while it does not — so the
- * judgement lives in one place rather than being spelled twice.
+ * Pulled out of the projection so the judgement lives in one place: the same
+ * question gets asked of the draft settings and, elsewhere, of what a bridge
+ * reports about itself.
  * @param dmMode - the direct-message mode.
  * @param dmAllowed - whether anyone may DM under that mode.
  * @param groupsAllowed - whether any group is served.
@@ -162,7 +186,7 @@ export interface FeishuCardFace extends ConnectorActions {
   readPresence: () => void
   /** Switch the channel's plugin on or off. */
   setEnabled: (enabled: boolean) => void
-  /** Read the sign-in state and the grantable domains. */
+  /** Read the sign-in state and what the bridge reports. */
   readAuth: () => void
   /** Check or clear one permission domain for the next scan. */
   selectDomain: (domain: string, wanted: boolean) => void
@@ -170,10 +194,12 @@ export interface FeishuCardFace extends ConnectorActions {
   beginAuth: () => void
   /** Abandon the scan in flight. */
   cancelAuth: () => void
-  /** Sign out on this machine. */
-  logout: () => void
-  /** Unfold or refold the sign-in section. */
-  toggleAuth: () => void
+  /** Show the setup controls again on a channel that is already set up. */
+  reopenSetup: () => void
+  /** Unfold or refold the settings. */
+  toggleSettings: () => void
+  /** Sign out and clear the setup; the first tap only arms it. */
+  reset: () => void
 }
 
 /** Bridges the `dsh-x-feishu` scope onto the Feishu card's staged form. */
@@ -182,25 +208,33 @@ export class FeishuCardController {
   private readonly presence: ConnectorPresenceController
   private readonly auth: FeishuAuthController
   private readonly store: SnapshotStore<FeishuCardState>
-  /** Whether the reader unfolded the sign-in section that reuse folds away. */
-  private authOpened = false
   /** What the bridge last reported. Read-only: nothing on this card writes it. */
   private status: BridgeStatusView = { connected: false }
+  private settingsOpen = false
+  private setupOpen = false
+  private confirmingReset = false
 
   /**
    * @param scope - the bound settings scope for the `dsh-x-feishu` namespace.
    * @param plugins - the plugin-tree calls the card's switch runs on.
    * @param rpc - the connection's raw RPC channel, where `feishuAuth/*` lives.
    */
-  constructor(scope: SettingsScope<FeishuSettings>, plugins: ConnectorPluginFace, private readonly rpc: AuthRpc) {
+  constructor(
+    scope: SettingsScope<FeishuSettings>,
+    plugins: ConnectorPluginFace,
+    private readonly rpc: AuthRpc,
+  ) {
     this.form = new ConnectorForm(scope, [
+      choiceField('mode', FEISHU_MODES),
+      textField('profileId'),
+      textField('appId'),
+      textField('eventCommand'),
+      textField('workspace'),
       textField('presetId'),
       choiceField('density', FEISHU_DENSITIES),
       durationField('flushMs'),
       durationField('approvalTimeoutMs'),
       textField('endpoint'),
-      choiceField('access', FEISHU_ACCESS),
-      textField('profile'),
       choiceField('dmMode', FEISHU_DM_MODES),
       listField('dmAllowlist'),
       listField('groupAllowlist'),
@@ -210,8 +244,8 @@ export class FeishuCardController {
     this.presence = new ConnectorPresenceController(FEISHU_MODULE, plugins)
     this.auth = new FeishuAuthController(rpc)
     this.store = this.form.bind(() => this.projection())
-    // 改了「dsh 是哪个飞书应用」，下面的登录与权限要跟着换过去——否则屏幕上写着
-    // 一个应用，扫码授权动的是另一个。
+    // 改了用哪份 profile，下面的登录与权限要跟着换过去——否则屏幕上写着一个
+    // profile，扫码授权动的是另一个。
     this.form.watch(() => { this.syncAuthProfile() })
     // Switching the plugin changes the pill, the switch, and whether there are
     // controls at all, so the card republishes on either source.
@@ -219,12 +253,31 @@ export class FeishuCardController {
     this.auth.store.subscribe(() => { this.store.set(this.projection()) })
   }
 
+  /** 让登录与权限那一段跟着「用哪份 profile」走。 */
+  private syncAuthProfile(): void {
+    const chosen = this.form.field('profileId').text
+    if (chosen === this.auth.store.getSnapshot().configDir) return
+    void this.auth.selectProfile(chosen)
+  }
+
   /**
-   * Which branch the card shows. Empty means the schema default, which is own.
-   * @returns the branch in effect.
+   * 这条渠道接好了没有。
+   *
+   * 按**配置齐不齐**判，不按连没连上：桥接没起来是运维状态，不是"没接入"，
+   * 两者混在一起的话，桥接一挂整张卡片就退回去问你打算怎么接。
+   * @returns 接好了为 `true`。
    */
-  private access(): FeishuAccess {
-    return this.form.field('access').text === 'reuse' ? 'reuse' : 'own'
+  private isReady(): boolean {
+    const mode = this.form.field('mode').text
+    if (mode === 'direct') {
+      const status = this.auth.store.getSnapshot().status
+      return status?.configured === true && status.user !== undefined
+    }
+    if (mode === 'bridge') {
+      return this.form.field('appId').text.trim() !== ''
+        && this.form.field('eventCommand').text.trim() !== ''
+    }
+    return false
   }
 
   /**
@@ -233,18 +286,9 @@ export class FeishuCardController {
    * Worth a line of its own because the deny-by-default policy is silent: an
    * allowlist mode with an empty allowlist and no groups listed is a channel
    * that is switched on, authorized, connected — and that nobody can use.
-   *
-   * Read from whoever owns the answer: the drafts while dsh owns the bridge,
-   * the bridge's own report while it does not. Showing the drafts in reuse
-   * would state a rule that is not the one being enforced.
    * @returns which of the two ways in are open.
    */
   private reach(): FeishuCardState['reach'] {
-    if (this.access() === 'reuse') {
-      const summary = this.status.bridge
-      if (summary === undefined) return 'nobody'
-      return reachOf(summary.dmMode, summary.dmAllowed > 0, summary.groupsAllowed > 0)
-    }
     return reachOf(
       this.form.field('dmMode').text,
       this.form.field('dmAllowlist').text.trim() !== '',
@@ -252,26 +296,18 @@ export class FeishuCardController {
     )
   }
 
-  /** 让登录与权限那一段跟着「dsh 是哪个飞书应用」走。 */
-  private syncAuthProfile(): void {
-    const chosen = this.form.field('profile').text
-    if (chosen === this.auth.store.getSnapshot().configDir) return
-    void this.auth.selectProfile(chosen)
-  }
-
   private projection(): FeishuCardState {
-    const access = this.access()
     return {
       ...this.form.state(),
       plugin: this.presence.store.getSnapshot(),
       auth: this.auth.store.getSnapshot(),
-      access: this.form.field('access'),
-      profile: this.form.field('profile'),
       bridge: this.status,
-      // Reuse means the apps belong to other tools, so signing in here is not
-      // part of the setup — but it stays reachable, because one of those apps
-      // may still be the one that needs a scan.
-      authFolded: access === 'reuse' && !this.authOpened,
+      ready: this.isReady(),
+      mode: this.form.field('mode'),
+      profileId: this.form.field('profileId'),
+      appId: this.form.field('appId'),
+      eventCommand: this.form.field('eventCommand'),
+      workspace: this.form.field('workspace'),
       presetId: this.form.field('presetId'),
       density: this.form.field('density'),
       flushMs: this.form.field('flushMs'),
@@ -283,16 +319,18 @@ export class FeishuCardController {
       requireMention: this.form.field('requireMention'),
       staleMs: this.form.field('staleMs'),
       reach: this.reach(),
+      settingsOpen: this.settingsOpen,
+      setupOpen: this.setupOpen,
+      confirmingReset: this.confirmingReset,
     }
   }
 
   /**
    * Read what the bridge says about itself.
    *
-   * Its own report rather than its configuration file: while dsh is reusing
-   * someone else's bridge, that file is theirs and may not even be where this
-   * side would look, but what arrives on the live connection is by definition
-   * what is in effect.
+   * Its own report rather than its configuration file: the file may belong to
+   * whoever runs the bridge, but what arrives on the live connection is by
+   * definition what is in effect.
    * @returns settlement after the read.
    */
   async readBridge(): Promise<void> {
@@ -304,29 +342,63 @@ export class FeishuCardController {
   }
 
   /**
+   * Undo the setup: sign out on this machine, then clear which way in was
+   * chosen so the card asks again.
+   *
+   * Armed by the first tap and performed by the second. It signs a real Feishu
+   * session out, and a settings card has no business opening a modal to ask.
+   * @returns settlement after the write.
+   */
+  private async reset(): Promise<void> {
+    if (!this.confirmingReset) {
+      this.confirmingReset = true
+      this.store.set(this.projection())
+      return
+    }
+    this.confirmingReset = false
+    if (this.form.field('mode').text === 'direct') await this.auth.logout()
+    const actions = this.form.actions()
+    for (const field of ['mode', 'appId', 'eventCommand']) actions.resetField(field)
+    await this.form.save()
+    this.setupOpen = false
+    this.store.set(this.projection())
+  }
+
+  /**
    * Build the face the card's slot registration injects.
    * @returns the card's snapshot and its form actions.
    */
   inject(): FeishuCardFace {
+    const actions = this.form.actions()
     return {
       hooks: { feishuCard: this.store },
       readPresence: () => { void this.presence.refresh() },
       setEnabled: (enabled) => { void this.presence.setEnabled(enabled) },
       readAuth: () => {
-        // 授权动作跟着「dsh 是哪个飞书应用」走，不另选一次：两个地方各选一次的
-        // 结果是屏幕上写着一个、扫码授权的是另一个。
-        void this.auth.selectProfile(this.form.field('profile').text)
+        // 授权动作跟着「用哪份 profile」走，不另选一次：两个地方各选一次的
+        // 结果是屏幕上写着一个、扫码授权动的是另一个。
+        void this.auth.selectProfile(this.form.field('profileId').text)
         void this.readBridge()
       },
       selectDomain: (domain, wanted) => { this.auth.select(domain, wanted) },
       beginAuth: () => { void this.auth.begin() },
       cancelAuth: () => { void this.auth.cancel() },
-      logout: () => { void this.auth.logout() },
-      toggleAuth: () => {
-        this.authOpened = !this.authOpened
+      reopenSetup: () => {
+        this.setupOpen = !this.setupOpen
         this.store.set(this.projection())
       },
-      ...this.form.actions(),
+      toggleSettings: () => {
+        this.settingsOpen = !this.settingsOpen
+        this.store.set(this.projection())
+      },
+      reset: () => { void this.reset() },
+      ...actions,
+      // 手在别处动过之后，下一次点「注销」不该直接执行——待命状态跟着任何一次
+      // 编辑解除。
+      edit: (field, text) => {
+        this.confirmingReset = false
+        actions.edit(field, text)
+      },
     }
   }
 }

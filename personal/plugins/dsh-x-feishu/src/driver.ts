@@ -58,8 +58,8 @@ export interface DriverOptions {
   readonly ctx: Context
   readonly router: SessionRouter
   readonly sink: TurnSink
-  /** 共用的工作区。 */
-  readonly cwd: string
+  /** 会话落在哪个目录。用到才读，所以改设置对下一次建会话就生效。 */
+  readonly cwd: () => string
   /**
    * 建会话时用的预设；不给就用部署默认。
    *
@@ -96,7 +96,8 @@ export class SessionDriver {
     const existing = this.agents.get(chatKey)
     if (existing !== undefined) return existing
 
-    const { ctx, router, cwd } = this.options
+    const { ctx, router } = this.options
+    const cwd = this.options.cwd()
     const presetId = this.options.presetId?.()
     const selection = ctx.agentDefaultModel.currentSelection()
     const setup = async (agentCtx: Context): Promise<void> => {

@@ -32,6 +32,14 @@ export interface ConnectorCardProps {
   state: ConnectorFormState
   /** Where the channel's plugin stands in the profile, and whether it is switching. */
   presence: ConnectorPresenceState
+  /**
+   * Pill copy while the plugin is running, when the channel knows better.
+   *
+   * A loaded plugin is not a working channel: it can be up and still not set
+   * up, and a pill reading "connected" over a card asking how to connect is
+   * the one contradiction this page must not print.
+   */
+  runningKey?: ConnectorsKey
   /** Read the plugin tree; the card calls this when it is first opened. */
   onReadPresence: () => void
   /** Anything else the channel wants read when its card is opened. */
@@ -75,6 +83,9 @@ export function ConnectorCard(props: ConnectorCardProps) {
   const [open, setOpen] = useState(false)
   const { state, presence, t } = props
   const name = t(props.nameKey)
+  const pillKey = presence.presence === 'enabled' && props.runningKey !== undefined
+    ? props.runningKey
+    : PRESENCE_KEY[presence.presence]
   const blocked = !state.dirty || state.invalid || state.saving
   const switchId = useId()
   // Read the tree the first time the card is opened rather than on mount: a
@@ -98,7 +109,7 @@ export function ConnectorCard(props: ConnectorCardProps) {
         <span className={css.headText}>
           <span className={css.nameRow}>
             <span className={css.name}>{name}</span>
-            <span className={css.state} data-state={presence.presence}>{t(PRESENCE_KEY[presence.presence])}</span>
+            <span className={css.state} data-state={presence.presence}>{t(pillKey)}</span>
           </span>
           <span className={css.summary}>{t(props.summaryKey)}</span>
         </span>

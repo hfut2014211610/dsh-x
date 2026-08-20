@@ -78,7 +78,7 @@ describe('登录态', () => {
     const status = await new LarkAuth().status('')
 
     expect(seen).toBe(dshConfigDir())
-    expect(seen?.endsWith('dsh-x')).toBe(true)
+    expect(seen?.endsWith('dsh')).toBe(true)
     expect(status.configDir).toBe(dshConfigDir())
   })
 

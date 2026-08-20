@@ -228,6 +228,7 @@ class Bridge {
       // 会把新应用的订阅一起拖三秒。
       void consumer.stop().then(() => { log(`不再订阅 ${key}`) })
     }
+    const command = this.config.eventCommand.trim()
     for (const [key, spec] of wanted) {
       if (this.consumers.has(key)) continue
       const consumer: EventConsumer = new EventConsumer(spec.eventKey, {
@@ -239,10 +240,10 @@ class Bridge {
           if (spec.eventKey === MESSAGE_EVENT) void this.onMessageEvent(spec.configDir, event as LarkMessageEvent)
           else this.onCardActionEvent(spec.configDir, event as LarkCardActionEvent)
         },
-      }, undefined, larkCliEnvironment(spec.configDir))
+      }, command === '' ? undefined : command, larkCliEnvironment(spec.configDir))
       consumer.start()
       this.consumers.set(key, consumer)
-      log(`开始订阅 ${key}`)
+      log(command === '' ? `开始订阅 ${key}` : `开始订阅 ${key}（事件来自 ${command}）`)
     }
   }
 

@@ -15,12 +15,14 @@ import {
   type PublishedBridgeFields,
 } from '../src/bridge-config.ts'
 import { larkCliEnvironment } from '../bridge/cli.ts'
+import { DEFAULT_PROFILE_ID, dshConfigDir, resolveConfigDir } from '../src/auth.ts'
 
 const FIELDS: PublishedBridgeFields = {
   endpoint: '\\\\.\\pipe\\dsh-x-feishu',
   eventEndpoint: '\\\\.\\pipe\\dsh-x-feishu-events',
   eventConfigDirs: ['C:\\lark\\dsh-x', 'C:\\lark\\agent-bus'],
   cardActionConfigDirs: ['C:\\lark\\dsh-x'],
+  eventCommand: '',
   policy: {
     dmMode: 'allowlist',
     dmAllowlist: ['ou_me'],
@@ -165,6 +167,44 @@ describe('收脏值', () => {
     const config = normalizeBridgeConfig({ botOpenId: 'ou_legacy', botOpenIds: { '': 'ou_new' } })
 
     expect(config.botOpenIds).toEqual({ '': 'ou_new' })
+  })
+})
+
+describe('换一个事件来源', () => {
+  // 别的进程已经独占了那个 EventKey 时，只能接一根管子进来。
+  it('写进去读得回来', async () => {
+    const withCommand = { ...FIELDS, eventCommand: 'node D:\\adapters\\relay.js' }
+
+    await publishBridgeConfig(withCommand, path)
+
+    expect((await readBridgeConfig(path)).config.eventCommand).toBe('node D:\\adapters\\relay.js')
+  })
+
+  it('不填就是照常 spawn lark-cli', () => {
+    expect(normalizeBridgeConfig({}).eventCommand).toBe('')
+  })
+})
+
+describe('profile 写名字还是写路径', () => {
+  // 设置页让人填一个名字（默认 dsh），底下要落到 ~/.lark-cli/<名字>；
+  // 老配置里写的是绝对路径，也得照收。
+  it('不带分隔符的当 profile 名', () => {
+    expect(resolveConfigDir('agent-bus').endsWith(join('.lark-cli', 'agent-bus'))).toBe(true)
+  })
+
+  it('带分隔符的当路径原样用', () => {
+    expect(resolveConfigDir('C:\\Users\\me\\.lark-cli\\agent-bus')).toBe('C:\\Users\\me\\.lark-cli\\agent-bus')
+  })
+
+  // 一个设置项不该有办法把目录指到 ~/.lark-cli 外面去。
+  it('往上跳的名字不认，落回 dsh 自己那份', () => {
+    expect(resolveConfigDir('..')).toBe(dshConfigDir())
+    expect(resolveConfigDir('a b')).toBe(dshConfigDir())
+  })
+
+  it('空串落到 dsh 自己那份', () => {
+    expect(resolveConfigDir('')).toBe(dshConfigDir())
+    expect(dshConfigDir().endsWith(join('.lark-cli', DEFAULT_PROFILE_ID))).toBe(true)
   })
 })
 

@@ -46,7 +46,9 @@ export class EventConsumer {
   /**
    * @param eventKey - 要订阅的 EventKey，例如 `im.message.receive_v1`。
    * @param handlers - 回调。
-   * @param command - lark-cli 的可执行名，测试可以换成假的。
+   * @param command - 替代 `lark-cli` 的可执行名；不给就走 lark-cli 自己。
+   *   别的进程已经独占了那个 EventKey 时用它把事件引过来——一个 EventKey 只
+   *   允许一个消费者，抢不过就只能接一根管子。参数照旧追加在后面。
    */
   constructor(
     private readonly eventKey: string,
@@ -59,17 +61,25 @@ export class EventConsumer {
   /** 起消费者；子进程退出会自动重启，直到 {@link stop}。 */
   start(): void {
     if (this.stopped || this.child !== undefined) return
-    const args = ['event', 'consume', this.eventKey, '--as', 'bot']
-    const invocation = this.command === undefined
-      ? larkCliInvocation(args)
-      : { file: this.command, args }
-    const child = spawn(invocation.file, [...invocation.args], {
-      stdio: ['pipe', 'pipe', 'pipe'],
-      windowsHide: true,
-      ...(this.environment === undefined
-        ? {}
-        : { env: { ...process.env, ...this.environment } }),
-    })
+    const extra = this.environment === undefined ? {} : { env: { ...process.env, ...this.environment } }
+    let child: ChildProcessByStdio<Writable, Readable, Readable>
+    if (this.command === undefined) {
+      const invocation = larkCliInvocation(['event', 'consume', this.eventKey, '--as', 'bot'])
+      child = spawn(invocation.file, [...invocation.args], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+        ...extra,
+      })
+    } else {
+      // 换了来源就整条命令交给 shell 跑，事件键追加在最后：填进来的是一行命令，
+      // 里面本来就可能带参数和引号，按空格拆会把带空格的路径拆坏。
+      child = spawn(`${this.command} ${this.eventKey}`, [], {
+        stdio: ['pipe', 'pipe', 'pipe'],
+        windowsHide: true,
+        shell: true,
+        ...extra,
+      })
+    }
     this.child = child
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
