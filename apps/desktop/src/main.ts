@@ -19,6 +19,7 @@ import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { createReadStream, createWriteStream } from 'node:fs'
 import { app, BrowserWindow, dialog, ipcMain, Menu, nativeImage, nativeTheme, shell, Tray } from 'electron'
+import { aboutMessage } from './about.ts'
 import { ensureBundledRuntime } from './bundled-runtime.ts'
 import { DEFAULT_PROBE_ORIGIN, discoverRuntime } from './discovery.ts'
 import { DEFAULT_HEALTH_OPTIONS, startHealthWatch } from './health.ts'
@@ -579,10 +580,32 @@ function createTray(): void {
     { label: 'Show', click: () => { showWindow() } },
     { label: 'Check for updates…', click: () => { void checkUpdates(true) } },
     { type: 'separator' },
-    { label: `Version ${app.getVersion()}`, enabled: false },
+    { label: 'About DeepSeek Harness…', click: () => { void showAbout() } },
     { label: 'Quit', click: () => { quit() } },
   ]))
   tray.on('click', () => { showWindow() })
+}
+
+/**
+ * Report what this shell is and what it is talking to.
+ *
+ * Read live rather than captured at startup: the runtime can change under a
+ * restart, and the whole reason to open this is to find out which one is
+ * answering right now.
+ */
+async function showAbout(): Promise<void> {
+  const snapshot = state.snapshot()
+  const { message, detail } = aboutMessage({
+    appVersion: app.getVersion(),
+    ...snapshot.runtime === undefined ? {} : { runtime: snapshot.runtime },
+    ...snapshot.url === undefined ? {} : { url: snapshot.url },
+    versions: {
+      electron: process.versions.electron,
+      chrome: process.versions.chrome,
+      node: process.versions.node,
+    },
+  })
+  await dialog.showMessageBox({ type: 'info', message, detail, buttons: ['Close'] })
 }
 
 function showWindow(): void {

@@ -20,12 +20,9 @@
     - strong: Open document
     - button "Close":
       - img
-    - text: Workspace-relative path
-    - textbox "Workspace-relative path":
-      - /placeholder: docs/subsystems/writing.md
-    - button "Open document" [disabled]:
-      - img
-      - text: Open document
+    - img
+    - textbox "Filter files":
+      - /placeholder: Filter by name; Enter opens
     - region "Workspace files":
       - strong: Workspace files
       - button "Refresh files":
