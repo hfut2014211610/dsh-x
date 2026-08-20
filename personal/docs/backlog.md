@@ -10,13 +10,11 @@
 |---|---|---|---|
 | 9 | UED 预览支持标注组件 / 加入对话；层叠元素可选中被遮挡项 | ⏸ 需定范围（大件） | iframe 是 `allow-scripts` 且不与 `allow-same-origin` 同列，宿主拿不到里面的 DOM。要注入受控拾取脚本 + postMessage，且不能破坏现有隔离断言 |
 | N | `test:web` 在 Windows 上过不去 | **保持现状（你定的）** | 直接断言工具目录的两个文件已改成认平台；剩下 14 个是重放夹具——录制时模型调 `bash`，win32 目录里没这个名字。**本机 `test:web` 的红不构成信号**，别拿它判断回归 |
-| O | 安装包不带 `personal/` | 待做 | `scripts/release/families.ts:311` 只 glob `packages/*/*/package.json` 与 `apps/*/package.json`。飞书通道、model-tuning 装完就没有 |
 
 ## 部分完成
 
 | # | 事项 | 已做的 | 还差的 |
 |---|---|---|---|
-| B2 | 纯浏览器用户看不到版本信息 | 桌面壳三处入口都有了 | 浏览器里没有菜单栏也没有托盘。要做得往 `settings.section` 挂一个 fork 自有包（跟连接器页同一条路）；但浏览器里也更新不了任何东西，只剩「我在跑哪个版本」这一条信息，**值不值一个包待定** |
 | C | 合并预览与编辑窗口，在预览状态下直接编辑 | 点一块就地改它的源文（`8dc3293d17`），围栏代码与展示公式也可点（`42b22d1223`）；Cmd/Ctrl+Enter 或点开落定，Esc 丢弃 | 「**弱化代码性、强调内容**」那半没做——改的仍是 Markdown 源文，不是所见即所得 |
 
 ## 搁置
@@ -48,6 +46,8 @@
 | M | 写作模式沙箱围栏漏洞 `674d487be1` | `.docx`/`.xlsx` 编辑路径绕过围栏直接 `node:fs` 写 |
 | P | 打包速度优化 `a1228e7841` | 并发打包 + `--reuse-runtime`；完整 97s / 桌面 40s |
 | V | 版本方案：上游版本号 + fork 后缀 `b1945091dc` | 224 个 manifest 与上游一致；fork 身份在 `electron-builder.yml` |
+| O | 安装包不带 `personal/` `3a0615f5e0` `bd88a4b505` | 每模型采样默认值进 `packages/llm/model-tuning`，飞书通道进 `packages/channel/feishu`（新建的 channel 组，下一个渠道往这儿放），两个都由 web bundle 默认挂载。桥接作为 `dsh-feishu-bridge` bin 随包发。settings 段名不变（是插件自己声明的，跟条目 id 无关），所以已有配置照用。`personal/plugins/` 已空并删除 |
+| B2 | 纯浏览器用户看不到版本信息 | 你 2026-08-20 决定不做——浏览器里也更新不了任何东西 |
 | L | 两个 runtime 同时写一份会话日志 `462b3b3a51` | 按你说的走钝刀：`dsh-host-instance-lock` 在 `$DSH_HOME` 留一份 claim，第二个 runtime 直接拒绝启动（走 `ctx.appExit`，不是抛异常——抛了只会让这一个条目失败、其余照常起来）。claim 只在它记的 pid 还活着时算数，断电留下的字条会被接管。一次性命令不挂这个 bundle，不受影响
 | Q | 清掉模型中心旧副本 | 两份都删了；`headless` profile 改指 `@deepseek-ai/dsh-model-hub`（毕业后的包没有 cordis.patch.yml，当不了 bundle，所以进了 profile 自己的 patch 层），`--dump-config` 验过能组合。settings 段照旧是 `dsh-x-model-hub:`——那是插件自己声明的命名空间，跟条目 id 无关
 | B | 关于菜单 + 更新入口 `038cde540f` `65e0446907` `dd87238950` | 窗口菜单栏「帮助 → 检查更新 / 关于」（之前挂的是 Electron 默认那个开发菜单，带 Reload 和 DevTools）；关于说清窗口背后是哪个 dsh；更新日志取自 release 自己的 notes，截断 12 行进「有新版本」对话框 |
