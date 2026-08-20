@@ -102,7 +102,9 @@ export class SessionDriver {
     const selection = ctx.agentDefaultModel.currentSelection()
     const setup = async (agentCtx: Context): Promise<void> => {
       // 唯一支持的挂预设位置：此时 agent 还没发布，组合失败会把整次创建回滚。
-      if (ctx.agentPresets !== undefined) await ctx.agentPresets.mount(agentCtx, presetId)
+      // agentPresets 是可选服务；直接读 ctx.agentPresets 会被 Cordis 的依赖代理
+      // 拒绝，因为本插件没有把它声明成硬依赖。get() 才是探测可选服务的入口。
+      await ctx.get('agentPresets')?.mount(agentCtx, presetId)
       const selected: ModelSelectionRef = { current: selection, assembled: undefined }
       installModelSelection(agentCtx, selected)
     }
