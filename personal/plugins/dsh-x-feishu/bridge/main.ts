@@ -39,11 +39,15 @@ import {
   type LarkCardActionEvent, type LarkMessageEvent,
 } from '../src/lark-events.ts'
 import {
-  bridgeConfigPath, readBridgeConfig, watchBridgeConfig,
+  bridgeConfigPath, ownedConsumersPath, readBridgeConfig, watchBridgeConfig,
   type BridgeConfig,
 } from '../src/bridge-config.ts'
 import { AppRouter } from '../src/app-routing.ts'
 import { EventConsumer } from './consumer.ts'
+import {
+  clearOwnedConsumers, processAlive, readCommandLine, readOwnedConsumers,
+  reapOwnedConsumers, writeOwnedConsumers,
+} from './owned-consumers.ts'
 import { larkCliEnvironment } from './cli.ts'
 import { approvalCard, messageIdOf, patchCard, progressCard, replyMessage, sendMessage, resolveBotOpenId } from './lark.ts'
 import { encodeEventRelayFrame } from './relay.ts'
@@ -104,6 +108,8 @@ class Bridge {
   private readonly botOpenIds = new Map<string, string>()
   /** 现在跑着的消费者，键是 {@link consumerKey}。 */
   private readonly consumers = new Map<string, EventConsumer>()
+  /** 每个消费者当前子进程的 pid 与它认领的 EventKey，留给下次启动回收。 */
+  private readonly ownedPids = new Map<string, { pid: number; eventKey: string }>()
   private launching = false
   /** 已经听上的端点。改端点要重启桥接，所以要记住当初听的是哪个。 */
   private listening = { endpoint: '', eventEndpoint: '' }
@@ -125,10 +131,30 @@ class Bridge {
     this.listening = { endpoint: this.config.endpoint, eventEndpoint: this.config.eventEndpoint }
 
     this.logPolicy()
+    // 先收上一次没来得及停掉的消费者，再起自己的：一个 EventKey 只允许一个
+    // 消费者，孤儿还占着的话，下面这批全部抢不到。
+    for (const line of await reapOwnedConsumers({
+      readRecords: () => readOwnedConsumers(ownedConsumersPath()),
+      clearRecords: () => clearOwnedConsumers(ownedConsumersPath()),
+      alive: processAlive,
+      commandLine: readCommandLine,
+      kill: (pid) => { try { process.kill(pid) } catch { /* 刚好在这一刻退了 */ } },
+    })) log(line)
     await this.syncConsumers()
 
     // 设置页保存之后不用重起桥接。端点例外，它已经听上了。
     this.stopWatching = watchBridgeConfig(bridgeConfigPath(), () => { void this.reload() })
+  }
+
+  /** 把当前拥有的消费者写成字条，覆盖上一份。 */
+  private async recordOwned(): Promise<void> {
+    try {
+      await writeOwnedConsumers(ownedConsumersPath(), [...this.ownedPids.values()])
+    } catch (error) {
+      // 写不成字条不该让桥接停下来：代价只是下次启动回收不到，而那本来就是
+      // 兜底路径。
+      log(`记不下消费者 pid：${error instanceof Error ? error.message : String(error)}`)
+    }
   }
 
   /**
@@ -148,6 +174,10 @@ class Bridge {
       await consumer.stop()
       log(`放掉订阅 ${key}`)
     }))
+    // 每个消费者都干净地退了，字条就没有意义了——留着只会让下次启动去检查一
+    // 批早已不存在的 pid。
+    this.ownedPids.clear()
+    await clearOwnedConsumers(ownedConsumersPath())
     this.server?.close()
     this.eventServer?.close()
     for (const socket of this.eventClients) socket.destroy()
@@ -237,9 +267,10 @@ class Bridge {
     for (const [key, consumer] of this.consumers) {
       if (wanted.has(key)) continue
       this.consumers.delete(key)
+      this.ownedPids.delete(key)
       // 不等它退完：走的是这个应用整份订阅，没有别人在等这个位置，而等下去
       // 会把新应用的订阅一起拖三秒。
-      void consumer.stop().then(() => { log(`不再订阅 ${key}`) })
+      void consumer.stop().then(() => { void this.recordOwned(); log(`不再订阅 ${key}`) })
     }
     for (const [key, spec] of wanted) {
       if (this.consumers.has(key)) continue
@@ -251,6 +282,11 @@ class Bridge {
         onEvent: (event: unknown) => {
           if (spec.eventKey === MESSAGE_EVENT) void this.onMessageEvent(spec.configDir, event as LarkMessageEvent)
           else this.onCardActionEvent(spec.configDir, event as LarkCardActionEvent)
+        },
+        // 每次重启都会再来一次，pid 变了字条就得跟着变。
+        onSpawn: (pid: number) => {
+          this.ownedPids.set(key, { pid, eventKey: spec.eventKey })
+          void this.recordOwned()
         },
       }, command === '' ? undefined : command, larkCliEnvironment(spec.configDir))
       consumer.start()

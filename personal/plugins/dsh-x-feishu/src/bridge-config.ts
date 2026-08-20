@@ -102,6 +102,16 @@ export function bridgeConfigPath(): string {
   return join(homedir(), '.dsh-x-feishu', 'config.json')
 }
 
+/**
+ * 桥接留给下次启动的字条位置：上一次它 spawn 了哪些 lark-cli 消费者。
+ *
+ * 跟配置放一个目录，因为它们描述的是同一个桥接实例。
+ * @returns `~/.dsh-x-feishu/owned-consumers.json`。
+ */
+export function ownedConsumersPath(): string {
+  return join(homedir(), '.dsh-x-feishu', 'owned-consumers.json')
+}
+
 /** 什么都没配时桥接跑成什么样：默认拒绝，谁都用不了。 */
 export const DEFAULT_BRIDGE_CONFIG: BridgeConfig = {
   endpoint: defaultEndpoint(),

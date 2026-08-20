@@ -30,6 +30,13 @@ export interface ConsumerHandlers {
   onDiagnostic(line: string): void
   /** 子进程退出了，即将重启。 */
   onExit(code: number | null, restartInMs: number): void
+  /**
+   * 刚 spawn 出一个子进程。
+   *
+   * 每次重启都会再报一次：pid 变了，桥接留给下次启动的那张字条就得跟着变，
+   * 否则记的是一个已经不存在的进程。
+   */
+  onSpawn?(pid: number): void
 }
 
 /**
@@ -81,6 +88,8 @@ export class EventConsumer {
       })
     }
     this.child = child
+    // pid 在 spawn 失败时是 undefined；那种情况没有东西要回收。
+    if (child.pid !== undefined) this.handlers.onSpawn?.(child.pid)
     child.stdout.setEncoding('utf8')
     child.stderr.setEncoding('utf8')
     child.stdout.on('data', (chunk: string) => { this.ingestStdout(chunk) })
