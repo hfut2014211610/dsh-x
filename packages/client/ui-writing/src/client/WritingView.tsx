@@ -401,7 +401,11 @@ export function WritingView({
   translate: t,
 }: ConvViewProps & WritingViewInjected) {
   const initialPath = new URL(window.location.href).searchParams.get('path') ?? ''
-  const [panel, setPanel] = useState<Panel | null>(initialPath === '' ? 'document' : null)
+  // Closed to start, whether or not a document is waiting. The panel used to
+  // open itself on an empty session to offer the tree; what that actually did
+  // was hand the writing view's first frame to a file browser, and pay for a
+  // directory listing nobody asked for. The rail says where the tree is.
+  const [panel, setPanel] = useState<Panel | null>(null)
   const [panelWidth, setPanelWidth] = useState(PANEL_DEFAULT)
   const [pathInput, setPathInput] = useState(initialPath)
   const [currentPath, setCurrentPath] = useState('')

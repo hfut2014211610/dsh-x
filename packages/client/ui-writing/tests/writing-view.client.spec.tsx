@@ -23,6 +23,8 @@ const entry: DocumentOutlineEntry = {
 function setup(options: {
   readonly content?: string
   readonly entries?: readonly DocumentOutlineEntry[]
+  /** Leave the tool panel closed, the way a freshly opened view has it. */
+  readonly panelClosed?: boolean
 } = {}) {
   let changed: ((change: DocumentChange) => void) | undefined
   const content = options.content ?? '# 简介\n\n初始内容'
@@ -72,6 +74,11 @@ function setup(options: {
       translate={key => zh[key]}
     />,
   )
+  // The view opens with the rail collapsed, so a test about the tree, the
+  // outline or search has to say so first — the same click a reader makes.
+  if (options.panelClosed !== true) {
+    fireEvent.click(view.getByRole('button', { name: zh['tools.document'] }))
+  }
   return { view, list, load, save, outline, search, changed: () => changed }
 }
 
@@ -110,6 +117,20 @@ async function expandDocs(view: ReturnType<typeof render>): Promise<void> {
 
 
 describe('WritingView', () => {
+  // A writing view opened with nothing loaded used to greet its reader with a
+  // file browser filling a third of the width, and pay for the workspace
+  // listing to fill it. The rail is where the tree lives; the first frame is
+  // the document.
+  it('opens with the tool panel closed and no listing fetched', async () => {
+    const b = setup({ panelClosed: true })
+    expect(b.view.queryByRole('tree', { name: zh['tree.label'] })).toBeNull()
+    expect(b.list).not.toHaveBeenCalled()
+
+    fireEvent.click(b.view.getByRole('button', { name: zh['tools.document'] }))
+    expect(await b.view.findByRole('tree', { name: zh['tree.label'] })).toBeTruthy()
+    expect(b.list).toHaveBeenCalled()
+  })
+
   // The sidebar's top field used to take a path and open it. As a filter it
   // answers the far more common question — where is that file — without
   // making someone click through folders to ask it.

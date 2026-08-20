@@ -311,6 +311,9 @@ describe('web e2e: agent-preset selection', () => {
     await page.getByRole('menuitem', { name: /Writing mode/ }).click()
     await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('writing')
 
+    // The view lands with its tool rail collapsed, so the tree is a click away
+    // rather than the first thing the workspace shows.
+    await page.getByRole('button', { name: 'Files', exact: true }).click()
     const writingTree = page.getByRole('tree', { name: 'Workspace document tree' })
     await writingTree.waitFor({ timeout: 15_000 })
     await page.getByRole('complementary', { name: 'Assistant' }).waitFor()
