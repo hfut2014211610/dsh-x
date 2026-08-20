@@ -39,7 +39,7 @@
       ],
       "platform": "web",
       "external": [
-        "@deepseek-ai/dsh-client-ui-renderer/src/client/bind.ts"
+        "@deepseek-ai/dsh-client-ui-renderer/client"
       ]
     }
   },

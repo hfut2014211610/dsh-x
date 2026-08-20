@@ -9,7 +9,7 @@
 
 import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-ui-renderer/src/client/bind.ts'
+import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: the shell's SlotMap merge (the 'settings.section' entry) and the
 // locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
