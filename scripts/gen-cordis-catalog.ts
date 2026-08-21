@@ -224,6 +224,7 @@ export const LINK_MAP: Readonly<Record<string, string>> = {
   WerewolfVictoryConditionDefinition: 'werewolf.md',
   WerewolfRuleSetInputV1: 'werewolf.md',
   WerewolfCompiledRuleSetV1: 'werewolf.md',
+  WerewolfBotRunnerConfigV1: 'werewolf.md',
   Agent: 'core.md',
   AgentCancelCause: 'core.md',
   AgentFactory: 'core.md',

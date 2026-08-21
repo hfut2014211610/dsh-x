@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/game/werewolf/README.md
-README.md: b5baec672029424de61145972323d7ee1b82488b
-README.zh.md: fb46d4cbaea7d29ed16966aa9358e51ea1bed43d
+README.md: 3b3d0fc0af51f028a56320c90ab4a891df667ef3
+README.zh.md: f1134aa8d630bdb7a113c4748895b3f0660c7f46

@@ -697,7 +697,7 @@ Version 1 protects against accidental disclosure through normal UI and prompt co
 
 ## Delivery stages
 
-Stage 1 has landed as [the deterministic-core note](../../implemented/feature/2026-08-21-werewolf-deterministic-core.md); stages 2–5 remain proposed.
+Stages 1–2 have landed ([deterministic core](../../implemented/feature/2026-08-21-werewolf-deterministic-core.md), [bot runner](../../implemented/feature/2026-08-21-werewolf-bot-runner.md)); stages 3–5 remain proposed.
 
 1. Add the `game/` group, Werewolf core types, registries, rule compiler, classic definitions, reducer, invariant, and pure tests. No model or UI path is needed to validate deterministic rules and configuration extension.
 2. Add Bot continuity state, observation projection, one-shot Bot runner, scripted provider integration, retry/fallback behavior, cancellation, and replay tests. Prove context revision `N` is included in decision `N + 1` and that another bot's context remains unchanged.

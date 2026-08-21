@@ -19,6 +19,7 @@ export type WerewolfErrorCode =
   | 'WEREWOLF_ILLEGAL_ACTION'
   | 'WEREWOLF_INVALID_CONTEXT_DELTA'
   | 'WEREWOLF_VICTORY_CONFLICT'
+  | 'WEREWOLF_PROVIDER_CAPABILITY'
 
 /** One typed Werewolf failure; `detail` is detached JSON for logs and tests. */
 export class WerewolfError extends Error {

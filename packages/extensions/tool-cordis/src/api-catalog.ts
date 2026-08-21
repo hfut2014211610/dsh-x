@@ -2251,6 +2251,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'The Werewolf extension surface: registration of rule sets, roles, phases, and victory conditions, plus rule-set compilation against the current registry state.',
     methods: [
       {
+        signature: 'botRunnerConfig(): WerewolfBotRunnerConfigV1',
+        description: 'The resolved bot runner settings the stage-2 runner consumes.',
+        parameters: [],
+        returns: 'the deployment-resolved runner configuration.',
+      },
+      {
         signature: 'registerRole(definition: WerewolfRoleDefinition): () => void',
         description: 'Register one role version on the calling fiber.',
         parameters: [{ name: 'definition', description: 'the role definition to register.' }],
@@ -4951,12 +4957,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WerewolfAnnouncementRecordV1 {\n    kind: \'system\' | \'death\' | \'vote\' | \'result\';\n    key: string;\n    data?: JsonValue;\n}',
   },
   {
+    name: 'WerewolfBotRunnerConfigV1',
+    declaration: 'export interface WerewolfBotRunnerConfigV1 {\n    provider: string;\n    botAgent?: AgentOptions;\n    retryLimit: number;\n    decisionTimeoutMs: number;\n    failurePolicy: \'auto-action\' | \'pause-game\';\n    limits: WerewolfContextLimitsV1;\n    publicTimelineEntries: number;\n}',
+  },
+  {
     name: 'WerewolfCompiledPhaseOccurrenceV1',
     declaration: 'export interface WerewolfCompiledPhaseOccurrenceV1 {\n    phaseId: string;\n    phaseVersion: number;\n    options: JsonValue;\n    compiled: CompiledWerewolfPhase;\n}',
   },
   {
     name: 'WerewolfCompiledRuleSetV1',
     declaration: 'export interface WerewolfCompiledRuleSetV1 {\n    input: WerewolfRuleSetInputV1;\n    digest: string;\n    roles: ReadonlyMap<string, CompiledWerewolfRole>;\n    cycle: {\n        setup: ReadonlyArray<WerewolfCompiledPhaseOccurrenceV1>;\n        night: ReadonlyArray<WerewolfCompiledPhaseOccurrenceV1>;\n        day: ReadonlyArray<WerewolfCompiledPhaseOccurrenceV1>;\n    };\n    victory: ReadonlyArray<{\n        definition: WerewolfVictoryConditionDefinition;\n        options: JsonValue;\n        priority: number;\n    }>;\n}',
+  },
+  {
+    name: 'WerewolfContextLimitsV1',
+    declaration: 'export interface WerewolfContextLimitsV1 {\n    memorySummaryChars: number;\n    beliefBasisChars: number;\n    commitmentChars: number;\n    strategyChars: number;\n    maxCommitments: number;\n}',
   },
   {
     name: 'WerewolfDeckEntryV1',

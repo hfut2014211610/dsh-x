@@ -34,7 +34,6 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
   'packages/util/brand': 'The package is a type-only primitive erased at compile time.',
   'packages/util/home-paths': 'The package only resolves harness-owned host paths; model-facing consumers own any rendered use.',
   'packages/util/launch-environment': 'The package only resolves host environment values; model-facing consumers own any rendered use.',
-  'packages/game/werewolf': 'The deterministic game core registers no tool, prompt, or schema; bot child requests arrive with the stage-2 subagent integration.',
   'packages/game/werewolf-classic': 'The definitions plugin only registers game rules on ctx.werewolf; it contributes no model-visible surface.',
 }
 

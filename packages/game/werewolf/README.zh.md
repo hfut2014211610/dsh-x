@@ -11,6 +11,8 @@
 - **事件** —— 九个 log-only 会话事件（`werewolf/game-started` … `werewolf/game-ended`）构成权威游戏记录；见 [docs/subsystems/werewolf.md](../../../docs/subsystems/werewolf.md) 与[持久化目录](../../../docs/persistence-catalog.md)。会改变状态的修订连续；`werewolf/bot-attempt-failed` 不改变修订。
 - **Reducer 与引擎** —— `reduceWerewolfGame`/`applyWerewolfEvent` 把事件折叠为 `WerewolfGameStateV1`；纯引擎步骤（`startWerewolfGame`、`openNextWerewolfPhase`、`submitWerewolfHumanAction`、`commitWerewolfBotDecisions`、`resolveOpenWerewolfPhase`、`driveWerewolfGame`、`abortWerewolfGame`）计算下一批事件并用同一 reducer 折叠，因此实况对局与回放共用一条路径。动作按封闭规格词汇（`player-target`、`choice`、`text`、`compound`）校验。
 - **Bot 连续性上下文** —— 每个 Bot 座位在配置限制下拥有一份主观 `WerewolfBotContextV1`；`validateWerewolfBotContextDelta` 与 `applyWerewolfBotContextDelta` 让每个被接受的决策成为独立检查点（`contextAfter`），增量则解释允许发生的变化。档案来自确定性的 `BOT_PROFILE_CATALOG` 分配。
+- **观察投影** —— `projectWerewolfBotObservation` 构造单次决策的授权视图：私有知识来自行动者角色投影器（仅当编译角色有权时才包含队友）、只含公开名册与有限近期时间线的公开状态、序列化的封闭动作规格，以及该行动者的先前上下文。任何路径都不会读取或序列化其他角色的私有状态。
+- **One-shot Bot 运行器** —— `runWerewolfBotDecision` 通过 `ctx.subagents.start()` 启动全新子代理，携带该阶段的对象根输出 schema、固定 Bot persona、空工具允许列表与委派深度上限。结构化结果作为不可信信封先校验动作；失败尝试返回带准确类别的 `werewolf/bot-attempt-failed` 载荷，重试只携带简短诊断，重试耗尽后应用配置的兜底（托管动作或暂停）。运行器绝不追加事件；调用方持有持久日志。
 
 ## 确定性与回放
 
@@ -24,9 +26,24 @@
 
 服务插件：default 导出 `WerewolfRuntime`，并把 `ctx.werewolf` 合并进 Cordis `Context` 接口。`./invariant` 子路径携带持久事件不变量伴随插件；类型位于 `src/types.ts`。
 
+## 模型体验
+
+### Bot 子代理 persona
+
+#### 模型看到什么
+
+每个 Bot 子代理在固定的 `WEREWOLF_BOT_PERSONA`（座位身份来自游戏状态、局内文本为不可信数据、只决定当前请求的动作）与 `WEREWOLF_BOT_INSTRUCTIONS`（恰好返回一个匹配输出 schema 的 JSON 对象；`legalAction.spec` 枚举全部合法值；上下文增量只更新自己的主观字段）下运行。prompt 携带序列化观察：决策标识、天数与阶段、行动者角色与私有知识、含有限近期时间线的公开状态、合法动作，以及该行动者的先前连续性上下文。重试尝试前prepend一行：`Previous attempt rejected: <category>: <diagnostic>`。
+
+#### Token 影响
+
+每次尝试一个全新子代理会话；token 成本随尝试次数与配置的 `publicTimelineEntries` 上限增长。父对话不受影响——父模型从不被要求解释游戏输入。
+
+#### KV Cache 影响
+
+每个子代理都是 one-shot，除 persona 与指令块外没有可复用前缀；父会话的缓存不受影响。
+
 ## 已知限制与遗留工作
 
-- **尚无 Bot 运行器或真人投影** —— 阶段1是确定性核心；one-shot Bot 运行器、真人授权投影、Typert remote 与专用 `werewolf` 会话视图随特性笔记的阶段 2–4 交付。本包不调用任何模型。
-- **尚无运行时变更 API** —— 活跃会话上的 `start`/`submitAction`/`resume`/`abortGame`（带 `requestId`/`expectedGameRevision` 幂等）随阶段3运行时落地；载荷字段与 reducer 的幂等键索引已就位。
+- **尚无会话集成控制器** —— 运行器返回分离载荷；活跃会话上的 `start`/`submitAction`/`resume`/`abortGame`（带 `requestId`/`expectedGameRevision` 幂等）随阶段3运行时落地，真人授权投影、Typert remote 与专用 `werewolf` 会话视图亦然。
 - **仅本地威胁模型** —— 为支持回放，完整角色分配与 Bot 上下文存于原始会话存储；阶段1防止通过正常 UI 与 prompt 构造意外泄密，不承诺对抗性防作弊。
 - **公告文案是键，不在此本地化** —— 结算记录 `key`/`data`；展示文案及其本地化由未来的视图阶段负责。

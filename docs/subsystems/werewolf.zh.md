@@ -20,6 +20,10 @@
 
 阶段引擎是纯函数：每一步计算下一批事件并用与回放相同的 reducer 折叠，因此实况对局与回放共用一条代码路径。一个周期按记录顺序遍历 `setup`、`night`、`day` 阶段列表；阶段以不可变动作计划（封闭动作规格词汇：`player-target`、`choice`、`text`、`compound`）开启或跳过；结算按固定记录顺序应用。平票策略由引擎拥有（`no-elimination`、`revote-once`、`seeded-random`），夜间击杀的平刀策略由阶段拥有。胜利在 setup 与每次结算后评估：条件按优先级提出主张，含主张的最低优先级获胜，相同结果合并证据，同一优先级上的分歧结果属于不变量失败。`maxDays` 耗尽仍无其他结果时以平局结束；只有 `abortGame` 能产生 `aborted` 结果。
 
+## One-shot Bot 运行器与观察投影
+
+`projectWerewolfBotObservation` 从折叠状态与已开启计划构造单次决策的授权视图：经注册角色投影器得到行动者角色与私有知识（仅当编译角色声明 `seesFactionTeammates` 时包含队友）、只含公开名册与配置数量的尾部时间线的公开状态、序列化的封闭动作规格，以及该行动者的先前连续性上下文。`runWerewolfBotDecision` 在配置的 provider 上通过 `ctx.subagents.start()` 启动全新子代理——由封闭规格词汇派生的对象根输出 schema、固定 Bot persona、`toolFilter: { allow: [] }`、委派深度上限，以及可选的逐子代理模型路由。结构化结果作为不可信信封先校验动作再校验增量；每次失败尝试以带准确类别（`provider-setup`、`result-rejected`、`timeout`、`invalid-output`、`illegal-action`、`invalid-context-delta`）的分离 `werewolf/bot-attempt-failed` 载荷出现，重试只携带简短诊断，重试耗尽后应用配置的兜底：带引擎生成上下文增量的确定性托管动作，或暂停请求。运行时经过校验的 `Config` 持有 provider 名、重试预算、超时、兜底策略、上下文限制与时间线上限。
+
 ## Bot 连续性上下文
 
 每个座位在游戏事件流中拥有一份持久的主观 `WerewolfBotContextV1`——受配置字符与数组限制约束的判断、承诺、策略、记忆摘要与最近决策标识。上下文不是游戏事实：它不能让非法动作变合法，也不能把猜测变成已知信息。每个被接受的决策记录前一个上下文修订、动作、经校验的增量与完整计算的 `contextAfter`，因此每次决策都是独立检查点，增量则解释允许发生的变化。档案由游戏种子确定性分配，并在整局内不可变。
@@ -39,6 +43,13 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 The Werewolf extension surface: registration of rule sets, roles, phases, and victory conditions, plus rule-set compilation against the current registry state.
 
 ```ts cordis-catalog
+/**
+ * The resolved bot runner settings the stage-2 runner consumes.
+ *
+ * @returns the deployment-resolved runner configuration.
+ */
+botRunnerConfig(): WerewolfBotRunnerConfigV1
+
 /**
  * Register one role version on the calling fiber.
  *
@@ -88,5 +99,5 @@ resolveRuleSet(input: JsonValue): WerewolfCompiledRuleSetV1
 listRuleSets(): ReadonlyMap<string, WerewolfRuleSetInputV1>
 ```
 
-Source: [`packages/game/werewolf/src/runtime.ts:34`](../../packages/game/werewolf/src/runtime.ts)
+Source: [`packages/game/werewolf/src/runtime.ts:63`](../../packages/game/werewolf/src/runtime.ts)
 <!-- END GENERATED cordis-surface -->

@@ -20,6 +20,10 @@ The parent session log is the authoritative game record; every werewolf event is
 
 The phase engine is pure: each step computes the next events and folds them through the same reducer replay uses, so live play and replay share one code path. One cycle walks the recorded `setup`, `night`, and `day` phase lists in order; a phase opens with an immutable action plan (closed action-spec vocabulary: `player-target`, `choice`, `text`, `compound`) or skips; resolution applies in a fixed record order. Tie policies are engine-owned for votes (`no-elimination`, `revote-once`, `seeded-random`) and phase-owned for the night kill. Victory is evaluated after setup and every resolution: conditions claim at priorities, the lowest priority with a claim wins, equal outcomes merge evidence, and divergent outcomes at one priority are an invariant failure. `maxDays` without another result ends the game as a tie; only `abortGame` produces an `aborted` result.
 
+## One-shot bot runner and observation projection
+
+`projectWerewolfBotObservation` builds one decision's authorized view from the folded state and the opened plan: the actor's role and private knowledge via the registered role projector (teammates only when the compiled role declares `seesFactionTeammates`), a public state of roster facts plus a configured trailing timeline slice, the serialized closed action spec, and the actor's prior continuity context. `runWerewolfBotDecision` starts a fresh child through `ctx.subagents.start()` on the configured provider — object-rooted output schema derived from the closed spec vocabulary, the fixed bot persona, `toolFilter: { allow: [] }`, a delegation-depth cap, and the optional per-child model route. Structured results are untrusted envelopes validated action-first and delta-second; every failed attempt surfaces as a detached `werewolf/bot-attempt-failed` payload with an exact category (`provider-setup`, `result-rejected`, `timeout`, `invalid-output`, `illegal-action`, `invalid-context-delta`), retries carry only a concise diagnostic, and retry exhaustion applies the configured fallback: a deterministic trustee action with an engine-authored context delta, or a pause request. The runtime's validated `Config` owns the provider name, retry budget, timeout, fallback policy, context limits, and timeline bound.
+
 ## Bot continuity context
 
 Every seat owns one durable subjective `WerewolfBotContextV1` inside the game's event stream — beliefs, commitments, strategy, memory summary, and the last decision identity under configured character and array limits. A context is not game truth: it can never make an illegal action legal or turn a belief into knowledge. Each accepted decision records the prior context revision, the action, the validated delta, and the full computed `contextAfter`, so every decision is an independent checkpoint while the delta explains the permitted change. Profiles are assigned deterministically from the game seed and are immutable for the game.
@@ -39,6 +43,13 @@ Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnp
 The Werewolf extension surface: registration of rule sets, roles, phases, and victory conditions, plus rule-set compilation against the current registry state.
 
 ```ts cordis-catalog
+/**
+ * The resolved bot runner settings the stage-2 runner consumes.
+ *
+ * @returns the deployment-resolved runner configuration.
+ */
+botRunnerConfig(): WerewolfBotRunnerConfigV1
+
 /**
  * Register one role version on the calling fiber.
  *
@@ -88,5 +99,5 @@ resolveRuleSet(input: JsonValue): WerewolfCompiledRuleSetV1
 listRuleSets(): ReadonlyMap<string, WerewolfRuleSetInputV1>
 ```
 
-Source: [`packages/game/werewolf/src/runtime.ts:34`](../../packages/game/werewolf/src/runtime.ts)
+Source: [`packages/game/werewolf/src/runtime.ts:63`](../../packages/game/werewolf/src/runtime.ts)
 <!-- END GENERATED cordis-surface -->

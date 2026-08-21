@@ -697,7 +697,7 @@ Bot 连续性上下文属于私有策略数据，UI 不得渲染。它可以包�
 
 ## 交付阶段
 
-阶段1已落地为[确定性核心笔记](../../implemented/feature/2026-08-21-werewolf-deterministic-core.md)；阶段 2–5 仍为 proposed。
+阶段 1–2 已落地（[确定性核心](../../implemented/feature/2026-08-21-werewolf-deterministic-core.md)、[Bot 运行器](../../implemented/feature/2026-08-21-werewolf-bot-runner.md)）；阶段 3–5 仍为 proposed。
 
 1. 增加 `game/` 包组、狼人杀核心类型、注册表、规则编译器、经典定义、reducer、不变量和纯测试。验证确定性规则和配置扩展不需要模型或 UI 路径。
 2. 增加 Bot 连续性状态、观察投影、one-shot Bot runner、脚本化 provider 集成、重试/兜底、取消和回放测试。证明上下文修订 `N` 会传入决策 `N + 1`，且其他 Bot 的上下文不变。
