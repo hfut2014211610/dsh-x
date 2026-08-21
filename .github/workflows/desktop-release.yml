@@ -195,6 +195,11 @@ jobs:
             if [[ "$version" =~ ^[0-9] ]]; then spec="@deepseek-ai/dsh@$version"; else spec='@deepseek-ai/dsh@latest'; fi
             npm install --prefix "$stage" --omit=dev "$spec"
           fi
+          # The x64 dmg embeds this same archive, but the stage above was
+          # installed for the arm64 host: koffi and sharp carry per-arch
+          # prebuilt packages and node-pty copied its host prebuild into
+          # build/. Complete the stage for both darwin architectures.
+          pnpm exec tsx scripts/release/darwin-universal.ts --stage "$stage"
           mkdir -p apps/desktop/resources
           # bsdtar writes forward-slash zip entries; the shell extracts this
           # archive into userData on first run.
