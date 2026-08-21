@@ -9,6 +9,8 @@
  * @module @deepseek-ai/dsh-werewolf/projection
  */
 
+import { isDeepStrictEqual } from 'node:util'
+import { WerewolfError } from './error.ts'
 import type {
   WerewolfActionSpecV1,
   WerewolfBotContextV1,
@@ -78,6 +80,21 @@ export function projectWerewolfBotObservation(
   request: WerewolfBotActionRequest,
   limits: WerewolfProjectionLimitsV1,
 ): WerewolfBotPromptV1 {
+  if (rules.digest !== state.ruleSetDigest) {
+    throw new WerewolfError('WEREWOLF_STALE_REVISION', 'werewolf projection: compiled rules do not match the active game')
+  }
+  if (request.gameId !== state.gameId || request.sourceGameRevision !== state.revision) {
+    throw new WerewolfError('WEREWOLF_STALE_REVISION', 'werewolf projection: request answers a stale game revision')
+  }
+  const openPhase = state.openPhase
+  if (openPhase === null) {
+    throw new WerewolfError('WEREWOLF_NO_ACTIVE_GAME', 'werewolf projection: no phase is open')
+  }
+  if (request.phaseInstanceId !== openPhase.phaseInstanceId
+    || request.phaseId !== openPhase.phaseId
+    || request.day !== openPhase.day) {
+    throw new WerewolfError('WEREWOLF_STALE_REVISION', 'werewolf projection: request answers a different phase')
+  }
   const player = state.players.find(entry => entry.playerId === request.playerId)
   if (player === undefined) {
     throw new Error(`werewolf projection: player ${request.playerId} is not seated`)
@@ -85,6 +102,30 @@ export function projectWerewolfBotObservation(
   const role = rules.roles.get(`${player.roleId}@${player.roleVersion}`)
   if (role === undefined) {
     throw new Error(`werewolf projection: role ${player.roleId}@${player.roleVersion} did not compile`)
+  }
+  const actor = openPhase.plan.actors.find(entry => entry.playerId === request.playerId)
+  const settled = openPhase.settled.some(entry => entry.playerId === request.playerId)
+  if (actor === undefined || player.human || settled) {
+    throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', `werewolf projection: player ${request.playerId} has no pending bot decision`)
+  }
+  if (openPhase.plan.mode === 'seat-order-public') {
+    const settledIds = new Set(openPhase.settled.map(entry => entry.playerId))
+    const first = openPhase.plan.actors.find(entry => !settledIds.has(entry.playerId))
+    if (first?.playerId !== request.playerId) {
+      throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', `werewolf projection: player ${request.playerId} is not the next public actor`)
+    }
+  }
+  if (request.actionKind !== actor.actionKind
+    || !isDeepStrictEqual(request.spec, actor.spec)
+    || !isDeepStrictEqual(request.context, actor.context)) {
+    throw new WerewolfError('WEREWOLF_STALE_REVISION', 'werewolf projection: request does not match the active action plan')
+  }
+  const currentContext = state.contexts[request.playerId]
+  if (currentContext === undefined) {
+    throw new WerewolfError('WEREWOLF_NO_ACTIVE_GAME', `werewolf projection: player ${request.playerId} has no bot context`)
+  }
+  if (!isDeepStrictEqual(request.priorContext, currentContext)) {
+    throw new WerewolfError('WEREWOLF_STALE_REVISION', 'werewolf projection: request carries stale or foreign bot context')
   }
   const teammates = role.seesFactionTeammates === true
     ? state.players
@@ -117,16 +158,16 @@ export function projectWerewolfBotObservation(
       key: entry.key,
       ...(entry.data === undefined ? {} : { data: structuredClone(entry.data) }),
     }))
-  const priorContext = cloneContext(request.priorContext)
+  const priorContext = cloneContext(currentContext)
   return {
     version: 1,
     decisionId: request.decisionId,
-    gameRevision: request.sourceGameRevision,
+    gameRevision: state.revision,
     contextRevision: priorContext.revision,
     phase: {
-      id: request.phaseId,
-      day: request.day,
-      actionKind: request.actionKind,
+      id: openPhase.phaseId,
+      day: openPhase.day,
+      actionKind: actor.actionKind,
     },
     self: {
       playerId: player.playerId,
@@ -142,9 +183,10 @@ export function projectWerewolfBotObservation(
     privateKnowledge: structuredClone(privateKnowledge),
     publicState: {
       day: state.day,
-      phaseId: request.phaseId,
-      mode: state.openPhase?.plan.mode ?? 'parallel-private',
+      phaseId: openPhase.phaseId,
+      mode: openPhase.plan.mode,
       roster: state.players.map(entry => ({
+        playerId: entry.playerId,
         seat: entry.seat,
         name: entry.displayName,
         alive: entry.alive,
@@ -153,9 +195,9 @@ export function projectWerewolfBotObservation(
       timeline,
     },
     legalAction: {
-      actionKind: request.actionKind,
-      spec: serializeWerewolfActionSpec(request.spec),
-      ...(request.context === undefined ? {} : { context: structuredClone(request.context) }),
+      actionKind: actor.actionKind,
+      spec: serializeWerewolfActionSpec(actor.spec),
+      ...(actor.context === undefined ? {} : { context: structuredClone(actor.context) }),
     },
     priorContext,
   }

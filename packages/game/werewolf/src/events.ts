@@ -109,6 +109,6 @@ export type WerewolfEvent<T extends WerewolfEventType = WerewolfEventType> = {
  * @param event - any event-shaped value.
  * @returns whether `event.type` is a declared werewolf event type.
  */
-export function isWerewolfEvent(event: { type: string }): event is WerewolfEvent {
+export function isWerewolfEvent<T extends { type: string }>(event: T): event is T & WerewolfEvent {
   return WEREWOLF_EVENT_TYPE_SET.has(event.type)
 }

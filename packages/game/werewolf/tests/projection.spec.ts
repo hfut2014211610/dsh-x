@@ -14,6 +14,22 @@ function botState() {
   return { rules, state: opened.state, request, requests }
 }
 
+function talkBotState() {
+  const rules = miniRuleSet({ voteTie: 'no-elimination' })
+  const { state } = startWerewolfGame({ ruleSet: rules, seed: 31, ids: counterIds() })
+  const opened = openNextWerewolfPhase({
+    ...state,
+    segment: 'day',
+    cursorIndex: -1,
+    occurrence: 0,
+    positionConsumed: true,
+  }, rules, counterIds())
+  const request = buildWerewolfBotRequests(opened.state, counterIds())
+    .find(candidate => opened.state.players.find(player => player.playerId === candidate.playerId)?.roleId === 'mini.villager')
+  if (request === undefined) throw new Error('fixture produced no villager talk request')
+  return { rules, state: opened.state, request }
+}
+
 const limits = { publicTimelineEntries: 5 }
 
 describe('serializeWerewolfActionSpec', () => {
@@ -51,51 +67,29 @@ describe('projectWerewolfBotObservation', () => {
     const role = prompt.self.role as { faction: string }
     expect(role.faction).toBe(state.players.find(player => player.playerId === request.playerId)?.faction)
     expect(prompt.priorContext).toEqual(request.priorContext)
+    const roster = (prompt.publicState as { roster: Array<{ playerId: string }> }).roster
+    expect(roster.map(entry => entry.playerId)).toEqual(state.players.map(entry => entry.playerId))
     const legalAction = prompt.legalAction as { actionKind: string; spec: { kind: string } }
     expect(legalAction.actionKind).toBe(request.actionKind)
     expect(legalAction.spec.kind).toBe(request.spec.kind)
   })
 
-  it('covers optional-field absence: no teammates, no actor, no data, no context', () => {
-    const rules = miniRuleSet({ voteTie: 'no-elimination' })
-    const { state } = startWerewolfGame({ ruleSet: rules, seed: 31, ids: counterIds() })
-    const villager = state.players.find(player => player.roleId === 'mini.villager' && player.alive)
-    if (villager === undefined) throw new Error('no living villager')
+  it('covers optional-field absence without constructing an impossible request', () => {
+    const { rules, state, request } = talkBotState()
     const bare: typeof state = {
       ...state,
-      players: state.players.map(entry => entry.playerId === villager.playerId
-        ? { ...entry, notices: [{ toPlayerId: entry.playerId, kind: 'k', data: { x: 1 } }] }
-        : entry),
       timeline: [
-        { id: '0', day: 1, phaseId: 'p', kind: 'announcement', key: 'k', actorId: villager.playerId, data: { y: 2 } },
+        { id: '0', day: 1, phaseId: 'p', kind: 'announcement', key: 'k', actorId: request.playerId, data: { y: 2 } },
         { id: '1', day: 1, phaseId: 'p', kind: 'system', key: 'k2' },
       ],
-      openPhase: null,
-    }
-    const request = {
-      decisionId: 'd' as never,
-      gameId: state.gameId,
-      sourceGameRevision: state.revision,
-      playerId: villager.playerId,
-      phaseInstanceId: 'i' as never,
-      phaseId: 'day.talk',
-      day: 1,
-      actionKind: 'speech',
-      spec: { kind: 'text' as const, maxChars: 10, allowSkip: true },
-      context: { hint: 'speak now' },
-      priorContext: state.contexts[villager.human ? '' : villager.playerId] ?? {
-        version: 1, gameId: state.gameId, playerId: villager.playerId, revision: 0,
-        profile: { personalityId: 'p', speakingStyle: 's', riskStyle: 'balanced' as const },
-        beliefs: [], commitments: [], strategy: { objective: 'o', priorityTargets: [] }, memorySummary: 'm',
-      },
     }
     const prompt = projectWerewolfBotObservation(bare, rules, request, limits)
     expect((prompt.privateKnowledge as { teammates?: unknown }).teammates).toBeUndefined()
     const timeline = (prompt.publicState as { timeline: Array<Record<string, unknown>> }).timeline
     expect(timeline[0]).toHaveProperty('actorId')
     expect(timeline[0]).toHaveProperty('data')
-    expect((prompt.privateKnowledge as Record<string, unknown>)).toEqual({})
-    expect((prompt.legalAction as Record<string, unknown>)).toHaveProperty('context')
+    expect(timeline[1]).not.toHaveProperty('actorId')
+    expect(timeline[1]).not.toHaveProperty('data')
   })
 
   it('throws for an unseated player or uncompiled role', () => {
@@ -104,6 +98,102 @@ describe('projectWerewolfBotObservation', () => {
       .toThrow(/is not seated/)
     const corrupted = { ...rules, roles: new Map() }
     expect(() => projectWerewolfBotObservation(state, corrupted, request, limits)).toThrow(/did not compile/)
+  })
+
+  it('rejects stale identity, active-plan drift, foreign context, and mismatched rules before projection', () => {
+    const { rules, state, request } = botState()
+    expect(() => projectWerewolfBotObservation(state, rules, {
+      ...request,
+      sourceGameRevision: request.sourceGameRevision - 1,
+    }, limits)).toThrow(/stale game revision/)
+    expect(() => projectWerewolfBotObservation(state, { ...rules, digest: 'foreign' }, request, limits))
+      .toThrow(/compiled rules do not match/)
+    expect(() => projectWerewolfBotObservation({ ...state, openPhase: null }, rules, request, limits))
+      .toThrow(/no phase is open/)
+    expect(() => projectWerewolfBotObservation(state, rules, {
+      ...request,
+      phaseInstanceId: 'foreign-phase' as never,
+    }, limits)).toThrow(/different phase/)
+    expect(() => projectWerewolfBotObservation(state, rules, {
+      ...request,
+      actionKind: 'foreign-action',
+    }, limits)).toThrow(/does not match the active action plan/)
+    expect(() => projectWerewolfBotObservation(state, rules, {
+      ...request,
+      priorContext: {
+        ...request.priorContext,
+        strategy: { ...request.priorContext.strategy, objective: 'foreign strategy' },
+      },
+    }, limits)).toThrow(/stale or foreign bot context/)
+    expect(() => projectWerewolfBotObservation({
+      ...state,
+      openPhase: state.openPhase === null
+        ? null
+        : { ...state.openPhase, settled: [{ playerId: request.playerId, decisionId: request.decisionId }] },
+    }, rules, request, limits)).toThrow(/has no pending bot decision/)
+
+    const contexts = Object.fromEntries(
+      Object.entries(state.contexts).filter(([playerId]) => playerId !== request.playerId),
+    )
+    expect(() => projectWerewolfBotObservation({ ...state, contexts }, rules, request, limits))
+      .toThrow(/has no bot context/)
+  })
+
+  it('enforces public actor order and projects non-empty notices and action context', () => {
+    const { rules, state, request } = talkBotState()
+    const openPhase = state.openPhase
+    if (openPhase === null) throw new Error('talk phase is not open')
+    expect(openPhase.plan.mode).toBe('seat-order-public')
+    const later = openPhase.plan.actors.find(entry => entry.playerId !== request.playerId
+      && state.players.find(player => player.playerId === entry.playerId)?.human === false)
+    if (later === undefined) throw new Error('fixture produced no later bot actor')
+    const laterContext = state.contexts[later.playerId]
+    if (laterContext === undefined) throw new Error('later bot has no context')
+    expect(() => projectWerewolfBotObservation(state, rules, {
+      decisionId: request.decisionId,
+      gameId: request.gameId,
+      sourceGameRevision: request.sourceGameRevision,
+      playerId: later.playerId,
+      phaseInstanceId: request.phaseInstanceId,
+      phaseId: request.phaseId,
+      day: request.day,
+      actionKind: later.actionKind,
+      spec: later.spec,
+      ...(later.context === undefined ? {} : { context: later.context }),
+      priorContext: laterContext,
+    }, limits)).toThrow(/is not the next public actor/)
+
+    const settledSiblingState: typeof state = {
+      ...state,
+      openPhase: {
+        ...openPhase,
+        settled: [{ playerId: later.playerId }],
+      },
+    }
+    expect(projectWerewolfBotObservation(settledSiblingState, rules, request, limits).self.playerId)
+      .toBe(request.playerId)
+
+    const actionContext = { hint: 'speak now' }
+    const contextualState: typeof state = {
+      ...state,
+      players: state.players.map(player => player.playerId === request.playerId
+        ? { ...player, notices: [{ toPlayerId: player.playerId, kind: 'test-notice', data: { value: 1 } }] }
+        : player),
+      openPhase: {
+        ...openPhase,
+        plan: {
+          ...openPhase.plan,
+          actors: openPhase.plan.actors.map(actor => actor.playerId === request.playerId
+            ? { ...actor, context: actionContext }
+            : actor),
+        },
+      },
+    }
+    const prompt = projectWerewolfBotObservation(contextualState, rules, {
+      ...request,
+      context: actionContext,
+    }, limits)
+    expect(prompt.legalAction).toMatchObject({ context: actionContext })
   })
 
   it('bounds the public timeline to the configured entry count', () => {

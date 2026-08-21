@@ -2,7 +2,7 @@
 
 [English](werewolf.md) | 中文
 
-由 [dsh-werewolf](../../packages/game/werewolf)（`ctx.werewolf`）承载的确定性、事件溯源的单机狼人杀运行时核心，经典角色、阶段与胜利定义位于 [dsh-werewolf-classic](../../packages/game/werewolf-classic)。引擎是角色分配、合法动作、效果应用、阶段转换与胜负判定的唯一权威；模型输出只是结构化输出边界上的不可信输入，该边界随阶段2的 Bot 集成交付。阶段1交付注册表、规则编译器、持久事件、reducer、阶段引擎与 Bot 连续性上下文；Bot 运行器、会话投影与专用游戏视图随[交付计划](../../.agents/notes/proposed/feature/2026-08-20-configurable-werewolf-mode.md)的后续阶段交付。
+确定性、事件溯源的单机狼人杀运行时由 [dsh-werewolf](../../packages/game/werewolf)（`ctx.werewolf`）承载，经典定义位于 [dsh-werewolf-classic](../../packages/game/werewolf-classic)，通用 Session Host 位于 [dsh-game](../../packages/game/game)（`ctx.games`）。角色、合法动作、效果、阶段与胜负只由引擎裁决；模型输出始终是不可信结构化输入。阶段1–3已交付确定性核心、带每座位持久上下文的 fresh one-shot Bot、每局一个专用 Host Agent 和 Session、原子命令批次、类型化 Host 方法、真人授权投影与终局回放。专用 Web 游戏视图仍在[交付计划](../../.agents/notes/proposed/feature/2026-08-20-configurable-werewolf-mode.md)中。
 
 源码：[`packages/game/werewolf/src/`](../../packages/game/werewolf/src/)
 
@@ -22,7 +22,15 @@
 
 ## One-shot Bot 运行器与观察投影
 
-`projectWerewolfBotObservation` 从折叠状态与已开启计划构造单次决策的授权视图：经注册角色投影器得到行动者角色与私有知识（仅当编译角色声明 `seesFactionTeammates` 时包含队友）、只含公开名册与配置数量的尾部时间线的公开状态、序列化的封闭动作规格，以及该行动者的先前连续性上下文。`runWerewolfBotDecision` 在配置的 provider 上通过 `ctx.subagents.start()` 启动全新子代理——由封闭规格词汇派生的对象根输出 schema、固定 Bot persona、`toolFilter: { allow: [] }`、委派深度上限，以及可选的逐子代理模型路由。结构化结果作为不可信信封先校验动作再校验增量；每次失败尝试以带准确类别（`provider-setup`、`result-rejected`、`timeout`、`invalid-output`、`illegal-action`、`invalid-context-delta`）的分离 `werewolf/bot-attempt-failed` 载荷出现，重试只携带简短诊断，重试耗尽后应用配置的兜底：带引擎生成上下文增量的确定性托管动作，或暂停请求。运行时经过校验的 `Config` 持有 provider 名、重试预算、超时、兜底策略、上下文限制与时间线上限。
+`projectWerewolfBotObservation` 首先证明请求仍匹配折叠状态中的游戏标识与修订、已开启阶段与动作计划、编译规则摘要、待决策行动者及其准确的当前连续性上下文，再构造授权视图：经注册角色投影器得到行动者角色与私有知识（仅当角色声明 `seesFactionTeammates` 时包含队友），公开状态包含玩家 id、名册事实与配置数量的尾部时间线，合法动作与先前上下文均取自权威状态。`runWerewolfBotDecision` 在配置 provider 上启动全新子代理，携带对象根 schema、固定 Bot persona、`toolFilter: { allow: [] }`、委派深度上限与可选子代理路由。provider 必须声明全部所需能力且 `inheritsParentContext === false`。结构化结果保持不可信，先校验动作，再校验上下文增量。失败尝试保留准确类别；取消与结果及超时竞速，并在返回前 dispose 子代理。重试耗尽后执行确定性托管动作或暂停游戏。Session Host 的 `GameAiExecutor` 补入准确 Host 父节点和操作 signal，执行 `maxConcurrentBots`，保持结果顺序，且绝不调用 Host 模型。
+
+## Session Host、命令与真人投影
+
+`WerewolfGameModule` 是注册到 `ctx.games` 的薄领域适配器。`start` 在 Host 存在前校验准确规则集修订和隔离型子代理 provider。通用 provider 创建 `game-<GameId>`，原子提交 `game/command-receipt` 与 `werewolf/game-started`，并推进阶段直到真人表单、暂停或结果。`submitAction`、`resume`、`abortGame` 携带调用方 request id 与 expected revision。相同 payload 的重复请求在自动推进后返回当前视图；同一键配另一 payload 会冲突，新请求携带过期修订则拒绝。全部变更按局串行。
+
+`Session.appendBatch()` 在改变实时日志前，针对影子前缀校验 JSON、完整 surface 转换和同步注册不变量。拒绝时事件、surface、观察者与修订均不改变。成功时完整批次先变得可见，再按顺序发布事件。通用回执与狼人杀事件均为 log-only。
+
+`WerewolfGameGateway` 暴露类型化 `start`、`getView`、`getReplay`、`submitAction`、`resume`、`abortGame`。它在内部解析版本1本地主体；请求不能选择 Session、participant、player 或座位。`WerewolfHumanViewV1` 投影公开事实，以及仅属于绑定真人的角色、获授权队友、资源、通知与当前表单。最终视图在结果产生后揭示角色。`getReplay` 拒绝活跃游戏，并返回授权检查点而非原始事件、Bot 上下文或子代理 prompt。
 
 ## Bot 连续性上下文
 
@@ -35,6 +43,82 @@
 ## Cordis API
 
 Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+
+<a id="ctxgames--gameservice-abstract-seam"></a>
+
+### `ctx.games` — `GameService` (abstract seam)
+
+Shared game Host contract implemented by the default Session provider.
+
+```ts cordis-catalog
+/**
+ * Register one exact module version as a caller-owned effect.
+ * @param module - domain adapter to register.
+ * @returns disposer that removes this exact registration.
+ */
+abstract registerModule(module: GameModule): () => void
+
+/**
+ * Resolve the version-1 loopback principal.
+ * @returns authenticated local principal.
+ */
+abstract resolvePrincipal(): LocalGamePrincipalV1
+
+/**
+ * Create a dedicated Host, commit start atomically, and auto-advance.
+ * @param request - module, idempotency key, initial revision, and module input.
+ * @returns current authorized projection after automatic advancement.
+ */
+abstract start<TView>(request: { moduleId: string requestId: GameRequestId expectedGameRevision: 0 input: JsonValue }): Promise<GameProjection<TView>>
+
+/**
+ * Return the current authorized view.
+ * @param gameId - game to read.
+ * @param principalId - authenticated caller.
+ * @returns current authorized projection.
+ */
+abstract getView<TView>(gameId: GameId, principalId: PrincipalId): Promise<GameProjection<TView>>
+
+/**
+ * Return the authorized module replay.
+ * @param gameId - game to replay.
+ * @param principalId - authenticated caller.
+ * @returns module-defined authorized replay.
+ */
+abstract getReplay<TReplay>(gameId: GameId, principalId: PrincipalId): Promise<TReplay>
+
+/**
+ * Commit one human action and auto-advance.
+ * @param request - authorized compare-and-set action.
+ * @returns current authorized projection after automatic advancement.
+ */
+abstract submitAction<TView>(request: { gameId: GameId principalId: PrincipalId requestId: GameRequestId expectedGameRevision: number action: JsonValue }): Promise<GameProjection<TView>>
+
+/**
+ * Resume one paused game and auto-advance.
+ * @param request - authorized compare-and-set resume request.
+ * @returns current authorized projection after automatic advancement.
+ */
+abstract resume<TView>(request: { gameId: GameId principalId: PrincipalId requestId: GameRequestId expectedGameRevision: number }): Promise<GameProjection<TView>>
+
+/**
+ * Record an aborted terminal result.
+ * @param request - authorized compare-and-set abort request.
+ * @returns terminal authorized projection.
+ */
+abstract abortGame<TView>(request: { gameId: GameId principalId: PrincipalId requestId: GameRequestId expectedGameRevision: number }): Promise<GameProjection<TView>>
+
+/**
+ * Resolve one game to its dedicated live Host Session.
+ * @param gameId - game to inspect.
+ * @returns indexed Host Session, when known to this process.
+ */
+abstract getHostSession(gameId: GameId): Session | undefined
+```
+
+Types: [Session](session.md)
+
+Source: [`packages/game/game/src/service.ts:26`](../../packages/game/game/src/service.ts)
 
 <a id="ctxwerewolf--werewolfruntime"></a>
 
@@ -100,4 +184,79 @@ listRuleSets(): ReadonlyMap<string, WerewolfRuleSetInputV1>
 ```
 
 Source: [`packages/game/werewolf/src/runtime.ts:63`](../../packages/game/werewolf/src/runtime.ts)
+
+<a id="ctxwerewolfgame--werewolfgamegateway"></a>
+
+### `ctx.werewolfGame` — `WerewolfGameGateway`
+
+Registers the Werewolf module and exposes the UI-facing typed methods.
+
+```ts cordis-catalog
+/**
+ * Start one local single-player game.
+ * @param request - rule selection, seed, and caller idempotency key.
+ * @returns current human-authorized projection.
+ */
+@Remote('start') async start(request: WerewolfStartRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>
+
+/**
+ * Read the current view for the locally authenticated principal.
+ * @param request - game identity.
+ * @returns current human-authorized projection.
+ */
+@Remote('getView') async getView(request: { gameId: string }): Promise<GameProjection<WerewolfHumanViewV1>>
+
+/**
+ * Read the terminal authorized replay.
+ * @param request - game identity.
+ * @returns replay containing authorized checkpoints.
+ */
+@Remote('getReplay') async getReplay(request: { gameId: string }): Promise<WerewolfReplayV1>
+
+/**
+ * Submit one action for the current human form.
+ * @param request - phase-bound compare-and-set action.
+ * @returns current human-authorized projection after automatic advancement.
+ */
+@Remote('submitAction') async submitAction(request: WerewolfSubmitActionRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>
+
+/**
+ * Resume one paused game.
+ * @param request - compare-and-set resume request.
+ * @returns current human-authorized projection after automatic advancement.
+ */
+@Remote('resume') async resume(request: WerewolfHostMutationRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>
+
+/**
+ * Abort one running or paused game.
+ * @param request - compare-and-set abort request.
+ * @returns terminal human-authorized projection.
+ */
+@Remote('abortGame') async abortGame(request: WerewolfHostMutationRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>
+```
+
+Source: [`packages/game/werewolf/src/host.ts:23`](../../packages/game/werewolf/src/host.ts)
+
+<a id="game-events"></a>
+
+### `game/*` events
+
+<a id="gameprojection-invalidated--emit"></a>
+
+#### `game/projection-invalidated` — emit
+
+Announce that authorized readers must re-read one game projection. The event deliberately carries no identity or hidden view data.
+
+```ts cordis-catalog
+/**
+ * Announce that authorized readers must re-read one game projection.
+ * The event deliberately carries no identity or hidden view data.
+ * @param gameId - changed game.
+ * @param gameRevision - committed domain revision.
+ * @mode emit
+ */
+'game/projection-invalidated'(gameId: GameId, gameRevision: number): void
+```
+
+Source: [`packages/game/game/src/service.ts:21`](../../packages/game/game/src/service.ts)
 <!-- END GENERATED cordis-surface -->

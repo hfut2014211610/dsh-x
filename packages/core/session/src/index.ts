@@ -14,7 +14,7 @@ import type { Scoped } from '@deepseek-ai/dsh-scope'
 import type { Message } from '@deepseek-ai/dsh-llm'
 import { SESSION_FORMAT_VERSION, SessionId } from './types.ts'
 import type { TypertLookup } from '@deepseek-ai/dsh-typert-protocol'
-import type { CreateSessionOptions, EpochHeader, PrepareSessionOptions, RequestContext, SessionEvent, SessionEventMap, SessionEventType, SessionHeader, SurfaceIntent, SurfaceEventType } from './types.ts'
+import type { CreateSessionOptions, EpochHeader, PrepareSessionOptions, RequestContext, SessionAppendEntry, SessionEvent, SessionEventMap, SessionEventType, SessionHeader, SurfaceIntent, SurfaceEventType } from './types.ts'
 import { snapshotJsonValue } from './json.ts'
 import { deriveEventMessage, SurfaceManager } from './surface.ts'
 import type { SessionSurface } from './surface.ts'
@@ -500,7 +500,7 @@ export class Session {
     id: SessionId,
     seed?: readonly SessionEvent[],
     header?: SessionHeader,
-    mode: 'snapshot' | 'restore' = 'snapshot',
+    mode: 'snapshot' | 'restore' | 'validation-shadow' = 'snapshot',
   ) {
     const restoredHeader = mode === 'restore'
       ? validateRestoredSessionHeader(id, header)
@@ -542,7 +542,7 @@ export class Session {
     // captures the creation seed: no load-time write. Re-marking is skipped
     // because a cold session is resumed on first touch, so repeatedly opening
     // one must not grow its log per open.
-    if (seed !== undefined && this.log.at(-1)?.type !== 'session/end-seed') {
+    if (mode !== 'validation-shadow' && seed !== undefined && this.log.at(-1)?.type !== 'session/end-seed') {
       this.append('session/end-seed', {})
     }
   }
@@ -646,6 +646,92 @@ export class Session {
         invokeContainedSessionObservers(entry.emitCtx, 'session/event', entry.id, callbackArgs, callbacks)
       }
       return event
+    } finally {
+      if (entry !== undefined) {
+        entry.appending = false
+        if (entry.detachRequested && !entry.announcing) entry.detach()
+      }
+    }
+  }
+
+  /**
+   * Atomically append an ordered event batch. Every payload, surface transition,
+   * and synchronous session invariant is validated against the complete prefix
+   * before the live log changes. After commit, observers receive the events in
+   * sequence order and already see the complete batch in {@link events}.
+   *
+   * @param entries - ordered typed event candidates.
+   * @returns the immutable events admitted to the log.
+   * @throws under the same JSON, surface, invariant, and reentrancy conditions
+   *   as {@link append}; any rejection leaves the log and surface unchanged.
+   */
+  appendBatch<const T extends readonly SessionAppendEntry[]>(
+    entries: T,
+  ): { readonly [K in keyof T]: T[K] extends SessionAppendEntry<infer E extends SessionEventType> ? SessionEvent<E> : never } {
+    const entry = attachments.get(this)
+    if (entry?.appending) {
+      throw new Error('session append cannot reenter while another append is being published')
+    }
+
+    const validationLog = [...this.log]
+    const validationSurface = new SurfaceManager(validationLog)
+    const events: SessionEvent[] = []
+    for (const candidate of entries) {
+      const dataSnapshot = snapshotJsonValue(candidate.data)
+      if (dataSnapshot === undefined) {
+        throw new Error(`session event "${candidate.type}" carries non-JSON-serializable data`)
+      }
+      assertSupportedRequestHeader(candidate.type, dataSnapshot, `session event "${candidate.type}"`)
+      const surfaceMetadata = candidate.intent === undefined
+        ? {}
+        : {
+          ...candidate.intent.sourceEventSeqs === undefined ? {} : { sourceEventSeqs: candidate.intent.sourceEventSeqs },
+          surfaceOp: candidate.intent.surfaceOp,
+        }
+      const surfaceMetadataSnapshot = snapshotJsonValue(surfaceMetadata)
+      if (surfaceMetadataSnapshot === undefined) {
+        throw new Error(`session event "${candidate.type}" carries non-JSON-serializable surface metadata`)
+      }
+      const event = deepFreeze({
+        type: candidate.type,
+        seq: validationLog.length,
+        time: Date.now(),
+        data: dataSnapshot,
+        ...(surfaceMetadataSnapshot as { surfaceOp?: unknown; sourceEventSeqs?: unknown }),
+      } as SessionEvent)
+      validationSurface.validateNext(event)
+      validationLog.push(event)
+      events.push(event)
+    }
+
+    if (entry !== undefined) {
+      for (const [index, event] of events.entries()) {
+        const shadow = new Session(
+          this.id,
+          [...this.log, ...events.slice(0, index)],
+          this.header,
+          'validation-shadow',
+        )
+        collectSessionCallbacks(entry.emitCtx, [entry.carrier, 'session/event', shadow, event])
+      }
+    }
+
+    if (entry !== undefined) entry.appending = true
+    try {
+      this.log.push(...events)
+      if (events.length > 0) this.eventsSnapshot = undefined
+      if (entry !== undefined) {
+        for (const event of events) {
+          const callbackArgs: unknown[] = [this, event]
+          const callbacks = collectSessionCallbacks(entry.emitCtx, [entry.carrier, 'session/event', ...callbackArgs])
+          invokeContainedSessionObservers(entry.emitCtx, 'session/event', entry.id, callbackArgs, callbacks)
+        }
+      }
+      return events as {
+        readonly [K in keyof T]: T[K] extends SessionAppendEntry<infer E extends SessionEventType>
+          ? SessionEvent<E>
+          : never
+      }
     } finally {
       if (entry !== undefined) {
         entry.appending = false

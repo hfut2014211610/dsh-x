@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-The deterministic Werewolf game core: the `ctx.werewolf` definition registries, rule-set compilation, the durable `werewolf/*` session events, the event reducer, the pure phase engine, and bot continuity context. The engine is the only authority for role assignment, legal actions, effect application, phase transitions, and victory; model-backed bots, session projections, and the game view arrive with later delivery stages of the [feature note](../../../.agents/notes/proposed/feature/2026-08-20-configurable-werewolf-mode.md).
+The deterministic Werewolf game runtime: `ctx.werewolf` definition registries, rule-set compilation, durable `werewolf/*` events, reducer, phase engine, bot continuity, authorized projections, fresh one-shot decision runner, thin `ctx.games` adapter, and typed Host methods. The engine remains the only authority for role assignment, legal actions, effects, phases, and victory. The dedicated Web game view remains a later stage of the [feature plan](../../../.agents/notes/proposed/feature/2026-08-20-configurable-werewolf-mode.md).
 
 ## What it does
 
@@ -11,8 +11,10 @@ The deterministic Werewolf game core: the `ctx.werewolf` definition registries, 
 - **Events** — nine log-only session events (`werewolf/game-started` … `werewolf/game-ended`) are the authoritative game record; see [docs/subsystems/werewolf.md](../../../docs/subsystems/werewolf.md) and the [persistence catalog](../../../docs/persistence-catalog.md). State-changing revisions are contiguous; `werewolf/bot-attempt-failed` changes none.
 - **Reducer and engine** — `reduceWerewolfGame`/`applyWerewolfEvent` fold events into `WerewolfGameStateV1`; the pure engine steps (`startWerewolfGame`, `openNextWerewolfPhase`, `submitWerewolfHumanAction`, `commitWerewolfBotDecisions`, `resolveOpenWerewolfPhase`, `driveWerewolfGame`, `abortWerewolfGame`) compute the next events and fold them through the same reducer, so live play and replay share one path. Actions are validated against a closed spec vocabulary (`player-target`, `choice`, `text`, `compound`).
 - **Bot continuity context** — every bot seat owns one subjective `WerewolfBotContextV1` under configured limits; `validateWerewolfBotContextDelta` and `applyWerewolfBotContextDelta` make each accepted decision an independent checkpoint (`contextAfter`) while the delta explains the permitted change. Profiles come from the deterministic `BOT_PROFILE_CATALOG` assignment.
-- **Observation projection** — `projectWerewolfBotObservation` builds one decision's authorized view: private knowledge from the actor's role projector (teammates only when the compiled role is entitled), a public state of roster facts and a bounded recent timeline, the serialized closed action spec, and the actor's prior context. Nothing reads or serializes another role's private state.
-- **One-shot bot runner** — `runWerewolfBotDecision` starts a fresh child through `ctx.subagents.start()` with the phase's object-rooted output schema, the fixed bot persona, an empty tool allowlist, and a delegation-depth cap. Structured results are untrusted envelopes validated action-first; failed attempts return `werewolf/bot-attempt-failed` payloads with exact categories, retries carry only a concise diagnostic, and retry exhaustion applies the configured fallback (trustee action or pause). The runner never appends events; the caller owns the durable log.
+- **Observation projection** — `projectWerewolfBotObservation` rejects a stale game, phase, rule digest, action plan, or bot context before constructing one decision's authorized view. Private knowledge comes from the actor's role projector (teammates only when the compiled role is entitled); public state contains roster ids and facts plus a bounded recent timeline; the legal action and continuity context come from the current folded state rather than caller-supplied copies. Nothing reads or serializes another role's private state.
+- **One-shot bot runner** — `runWerewolfBotDecision` starts a fresh child through `ctx.subagents.start()` with the phase's object-rooted output schema, fixed bot persona, empty tool allowlist, and delegation-depth cap. Structured results are untrusted envelopes validated action-first, including public-speech legality and bounds, then context delta. Cancellation races the result and timeout, every started run is disposed before settlement, and a disposal failure is a retryable `disposal` attempt rather than an accepted result. Retry exhaustion applies the configured fallback (trustee action or pause). The runner never appends events; the caller owns the durable log.
+- **Session Host adapter** — `WerewolfGameModule` registers on `ctx.games`; it folds the Host Session, commits human actions, enforces `maxConcurrentBots`, publishes one ordered parallel decision event, and auto-advances to the next human form, pause, or result. `WerewolfGameGateway` exposes typed `start`, `getView`, `getReplay`, `submitAction`, `resume`, and `abortGame` methods. Requests never accept a Session id, player id, or seat.
+- **Human projection and replay** — `WerewolfHumanViewV1` contains public roster and timeline facts plus only the bound human's role, entitled teammates, notices, resources, and current action form. Roles reveal to the final view only after the result. Replay is available only for ended games and returns authorized checkpoints, never raw events, bot contexts, or child prompts.
 
 ## Determinism and replay
 
@@ -24,7 +26,7 @@ Plugins register definitions and rule sets; rule-set configuration references th
 
 ## Export shape
 
-A service plugin: it default-exports `WerewolfRuntime` and merges `ctx.werewolf` into the Cordis `Context` interface. The `./invariant` subpath carries the durable-event invariant companion; the `./types` types live in `src/types.ts`.
+The main service plugin default-exports `WerewolfRuntime` and merges `ctx.werewolf`. The `./host` plugin registers `WerewolfGameModule` and exposes `ctx.werewolfGame`; `./types` is the dedicated UI's wire vocabulary, while `./typert` and `./remote` carry the generated Host and client contracts. `./invariant` carries durable-event checks.
 
 ## Model Experience
 
@@ -44,6 +46,6 @@ Each child is one-shot, so there is no reusable prefix across decisions beyond t
 
 ## Known Limitations and Deferred Work
 
-- **No session-integrated controller yet** — the runner returns detached payloads; a live `start`/`submitAction`/`resume`/`abortGame` surface with `requestId`/`expectedGameRevision` idempotency lands with the stage-3 runtime, as do human-authorized projections, the Typert remote, and the dedicated `werewolf` conversation view.
+- **No dedicated Web view yet** — Stage 3 exposes the typed Host API and authorized view data, but Stage 4 still owns the lobby, covered role reveal, game table, action controls, responsive layout, accessibility, and replay presentation. No slash command or Chat-composer mutation path is registered.
 - **Local threat model only** — full role assignment and bot contexts sit in raw session storage for replay; version 1 prevents accidental disclosure through normal UI and prompt construction, not adversarial anti-cheat.
 - **Announcement copy is keyed, not localized here** — resolutions record `key`/`data`; display copy and its localization are owned by the future view stage.

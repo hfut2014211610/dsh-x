@@ -18,10 +18,12 @@ import type { JsonValue } from '@deepseek-ai/dsh-session'
 import type { JsonSchemaNode, ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
 import type { SubagentRuntime } from '@deepseek-ai/dsh-subagent'
 import { delegationDepthOf } from '@deepseek-ai/dsh-subagent'
+import type { GameAiExecutor } from '@deepseek-ai/dsh-game'
 import { WerewolfError } from './error.ts'
 import { validateWerewolfAction, type WerewolfBotActionRequest, type WerewolfBotSubmission } from './engine.ts'
 import { projectWerewolfBotObservation } from './projection.ts'
 import { validateWerewolfBotContextDelta } from './bot-context.ts'
+import { normalizeWerewolfPublicSpeech } from './submission-validation.ts'
 import type {
   WerewolfActionSpecV1,
   WerewolfBotFailureCategoryV1,
@@ -43,6 +45,8 @@ export interface WerewolfBotRunnerConfigV1 {
   decisionTimeoutMs: number
   /** Fallback after retry exhaustion: engine-authored trustee action or pause. */
   failurePolicy: 'auto-action' | 'pause-game'
+  /** Maximum bot children the phase coordinator may run concurrently. */
+  maxConcurrentBots: number
   /** Context bounds the envelope's delta must satisfy. */
   limits: WerewolfContextLimitsV1
   /** Trailing public timeline entries one prompt carries. */
@@ -66,7 +70,7 @@ export const WEREWOLF_BOT_PERSONA = [
 
 /** The fixed instruction block appended to every bot prompt. */
 export const WEREWOLF_BOT_INSTRUCTIONS = [
-  'Return exactly one JSON object matching the requested output schema: the legal action, an optional public speech, and your context delta.',
+  'Return exactly one JSON object matching the requested output schema: the legal action, your context delta, and public speech only when the schema permits it.',
   'The legalAction.spec field enumerates every legal value; anything else is rejected and retried.',
   'The context delta updates only your own subjective beliefs, commitments, strategy, and memory summary.',
 ].join(' ')
@@ -82,6 +86,12 @@ export function assertWerewolfBotProvider(subagents: SubagentRuntime, name: stri
   const provider = subagents.getProvider(name)
   if (provider === undefined) {
     throw new WerewolfError('WEREWOLF_PROVIDER_CAPABILITY', `werewolf bot provider ${JSON.stringify(name)} is not registered`)
+  }
+  if (provider.inheritsParentContext) {
+    throw new WerewolfError(
+      'WEREWOLF_PROVIDER_CAPABILITY',
+      `werewolf bot provider ${JSON.stringify(name)} inherits parent context; fresh one-shot decisions require isolated children`,
+    )
   }
   const missing: string[] = []
   if (!provider.capabilities.outputSchema) missing.push('outputSchema')
@@ -117,7 +127,7 @@ export function werewolfEnvelopeSchema(spec: WerewolfActionSpecV1): ObjectJsonSc
     additionalProperties: false,
     properties: {
       action: valueSchema,
-      publicSpeech: { type: 'string' },
+      ...(spec.kind === 'text' ? { publicSpeech: { type: 'string' as const } } : {}),
       contextDelta: { type: 'object' },
     },
     required: ['action', 'contextDelta'],
@@ -206,18 +216,46 @@ function promptBlocks(promptText: string, diagnostic: string | undefined): Conte
   return [{ type: 'text', text }]
 }
 
-type TimedResult<T> = { ok: true; value: T } | { ok: false }
+type AttemptWait<T> =
+  | { kind: 'result'; value: T }
+  | { kind: 'timeout' }
+  | { kind: 'cancelled' }
 
-async function withTimeout<T>(promise: Promise<T>, ms: number): Promise<TimedResult<T>> {
+async function waitForAttempt<T>(promise: Promise<T>, ms: number, signal: AbortSignal | undefined): Promise<AttemptWait<T>> {
   let timer: ReturnType<typeof setTimeout> | undefined
-  const timeout = new Promise<TimedResult<T>>((resolve) => {
-    timer = setTimeout(() =>{  resolve({ ok: false }) }, ms)
+  let abortListener: (() => void) | undefined
+  const timeout = new Promise<AttemptWait<T>>((resolve) => {
+    timer = setTimeout(() => { resolve({ kind: 'timeout' }) }, ms)
   })
+  const cancelled = signal === undefined
+    ? undefined
+    : new Promise<AttemptWait<T>>((resolve) => {
+      abortListener = () => { resolve({ kind: 'cancelled' }) }
+      if (signal.aborted) abortListener()
+      else signal.addEventListener('abort', abortListener, { once: true })
+    })
   try {
-    return await Promise.race([promise.then(value => ({ ok: true as const, value })), timeout])
+    const result = promise.then(value => ({ kind: 'result' as const, value }))
+    return await Promise.race(cancelled === undefined ? [result, timeout] : [result, timeout, cancelled])
   } finally {
     clearTimeout(timer)
+    if (abortListener !== undefined) signal?.removeEventListener('abort', abortListener)
   }
+}
+
+type DisposalOutcome = { ok: true } | { ok: false; error: unknown }
+
+async function disposeAttempt(run: { dispose(): Promise<void> }): Promise<DisposalOutcome> {
+  try {
+    await run.dispose()
+    return { ok: true }
+  } catch (error) {
+    return { ok: false, error }
+  }
+}
+
+function errorMessage(error: unknown): string {
+  return error instanceof Error ? error.message : String(error)
 }
 
 /** A rejecting child result surfaced through the awaited promise. */
@@ -242,12 +280,13 @@ function parseEnvelope(structured: unknown): WerewolfBotEnvelopeResult {
       throw new Error(`structured result has unknown key ${JSON.stringify(key)}`)
     }
   }
+  if (record.action === undefined) throw new Error('structured result is missing action')
   if (record.contextDelta === undefined) throw new Error('structured result is missing contextDelta')
   if (record.publicSpeech !== undefined && typeof record.publicSpeech !== 'string') {
     throw new Error('publicSpeech is not a string')
   }
   return {
-    action: record.action === undefined ? null : record.action as JsonValue,
+    action: record.action as JsonValue,
     ...(record.publicSpeech === undefined ? {} : { publicSpeech: record.publicSpeech }),
     contextDelta: record.contextDelta,
   }
@@ -270,14 +309,19 @@ export async function runWerewolfBotDecision(input: {
   rules: WerewolfCompiledRuleSetV1
   request: WerewolfBotActionRequest
   agent: Agent
+  /** Host-owned child starter; omission preserves the direct runner API. */
+  executor?: Pick<GameAiExecutor, 'start'>
   signal?: AbortSignal
 }): Promise<WerewolfBotRunOutcome> {
-  const { ctx, config, state, rules, request, agent, signal } = input
+  const { ctx, config, state, rules, request, agent, executor, signal } = input
   const openPhase = state.openPhase
   const actor = openPhase?.plan.actors.find(entry => entry.playerId === request.playerId)
   if (openPhase === null || actor === undefined) {
     throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', `player ${request.playerId} is not an actor of the open phase`)
   }
+  const prompt = projectWerewolfBotObservation(state, rules, request, {
+    publicTimelineEntries: config.publicTimelineEntries,
+  })
   const roster = state.players.map(player => player.playerId)
   const attempts: WerewolfEvent<'werewolf/bot-attempt-failed'>[] = []
   let diagnostic: string | undefined
@@ -286,76 +330,99 @@ export async function runWerewolfBotDecision(input: {
     if (isAborted()) {
       return { kind: 'cancelled', attempts }
     }
-    const prompt = projectWerewolfBotObservation(state, rules, request, {
-      publicTimelineEntries: config.publicTimelineEntries,
-    })
     const label = `werewolf ${request.phaseId} seat ${actor.seat} attempt ${attempt}`
     let run
     try {
-      run = await ctx.subagents.start(config.provider, {
+      const childRequest = {
         label,
         prompt: promptBlocks(JSON.stringify(prompt), attempt > 1 ? diagnostic : undefined),
-        parent: agent,
-        signal: signal ?? new AbortController().signal,
         ...(config.botAgent === undefined ? {} : { agentOptions: config.botAgent }),
-        outputSchema: werewolfEnvelopeSchema(request.spec),
+        outputSchema: werewolfEnvelopeSchema(actor.spec),
         maxDepth: delegationDepthOf(agent) + 1,
         toolFilter: { allow: [] },
         persona: WEREWOLF_BOT_PERSONA,
-      })
+      }
+      run = executor === undefined
+        ? await ctx.subagents.start(config.provider, {
+          ...childRequest,
+          parent: agent,
+          signal: signal ?? new AbortController().signal,
+        })
+        : await executor.start(config.provider, childRequest)
     } catch (error) {
-      diagnostic = `provider-setup: ${(error as Error).message}`
+      if (isAborted()) return { kind: 'cancelled', attempts }
+      diagnostic = `provider-setup: ${errorMessage(error)}`
       attempts.push(attemptEvent(state, request, attempt, '(none)', 'provider-setup'))
       continue
     }
-    const timed = await withTimeout(
+    const settled = await waitForAttempt(
       run.result.then(
         value => value,
         (error: unknown) => new ResultFault(error),
       ),
       config.decisionTimeoutMs,
+      signal,
     )
-    if (!timed.ok) {
-      await run.dispose().catch(() => {})
-      diagnostic = 'timeout: the child did not settle within the decision budget'
-      attempts.push(attemptEvent(state, request, attempt, run.id, 'timeout'))
+    let failure: { category: WerewolfBotFailureCategoryV1; diagnostic: string } | undefined
+    let envelope: WerewolfBotEnvelopeResult
+    let publicSpeech: string | undefined
+    if (settled.kind === 'timeout') {
+      failure = { category: 'timeout', diagnostic: 'timeout: the child did not settle within the decision budget' }
+      envelope = { action: null, contextDelta: {} }
+    } else if (settled.kind === 'cancelled') {
+      envelope = { action: null, contextDelta: {} }
+    } else if (settled.value instanceof ResultFault) {
+      failure = { category: 'result-rejected', diagnostic: `result-rejected: ${errorMessage(settled.value.error)}` }
+      envelope = { action: null, contextDelta: {} }
+    } else if (settled.value.stopReason !== 'completed') {
+      failure = { category: 'result-rejected', diagnostic: `result-rejected: stopReason ${settled.value.stopReason}` }
+      envelope = { action: null, contextDelta: {} }
+    } else {
+      try {
+        envelope = parseEnvelope(settled.value.structured)
+      } catch (error) {
+        envelope = { action: null, contextDelta: {} }
+        failure = { category: 'invalid-output', diagnostic: `invalid-output: ${errorMessage(error)}` }
+      }
+      if (failure === undefined) {
+        const actionError = validateWerewolfAction(actor, envelope.action)
+        if (actionError !== undefined) {
+          failure = { category: 'illegal-action', diagnostic: `illegal-action: ${actionError}` }
+        }
+      }
+      if (failure === undefined) {
+        try {
+          publicSpeech = normalizeWerewolfPublicSpeech(
+            actor.spec,
+            envelope.publicSpeech,
+            state.ruleSet.policies.speechMaxChars,
+          )
+        } catch (error) {
+          failure = { category: 'illegal-action', diagnostic: `illegal-action: ${errorMessage(error)}` }
+        }
+      }
+      if (failure === undefined) {
+        try {
+          validateWerewolfBotContextDelta(envelope.contextDelta, prompt.priorContext, roster, config.limits)
+        } catch (error) {
+          failure = { category: 'invalid-context-delta', diagnostic: `invalid-context-delta: ${errorMessage(error)}` }
+        }
+      }
+    }
+    const disposal = await disposeAttempt(run)
+    if (!disposal.ok) {
+      const preceding = failure === undefined ? '' : `; preceding ${failure.diagnostic}`
+      diagnostic = `disposal: ${errorMessage(disposal.error)}${preceding}`
+      attempts.push(attemptEvent(state, request, attempt, run.id, 'disposal'))
+      if (settled.kind === 'cancelled' || isAborted()) return { kind: 'cancelled', attempts }
       continue
     }
-    if (isAborted()) {
-      await run.dispose().catch(() => {})
+    if (settled.kind === 'cancelled' || isAborted()) {
       return { kind: 'cancelled', attempts }
     }
-    await run.dispose().catch(() => {})
-    if (timed.value instanceof ResultFault) {
-      diagnostic = `result-rejected: ${(timed.value.error as Error).message}`
-      attempts.push(attemptEvent(state, request, attempt, run.id, 'result-rejected'))
-      continue
-    }
-    const result = timed.value
-    if (result.stopReason !== 'completed') {
-      diagnostic = `result-rejected: stopReason ${result.stopReason}`
-      attempts.push(attemptEvent(state, request, attempt, run.id, 'result-rejected'))
-      continue
-    }
-    let envelope: WerewolfBotEnvelopeResult
-    try {
-      envelope = parseEnvelope(result.structured)
-    } catch (error) {
-      diagnostic = `invalid-output: ${(error as Error).message}`
-      attempts.push(attemptEvent(state, request, attempt, run.id, 'invalid-output'))
-      continue
-    }
-    const actionError = validateWerewolfAction(actor, envelope.action)
-    if (actionError !== undefined) {
-      diagnostic = `illegal-action: ${actionError}`
-      attempts.push(attemptEvent(state, request, attempt, run.id, 'illegal-action'))
-      continue
-    }
-    try {
-      validateWerewolfBotContextDelta(envelope.contextDelta, request.priorContext, roster, config.limits)
-    } catch (error) {
-      diagnostic = `invalid-context-delta: ${(error as Error).message}`
-      attempts.push(attemptEvent(state, request, attempt, run.id, 'invalid-context-delta'))
+    if (failure !== undefined) {
+      diagnostic = failure.diagnostic
+      attempts.push(attemptEvent(state, request, attempt, run.id, failure.category))
       continue
     }
     return {
@@ -365,7 +432,7 @@ export async function runWerewolfBotDecision(input: {
         request,
         envelope: {
           action: envelope.action,
-          ...(envelope.publicSpeech === undefined ? {} : { publicSpeech: envelope.publicSpeech }),
+          ...(publicSpeech === undefined ? {} : { publicSpeech }),
           contextDelta: envelope.contextDelta,
         },
       },
@@ -386,7 +453,7 @@ export async function runWerewolfBotDecision(input: {
     submission: {
       request,
       envelope: {
-        action: selectWerewolfTrusteeAction(request.spec),
+        action: selectWerewolfTrusteeAction(actor.spec),
         contextDelta: { memorySummary: trusteeSummary },
       },
       trustee: true,

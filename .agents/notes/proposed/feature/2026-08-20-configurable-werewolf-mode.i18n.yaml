@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-08-20-configurable-werewolf-mode.md
-2026-08-20-configurable-werewolf-mode.md: de7ab92d72c35a443f440c9e1dcb4ced4913651c
-2026-08-20-configurable-werewolf-mode.zh.md: a26832e0f963d0c4392096f78f37e81647d4a715
+2026-08-20-configurable-werewolf-mode.md: 98909bcdd99326915141004284bbbc27bd8cb2b4
+2026-08-20-configurable-werewolf-mode.zh.md: d5cb7b8ffd74974c63aaf5711b554e270ad013c6

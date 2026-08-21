@@ -12,16 +12,17 @@ Status: implemented
 
 在 `@deepseek-ai/dsh-werewolf` 中新增三部分，全部复用既有事件词汇：
 
-1. **观察投影是折叠状态的纯函数。** `projectWerewolfBotObservation` 构造完整的 `WerewolfBotPromptV1`：行动者角色与私有知识来自注册的角色投影器，仅当编译角色声明 `seesFactionTeammates` 时才提供队友，公开状态只含名册事实与配置数量的尾部时间线，合法动作序列化封闭规格词汇。隔离测试将序列化 prompt 与禁止内容（他人角色或阵营、同级上下文）比对，而不只检查预期字段。
-2. **运行器在每个边界都把模型输出当作不可信数据。** `runWerewolfBotDecision` 通过 `ctx.subagents.start()` 启动全新子代理，携带由封闭规格词汇派生的对象根输出 schema（schema 子集强制 `enum` 节点携带 `type`）、固定 persona、`toolFilter: { allow: [] }`、`delegationDepthOf(parent) + 1` 的委派深度上限，以及可选的逐子代理路由。信封被严格解析（未知键拒绝）、先动作后增量校验，每次失败追加带唯一准确类别的分离 `werewolf/bot-attempt-failed` 载荷；子代理结果被拒绝时以 `result-rejected` 收束而非未处理拒绝。重试复用同一逻辑决策 id、递增尝试号，且只前置一行诊断——绝不携带上一个子代理的输出。
-3. **兜底与取消是可见事实。** 配置的重试预算耗尽后，`auto-action` 提交按规格种类取首个合法值的确定性托管动作，附引擎生成的上下文增量与 `trustee: true`；`pause-game` 返回暂停请求由调用方追加。调用方 signal 取消会 dispose 在途子代理并返回 `cancelled`；超时或 dispose 之后的迟到结果无法改变任何状态，因为该次尝试已经收束。运行时新增经校验的 schemastery `Config`（provider 名、逐子代理路由、重试预算、超时、兜底策略、上下文限制、并发、时间线上限），经 `botRunnerConfig()` 暴露；阶段3控制器接入会话流后，游戏开始将在首个事件前断言 provider 的四项能力。
+1. **观察投影是权威折叠状态的纯函数。** `projectWerewolfBotObservation` 仅在请求的游戏及修订、阶段标识、动作计划、编译规则摘要、待决策行动者与完整先前上下文仍匹配当前状态时继续。prompt 随后从该状态派生合法动作与上下文，在座位及名称旁携带公开玩家 id，并经注册角色投影器得到私有知识；仅当编译角色声明 `seesFactionTeammates` 时才提供队友。隔离测试将序列化 prompt 与禁止内容比对，而不只检查预期字段。
+2. **运行器在每个边界都把模型输出当作不可信数据。** `runWerewolfBotDecision` 通过 `ctx.subagents.start()` 启动全新子代理，携带由权威封闭规格词汇派生的对象根输出 schema（schema 子集强制 `enum` 节点携带 `type`）、固定 persona、`toolFilter: { allow: [] }`、`delegationDepthOf(parent) + 1` 的委派深度上限，以及可选的逐子代理路由。信封被严格解析（未知键拒绝），先校验动作（包括公开发言的阶段与长度规则），再校验上下文增量。每次失败返回带唯一准确类别的分离 `werewolf/bot-attempt-failed` 载荷；子代理结果被拒绝时以 `result-rejected` 收束而非未处理拒绝。重试复用同一逻辑决策 id、递增尝试号，且只前置一行诊断——绝不携带上一个子代理的输出。
+3. **兜底、取消与清理都是可见事实。** 取消会与子代理结果及超时直接竞速，而非等待超时预算，并在返回 `cancelled` 前等待 dispose。每条结果路径都先 dispose 再接受；dispose 失败时使用 `disposal` 类别重试，因为子代理未证明静止。其他失败与 dispose 失败同时发生时，重试诊断保留两者，持久尝试类别记录为 `disposal`。配置的重试预算耗尽后，`auto-action` 提交按规格种类取首个合法值的确定性托管动作，附引擎生成的上下文增量与 `trustee: true`；`pause-game` 返回暂停请求由调用方追加。超时或 dispose 之后的迟到结果没有消费者，不能改变任何状态。运行时经校验的 schemastery `Config` 由 `botRunnerConfig()` 暴露，包括 `maxConcurrentBots`；Session Host 现在会在开始前校验 `inheritsParentContext === false`，并通过注入 executor 执行该并发设置。
 
 ## 后果
 
 - 阶段2验收证明在测试中成立：决策 N 被接受的 `contextAfter` 正是决策 N+1 收到的 `priorContext`，同级 Bot 上下文保持不变，且同级捕获的 prompt 从不包含第一个 Bot 的私有增量。
 - 每次尝试一个全新子代理会话，标签为 `werewolf <phase> seat <n> attempt <k>`；父会话的模型历史在构造上不受影响。
-- 运行器只返回分离载荷——阶段3控制器负责追加它们、重试纪元预算与暂停/恢复持久化。
-- `maxConcurrentBots` 是经过校验的配置，但测试中为串行执行；遵循它的并行协调器随阶段3控制器落地。
+- 运行器只返回分离载荷；`WerewolfGameModule` 现在经通用 Session Host 追加这些载荷，并接入重试纪元及暂停/恢复。
+- 无密钥真实 Loader 覆盖保留完整授权重试请求快照，并新增通过类型化 Host 表面完成 `quick-7` 且不调用 Host 模型的证明。
+- `maxConcurrentBots` 解析为部署值；通用 executor 现在执行该上限，运行器自身仍保持每次调用只处理一个决策。
 
 ## 备选方案
 

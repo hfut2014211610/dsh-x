@@ -479,6 +479,20 @@ declare class Session {
     ...opts: T extends SurfaceEventType ? [opts: SurfaceIntent] : []
   ): SessionEvent<T>;
   /**
+   * Atomically append an ordered event batch. Every payload, surface transition,
+   * and synchronous session invariant is validated against the complete prefix
+   * before the live log changes. After commit, observers receive the events in
+   * sequence order and already see the complete batch in {@link events}.
+   *
+   * @param entries - ordered typed event candidates.
+   * @returns the immutable events admitted to the log.
+   * @throws under the same JSON, surface, invariant, and reentrancy conditions
+   *   as {@link append}; any rejection leaves the log and surface unchanged.
+   */
+  appendBatch<const T extends readonly SessionAppendEntry[]>(
+    entries: T,
+  ): { readonly [K in keyof T]: T[K] extends SessionAppendEntry<infer E extends SessionEventType> ? SessionEvent<E> : never };
+  /**
    * The {@link EpochHeader} in force after the log's last header event — the
    * header the NEXT request will be compared against — or undefined before
    * the first `request/header` snapshot. The live, incrementally-maintained
@@ -750,7 +764,7 @@ fork(source: SessionForkSource, boundary?: number, childSessionId?: SessionId): 
 
 Types: [CreateSessionOptions](persistence.md) · [PrepareSessionOptions](persistence.md) · [SessionId](core.md)
 
-Source: [`packages/core/session/src/index.ts:792`](../../packages/core/session/src/index.ts)
+Source: [`packages/core/session/src/index.ts:878`](../../packages/core/session/src/index.ts)
 
 <a id="session-events"></a>
 

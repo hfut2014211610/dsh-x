@@ -14,7 +14,7 @@ fresh one-shot 子代理适合隔离单次决策，并能返回结构化结果�
 
 ## 方案
 
-增加一个可选的狼人杀 bundle，由 Host 运行时维护确定性的事件溯源游戏。一个父 Session 保存整局游戏事件，并作为所有 Bot 调用的血缘父节点。专用 Web 游戏视图通过类型化 Typert 方法直接调用运行时，因此普通游戏操作既不会触发父模型，也不会经过 Chat 输入框。
+增加一个可选的狼人杀 bundle，由通用 `ctx.games` 运行时托管确定性引擎。开始游戏时创建一个专用的空闲 Host Agent 和 Session；该 Session 保存整局游戏事件，并作为所有 Bot 调用的血缘父节点。专用 Web 游戏视图通过类型化 Typert 方法调用 Host，因此普通游戏操作既不会触发 Host 模型，也不会经过 Chat 输入框。
 
 每个座位对应一个持久存在的逻辑 `BotActor`。该 Bot 每次需要决策时，都通过 `ctx.subagents.start()` 创建新的 one-shot 子代理，并向它提供完整的权威观察和此 Bot 最新的 `BotContinuityContext`。子代理按对象根 JSON Schema 返回阶段动作和受限的 `BotContextDelta`。运行时校验两者、计算下一版上下文，并在同一个 `werewolf/bot-decision` 事件中原子记录已接受动作、增量和完整结果上下文。该逻辑 Bot 的后续决策始终从最新已接受的上下文修订开始。
 
@@ -28,7 +28,7 @@ fresh one-shot 子代理适合隔离单次决策，并能返回结构化结果�
 
 版本 1 不提供在线多人、对抗性防作弊、语音聊天、自动生成角色代码、任意配置表达式、长驻 Bot 子代理对话或模型法官。警长竞选、猎人开枪、守卫、特殊胜利条件等角色可通过扩展约定接入，但首个版本不必交付。
 
-父代理仍是普通的活跃 `Agent`，因为子代理服务需要准确的父节点，Session 也需要保存持久游戏事件。父模型不负责解释游戏输入、校验动作、总结 Bot 或决定胜负。
+Host 仍是普通的活跃 `Agent`，因为子代理服务需要准确的父节点，Session 也需要保存持久游戏事件。它只服务一个游戏实例并保持空闲：Host 模型不负责解释游戏输入、校验动作、总结 Bot 或决定胜负。再次开始游戏会创建新的 Host，不会复用已结束游戏的 Session。
 
 ## 运行时架构
 
@@ -36,10 +36,11 @@ fresh one-shot 子代理适合隔离单次决策，并能返回结构化结果�
 flowchart LR
   User[User] --> View[Dedicated Werewolf view]
   View --> Remote[Typed Typert remote]
-  Remote --> Runtime[ctx.werewolf]
+  Remote --> Host[ctx.games]
+  Host --> Runtime[ctx.werewolf module]
   Runtime --> Rules[Compiled rule set]
-  Runtime --> Log[Parent Session werewolf events]
-  Runtime --> BotRunner[Bot runner]
+  Host --> Log[Dedicated game Session]
+  Host --> BotRunner[Werewolf Bot runner]
   BotRunner --> Subagents[ctx.subagents.start]
   Subagents --> Child[Fresh one-shot child]
   Child --> BotRunner
@@ -48,9 +49,13 @@ flowchart LR
   Remote --> View
 ```
 
-`WerewolfRuntime` 是具体的 Cordis 服务，不是新的 capability seam。它拥有游戏控制器以及规则集、角色、阶段、胜利条件四个扩展注册表。所有注册都属于 effect，同一个版本下的重复标识符在注册时直接失败。运行时只依赖 `dsh-subagent`、`dsh-session`、`dsh-agent` 等 Service Definition，不依赖具体子代理 provider 包。
+阶段 3 引入最小的通用 `ctx.games` capability seam，并在一个完整包中同时提供 Service Definition、默认的 Session Host provider，以及狼人杀使用的类型化 Host consumer。它独占游戏实例创建、Host Agent 与 Session 绑定、单局串行化、幂等回执、Session 原子批次、平台主体到参与者的绑定、投影失效和 AI 调度。这是后续纸牌与 DND 模块复用的边界，不是第二套狼人杀控制器。
 
-可选 composition bundle 挂载具体的 `spawn` provider、狼人杀运行时、经典定义、Host remote 和 Web Client 插件。其他 profile 只有在所选 provider 声明支持 `outputSchema`、`persona`、`toolFilter` 和 `depthLimit` 时才能替换 provider；缺少任何能力时，游戏必须在追加 `werewolf/game-started` 之前失败。
+`WerewolfRuntime` 仍是具体的 Cordis 领域服务。它拥有规则集、角色、阶段和胜利条件注册表、规则编译、确定性引擎与 reducer、投影、不变量和 Bot 策略。它向 `ctx.games` 注册一层薄模块适配器，不再拥有 Host 生命周期、外部身份、RPC 变更串行化或 Session 持久化。所有注册都属于 effect，同一个版本下的重复标识符在注册时直接失败。两个服务都只依赖 capability Service Definition，不依赖具体 provider 包。
+
+阶段 1–2 的公开契约保持不变。`buildWerewolfBotRequests()` 向通用 Host 提供稳定的待决策描述符，其观察与输出 schema 成为 `prepareAiTurn()` 输入。现有领域事件、reducer、动作规范、种子随机、连续性上下文、投影和 Bot 结果校验继续保持权威。阶段 3 向 runner 注入通用 AI executor，使 `ctx.games` 负责 provider 调用、取消、并发与子 Session 证据，狼人杀继续负责 prompt 构造、schema、结果解析、重试诊断、兜底和暂停策略。
+
+可选 composition bundle 挂载 `ctx.games`、具体的 `spawn` provider、狼人杀运行时、经典定义、Host remote 和 Web Client 插件。模型选择通过 `model-hub` 按座位覆盖、游戏默认、Host 默认的优先级解析。其他 profile 只有在所选子代理 provider 声明支持 `outputSchema`、`persona`、`toolFilter`、`depthLimit`、取消和 `inheritsParentContext === false` 时才能替换 provider；缺少任何能力时，游戏必须在追加 `werewolf/game-started` 之前失败。
 
 ## 可配置规则
 
@@ -252,9 +257,9 @@ policies:
 
 ## 游戏生命周期与调度
 
-一个 Session 同时最多只有一局活跃游戏。已结束或中止的游戏继续保留在日志中，之后再次开始会创建新的 `GameId`。fork Session 会在 fork 后的 Session 中创建另一条游戏时间线，不会加入或修改源 Session 的游戏。
+每个游戏实例拥有一个专用 Host Agent 和 Session，且该 Session 只保存这一局游戏。已结束或中止的游戏继续保留在自身日志中。之后再次 `start` 会创建新的 `GameId`、Host 和 Session，并可记录到上一局的血缘。产品级游戏 fork 同样创建新的 Host 和 Session，使用父修订与新增服务端熵派生新的随机流，并记录父游戏与修订。原始 Session fork 只保留为诊断机制，不是产品级游戏 fork 命令。
 
-运行时串行处理一个活跃 Agent 上的所有状态变更操作。每个 mutation 都携带调用方生成的 UUID `requestId` 和 `expectedGameRevision`。持久幂等键是 `{ sessionId, method, requestId }`，提交事件还保存规范化 mutation payload 的摘要。`game-started`、`human-action`、`game-resumed` 和终止 `game-ended` 分别拥有 `start`、`submitAction`、`resume` 与 `abortGame` 的键。进程重启后，reducer 从这些事件重建键索引。相同键和摘要的重复请求不产生状态转换，并返回当前授权投影；相同键配不同摘要属于幂等冲突。新键携带过期 expected revision 时直接拒绝。其余请求折叠当前状态、校验、追加事件，并自动推进，直到下一次真人操作、游戏结束、暂停或取消检查点。
+`ctx.games` 串行处理一个游戏 Host 上的所有状态变更操作。每个 mutation 都携带调用方生成的 UUID `requestId` 和 `expectedGameRevision`。持久幂等键是 `{ gameId, method, requestId }`，提交的命令回执还保存规范化 mutation payload 的摘要。进程重启后，通用 Host 投影从回执重建索引。相同键和摘要的重复请求不产生状态转换，并返回当前授权投影；相同键配不同摘要属于幂等冲突。新键携带过期 expected revision 时直接拒绝。其余请求由 Host 折叠当前状态，要求狼人杀模块校验并转换，把回执与领域事件作为一个批次提交，并自动推进，直到下一次真人操作、游戏结束、暂停或取消检查点。
 
 每个周期按记录顺序遍历阶段列表。当没有符合条件的存活行动者，或角色资源使阶段不再生效时，阶段可以跳过。运行时在 setup 之后，以及每个可能改变存活玩家、阵营或胜利条件自有角色状态的阶段结算后，评估已配置胜利条件。较小的数值 `priority` 优先：运行时选择第一个包含非 null claim 的最低优先级。outcome 等价性使用稳定 key `faction:<factionId>` 或 `tie`；相同 key 合并 evidence，该选中优先级上出现不同 key 时以不变量失败暂停；之后不再考虑更低优先级条件。动态冲突依赖实时状态，规则编译阶段不能拒绝。配置的 `maxDays` 完成且仍没有其他结果时，引擎在最后一个白天周期后产生带 `max-days` evidence 的 `{ kind: 'tie' }`。只有 `abortGame` 能产生 `{ kind: 'aborted' }`，胜利插件不能返回它。
 
@@ -264,7 +269,7 @@ policies:
 
 ## 持久游戏事件
 
-父 Session 日志是权威游戏记录。狼人杀事件只进入日志，不进入父模型历史。公开视图和真人私有视图都由这些事件投影得到。根据现有“模型可见即日志可重建”规则，Bot prompt 与输出分别记录在对应子 Session 中。
+专用 Host Session 日志是权威游戏记录。通用命令回执和狼人杀事件只进入日志，不进入 Host 模型历史。公开视图和真人私有视图都由这些事件投影得到。根据现有“模型可见即日志可重建”规则，Bot prompt 与输出分别记录在对应子 Session 中。
 
 ```ts ignore-check
 interface WerewolfSessionEventMap {
@@ -282,7 +287,7 @@ interface WerewolfSessionEventMap {
 
 每个 payload 都以 `{ version, gameId, gameRevision }` 开头。会改变状态的修订必须连续并逐次加一。阶段事件额外携带稳定的 `PhaseInstanceId`，每个 Bot 决策 entry 携带稳定的 `DecisionId`，每个真人动作事件携带稳定的 `HumanActionId`。`game-ended` 对该 `GameId` 是终止事件，`game-paused` 则保留可恢复阶段和类型化原因。
 
-`WerewolfBotDecision` 携带源游戏修订和一个或多个有序决策 entry。串行公开阶段追加一个 entry；并行私有阶段把全部已接受或托管 entry 放在同一个 Session 事件中追加。单次同步 `Session.append()` 就是原子批次边界，因此该设计不要求新增多事件事务 API。
+`WerewolfBotDecision` 携带源游戏修订和一个或多个有序决策 entry。串行公开阶段产生一个 entry；并行私有阶段在一个领域事件中产生全部已接受或托管 entry。阶段 3 增加真正的 `Session.appendBatch()` 边界，因为通用命令回执与一个或多个领域事件必须共同提交。它在修改实时日志、surface 或持久化观察者之前，先用同一个影子 fold 校验完整候选批次及全部已注册不变量。任何候选失败时，整个批次都不可见，游戏修订也不前进。原子提交成功后，普通逐事件观察者才能按顺序收到通知。
 
 `werewolf/game-started` 包含洗牌后的玩家表、完整秘密角色分配、初始角色状态、真人玩家 id、不可变 Bot profile、随机种子状态、规范化规则集和定义版本。这样一个 Session 就足以完成回放与恢复。普通 UI 和 Bot 观察投影器会隐藏无权访问的字段，但能直接读取本地 Session 存储的用户仍可查看秘密；版本 1 不承诺对抗性防作弊。
 
@@ -396,9 +401,9 @@ interface BotDecisionEnvelopeV1 {
 
 `self.role` 和 `privateKnowledge` 来自行动者已注册角色的投影器。`publicState` 只包含公开玩家状态、数量受限的近期消息、公告、死亡和投票历史。`legalAction` 由已开启阶段生成，枚举全部允许目标或选项。任何投影器都不能接收或序列化其他角色的私有状态，除非行动者明确有权获知，例如狼人队友。
 
-子代理 persona 固定座位身份、不可变 profile、游戏行为规则、信息隔离规则，以及只返回结构化结果且不输出隐藏推理的指令。公开发言作为不可信游戏数据引用。子代理接收 `toolFilter: { allow: [] }`、阻止继续派生子代理的绝对深度限制、已配置 provider/model/max tokens、当前阶段的对象根输出 schema，以及父操作的取消 signal。
+子代理 persona 固定座位身份、不可变 profile、游戏行为规则、信息隔离规则，以及只返回结构化结果且不输出隐藏推理的指令。公开发言作为不可信游戏数据引用。子代理接收 `toolFilter: { allow: [] }`、阻止继续派生子代理的绝对深度限制、`inheritsParentContext: false`、由 model-hub 解析的 provider/model/max tokens、当前阶段的对象根输出 schema，以及 Host 操作的取消 signal。子 Session 记录实际选中的路由和模型，作为执行证据。
 
-只有以下值仍全部匹配时，运行时才接受结果：`DecisionId`、`GameId`、阶段实例、源游戏修订、行动者和上一版上下文修订。它先校验阶段动作，再校验上下文 delta；非法动作不能更新上下文。串行阶段重新进入单局串行队列，再次检查、计算 `contextAfter` 并追加单 entry 事件。并行协调器只在内存中保存已校验的分离结果；全部行动者结束后只进入队列一次，重新检查源游戏修订和每个行动者的上下文修订，计算全部上下文，再追加一个有序批次事件。迟到或重复的子代理结果会被 dispose，不能修改日志。
+只有以下值仍全部匹配时，运行时才接受结果：`DecisionId`、`GameId`、阶段实例、源游戏修订、行动者和上一版上下文修订。它先校验阶段动作，再校验上下文 delta；非法动作不能更新上下文。串行阶段重新进入 `ctx.games` 的单局串行队列，再次检查、计算 `contextAfter` 并提出单 entry 领域事件。并行协调器只在内存中保存已校验的分离结果；全部行动者结束后只进入队列一次，重新检查源游戏修订和每个行动者的上下文修订，计算全部上下文，并提出一个有序领域事件。Host 通过 `appendBatch()` 将它与命令或调度回执共同提交。迟到或重复的子代理结果会被 dispose，不能修改日志。
 
 重试沿用同一个逻辑 `DecisionId`，增加 attempt 编号，并创建新的子 Session。失败尝试不会修改 Bot 上下文。重试 prompt 只包含简短校验诊断，不包含上一个子代理不受约束的输出。超过配置的重试次数后，`auto-action` 使用已记录的种子 PRNG 选择合法动作，并应用由引擎生成、注明托管动作的上下文 delta；`pause-game` 则追加 `werewolf/game-paused`。两种结果都是可见事实，不会静默降级。
 
@@ -408,24 +413,22 @@ interface BotDecisionEnvelopeV1 {
 
 ### 专用会话视图
 
-Web Client 按现有专用视图模式向 `conversation.view` slot 注入 id 为 `werewolf` 的条目。空白视图展示游戏大厅。`ctx.conversation.declarePreferredView()` 对 `agentPreset` 为 `werewolf` 的 Session 选择该视图，但不覆盖用户持久化的 tab。这与当前 resolver 输入一致，并让重新打开该 preset 时直接回到大厅、进行中游戏桌或暂停游戏桌。由于当前视图环没有按 Session 控制可用性的 resolver，该 slot 条目在同一个 Web composition 中全局注册；普通 Session 可以手动打开这个 tab，但只有狼人杀视图能够开始或修改游戏。
+Web Client 按现有专用视图模式向 `conversation.view` slot 注入 id 为 `werewolf` 的条目。在普通 Session 中，它只作为启动器并展示游戏大厅；`start` 创建专用 Host 后，把视图导航到该 Host Session。`ctx.conversation.declarePreferredView()` 对 `agentPreset` 为 `werewolf` 的 Host Session 选择该视图，但不覆盖用户持久化的 tab，因此重新打开游戏时会直接回到进行中或暂停的游戏桌。由于当前视图环没有按 Session 控制可用性的 resolver，该 slot 条目在同一个 Web composition 中全局注册。只有已绑定的游戏 Host 接受变更方法。
 
-React 组件通过注入 props 接收全部数据和回调，不直接访问 Cordis context。权威游戏状态属于 Host Session 投影；一个小型已注册 client store 只能保存展示偏好，例如当前打开的侧栏、是否减弱动画，以及用户尚未提交的讨论草稿。
+React 组件通过注入 props 接收全部数据和回调，不直接访问 Cordis context。视图通过 `ctx.games` 将 `gameId` 解析到专用 Host；权威游戏状态属于该 Host Session 投影。一个小型已注册 client store 只能保存展示偏好，例如当前打开的侧栏、是否减弱动画，以及用户尚未提交的讨论草稿。
 
 视图调用带版本的 Typert namespace，所有变更请求都包含 `requestId` 和 `expectedGameRevision`。
 
 ```ts ignore-check
 interface WerewolfRemoteV1 {
   getView(input: {
-    sessionId: SessionId
+    gameId: GameId
   }): Promise<WerewolfHumanViewV1>
   getReplay(input: {
-    sessionId: SessionId
     gameId: GameId
     cursor?: string
   }): Promise<WerewolfReplayPageV1>
   start(input: {
-    sessionId: SessionId
     requestId: string
     expectedGameRevision: 0
     ruleSetId: string
@@ -433,28 +436,28 @@ interface WerewolfRemoteV1 {
     humanSeatPreference?: number
   }): Promise<WerewolfHumanViewV1>
   submitAction(input: {
-    sessionId: SessionId
+    gameId: GameId
     requestId: string
     expectedGameRevision: number
     phaseInstanceId: PhaseInstanceId
     action: JsonValue
   }): Promise<WerewolfHumanViewV1>
   resume(input: {
-    sessionId: SessionId
+    gameId: GameId
     requestId: string
     expectedGameRevision: number
   }): Promise<WerewolfHumanViewV1>
   abortGame(input: {
-    sessionId: SessionId
+    gameId: GameId
     requestId: string
     expectedGameRevision: number
   }): Promise<WerewolfHumanViewV1>
 }
 ```
 
-该 namespace 转发轻量 `werewolf/view-invalidated` 事件，其中只包含 `sessionId`、`gameId` 和新修订。client 在首次读取前完成订阅，忽略其他 Session 的事件，并通过 `getView()` 刷新。连接重置也会触发刷新。失效事件不携带秘密游戏字段，因此授权逻辑始终集中在一个 Host 投影器中。
+该 namespace 转发轻量 `werewolf/view-invalidated` 事件，其中只包含 `gameId` 和新修订。client 在首次读取前完成订阅，忽略其他游戏的事件，并通过 `getView()` 刷新。连接重置也会触发刷新。失效事件不携带秘密游戏字段，因此授权逻辑始终集中在一个 Host 投影器中。
 
-每个 handler 都通过现有 Gateway 与 Session 访问策略解析 `sessionId`，并拒绝未知、不可用或非顶层 Session。请求从不接受 `playerId`：`werewolf/game-started` 绑定唯一 `humanPlayerId`，之后每个投影和动作都从活跃游戏派生该身份。版本 1 中，任何已经获准操作该 Session 的 loopback same-origin client 都代表这个唯一真人。绕过渲染视图直接调用 Typert 方法具有相同的本地权限，不会产生多人身份边界；在线玩法不在范围内。
+每个 handler 都先解析已认证或本地平台主体，再由 `ctx.games` 查询该主体的参与者绑定和 Host。请求从不接受 `sessionId` 或 `playerId`，因此调用方不能自行选择任意 Host 或座位。版本 1 把 loopback same-origin Web client 映射为一个本地主体，并在开始游戏时将该主体绑定到唯一真人参与者。未来飞书适配器把 `open_id` 映射到同一平台主体契约，并调用同一命令路径；飞书交付不属于阶段 3。在线对抗性身份不在范围内。
 
 ### 真人授权投影
 
@@ -463,7 +466,6 @@ UI 绝不直接折叠原始 Session 事件。Host 返回一个完整投影，其
 ```ts ignore-check
 interface WerewolfHumanViewV1 {
   version: 1
-  sessionId: SessionId
   game: null | {
     gameId: GameId
     revision: number
@@ -623,14 +625,15 @@ UI 使用克制的夜间桌游风格，而不是普通聊天卡片：深色中�
 
 | 包或路径 | 职责 |
 |---|---|
-| `packages/game/werewolf/` | `ctx.werewolf`、id 与公共类型、定义注册表、规则编译、事件声明、reducer、投影、控制器、Bot runner、上下文 reducer、不变量和类型化错误 |
+| `packages/game/game/`（阶段 3） | 完整的 `ctx.games` capability seam：模块契约与注册表、默认 Session Host provider、mailbox、绑定、幂等、批次提交、身份、投影失效和内部 AI executor |
+| `packages/game/werewolf/` | `ctx.werewolf`、id 与公共类型、定义注册表、规则编译、事件声明、reducer、投影、薄游戏模块适配器、Bot 领域策略、上下文 reducer、不变量和类型化错误 |
 | `packages/game/werewolf-classic/` | 经典角色、阶段和胜利条件定义，以及 `quick-7` 规则集 |
 | `client/ui-werewolf/` (under `packages/`, stage 4) | `conversation.view` 注册、Typert client 绑定、专用游戏桌、大厅、身份揭示、动作表单、时间线、结算/回顾、响应式布局、可访问性和本地化文案 |
 | `bundle/werewolf/` (under `packages/`, stage 4) | 挂载 Host、经典定义、Typert remote 和 Web 插件的可选 composition rows 与 `werewolf` agent preset |
 | `examples/werewolf/` (repo root, stage 3) | 无密钥可运行 composition、脚本化 Bot provider、回放输入和产品快照 |
 | `docs/subsystems/werewolf.md` | 实现后的当前运行时类型和 Cordis API |
 
-除非实现证据支持更精简的拆分，核心包应采用以下源模块：`brand.ts`、`types.ts`、`rules.ts`、`registry.ts`、`events.ts`、`reducer.ts`、`projection.ts`、`bot-context.ts`、`bot-runner.ts`、`engine.ts`、`runtime.ts`、`error.ts`、`invariant.ts` 和 `index.ts`。测试与所属包放在一起，描述行为而不是重复此文件清单。
+除非实现证据支持更精简的拆分，狼人杀包应采用以下源模块：`brand.ts`、`types.ts`、`rules.ts`、`registry.ts`、`events.ts`、`reducer.ts`、`projection.ts`、`bot-context.ts`、`bot-runner.ts`、`engine.ts`、`module-adapter.ts`、`error.ts`、`invariant.ts` 和 `index.ts`。阶段 3 把完整通用 seam 保留在 `packages/game/game/` 中；在第二个游戏证明真实拆分需求之前，不创建独立 `game-session-runtime` 或 `game-agent` 包。测试与所属包放在一起，描述行为而不是重复此文件清单。
 
 包 README 应记录配置、生命周期语义、失败行为、扩展注册、模型可见影响、token 成本和已知限制。类型声明更新狼人杀子系统参考。配置、Cordis、持久化、事件生产者/消费者和模块图等生成产物必须从源生成，不能手工编辑。实现 PR 中，本 Agent Note 移至 `implemented/feature` 并重写为已交付事实。
 
@@ -667,13 +670,13 @@ interface Config {
 }
 ```
 
-bundle 可以提供经过评审的默认值，但运行时只能读取解析后的 `Config`。`defaultRuleSet` 必须在插件加载时解析到准确的已注册组合。省略 `botAgent` 时，通过现有子代理请求约定明确继承父代理的 provider 和 model。模型 temperature 及路由级调优继续由现有模型调优层负责，不在狼人杀中重复实现。
+bundle 可以提供经过评审的默认值，但运行时只能读取解析后的 `Config`。`defaultRuleSet` 必须在插件加载时解析到准确的已注册组合。`subagentProvider` 选择 capability provider，provider/model 路由则通过 `model-hub` 解析：明确座位覆盖优先于游戏默认，游戏默认优先于专用 Host 默认。省略配置不等于继承对话；每个 Bot 请求都设置 `inheritsParentContext: false`。模型 temperature、路由故障转移、凭据和路由级调优继续由 `model-hub` 与现有模型调优层负责，不在狼人杀中重复实现。
 
 规则集 `policies` 控制游戏行为，顶层 `Config` 控制部署资源、失败处理和经过评审的 UI 默认值。因此，一份规则集在记录的策略快照下能一致回放；运维方也能调整后续游戏的并发、超时、模型路由、重试、上下文大小和呈现默认值，而无需虚构新的玩法变体。每个用户的呈现偏好只覆盖 `ui` 默认值，永远不进入游戏事件。
 
 ## 失败、取消与恢复
 
-游戏开始前校验所选规则集、引用定义、provider 能力、上下文限制、父 Agent，以及当前没有另一局活跃游戏；只有全部通过后才能追加狼人杀事件。失败不会留下半局游戏。
+游戏开始前校验所选规则集、引用定义、model-hub 路由、provider 能力、上下文限制、平台主体绑定和专用 Host 创建；只有全部通过后才能追加命令回执或狼人杀事件。失败会 dispose 尚未发布的 Host，不会留下半局游戏。
 
 每个外部操作和自动阶段推进在事件提交前都遵守同一个调用方 signal。取消会中止活跃子代理调用并 dispose 所有已发布 run。如果进程仍存活且已开启阶段尚未完成，运行时追加原因是 `cancelled` 的 `game-paused`；进程非正常停止后，加载活跃未完成阶段会派生非持久的 `interrupted` 暂停状态，直到调用 `resume`。即使调用方在事件提交后立即断开连接，已提交事件仍是权威事实。
 
@@ -689,7 +692,7 @@ bundle 可以提供经过评审的默认值，但运行时只能读取解析后�
 
 每个 Bot 观察都按角色和阶段使用 allowlist。测试需要把序列化 prompt 与禁止出现的角色分配和私有通知比较，而不只是检查预期字段。公开玩家文本按数据编码，并附带固定指令，明确它不能改变规则、工具、输出格式或身份。
 
-Bot 子代理不接收任何全局工具，也不能派生后代。所选子代理 provider 必须执行请求中的过滤和深度能力。游戏插件绝不向 Bot 授予文件、shell、网络、命令、游戏控制器、Session 查询或子代理控制工具。
+Bot 子代理不接收任何全局工具、不能派生后代，也绝不继承 Host 对话。所选子代理 provider 必须执行请求中的过滤、深度、取消和 `inheritsParentContext === false` 能力。游戏插件绝不向 Bot 授予文件、shell、网络、命令、游戏控制器、Session 查询或子代理控制工具。
 
 Bot 连续性上下文属于私有策略数据，UI 不得渲染。它可以包含与游戏事实冲突的判断，这是预期行为，也不能因此获得知识。运行时绝不把一个 Bot 的上下文传给另一个 Bot。
 
@@ -697,11 +700,11 @@ Bot 连续性上下文属于私有策略数据，UI 不得渲染。它可以包�
 
 ## 交付阶段
 
-阶段 1–2 已落地（[确定性核心](../../implemented/feature/2026-08-21-werewolf-deterministic-core.md)、[Bot 运行器](../../implemented/feature/2026-08-21-werewolf-bot-runner.md)）；阶段 3–5 仍为 proposed。
+阶段 1–3 已落地（[确定性核心](../../implemented/feature/2026-08-21-werewolf-deterministic-core.md)、[Bot 运行器](../../implemented/feature/2026-08-21-werewolf-bot-runner.md)、[Session Host](../../implemented/feature/2026-08-21-werewolf-session-host.md)）；阶段 4–5 仍为 proposed。
 
 1. 增加 `game/` 包组、狼人杀核心类型、注册表、规则编译器、经典定义、reducer、不变量和纯测试。验证确定性规则和配置扩展不需要模型或 UI 路径。
 2. 增加 Bot 连续性状态、观察投影、one-shot Bot runner、脚本化 provider 集成、重试/兜底、取消和回放测试。证明上下文修订 `N` 会传入决策 `N + 1`，且其他 Bot 的上下文不变。
-3. 增加 `WerewolfRuntime`、Session 投影、Typert 方法与失效事件、无密钥可运行示例，以及不调用父模型即可完成一局 `quick-7` 的快照。
+3. 增加完整的单包 `ctx.games` seam、真正的 `Session.appendBatch()`、一局一 Host 归属、平台主体绑定、基于 model-hub 的 AI 执行，以及狼人杀薄模块适配器。增加 Session 投影、类型化 Typert 方法与失效事件、无密钥可运行示例，以及不调用 Host 模型即可完成一局 `quick-7` 的快照。通过适配器等价测试保持阶段 1–2 的领域行为。
 4. 增加专用 `werewolf` 会话视图、大厅、遮盖式身份揭示、游戏桌、通用真人动作表单、观战状态、结算/回顾、响应式与可访问性测试，以及可选 bundle composition。不得增加斜杠命令或 Chat 输入框路由。
 5. 更新包 README、狼人杀子系统参考、新 Session 事件影响的 TypeScript 与 Python SDK 预期输出、生成目录和图，并把本 Agent Note 重写为已实现事实。
 
@@ -734,15 +737,15 @@ Bot 连续性上下文属于私有策略数据，UI 不得渲染。它可以包�
 - 大厅能够选择两份牌组、角色选项、阶段顺序、平票策略和胜利条件不同的准确 `{ id, revision }` 规则集组合，无需修改引擎代码。角色、阶段、条件和规则集版本都不能隐式选择最新版本；无效引用或跨字段不变量会在首个游戏事件前禁用开始操作。
 - 测试角色能够通过已校验 `phaseBindings` entry 加入准确的已有阶段版本。另一组测试角色与阶段插件能够注册新机制、收集合法动作、结算声明式效果和非经典阵营结果，并在不调用插件的情况下回放；只有全部已记录定义版本仍可用时才能恢复。
 - 每个逻辑 Bot 都有不可变 profile 和独立 `BotContinuityContextV1`；决策 `N` 原子记录动作、delta 和计算得到的上下文修订 `N`，决策 `N + 1` 收到这份准确上下文，同时其他 Bot 上下文保持不变。
-- 并行私有阶段通过一次 `werewolf/bot-decision` append 提交全部 Bot entry。测试覆盖纯 Bot、真人加 Bot、批次前取消、真人动作后重启和批次后重启，并证明任何同级私有动作都不会进入另一个 Bot 的观察。
+- 并行私有阶段在一个 `werewolf/bot-decision` 事件中产生全部 Bot entry。`appendBatch()` 在一次影子 fold 后原子提交调度回执与领域事件；故障注入测试证明第二个候选无效时，日志、surface、不变量和游戏修订都保持不变。测试还覆盖纯 Bot、真人加 Bot、批次前取消、真人动作后重启和批次后重启，并证明任何同级私有动作都不会进入另一个 Bot 的观察。
 - Bot 上下文不包含不受限制的推理记录。无效上下文引用、未知字段、超限文本、非法 commitment 转换和重新计算不匹配都会拒绝决策，且不改变游戏或上下文状态。
 - 每个 Bot prompt 只包含有权获知的私有信息、公开状态、合法动作及自身上下文。测试证明平民看不到角色分配，预言家只能看到已完成查验，狼人只能看到有权获知的队友，任何 Bot 都不能收到其他 Bot 的上下文。
-- Bot 子代理使用能够执行结构化输出、persona、空工具 allowlist 和深度限制的 provider。缺少能力时游戏开始失败；Bot 不能调用游戏、Session、shell、文件、Web、命令或子代理工具。
-- 经典 `quick-7` composition 能确定性完成好人胜、狼人胜、平局、真人死亡后观战、重试/兜底、使用新 retry epoch 暂停/恢复、中止本局、取消、进程重启和 Session fork 场景。
+- Bot 子代理使用能够执行结构化输出、persona、空工具 allowlist、深度限制、取消和 `inheritsParentContext === false` 的 provider。测试覆盖 model-hub 优先级和实际选中的路由/模型。缺少能力时游戏开始失败；Bot 不能调用游戏、Session、shell、文件、Web、命令或子代理工具。
+- 经典 `quick-7` composition 能确定性完成好人胜、狼人胜、平局、真人死亡后观战、重试/兜底、使用新 retry epoch 暂停/恢复、中止本局、取消、进程重启和产品级游戏 fork 场景。每局游戏与每个 fork 都拥有独立 Host Session；原始 Session fork 只作为诊断投影场景测试。
 - 摘要相同的重复 mutation key 返回当前投影，不产生第二次转换；同一 key 配不同摘要时失败。重复子代理结果、迟到子代理结果、过期游戏修订、过期上下文修订、无效目标、死亡行动者、耗尽资源和游戏结束后事件也不能产生第二次状态转换。
-- 大厅、身份揭示、夜间行动、白天讨论、投票、观战、暂停/恢复、结算、回顾和新游戏流程都完全在专用 `werewolf` 视图中完成。插件不注册斜杠命令，Chat 文本不能改变游戏状态。
-- 视图操作不会创建父模型请求。子模型请求与输出可从各子 Session 日志重建，父 Session 保存每个已接受的领域决策。
-- 首次加载、失效刷新、连接重置、进程重启和 Session fork 对同一组已提交事件生成相同的 `WerewolfHumanViewV1`。分页 `getReplay()` 返回相同授权历史帧，不会向前反向泄密。UI 只揭示真人有权查看的私有视图，浏览器绝不折叠原始秘密事件。
+- 大厅、身份揭示、夜间行动、白天讨论、投票、观战、暂停/恢复、结算、回顾和新游戏流程都完全在专用 `werewolf` 视图中完成。插件不注册斜杠命令，Chat 文本不能改变游戏状态。RPC 测试证明运行时从平台主体派生参与者，并拒绝调用方自行选择 Host Session 或座位。
+- 视图操作不会创建 Host 模型请求。子模型请求与输出可从各子 Session 日志重建，专用 Host Session 保存每个已接受的领域决策。
+- 首次加载、失效刷新、连接重置、进程重启和诊断性 Session fork 对同一组已提交事件生成相同的 `WerewolfHumanViewV1`。分页 `getReplay()` 返回相同授权历史帧，不会向前反向泄密。UI 只揭示已绑定真人参与者有权查看的私有视图，浏览器绝不折叠原始秘密事件。
 - 桌面、中间宽度和 390 像素快照覆盖确定性座位布局、粘性阶段状态、侧栏或 bottom-sheet 动作表单、遮盖式身份揭示和结算回顾。纯键盘游玩、屏幕阅读器阶段播报、减弱动画、焦点恢复、非颜色状态提示和 WCAG AA 对比度通过 client 测试。
 - 实现包含聚焦包测试、不变量拒绝用例、脚本化 provider 集成、无密钥组装产品快照、client 刷新/回放/可访问性测试、更新后的 TypeScript 与 Python SDK 预期输出、双语包与子系统文档、生成产物和适用 pre-push 检查。
 

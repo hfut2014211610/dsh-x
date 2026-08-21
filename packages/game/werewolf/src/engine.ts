@@ -17,6 +17,7 @@ import {
   normalizeWerewolfText,
   validateWerewolfBotContextDelta,
 } from './bot-context.ts'
+import { normalizeWerewolfPublicSpeech } from './submission-validation.ts'
 import { applyWerewolfEvent } from './reducer.ts'
 import type { WerewolfEvent } from './events.ts'
 import type {
@@ -568,12 +569,14 @@ export function validateWerewolfAction(actor: WerewolfActionActorV1, action: Jso
  * @param state - the folded state with an open phase.
  * @param action - the human's action JSON.
  * @param ids - id factory override.
+ * @param request - optional idempotency receipt recorded with the action.
  * @returns the `werewolf/human-action` event and the next state.
  */
 export function submitWerewolfHumanAction(
   state: WerewolfGameStateV1,
   action: JsonValue,
   ids: WerewolfEngineIds = defaultWerewolfEngineIds(),
+  request?: { requestId: string; digest: string },
 ): WerewolfEngineStep {
   const openPhase = requireOpen(state)
   const actor = actorOf(openPhase, state.humanPlayerId)
@@ -600,6 +603,58 @@ export function submitWerewolfHumanAction(
       phaseInstanceId: openPhase.phaseInstanceId,
       playerId: state.humanPlayerId,
       action,
+    },
+  }
+  if (request !== undefined) event.data.request = request
+  return foldStep(state, [event])
+}
+
+/**
+ * Pause a running game at its current resumable phase.
+ * @param state - running folded state.
+ * @param reason - stable pause classification.
+ * @param detail - optional JSON-safe diagnostic detail.
+ * @returns the pause event and next state.
+ */
+export function pauseWerewolfGame(
+  state: WerewolfGameStateV1,
+  reason: 'bot-failure' | 'cancelled' | 'unsupported-definition' | 'invariant-failure' | 'operator-request',
+  detail?: JsonValue,
+): WerewolfEngineStep {
+  requireRunning(state)
+  const event: WerewolfEvent<'werewolf/game-paused'> = {
+    type: 'werewolf/game-paused',
+    data: {
+      version: 1,
+      gameId: state.gameId,
+      gameRevision: state.revision + 1,
+      reason,
+      ...(state.openPhase === null ? {} : { phaseInstanceId: state.openPhase.phaseInstanceId }),
+      ...(detail === undefined ? {} : { detail }),
+    },
+  }
+  return foldStep(state, [event])
+}
+
+/**
+ * Resume a paused game and advance its retry epoch.
+ * @param state - paused folded state.
+ * @param request - optional idempotency receipt recorded with the resume.
+ * @returns the resume event and next state.
+ */
+export function resumeWerewolfGame(
+  state: WerewolfGameStateV1,
+  request?: { requestId: string; digest: string },
+): WerewolfEngineStep {
+  if (state.status !== 'paused') throw new WerewolfError('WEREWOLF_NO_ACTIVE_GAME', `the game is ${state.status}, not paused`)
+  const event: WerewolfEvent<'werewolf/game-resumed'> = {
+    type: 'werewolf/game-resumed',
+    data: {
+      version: 1,
+      gameId: state.gameId,
+      gameRevision: state.revision + 1,
+      retryEpoch: state.retryEpoch + 1,
+      ...(request === undefined ? {} : { request }),
     },
   }
   return foldStep(state, [event])
@@ -711,17 +766,11 @@ export function commitWerewolfBotDecisions(
       throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', `illegal bot action: ${error}`)
     }
     const delta = validateWerewolfBotContextDelta(submission.envelope.contextDelta, request.priorContext, roster, limits)
-    let publicSpeech: string | undefined
-    if (submission.envelope.publicSpeech !== undefined && submission.envelope.publicSpeech.length > 0) {
-      if (actor.spec.kind !== 'text') {
-        throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', 'publicSpeech is only legal in text-speech phases')
-      }
-      const normalized = normalizeWerewolfText(submission.envelope.publicSpeech)
-      if (normalized.length > state.ruleSet.policies.speechMaxChars) {
-        throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', 'publicSpeech exceeds the speechMaxChars policy')
-      }
-      publicSpeech = normalized
-    }
+    const publicSpeech = normalizeWerewolfPublicSpeech(
+      actor.spec,
+      submission.envelope.publicSpeech,
+      state.ruleSet.policies.speechMaxChars,
+    )
     const contextAfter = applyWerewolfBotContextDelta(request.priorContext, delta, {
       decisionId: submission.request.decisionId,
       phaseId: openPhase.phaseId,

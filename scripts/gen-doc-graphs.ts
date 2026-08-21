@@ -264,12 +264,27 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Projects bounded current-surface conversation snapshots into durable untrusted message context; host adapters own mention syntax.',
   },
   {
+    key: 'games',
+    pkg: 'game',
+    title: 'Session-backed game Host',
+    mode: 'seam',
+    consumers: ['werewolf'],
+    note: 'The package combines the game-module contract and default Session provider: one idle Host Agent per game, atomic receipts and domain events, principal binding, serialized mutations, invalidation, and bounded fresh-child scheduling.',
+  },
+  {
     key: 'werewolf',
     pkg: 'werewolf',
     title: 'Werewolf definition registries',
     mode: 'seam',
     implementations: ['werewolf-classic'],
     note: 'Trusted same-process registries for rule sets, roles, phases, and victory conditions; classic definitions register on it and rule compilation resolves exact versions.',
+  },
+  {
+    key: 'werewolfGame',
+    pkg: 'werewolf',
+    title: 'Typed Werewolf Host gateway',
+    mode: 'core',
+    note: 'Registers the thin Werewolf game module and exposes principal-resolved start, view, action, resume, abort, and terminal replay methods for the dedicated Web UI.',
   },
   {
     key: 'sessionTitle',

@@ -117,6 +117,7 @@ export class WerewolfRuntime extends Service {
       retryLimit: config.botRetryLimit ?? 2,
       decisionTimeoutMs: config.botDecisionTimeoutMs ?? 60000,
       failurePolicy: config.botFailurePolicy ?? 'auto-action',
+      maxConcurrentBots: config.maxConcurrentBots ?? 4,
       limits,
       publicTimelineEntries: config.publicTimelineEntries ?? 24,
     }

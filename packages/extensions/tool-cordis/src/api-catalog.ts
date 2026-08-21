@@ -783,6 +783,67 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'games',
+    summary: 'Shared game Host contract implemented by the default Session provider.',
+    description: 'Shared game Host contract implemented by the default Session provider.',
+    methods: [
+      {
+        signature: 'abstract registerModule(module: GameModule): () => void',
+        description: 'Register one exact module version as a caller-owned effect.',
+        parameters: [{ name: 'module', description: 'domain adapter to register.' }],
+        returns: 'disposer that removes this exact registration.',
+      },
+      {
+        signature: 'abstract resolvePrincipal(): LocalGamePrincipalV1',
+        description: 'Resolve the version-1 loopback principal.',
+        parameters: [],
+        returns: 'authenticated local principal.',
+      },
+      {
+        signature: 'abstract start<TView>(request: { moduleId: string requestId: GameRequestId expectedGameRevision: 0 input: JsonValue }): Promise<GameProjection<TView>>',
+        description: 'Create a dedicated Host, commit start atomically, and auto-advance.',
+        parameters: [{ name: 'request', description: 'module, idempotency key, initial revision, and module input.' }],
+        returns: 'current authorized projection after automatic advancement.',
+      },
+      {
+        signature: 'abstract getView<TView>(gameId: GameId, principalId: PrincipalId): Promise<GameProjection<TView>>',
+        description: 'Return the current authorized view.',
+        parameters: [{ name: 'gameId', description: 'game to read.' }, { name: 'principalId', description: 'authenticated caller.' }],
+        returns: 'current authorized projection.',
+      },
+      {
+        signature: 'abstract getReplay<TReplay>(gameId: GameId, principalId: PrincipalId): Promise<TReplay>',
+        description: 'Return the authorized module replay.',
+        parameters: [{ name: 'gameId', description: 'game to replay.' }, { name: 'principalId', description: 'authenticated caller.' }],
+        returns: 'module-defined authorized replay.',
+      },
+      {
+        signature: 'abstract submitAction<TView>(request: { gameId: GameId principalId: PrincipalId requestId: GameRequestId expectedGameRevision: number action: JsonValue }): Promise<GameProjection<TView>>',
+        description: 'Commit one human action and auto-advance.',
+        parameters: [{ name: 'request', description: 'authorized compare-and-set action.' }],
+        returns: 'current authorized projection after automatic advancement.',
+      },
+      {
+        signature: 'abstract resume<TView>(request: { gameId: GameId principalId: PrincipalId requestId: GameRequestId expectedGameRevision: number }): Promise<GameProjection<TView>>',
+        description: 'Resume one paused game and auto-advance.',
+        parameters: [{ name: 'request', description: 'authorized compare-and-set resume request.' }],
+        returns: 'current authorized projection after automatic advancement.',
+      },
+      {
+        signature: 'abstract abortGame<TView>(request: { gameId: GameId principalId: PrincipalId requestId: GameRequestId expectedGameRevision: number }): Promise<GameProjection<TView>>',
+        description: 'Record an aborted terminal result.',
+        parameters: [{ name: 'request', description: 'authorized compare-and-set abort request.' }],
+        returns: 'terminal authorized projection.',
+      },
+      {
+        signature: 'abstract getHostSession(gameId: GameId): Session | undefined',
+        description: 'Resolve one game to its dedicated live Host Session.',
+        parameters: [{ name: 'gameId', description: 'game to inspect.' }],
+        returns: 'indexed Host Session, when known to this process.',
+      },
+    ],
+  },
+  {
     key: 'goals',
     summary: 'Goal service (`ctx.goals`) backed exclusively by the owning session log.',
     description: 'Goal service (`ctx.goals`) backed exclusively by the owning session log.',
@@ -2295,6 +2356,49 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'werewolfGame',
+    summary: 'Registers the Werewolf module and exposes the UI-facing typed methods.',
+    description: 'Registers the Werewolf module and exposes the UI-facing typed methods.',
+    methods: [
+      {
+        signature: '@Remote(\'start\') async start(request: WerewolfStartRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>',
+        description: 'Start one local single-player game.',
+        parameters: [{ name: 'request', description: 'rule selection, seed, and caller idempotency key.' }],
+        returns: 'current human-authorized projection.',
+      },
+      {
+        signature: '@Remote(\'getView\') async getView(request: { gameId: string }): Promise<GameProjection<WerewolfHumanViewV1>>',
+        description: 'Read the current view for the locally authenticated principal.',
+        parameters: [{ name: 'request', description: 'game identity.' }],
+        returns: 'current human-authorized projection.',
+      },
+      {
+        signature: '@Remote(\'getReplay\') async getReplay(request: { gameId: string }): Promise<WerewolfReplayV1>',
+        description: 'Read the terminal authorized replay.',
+        parameters: [{ name: 'request', description: 'game identity.' }],
+        returns: 'replay containing authorized checkpoints.',
+      },
+      {
+        signature: '@Remote(\'submitAction\') async submitAction(request: WerewolfSubmitActionRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>',
+        description: 'Submit one action for the current human form.',
+        parameters: [{ name: 'request', description: 'phase-bound compare-and-set action.' }],
+        returns: 'current human-authorized projection after automatic advancement.',
+      },
+      {
+        signature: '@Remote(\'resume\') async resume(request: WerewolfHostMutationRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>',
+        description: 'Resume one paused game.',
+        parameters: [{ name: 'request', description: 'compare-and-set resume request.' }],
+        returns: 'current human-authorized projection after automatic advancement.',
+      },
+      {
+        signature: '@Remote(\'abortGame\') async abortGame(request: WerewolfHostMutationRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>',
+        description: 'Abort one running or paused game.',
+        parameters: [{ name: 'request', description: 'compare-and-set abort request.' }],
+        returns: 'terminal human-authorized projection.',
+      },
+    ],
+  },
+  {
     key: 'workflowEngine',
     summary: 'Workflow Service Definition contract.',
     description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, cancellation and disposal are bounded, and disposal waits for child cleanup within that bound. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
@@ -2583,6 +2687,14 @@ export const EVENT_API: readonly EventApiEntry[] = [
     summary: 'Single-slot decision for the next FileSystem.writeText.',
     description: 'Single-slot decision for the next FileSystem.writeText. Calling `next()` yields the bare provider\'s unconditional write; the first listener that returns an intent owns the decision rather than composing with peers.',
     parameters: [{ name: 'target', description: 'the resolved target about to be written.' }, { name: 'actor', description: 'the opaque tool-execution context the decider keys off.' }],
+  },
+  {
+    name: 'game/projection-invalidated',
+    mode: 'emit',
+    signature: '\'game/projection-invalidated\'(gameId: GameId, gameRevision: number): void',
+    summary: 'Announce that authorized readers must re-read one game projection.',
+    description: 'Announce that authorized readers must re-read one game projection. The event deliberately carries no identity or hidden view data.',
+    parameters: [{ name: 'gameId', description: 'changed game.' }, { name: 'gameRevision', description: 'committed domain revision.' }],
   },
   {
     name: 'goal/changed',
@@ -3369,6 +3481,54 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface FsWriteOutcome {\n    operation: \'create\' | \'update\';\n    version: FsVersion;\n    before: string | null;\n    after: string;\n}',
   },
   {
+    name: 'GameAdvance',
+    declaration: 'export interface GameAdvance<TState> extends GameTransition<TState> {\n    stop: boolean;\n}',
+  },
+  {
+    name: 'GameAiExecutor',
+    declaration: 'export interface GameAiExecutor {\n    readonly host: Agent;\n    readonly signal: AbortSignal;\n    start(provider: string, request: GameChildStartRequest): Promise<SubagentRun>;\n    map<T, R>(items: readonly T[], maxConcurrency: number, worker: (item: T) => Promise<R>): Promise<R[]>;\n}',
+  },
+  {
+    name: 'GameChildStartRequest',
+    declaration: 'export type GameChildStartRequest = Omit<SubagentStartRequest, \'parent\' | \'signal\'>;',
+  },
+  {
+    name: 'GameEventCandidate',
+    declaration: 'export interface GameEventCandidate {\n    type: string;\n    data: JsonValue;\n}',
+  },
+  {
+    name: 'GameId',
+    declaration: 'export type GameId = Branded<\'GameId\'>;',
+  },
+  {
+    name: 'GameModule',
+    declaration: 'export interface GameModule<TState = unknown, TStart = JsonValue, TMutation = JsonValue, TView = unknown, TReplay = unknown> {\n    readonly id: string;\n    readonly version: number;\n    prepareStart(input: TStart, principal: LocalGamePrincipalV1, requestId: GameRequestId, payloadDigest: string): Promise<PreparedGameStart<TState>>;\n    restore(events: readonly SessionEvent[]): TState | undefined;\n    gameId(state: TState): GameId;\n    revision(state: TState): number;\n    status(state: TState): \'running\' | \'paused\' | \'ended\';\n    mutate(state: TState, request: GameMutationRequest<TMutation>): Promise<GameTransition<TState>>;\n    advance(state: TState, history: readonly SessionEvent[], executor: GameAiExecutor): Promise<GameAdvance<TState>>;\n    project(state: TState, participantId: ParticipantId): TView;\n    replay(state: TState, history: readonly SessionEvent[], participantId: ParticipantId): TReplay;\n    hostAgentOptions?: AgentOptions;\n}',
+  },
+  {
+    name: 'GameModuleVersion',
+    declaration: 'export interface GameModuleVersion {\n    id: string;\n    version: number;\n}',
+  },
+  {
+    name: 'GameMutationMethod',
+    declaration: 'export type GameMutationMethod = \'start\' | \'submitAction\' | \'resume\' | \'abortGame\';',
+  },
+  {
+    name: 'GameMutationRequest',
+    declaration: 'export interface GameMutationRequest<TPayload = JsonValue> {\n    method: Exclude<GameMutationMethod, \'start\'>;\n    participantId: ParticipantId;\n    payload: TPayload;\n    requestId: GameRequestId;\n    payloadDigest: string;\n}',
+  },
+  {
+    name: 'GameProjection',
+    declaration: 'export interface GameProjection<TView = unknown> {\n    gameId: GameId;\n    gameRevision: number;\n    module: GameModuleVersion;\n    view: TView;\n}',
+  },
+  {
+    name: 'GameRequestId',
+    declaration: 'export type GameRequestId = Branded<\'GameRequestId\'>;',
+  },
+  {
+    name: 'GameTransition',
+    declaration: 'export interface GameTransition<TState> {\n    state: TState;\n    events: readonly GameEventCandidate[];\n}',
+  },
+  {
     name: 'GenerateOptions',
     declaration: 'export interface GenerateOptions {\n    provider: string;\n    model: string;\n    reasoningEffort?: ReasoningEffortId;\n    messages: Message[];\n    system?: string;\n    tools?: ToolSchema[];\n    temperature?: number;\n    maxTokens?: number;\n    stop?: string[];\n    signal?: AbortSignal;\n    sessionId?: Branded<\'SessionId\'>;\n    purpose?: \'compaction\' | \'session-title\';\n}',
   },
@@ -3597,6 +3757,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export class LlmRuntime extends Service {\n    constructor(ctx: Context);\n    registerAdapter(providers: string[], adapter: LlmAdapter): AdapterRegistrationHandle;\n    listProviders(): LlmProviderInfo[];\n    registerConfigurableProviders(entries: readonly LlmConfigurableProvider[]): DirectoryRegistrationHandle;\n    listConfigurableProviders(): LlmConfigurableProvider[];\n    registerModelDiscovery(settingsNs: string, discover: (request: LlmModelDiscoveryRequest) => Promise<readonly LlmDiscoveredModel[]>): () => void;\n    async discoverModels(settingsNs: string, request: LlmModelDiscoveryRequest): Promise<LlmDiscoveredModel[]>;\n    providerRetryPolicy(provider: string): ResolvedRetryPolicy;\n    async listModels(provider: string): Promise<LlmModelInfo[]>;\n    async resolveModelInfo(provider: string, model: string, signal?: AbortSignal): Promise<LlmResolvedModelInfo>;\n    async resolveCallConfig(config: LlmCallConfig, signal?: AbortSignal): Promise<LlmCallConfig>;\n    async prepareCall(config: LlmCallConfig, signal?: AbortSignal): Promise<PreparedLlmCall>;\n    stream(options: GenerateOptions): AsyncIterable<StreamChunk>;\n}',
   },
   {
+    name: 'LocalGamePrincipalV1',
+    declaration: 'export interface LocalGamePrincipalV1 {\n    version: 1;\n    kind: \'local\';\n    id: PrincipalId;\n}',
+  },
+  {
     name: 'LspHover',
     declaration: 'export interface LspHover {\n    readonly contents: string;\n    readonly range?: LspRange;\n}',
   },
@@ -3753,12 +3917,20 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface OneShotSubagentDescriptorData extends SubagentDescriptorBase {\n    readonly mode: \'one-shot\';\n    readonly label?: string;\n}',
   },
   {
+    name: 'ParticipantId',
+    declaration: 'export type ParticipantId = Branded<\'ParticipantId\'>;',
+  },
+  {
     name: 'PermissionSelect',
     declaration: 'export interface PermissionSelect {\n    options: PresetOption[];\n    currentValue: string;\n}',
   },
   {
     name: 'PostToolDecision',
     declaration: 'export type PostToolDecision = {\n    kind: \'accept\';\n    content?: ContentBlock[];\n    value?: never;\n    additionalContexts?: UserMessage[];\n} | {\n    kind: \'accept\';\n    value: JsonValue;\n    content?: never;\n    additionalContexts?: UserMessage[];\n} | {\n    kind: \'block\';\n    feedback: ContentBlock[];\n    additionalContexts?: UserMessage[];\n};',
+  },
+  {
+    name: 'PreparedGameStart',
+    declaration: 'export interface PreparedGameStart<TState> {\n    gameId: GameId;\n    participantId: ParticipantId;\n    state: TState;\n    events: readonly GameEventCandidate[];\n}',
   },
   {
     name: 'PreparedLlmCall',
@@ -3791,6 +3963,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'PreToolDecision',
     declaration: 'export type PreToolDecision = {\n    kind: \'allow\';\n} | {\n    kind: \'deny\';\n    reason: string;\n} | {\n    kind: \'ask\';\n    reason?: string;\n};',
+  },
+  {
+    name: 'PrincipalId',
+    declaration: 'export type PrincipalId = Branded<\'PrincipalId\'>;',
   },
   {
     name: 'ProjectionChangeListener',
@@ -4957,8 +5133,24 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WerewolfAnnouncementRecordV1 {\n    kind: \'system\' | \'death\' | \'vote\' | \'result\';\n    key: string;\n    data?: JsonValue;\n}',
   },
   {
+    name: 'WerewolfBeliefV1',
+    declaration: 'export interface WerewolfBeliefV1 {\n    playerId: WerewolfPlayerId;\n    tendency: \'trusted\' | \'lean-village\' | \'unknown\' | \'lean-wolf\' | \'wolf\';\n    confidence: \'low\' | \'medium\' | \'high\';\n    basis: string;\n}',
+  },
+  {
+    name: 'WerewolfBotContextV1',
+    declaration: 'export interface WerewolfBotContextV1 {\n    version: 1;\n    gameId: WerewolfGameId;\n    playerId: WerewolfPlayerId;\n    revision: number;\n    profile: WerewolfBotProfileV1;\n    beliefs: WerewolfBeliefV1[];\n    commitments: WerewolfCommitmentV1[];\n    strategy: {\n        objective: string;\n        intendedClaim?: string;\n        priorityTargets: WerewolfPlayerId[];\n    };\n    memorySummary: string;\n    lastDecision?: {\n        decisionId: WerewolfDecisionId;\n        phaseId: string;\n        actionKind: string;\n    };\n}',
+  },
+  {
+    name: 'WerewolfBotProfileV1',
+    declaration: 'export interface WerewolfBotProfileV1 {\n    personalityId: string;\n    speakingStyle: string;\n    riskStyle: \'cautious\' | \'balanced\' | \'aggressive\';\n}',
+  },
+  {
     name: 'WerewolfBotRunnerConfigV1',
-    declaration: 'export interface WerewolfBotRunnerConfigV1 {\n    provider: string;\n    botAgent?: AgentOptions;\n    retryLimit: number;\n    decisionTimeoutMs: number;\n    failurePolicy: \'auto-action\' | \'pause-game\';\n    limits: WerewolfContextLimitsV1;\n    publicTimelineEntries: number;\n}',
+    declaration: 'export interface WerewolfBotRunnerConfigV1 {\n    provider: string;\n    botAgent?: AgentOptions;\n    retryLimit: number;\n    decisionTimeoutMs: number;\n    failurePolicy: \'auto-action\' | \'pause-game\';\n    maxConcurrentBots: number;\n    limits: WerewolfContextLimitsV1;\n    publicTimelineEntries: number;\n}',
+  },
+  {
+    name: 'WerewolfCommitmentV1',
+    declaration: 'export interface WerewolfCommitmentV1 {\n    id: string;\n    text: string;\n    status: \'active\' | \'fulfilled\' | \'abandoned\';\n}',
   },
   {
     name: 'WerewolfCompiledPhaseOccurrenceV1',
@@ -4973,12 +5165,64 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WerewolfContextLimitsV1 {\n    memorySummaryChars: number;\n    beliefBasisChars: number;\n    commitmentChars: number;\n    strategyChars: number;\n    maxCommitments: number;\n}',
   },
   {
+    name: 'WerewolfDecisionId',
+    declaration: 'export type WerewolfDecisionId = Branded<\'WerewolfDecisionId\'>;',
+  },
+  {
     name: 'WerewolfDeckEntryV1',
     declaration: 'export interface WerewolfDeckEntryV1 {\n    role: string;\n    roleVersion: number;\n    count: number;\n    options?: JsonValue;\n}',
   },
   {
+    name: 'WerewolfDefinitionVersionsV1',
+    declaration: 'export interface WerewolfDefinitionVersionsV1 {\n    roles: ReadonlyArray<{\n        id: string;\n        version: number;\n    }>;\n    phases: ReadonlyArray<{\n        id: string;\n        version: number;\n    }>;\n    victory: ReadonlyArray<{\n        id: string;\n        version: number;\n    }>;\n}',
+  },
+  {
+    name: 'WerewolfGameActionV1',
+    declaration: 'export interface WerewolfGameActionV1 {\n    phaseInstanceId: string;\n    action: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfGameId',
+    declaration: 'export type WerewolfGameId = Branded<\'WerewolfGameId\'>;',
+  },
+  {
+    name: 'WerewolfGameResultV1',
+    declaration: 'export interface WerewolfGameResultV1 {\n    outcome: WerewolfVictoryOutcomeV1 | {\n        kind: \'aborted\';\n    };\n    evidence: WerewolfResultEvidenceV1[];\n}',
+  },
+  {
+    name: 'WerewolfGameStartV1',
+    declaration: 'export interface WerewolfGameStartV1 {\n    ruleSetId: string;\n    ruleSetRevision: number;\n    seed: number;\n    humanSeatPreference?: number;\n    playerNames?: string[];\n}',
+  },
+  {
+    name: 'WerewolfGameStateV1',
+    declaration: 'export interface WerewolfGameStateV1 {\n    gameId: WerewolfGameId;\n    status: \'running\' | \'paused\' | \'ended\';\n    revision: number;\n    day: number;\n    retryEpoch: number;\n    ruleSet: WerewolfRuleSetInputV1;\n    ruleSetDigest: string;\n    definitionVersions: WerewolfDefinitionVersionsV1;\n    humanPlayerId: WerewolfPlayerId;\n    players: WerewolfPlayerRuntimeV1[];\n    botProfiles: Readonly<Record<string, WerewolfBotProfileV1>>;\n    contexts: Readonly<Record<string, WerewolfBotContextV1>>;\n    seed: number;\n    rngState: number;\n    segment: \'setup\' | \'night\' | \'day\' | null;\n    cursorIndex: number;\n    occurrence: number;\n    positionConsumed: boolean;\n    openPhase: WerewolfOpenPhaseV1 | null;\n    sameDayResolutions: readonly WerewolfPriorResolutionV1[];\n    timeline: WerewolfTimelineEntryV1[];\n    attempts: Readonly<Record<string, number>>;\n    result: WerewolfGameResultV1 | null;\n    pauseReason: WerewolfPauseReasonV1 | \'interrupted\' | null;\n    idempotencyKeys: ReadonlyMap<string, string>;\n}',
+  },
+  {
+    name: 'WerewolfHostMutationRequestV1',
+    declaration: 'export interface WerewolfHostMutationRequestV1 {\n    gameId: string;\n    requestId: string;\n    expectedGameRevision: number;\n}',
+  },
+  {
+    name: 'WerewolfHumanActionFormV1',
+    declaration: 'export interface WerewolfHumanActionFormV1 {\n    phaseInstanceId: string;\n    phaseId: string;\n    day: number;\n    actionKind: string;\n    spec: ReturnType<typeof serializeWerewolfActionSpec>;\n}',
+  },
+  {
+    name: 'WerewolfHumanActionId',
+    declaration: 'export type WerewolfHumanActionId = Branded<\'WerewolfHumanActionId\'>;',
+  },
+  {
+    name: 'WerewolfHumanViewV1',
+    declaration: 'export interface WerewolfHumanViewV1 {\n    version: 1;\n    gameId: string;\n    gameRevision: number;\n    status: WerewolfGameStateV1[\'status\'];\n    day: number;\n    ruleSet: WerewolfRuleSetOptionV1;\n    availableRuleSets: WerewolfRuleSetOptionV1[];\n    players: Array<{\n        playerId: string;\n        seat: number;\n        displayName: string;\n        alive: boolean;\n        human: boolean;\n        deathDay?: number;\n        deathCause?: string;\n        revealedRole?: {\n            id: string;\n            name: string;\n            faction: string;\n        };\n    }>;\n    self: {\n        playerId: string;\n        seat: number;\n        role: {\n            id: string;\n            name: string;\n            faction: string;\n        };\n        resources: Record<string, number>;\n        teammates: Array<{\n            playerId: string;\n            seat: number;\n            alive: boolean;\n        }>;\n        notices: Array<{\n            kind: string;\n            data: JsonValue;\n        }>;\n    };\n    phase: null | {\n        phaseInstanceId: string;\n        phaseId: string;\n        segment: \'setup\' | \'night\' | \'day\';\n        day: number;\n        mode: \'parallel-private\' | \'seat-order-public\';\n    };\n    actionForm: WerewolfHumanActionFormV1 | null;\n    timeline: WerewolfTimelineEntryV1[];\n    pauseReason: WerewolfGameStateV1[\'pauseReason\'];\n    result: WerewolfGameResultV1 | null;\n}',
+  },
+  {
+    name: 'WerewolfOpenPhaseV1',
+    declaration: 'export interface WerewolfOpenPhaseV1 {\n    phaseInstanceId: WerewolfPhaseInstanceId;\n    phaseId: string;\n    phaseVersion: number;\n    segment: \'setup\' | \'night\' | \'day\';\n    day: number;\n    occurrence: number;\n    plan: WerewolfActionPlanV1;\n    settled: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        decisionId?: WerewolfDecisionId;\n        humanActionId?: WerewolfHumanActionId;\n    }>;\n}',
+  },
+  {
     name: 'WerewolfParticipantFactsV1',
     declaration: 'export interface WerewolfParticipantFactsV1 {\n    playerId: WerewolfPlayerId;\n    seat: number;\n    alive: boolean;\n    roleState: JsonValue;\n    resources: Readonly<Record<string, number>>;\n    binding: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfPauseReasonV1',
+    declaration: 'export type WerewolfPauseReasonV1 = \'bot-failure\' | \'cancelled\' | \'unsupported-definition\' | \'invariant-failure\' | \'operator-request\';',
   },
   {
     name: 'WerewolfPhaseDefinition',
@@ -4987,6 +5231,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WerewolfPhaseEntryV1',
     declaration: 'export interface WerewolfPhaseEntryV1 {\n    phase: string;\n    phaseVersion: number;\n    options?: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfPhaseInstanceId',
+    declaration: 'export type WerewolfPhaseInstanceId = Branded<\'WerewolfPhaseInstanceId\'>;',
   },
   {
     name: 'WerewolfPhaseOpenInputV1',
@@ -5009,6 +5257,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export type WerewolfPlayerId = Branded<\'WerewolfPlayerId\'>;',
   },
   {
+    name: 'WerewolfPlayerRuntimeV1',
+    declaration: 'export interface WerewolfPlayerRuntimeV1 {\n    playerId: WerewolfPlayerId;\n    seat: number;\n    displayName: string;\n    human: boolean;\n    roleId: string;\n    roleVersion: number;\n    faction: string;\n    alive: boolean;\n    deathDay?: number;\n    deathCause?: string;\n    roleState: JsonValue;\n    resources: Readonly<Record<string, number>>;\n    notices: ReadonlyArray<WerewolfPrivateNoticeRecordV1>;\n}',
+  },
+  {
     name: 'WerewolfPoliciesV1',
     declaration: 'export interface WerewolfPoliciesV1 {\n    voteTie: \'no-elimination\' | \'revote-once\' | \'seeded-random\';\n    wolfTie: \'no-kill\' | \'seeded-random\';\n    deadHuman: \'spectate\' | \'auto-advance\';\n    maxDays: number;\n    speechMaxChars: number;\n}',
   },
@@ -5021,8 +5273,16 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WerewolfPrivateNoticeRecordV1 {\n    toPlayerId: WerewolfPlayerId;\n    kind: string;\n    data: JsonValue;\n}',
   },
   {
+    name: 'WerewolfReplayV1',
+    declaration: 'export interface WerewolfReplayV1 {\n    version: 1;\n    gameId: string;\n    finalRevision: number;\n    checkpoints: Array<{\n        eventType: string;\n        gameRevision: number;\n        view: WerewolfHumanViewV1;\n    }>;\n}',
+  },
+  {
     name: 'WerewolfResolutionV1',
     declaration: 'export interface WerewolfResolutionV1 {\n    eliminations: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        cause: string;\n    }>;\n    prevented: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        cause: string;\n    }>;\n    resourceReplacements: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        resourceId: string;\n        remaining: number;\n    }>;\n    roleStateReplacements: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        roleState: JsonValue;\n    }>;\n    privateNotices: ReadonlyArray<WerewolfPrivateNoticeRecordV1>;\n    announcements: ReadonlyArray<WerewolfAnnouncementRecordV1>;\n    votes: ReadonlyArray<{\n        voterId: WerewolfPlayerId;\n        targetId: WerewolfPlayerId | null;\n    }>;\n    outcome: JsonValue;\n    voteOutcome?: {\n        eliminated: WerewolfPlayerId | null;\n        tiedPlayers: readonly WerewolfPlayerId[];\n    };\n}',
+  },
+  {
+    name: 'WerewolfResultEvidenceV1',
+    declaration: 'export interface WerewolfResultEvidenceV1 {\n    source: \'condition\' | \'max-days\' | \'human-abort\';\n    conditionId?: string;\n    conditionVersion?: number;\n    priority?: number;\n    data: JsonValue;\n}',
   },
   {
     name: 'WerewolfRng',
@@ -5045,12 +5305,28 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WerewolfRuleSetInputV1 {\n    schemaVersion: 1;\n    id: string;\n    revision: number;\n    displayName: string;\n    playerCount: number;\n    deck: WerewolfDeckEntryV1[];\n    cycle: {\n        setup?: WerewolfPhaseEntryV1[];\n        night: WerewolfPhaseEntryV1[];\n        day: WerewolfPhaseEntryV1[];\n    };\n    victory: WerewolfVictoryEntryV1[];\n    policies: WerewolfPoliciesV1;\n}',
   },
   {
+    name: 'WerewolfRuleSetOptionV1',
+    declaration: 'export interface WerewolfRuleSetOptionV1 {\n    id: string;\n    revision: number;\n    displayName: string;\n    playerCount: number;\n}',
+  },
+  {
     name: 'WerewolfRuleSetSummaryV1',
     declaration: 'export interface WerewolfRuleSetSummaryV1 {\n    id: string;\n    revision: number;\n    displayName: string;\n    playerCount: number;\n    policies: WerewolfPoliciesV1;\n    deck: ReadonlyArray<WerewolfDeckEntryV1>;\n}',
   },
   {
     name: 'WerewolfSingleActionSpecV1',
     declaration: 'export type WerewolfSingleActionSpecV1 = Exclude<WerewolfActionSpecV1, {\n    kind: \'compound\';\n}>;',
+  },
+  {
+    name: 'WerewolfStartRequestV1',
+    declaration: 'export interface WerewolfStartRequestV1 extends WerewolfGameStartV1 {\n    requestId: string;\n    expectedGameRevision: 0;\n}',
+  },
+  {
+    name: 'WerewolfSubmitActionRequestV1',
+    declaration: 'export interface WerewolfSubmitActionRequestV1 extends WerewolfGameActionV1 {\n    gameId: string;\n    requestId: string;\n    expectedGameRevision: number;\n}',
+  },
+  {
+    name: 'WerewolfTimelineEntryV1',
+    declaration: 'export interface WerewolfTimelineEntryV1 {\n    id: string;\n    day: number;\n    phaseId: string;\n    kind: \'speech\' | \'announcement\' | \'vote\' | \'death\' | \'system\';\n    actorId?: WerewolfPlayerId;\n    key: string;\n    data?: JsonValue;\n}',
   },
   {
     name: 'WerewolfVictoryClaimV1',

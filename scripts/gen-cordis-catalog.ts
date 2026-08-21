@@ -71,6 +71,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   e2b: 'subprocess.md',
   fileReferences: 'session-reference.md',
   fs: 'filesystem.md',
+  games: 'werewolf.md',
   goals: 'goal.md',
   webServer: 'web-server.md',
   invariants: 'invariants.md',
@@ -108,6 +109,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   userQuestions: 'user-questions.md',
   web: 'web.md',
   werewolf: 'werewolf.md',
+  werewolfGame: 'werewolf.md',
   workflowEngine: 'workflow.md',
   workspaceRegistry: 'workspace.md',
 }
@@ -178,6 +180,7 @@ export const EVENT_SCOPE_PAGE: Record<string, string> = {
   'domain': 'storage.md',
   'documents': 'writing.md',
   'fs': 'filesystem.md',
+  'game': 'werewolf.md',
   'goal': 'goal.md',
   'llm': 'llm-streaming.md',
   'session': 'session.md',
@@ -219,6 +222,19 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
  * appear on more than one page.
  */
 export const LINK_MAP: Readonly<Record<string, string>> = {
+  GameId: 'werewolf.md',
+  GameModule: 'werewolf.md',
+  GameProjection: 'werewolf.md',
+  GameRequestId: 'werewolf.md',
+  LocalGamePrincipalV1: 'werewolf.md',
+  PrincipalId: 'werewolf.md',
+  WerewolfGameActionV1: 'werewolf.md',
+  WerewolfGameStartV1: 'werewolf.md',
+  WerewolfHostMutationRequestV1: 'werewolf.md',
+  WerewolfHumanViewV1: 'werewolf.md',
+  WerewolfReplayV1: 'werewolf.md',
+  WerewolfStartRequestV1: 'werewolf.md',
+  WerewolfSubmitActionRequestV1: 'werewolf.md',
   WerewolfRoleDefinition: 'werewolf.md',
   WerewolfPhaseDefinition: 'werewolf.md',
   WerewolfVictoryConditionDefinition: 'werewolf.md',

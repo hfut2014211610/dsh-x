@@ -2,7 +2,7 @@ import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
 import { createScope, scopeTarget } from '@deepseek-ai/dsh-scope'
 import { createUserMessage, CallId, createMessage, createToolResultMessage, freezeMessage } from '@deepseek-ai/dsh-llm'
-import SessionStore, { SessionId, TOOL_NOT_STARTED } from '@deepseek-ai/dsh-session'
+import SessionStore, { Session, SessionId, TOOL_NOT_STARTED } from '@deepseek-ai/dsh-session'
 import * as SessionInvariant from '@deepseek-ai/dsh-session/invariant'
 import InvariantRegistry, { InvariantError } from '@deepseek-ai/dsh-invariants'
 
@@ -97,6 +97,114 @@ describe('session-log invariants', () => {
       session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     }).not.toThrow()
     expect(warnings).toHaveLength(2)
+  })
+
+  it('commits a validated batch before publishing its ordered events', async () => {
+    const { ctx } = await setup()
+    const session = ctx.sessions.create(SessionId('atomic-batch'))
+    const observed: Array<{ type: string; visibleLength: number }> = []
+    ctx.on('session/event', (candidate, event) => {
+      if (candidate !== session) return
+      observed.push({ type: event.type, visibleLength: candidate.events.length })
+    })
+
+    const events = session.appendBatch([
+      { type: 'turn/start', data: { turn: 1 } },
+      { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } },
+    ])
+
+    expect(events.map(event => [event.type, event.seq])).toEqual([
+      ['turn/start', 0],
+      ['turn/end', 1],
+    ])
+    expect(observed).toEqual([
+      { type: 'turn/start', visibleLength: 2 },
+      { type: 'turn/end', visibleLength: 2 },
+    ])
+  })
+
+  it('leaves log, surface, and observers unchanged when a later batch event is invalid', async () => {
+    const { ctx } = await setup()
+    const session = ctx.sessions.create(SessionId('atomic-batch-rejection'))
+    let observed = 0
+    ctx.on('session/event', (candidate) => {
+      if (candidate === session) observed += 1
+    })
+
+    expect(() => session.appendBatch([
+      { type: 'turn/start', data: { turn: 1 } },
+      { type: 'turn/start', data: { turn: 2 } },
+    ])).toThrow(/turn 1 is still open/)
+    expect(session.events).toEqual([])
+    expect(session.surface.nodes).toEqual([])
+    expect(observed).toBe(0)
+    expect(() => session.appendBatch([
+      { type: 'turn/start', data: { turn: 1 } },
+      { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } },
+    ])).not.toThrow()
+  })
+
+  it('validates batch payloads and explicit surface metadata before publication', async () => {
+    const { ctx } = await setup()
+    const session = ctx.sessions.create(SessionId('atomic-batch-inputs'))
+    expect(() => session.appendBatch([
+      { type: 'turn/start', data: { turn: BigInt(1) } as never },
+    ])).toThrow(/non-JSON-serializable data/)
+    expect(() => session.appendBatch([
+      {
+        type: 'user/message',
+        data: createUserMessage({ content: [{ type: 'text', text: 'bad metadata' }], source: { kind: 'user' } }),
+        intent: { surfaceOp: { op: 'replace', start: BigInt(1), end: 2 } as never },
+      },
+    ])).toThrow(/non-JSON-serializable surface metadata/)
+
+    const events = session.appendBatch([
+      { type: 'turn/start', data: { turn: 1 } },
+      {
+        type: 'user/message',
+        data: createUserMessage({ content: [{ type: 'text', text: 'batched' }], source: { kind: 'user' } }),
+        intent: { surfaceOp: 'append', sourceEventSeqs: [0] },
+      },
+      { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } },
+    ])
+    expect(events).toHaveLength(3)
+    expect(session.surface.nodes).toHaveLength(1)
+  })
+
+  it('supports unattached and empty batches', async () => {
+    const unattached = Session.create(SessionId('unattached-batch'))
+    expect(unattached.appendBatch([{ type: 'turn/start', data: { turn: 1 } }])).toHaveLength(1)
+    const { ctx } = await setup()
+    expect(ctx.sessions.create(SessionId('empty-batch')).appendBatch([])).toEqual([])
+  })
+
+  it('rejects reentrant batches and defers detach until publication finishes', async () => {
+    const { ctx } = await setup()
+    const session = ctx.sessions.prepare(SessionId('atomic-batch-reentry'))
+    const detach = ctx.sessions.enter(session)
+    ctx.sessions.announce(session)
+    let reentry: unknown
+    const observed: string[] = []
+    ctx.on('session/event', (candidate, event) => {
+      if (candidate !== session) return
+      observed.push(event.type)
+      if (event.type !== 'turn/start') return
+      try {
+        session.appendBatch([{ type: 'turn/start', data: { turn: 2 } }])
+      } catch (error) {
+        reentry = error
+      }
+      detach()
+      expect(ctx.sessions.get(session.id)).toBe(session)
+    })
+    session.appendBatch([
+      { type: 'turn/start', data: { turn: 1 } },
+      { type: 'turn/end', data: { turn: 1, reason: { kind: 'completed' } } },
+    ])
+    if (!(reentry instanceof Error)) throw new Error('missing reentry error fixture')
+    expect(reentry.message).toContain('cannot reenter')
+    expect(observed).toEqual(['turn/start', 'turn/end'])
+    expect(ctx.sessions.get(session.id)).toBeUndefined()
   })
 
   it('rejects non-monotonic event sequence numbers', async () => {

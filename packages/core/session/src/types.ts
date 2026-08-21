@@ -393,6 +393,18 @@ export interface SurfaceIntent {
 }
 
 /**
+ * One candidate accepted by {@link Session.appendBatch}. Surface-producing
+ * events carry the same required placement metadata as {@link Session.append};
+ * log-only events cannot carry it.
+ */
+export type SessionAppendEntry<T extends SessionEventType = SessionEventType> = {
+  [K in T]: {
+    type: K
+    data: SessionEventMap[K]
+  } & (K extends SurfaceEventType ? { intent: SurfaceIntent } : { intent?: never })
+}[T]
+
+/**
  * One immutable entry in the session log.
  *
  * A proper discriminated union over `type` (not independent `type`/`data`

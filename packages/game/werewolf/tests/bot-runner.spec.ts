@@ -31,6 +31,7 @@ type ScriptStep =
   | { kind: 'stop'; stopReason: SubagentResult['stopReason'] }
   | { kind: 'hang' }
   | { kind: 'throw' }
+  | { kind: 'throw-string' }
   | { kind: 'reject-result' }
 
 /** The first legal value of the request's serialized action spec. */
@@ -73,6 +74,9 @@ async function setupWorld(steps: ScriptStep[]): Promise<ScriptedWorld> {
       requests.push(request)
       const step = steps[Math.min(n - 1, steps.length - 1)] ?? { kind: 'structured' as const, value: {} }
       if (step.kind === 'throw') return Promise.reject(new Error('scripted start fault'))
+      // Subagent providers cross a process boundary and may reject with an untyped value.
+      // oxlint-disable-next-line typescript/prefer-promise-reject-errors
+      if (step.kind === 'throw-string') return Promise.reject('scripted string fault')
       let value: unknown = step.kind === 'structured' ? step.value : undefined
       if (step.kind === 'structured') {
         const action = (step.value as { action?: { value?: unknown } }).action
@@ -118,6 +122,7 @@ const config = (overrides: Partial<WerewolfBotRunnerConfigV1> = {}): WerewolfBot
   retryLimit: 2,
   decisionTimeoutMs: 60,
   failurePolicy: 'auto-action',
+  maxConcurrentBots: 4,
   limits: testLimits(),
   publicTimelineEntries: 5,
   ...overrides,
@@ -165,6 +170,13 @@ describe('assertWerewolfBotProvider', () => {
     expect(() =>{  assertWerewolfBotProvider(world.ctx.subagents, 'no-depthLimit') }).toThrow(/lacks depthLimit/)
     expect(() =>{  assertWerewolfBotProvider(world.ctx.subagents, 'no-toolFilter') }).toThrow(/lacks toolFilter/)
     expect(() =>{  assertWerewolfBotProvider(world.ctx.subagents, 'no-persona') }).toThrow(/lacks persona/)
+    world.ctx.subagents.registerProvider({
+      name: 'inherits-history',
+      capabilities: CAPABLE,
+      inheritsParentContext: true,
+      start: () => { throw new Error('unreachable') },
+    })
+    expect(() => { assertWerewolfBotProvider(world.ctx.subagents, 'inherits-history') }).toThrow(/fresh one-shot decisions require isolated children/)
     expect(() =>{  assertWerewolfBotProvider(world.ctx.subagents, 'scripted') }).not.toThrow()
     void n
   })
@@ -176,6 +188,7 @@ describe('werewolfEnvelopeSchema', () => {
     expect(single.type).toBe('object')
     expect(single.additionalProperties).toBe(false)
     expect(single.required).toEqual(['action', 'contextDelta'])
+    expect(single.properties?.publicSpeech).toBeUndefined()
     const action = single.properties?.action
     expect(action?.type).toBe('object')
     expect((action?.properties?.value as { oneOf?: Array<{ enum?: unknown[] }> }).oneOf?.[1]?.enum).toEqual(['p1'])
@@ -186,6 +199,7 @@ describe('werewolfEnvelopeSchema', () => {
     expect((choiceForced.properties?.action?.properties?.value as { type?: string }).type).toBe('string')
     const textForced = werewolfEnvelopeSchema({ kind: 'text', maxChars: 4, allowSkip: false })
     expect(textForced.properties?.action?.properties?.value).toEqual({ type: 'string' })
+    expect(textForced.properties?.publicSpeech).toEqual({ type: 'string' })
     const compound = werewolfEnvelopeSchema({
       kind: 'compound',
       fields: [{ id: 'save', spec: { kind: 'choice', options: ['use'], allowSkip: false } }],
@@ -222,7 +236,6 @@ describe('runWerewolfBotDecision', () => {
     const { rules, state, request } = firstRequest()
     const target = request.spec.kind === 'player-target' ? request.spec.targets[0] : null
     const world = await setupWorld([{ kind: 'structured', value: envelope({ value: target }) }])
-    world.disposeFaults = 1
     const outcome = await runWerewolfBotDecision({
       ctx: world.ctx, config: config(), state, rules, request, agent: world.agent,
     })
@@ -322,6 +335,12 @@ describe('runWerewolfBotDecision', () => {
     if (outcome.kind !== 'trustee') return
     expect(outcome.attempts.map(attempt => attempt.data.category)).toEqual(['provider-setup', 'provider-setup', 'provider-setup'])
     expect((outcome.attempts[0] as { data: { childSessionId: string } }).data.childSessionId).toBe('(none)')
+
+    const stringWorld = await setupWorld([{ kind: 'throw-string' }])
+    const stringOutcome = await runWerewolfBotDecision({
+      ctx: stringWorld.ctx, config: config({ retryLimit: 0 }), state, rules, request, agent: stringWorld.agent,
+    })
+    expect(stringOutcome.attempts.map(entry => entry.data.category)).toEqual(['provider-setup'])
   })
 
   it('times out a hanging child, disposes it, and settles by fallback', async () => {
@@ -333,6 +352,26 @@ describe('runWerewolfBotDecision', () => {
     })
     expect(outcome.kind).toBe('trustee')
     expect(world.disposed).toBe(3)
+    if (outcome.kind !== 'trustee') return
+    expect(outcome.attempts.map(entry => entry.data.category)).toEqual(['disposal', 'disposal', 'disposal'])
+  })
+
+  it('rejects an otherwise valid attempt when disposal fails, then retries cleanly', async () => {
+    const { rules, state, request } = firstRequest()
+    const target = request.spec.kind === 'player-target' ? request.spec.targets[0] : null
+    const world = await setupWorld([
+      { kind: 'structured', value: envelope({ value: target }) },
+      { kind: 'structured', value: envelope({ value: target }) },
+    ])
+    world.disposeFaults = 1
+    const outcome = await runWerewolfBotDecision({
+      ctx: world.ctx, config: config(), state, rules, request, agent: world.agent,
+    })
+    expect(outcome.kind).toBe('accepted')
+    if (outcome.kind !== 'accepted') return
+    expect(outcome.attempts.map(entry => entry.data.category)).toEqual(['disposal'])
+    const retry = world.requests[1]?.prompt[0]
+    expect(retry?.type === 'text' && retry.text.includes('disposal')).toBe(true)
   })
 
   it('cancels through the caller signal and disposes the running child', async () => {
@@ -347,11 +386,23 @@ describe('runWerewolfBotDecision', () => {
     const world2 = await setupWorld([{ kind: 'hang' }])
     const controller2 = new AbortController()
     const pending = runWerewolfBotDecision({
-      ctx: world2.ctx, config: config({ decisionTimeoutMs: 5 }), state, rules, request, agent: world2.agent, signal: controller2.signal,
+      ctx: world2.ctx, config: config({ decisionTimeoutMs: 60000 }), state, rules, request, agent: world2.agent, signal: controller2.signal,
     })
+    await new Promise(resolve => setTimeout(resolve, 0))
     controller2.abort()
     expect(await pending).toMatchObject({ kind: 'cancelled' })
     expect(world2.disposed).toBe(1)
+  })
+
+  it('treats cancellation during rejecting provider setup as cancellation, not a provider failure', async () => {
+    const { rules, state, request } = firstRequest()
+    const world = await setupWorld([{ kind: 'throw' }])
+    const controller = new AbortController()
+    const pending = runWerewolfBotDecision({
+      ctx: world.ctx, config: config(), state, rules, request, agent: world.agent, signal: controller.signal,
+    })
+    controller.abort()
+    await expect(pending).resolves.toEqual({ kind: 'cancelled', attempts: [] })
   })
 
   it('classifies malformed envelopes and a rejecting child result precisely', async () => {
@@ -361,7 +412,7 @@ describe('runWerewolfBotDecision', () => {
       [{ action: { value: target }, contextDelta: {}, extra: 1 }, 'invalid-output'],
       [{ action: { value: target }, publicSpeech: 42, contextDelta: {} }, 'invalid-output'],
       ['nope', 'invalid-output'],
-      [{ contextDelta: {} }, 'illegal-action'],
+      [{ contextDelta: {} }, 'invalid-output'],
     ]
     for (const [value, category] of cases) {
       const world = await setupWorld([{ kind: 'structured', value }, { kind: 'structured', value }, { kind: 'structured', value }])
@@ -406,7 +457,7 @@ describe('runWerewolfBotDecision', () => {
     if (talkRequest === undefined) throw new Error('no talk request')
     expect(talkRequest.spec.kind).toBe('text')
     const world = await setupWorld([
-      { kind: 'structured', value: envelope({ value: null }, EMPTY_DELTA, 'hello table') },
+      { kind: 'structured', value: envelope({ value: null }, EMPTY_DELTA, '  hello   table  ') },
       { kind: 'structured', value: envelope({ value: null }) },
     ])
     void target
@@ -417,6 +468,55 @@ describe('runWerewolfBotDecision', () => {
     if (talkOutcome.kind !== 'accepted') return
     expect(talkOutcome.submission.envelope.publicSpeech).toBe('hello table')
     expect(talkOutcome.submission.envelope.action).toEqual({ value: null })
+
+    const whitespaceWorld = await setupWorld([
+      { kind: 'structured', value: envelope({ value: null }, EMPTY_DELTA, '   \n  ') },
+    ])
+    const whitespace = await runWerewolfBotDecision({
+      ctx: whitespaceWorld.ctx, config: config(), state: kill.state, rules, request: talkRequest, agent: whitespaceWorld.agent,
+    })
+    expect(whitespace.kind).toBe('accepted')
+    if (whitespace.kind !== 'accepted') return
+    expect(whitespace.submission.envelope.publicSpeech).toBeUndefined()
+  })
+
+  it('rejects public speech outside text phases and above the active policy limit', async () => {
+    const first = firstRequest()
+    const target = first.request.spec.kind === 'player-target' ? first.request.spec.targets[0] : null
+    const nonTextWorld = await setupWorld(Array.from({ length: 3 }, () => ({
+      kind: 'structured' as const,
+      value: envelope({ value: target }, EMPTY_DELTA, 'not allowed'),
+    })))
+    const nonText = await runWerewolfBotDecision({
+      ctx: nonTextWorld.ctx, config: config(), state: first.state, rules: first.rules,
+      request: first.request, agent: nonTextWorld.agent,
+    })
+    expect(nonText.kind).toBe('trustee')
+    if (nonText.kind !== 'trustee') return
+    expect(nonText.attempts.map(entry => entry.data.category)).toEqual(['illegal-action', 'illegal-action', 'illegal-action'])
+
+    const rules = miniRuleSet({ voteTie: 'no-elimination' })
+    const started = startWerewolfGame({ ruleSet: rules, seed: 12, ids: counterIds() })
+    const talk = openNextWerewolfPhase({
+      ...started.state,
+      segment: 'day',
+      cursorIndex: -1,
+      occurrence: 0,
+      positionConsumed: true,
+    }, rules, counterIds())
+    const talkRequest = buildWerewolfBotRequests(talk.state, counterIds())[0]
+    if (talkRequest === undefined || talkRequest.spec.kind !== 'text') throw new Error('no talk request')
+    const tooLong = 'x'.repeat(talk.state.ruleSet.policies.speechMaxChars + 1)
+    const longWorld = await setupWorld(Array.from({ length: 3 }, () => ({
+      kind: 'structured' as const,
+      value: envelope({ value: null }, EMPTY_DELTA, tooLong),
+    })))
+    const long = await runWerewolfBotDecision({
+      ctx: longWorld.ctx, config: config(), state: talk.state, rules, request: talkRequest, agent: longWorld.agent,
+    })
+    expect(long.kind).toBe('trustee')
+    if (long.kind !== 'trustee') return
+    expect(long.attempts.map(entry => entry.data.category)).toEqual(['illegal-action', 'illegal-action', 'illegal-action'])
   })
 
   it('cancels after a settled result through the caller signal', async () => {
@@ -431,6 +531,7 @@ describe('runWerewolfBotDecision', () => {
     controller.abort()
     const outcome = await pending
     expect(outcome).toMatchObject({ kind: 'cancelled' })
+    expect(outcome.attempts.map(entry => entry.data.category)).toEqual(['disposal'])
   })
 
   it('rejects a request whose player is not an actor of the open phase', async () => {
@@ -500,6 +601,7 @@ describe('runtime bot configuration', () => {
     expect(resolved.retryLimit).toBe(2)
     expect(resolved.decisionTimeoutMs).toBe(60000)
     expect(resolved.failurePolicy).toBe('auto-action')
+    expect(resolved.maxConcurrentBots).toBe(4)
     expect(resolved.publicTimelineEntries).toBe(24)
     expect(resolved.botAgent).toBeUndefined()
     expect(resolved.limits.maxCommitments).toBe(8)
@@ -534,6 +636,7 @@ describe('runtime bot configuration', () => {
     const resolved = ctx.werewolf.botRunnerConfig()
     expect(resolved.retryLimit).toBe(0)
     expect(resolved.failurePolicy).toBe('pause-game')
+    expect(resolved.maxConcurrentBots).toBe(2)
     expect(resolved.botAgent).toEqual({ provider: 'mock', model: 'bot' })
     expect(resolved.limits.memorySummaryChars).toBe(10)
     expect(resolved.publicTimelineEntries).toBe(4)
