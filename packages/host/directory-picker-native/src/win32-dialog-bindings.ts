@@ -25,20 +25,26 @@ interface Koffi {
   register(fn: (...args: unknown[]) => unknown, type: unknown): unknown
   unregister(callback: unknown): void
   sizeof(type: string): number
-  view(ref: unknown, len: number): ArrayBuffer
 }
 
 /**
  * Read a NUL-terminated UTF-16 string at a native address. koffi's
  * `_Out_ void **` out-params surface a raw address, and
  * `koffi.decode(addr, 'str16')` would dereference it as a pointer — crash
- * on real Windows — so view the memory directly instead.
+ * on real Windows. Decoding one `uint16` at a time reads the memory at the
+ * address itself: `koffi.view` would do it in one shot, but it hands V8 an
+ * externally-backed ArrayBuffer, which the V8 memory sandbox — on in the
+ * Electron runtime the packaged desktop app runs — rejects with a fatal
+ * napi error; plain node accepts it, so the dialog only crashed packaged.
  */
 function readUtf16(koffi: Koffi, address: unknown): string {
-  const bytes = Buffer.from(koffi.view(address, 32768))
-  let end = 0
-  while (end + 1 < bytes.length && bytes[end] !== 0) end += 2
-  return bytes.toString('utf16le', 0, end)
+  let out = ''
+  for (let offset = 0; offset < 32768; offset += 2) {
+    const code = koffi.decode(address, offset, 'uint16') as number
+    if (code === 0) break
+    out += String.fromCharCode(code)
+  }
+  return out
 }
 
 const COINIT_APARTMENTTHREADED = 0x2
