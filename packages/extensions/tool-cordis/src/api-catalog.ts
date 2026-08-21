@@ -2246,6 +2246,49 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'werewolf',
+    summary: 'The Werewolf extension surface: registration of rule sets, roles, phases, and victory conditions, plus rule-set compilation against the current registry state.',
+    description: 'The Werewolf extension surface: registration of rule sets, roles, phases, and victory conditions, plus rule-set compilation against the current registry state.',
+    methods: [
+      {
+        signature: 'registerRole(definition: WerewolfRoleDefinition): () => void',
+        description: 'Register one role version on the calling fiber.',
+        parameters: [{ name: 'definition', description: 'the role definition to register.' }],
+        returns: 'a disposer removing exactly this registration.',
+      },
+      {
+        signature: 'registerPhase(definition: WerewolfPhaseDefinition): () => void',
+        description: 'Register one phase version on the calling fiber.',
+        parameters: [{ name: 'definition', description: 'the phase definition to register.' }],
+        returns: 'a disposer removing exactly this registration.',
+      },
+      {
+        signature: 'registerVictoryCondition(definition: WerewolfVictoryConditionDefinition): () => void',
+        description: 'Register one victory-condition version on the calling fiber.',
+        parameters: [{ name: 'definition', description: 'the victory-condition definition to register.' }],
+        returns: 'a disposer removing exactly this registration.',
+      },
+      {
+        signature: 'registerRuleSet(input: WerewolfRuleSetInputV1): () => void',
+        description: 'Register one immutable `{ id, revision }` rule-set pair on the calling fiber.',
+        parameters: [{ name: 'input', description: 'the parsed rule-set input to register.' }],
+        returns: 'a disposer removing exactly this registration.',
+      },
+      {
+        signature: 'resolveRuleSet(input: JsonValue): WerewolfCompiledRuleSetV1',
+        description: 'Compile one rule set against the current registries.',
+        parameters: [{ name: 'input', description: 'the raw or parsed rule-set input.' }],
+        returns: 'the immutable compiled rule set with its digest.',
+      },
+      {
+        signature: 'listRuleSets(): ReadonlyMap<string, WerewolfRuleSetInputV1>',
+        description: 'Every registered rule-set input, keyed `${id}@${revision}`.',
+        parameters: [],
+        returns: 'the registered rule-set inputs.',
+      },
+    ],
+  },
+  {
     key: 'workflowEngine',
     summary: 'Workflow Service Definition contract.',
     description: 'Workflow Service Definition contract. Invalid requests throw before publication; a live run is holder-owned, its result never rejects, cancellation and disposal are bounded, and disposal waits for child cleanup within that bound. Lifecycle listener failures are contained, and `workflow/end` fires exactly once as the result settles.',
@@ -2982,6 +3025,14 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'CompactionTrigger',
     declaration: 'export type CompactionTrigger = \'pressure\' | \'context-overflow\';',
+  },
+  {
+    name: 'CompiledWerewolfPhase',
+    declaration: 'export interface CompiledWerewolfPhase {\n    id: string;\n    version: number;\n    open(input: WerewolfPhaseOpenInputV1): WerewolfPhaseOpenResultV1;\n    resolve(input: WerewolfPhaseResolveInputV1): WerewolfResolutionV1;\n}',
+  },
+  {
+    name: 'CompiledWerewolfRole',
+    declaration: 'export interface CompiledWerewolfRole {\n    id: string;\n    version: number;\n    faction: string;\n    publicName: string;\n    initialRoleState: JsonValue;\n    initialResources?: Readonly<Record<string, number>>;\n    seesFactionTeammates?: boolean;\n    phaseBindings: WerewolfRolePhaseBindingV1[];\n    projectPrivateKnowledge(input: WerewolfRoleKnowledgeInputV1): JsonValue;\n}',
   },
   {
     name: 'ConfinedArgv',
@@ -4882,6 +4933,130 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WebUpgradeRoute',
     declaration: 'export interface WebUpgradeRoute {\n    path: string;\n    handler: (req: IncomingMessage, socket: Duplex, head: Buffer) => void | Promise<void>;\n}',
+  },
+  {
+    name: 'WerewolfActionActorV1',
+    declaration: 'export interface WerewolfActionActorV1 {\n    playerId: WerewolfPlayerId;\n    seat: number;\n    actionKind: string;\n    spec: WerewolfActionSpecV1;\n    context?: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfActionPlanV1',
+    declaration: 'export interface WerewolfActionPlanV1 {\n    mode: \'parallel-private\' | \'seat-order-public\';\n    actors: ReadonlyArray<WerewolfActionActorV1>;\n}',
+  },
+  {
+    name: 'WerewolfActionSpecV1',
+    declaration: 'export type WerewolfActionSpecV1 = {\n    kind: \'player-target\';\n    targets: readonly WerewolfPlayerId[];\n    allowSkip: boolean;\n} | {\n    kind: \'choice\';\n    options: readonly string[];\n    allowSkip: boolean;\n} | {\n    kind: \'text\';\n    maxChars: number;\n    allowSkip: boolean;\n} | {\n    kind: \'compound\';\n    fields: ReadonlyArray<{\n        id: string;\n        spec: WerewolfSingleActionSpecV1;\n    }>;\n    allowSkip: boolean;\n};',
+  },
+  {
+    name: 'WerewolfAnnouncementRecordV1',
+    declaration: 'export interface WerewolfAnnouncementRecordV1 {\n    kind: \'system\' | \'death\' | \'vote\' | \'result\';\n    key: string;\n    data?: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfCompiledPhaseOccurrenceV1',
+    declaration: 'export interface WerewolfCompiledPhaseOccurrenceV1 {\n    phaseId: string;\n    phaseVersion: number;\n    options: JsonValue;\n    compiled: CompiledWerewolfPhase;\n}',
+  },
+  {
+    name: 'WerewolfCompiledRuleSetV1',
+    declaration: 'export interface WerewolfCompiledRuleSetV1 {\n    input: WerewolfRuleSetInputV1;\n    digest: string;\n    roles: ReadonlyMap<string, CompiledWerewolfRole>;\n    cycle: {\n        setup: ReadonlyArray<WerewolfCompiledPhaseOccurrenceV1>;\n        night: ReadonlyArray<WerewolfCompiledPhaseOccurrenceV1>;\n        day: ReadonlyArray<WerewolfCompiledPhaseOccurrenceV1>;\n    };\n    victory: ReadonlyArray<{\n        definition: WerewolfVictoryConditionDefinition;\n        options: JsonValue;\n        priority: number;\n    }>;\n}',
+  },
+  {
+    name: 'WerewolfDeckEntryV1',
+    declaration: 'export interface WerewolfDeckEntryV1 {\n    role: string;\n    roleVersion: number;\n    count: number;\n    options?: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfParticipantFactsV1',
+    declaration: 'export interface WerewolfParticipantFactsV1 {\n    playerId: WerewolfPlayerId;\n    seat: number;\n    alive: boolean;\n    roleState: JsonValue;\n    resources: Readonly<Record<string, number>>;\n    binding: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfPhaseDefinition',
+    declaration: 'export interface WerewolfPhaseDefinition {\n    id: string;\n    version: number;\n    repeatable?: boolean;\n    parseOptions(value: JsonValue | undefined): JsonValue;\n    parseRoleBinding(binding: WerewolfRolePhaseBindingV1): JsonValue;\n    compile(input: {\n        options: JsonValue;\n        participants: ReadonlyArray<{\n            role: CompiledWerewolfRole;\n            binding: JsonValue;\n        }>;\n    }): CompiledWerewolfPhase;\n}',
+  },
+  {
+    name: 'WerewolfPhaseEntryV1',
+    declaration: 'export interface WerewolfPhaseEntryV1 {\n    phase: string;\n    phaseVersion: number;\n    options?: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfPhaseOpenInputV1',
+    declaration: 'export interface WerewolfPhaseOpenInputV1 {\n    day: number;\n    occurrence: number;\n    policies: WerewolfPoliciesV1;\n    players: ReadonlyArray<WerewolfPlayerFactsV1>;\n    participants: ReadonlyArray<WerewolfParticipantFactsV1>;\n    sameDayHistory: ReadonlyArray<WerewolfPriorResolutionV1>;\n    rng: WerewolfRng;\n}',
+  },
+  {
+    name: 'WerewolfPhaseOpenResultV1',
+    declaration: 'export type WerewolfPhaseOpenResultV1 = {\n    kind: \'skip\';\n    reason: string;\n} | {\n    kind: \'plan\';\n    plan: WerewolfActionPlanV1;\n};',
+  },
+  {
+    name: 'WerewolfPhaseResolveInputV1',
+    declaration: 'export interface WerewolfPhaseResolveInputV1 extends WerewolfPhaseOpenInputV1 {\n    actions: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        action: JsonValue;\n    }>;\n    speeches?: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        text: string;\n    }>;\n}',
+  },
+  {
+    name: 'WerewolfPlayerFactsV1',
+    declaration: 'export interface WerewolfPlayerFactsV1 {\n    playerId: WerewolfPlayerId;\n    seat: number;\n    displayName: string;\n    alive: boolean;\n    faction?: string;\n}',
+  },
+  {
+    name: 'WerewolfPlayerId',
+    declaration: 'export type WerewolfPlayerId = Branded<\'WerewolfPlayerId\'>;',
+  },
+  {
+    name: 'WerewolfPoliciesV1',
+    declaration: 'export interface WerewolfPoliciesV1 {\n    voteTie: \'no-elimination\' | \'revote-once\' | \'seeded-random\';\n    wolfTie: \'no-kill\' | \'seeded-random\';\n    deadHuman: \'spectate\' | \'auto-advance\';\n    maxDays: number;\n    speechMaxChars: number;\n}',
+  },
+  {
+    name: 'WerewolfPriorResolutionV1',
+    declaration: 'export interface WerewolfPriorResolutionV1 {\n    phaseId: string;\n    phaseVersion: number;\n    day: number;\n    segment: \'setup\' | \'night\' | \'day\';\n    resolution: WerewolfResolutionV1;\n}',
+  },
+  {
+    name: 'WerewolfPrivateNoticeRecordV1',
+    declaration: 'export interface WerewolfPrivateNoticeRecordV1 {\n    toPlayerId: WerewolfPlayerId;\n    kind: string;\n    data: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfResolutionV1',
+    declaration: 'export interface WerewolfResolutionV1 {\n    eliminations: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        cause: string;\n    }>;\n    prevented: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        cause: string;\n    }>;\n    resourceReplacements: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        resourceId: string;\n        remaining: number;\n    }>;\n    roleStateReplacements: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        roleState: JsonValue;\n    }>;\n    privateNotices: ReadonlyArray<WerewolfPrivateNoticeRecordV1>;\n    announcements: ReadonlyArray<WerewolfAnnouncementRecordV1>;\n    votes: ReadonlyArray<{\n        voterId: WerewolfPlayerId;\n        targetId: WerewolfPlayerId | null;\n    }>;\n    outcome: JsonValue;\n    voteOutcome?: {\n        eliminated: WerewolfPlayerId | null;\n        tiedPlayers: readonly WerewolfPlayerId[];\n    };\n}',
+  },
+  {
+    name: 'WerewolfRng',
+    declaration: 'export interface WerewolfRng {\n    pick<T>(items: readonly T[]): T;\n}',
+  },
+  {
+    name: 'WerewolfRoleDefinition',
+    declaration: 'export interface WerewolfRoleDefinition {\n    id: string;\n    version: number;\n    parseOptions(value: JsonValue | undefined): JsonValue;\n    compile(input: {\n        options: JsonValue;\n        ruleSet: WerewolfRuleSetSummaryV1;\n    }): CompiledWerewolfRole;\n}',
+  },
+  {
+    name: 'WerewolfRoleKnowledgeInputV1',
+    declaration: 'export interface WerewolfRoleKnowledgeInputV1 {\n    self: {\n        playerId: WerewolfPlayerId;\n        seat: number;\n        alive: boolean;\n        roleState: JsonValue;\n        resources: Readonly<Record<string, number>>;\n        notices: ReadonlyArray<WerewolfPrivateNoticeRecordV1>;\n    };\n    teammates: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        seat: number;\n        alive: boolean;\n    }>;\n    day: number;\n}',
+  },
+  {
+    name: 'WerewolfRolePhaseBindingV1',
+    declaration: 'export interface WerewolfRolePhaseBindingV1 {\n    phaseId: string;\n    phaseVersion: number;\n    required: boolean;\n    kind: string;\n    options: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfRuleSetInputV1',
+    declaration: 'export interface WerewolfRuleSetInputV1 {\n    schemaVersion: 1;\n    id: string;\n    revision: number;\n    displayName: string;\n    playerCount: number;\n    deck: WerewolfDeckEntryV1[];\n    cycle: {\n        setup?: WerewolfPhaseEntryV1[];\n        night: WerewolfPhaseEntryV1[];\n        day: WerewolfPhaseEntryV1[];\n    };\n    victory: WerewolfVictoryEntryV1[];\n    policies: WerewolfPoliciesV1;\n}',
+  },
+  {
+    name: 'WerewolfRuleSetSummaryV1',
+    declaration: 'export interface WerewolfRuleSetSummaryV1 {\n    id: string;\n    revision: number;\n    displayName: string;\n    playerCount: number;\n    policies: WerewolfPoliciesV1;\n    deck: ReadonlyArray<WerewolfDeckEntryV1>;\n}',
+  },
+  {
+    name: 'WerewolfSingleActionSpecV1',
+    declaration: 'export type WerewolfSingleActionSpecV1 = Exclude<WerewolfActionSpecV1, {\n    kind: \'compound\';\n}>;',
+  },
+  {
+    name: 'WerewolfVictoryClaimV1',
+    declaration: 'export interface WerewolfVictoryClaimV1 {\n    outcome: WerewolfVictoryOutcomeV1;\n    evidence: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfVictoryConditionDefinition',
+    declaration: 'export interface WerewolfVictoryConditionDefinition {\n    id: string;\n    version: number;\n    parseOptions(value: JsonValue | undefined): JsonValue;\n    evaluate(input: WerewolfVictoryEvaluationInputV1 & {\n        options: JsonValue;\n    }): WerewolfVictoryClaimV1 | null;\n}',
+  },
+  {
+    name: 'WerewolfVictoryEntryV1',
+    declaration: 'export interface WerewolfVictoryEntryV1 {\n    condition: string;\n    conditionVersion: number;\n    priority: number;\n    options?: JsonValue;\n}',
+  },
+  {
+    name: 'WerewolfVictoryEvaluationInputV1',
+    declaration: 'export interface WerewolfVictoryEvaluationInputV1 {\n    day: number;\n    players: ReadonlyArray<{\n        playerId: WerewolfPlayerId;\n        faction: string;\n        alive: boolean;\n    }>;\n}',
+  },
+  {
+    name: 'WerewolfVictoryOutcomeV1',
+    declaration: 'export type WerewolfVictoryOutcomeV1 = {\n    kind: \'faction\';\n    factionId: string;\n} | {\n    kind: \'tie\';\n};',
   },
   {
     name: 'WorkflowAgentEndInfo',

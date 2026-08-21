@@ -3527,6 +3527,7 @@ These load from a `cordis.yml` entry with no `config:` block; they declare no co
 - `@deepseek-ai/dsh-tool-subagent-control` — requires `tools` · `subagents` ([`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts))
 - `@deepseek-ai/dsh-usage-stats` — requires `sessionProjections` ([`packages/session/usage-stats/src/index.ts`](../packages/session/usage-stats/src/index.ts))
 - `@deepseek-ai/dsh-user-questions` ([`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts))
+- `@deepseek-ai/dsh-werewolf-classic` — requires `werewolf` ([`packages/game/werewolf-classic/src/index.ts`](../packages/game/werewolf-classic/src/index.ts))
 - `@deepseek-ai/dsh-workspace` — requires `storageDomain` · `sessionPersistence` ([`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts))
 - `@deepseek-ai/dsh-writing-mode` — requires `systemPrompt` ([`packages/writing/writing-mode/src/index.ts`](../packages/writing/writing-mode/src/index.ts))
 
@@ -3588,3 +3589,4 @@ Imported as libraries by other packages; a `cordis.yml` cannot load them.
 - `@deepseek-ai/dsh-typert-generator` ([`packages/typert/generator/src/index.ts`](../packages/typert/generator/src/index.ts))
 - `@deepseek-ai/dsh-typert-protocol` ([`packages/typert/protocol/src/index.ts`](../packages/typert/protocol/src/index.ts))
 - `@deepseek-ai/dsh-typert-registry` ([`packages/typert/registry/src/index.ts`](../packages/typert/registry/src/index.ts))
+- `@deepseek-ai/dsh-werewolf` ([`packages/game/werewolf/src/index.ts`](../packages/game/werewolf/src/index.ts))

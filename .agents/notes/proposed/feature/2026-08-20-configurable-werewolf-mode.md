@@ -625,9 +625,9 @@ The implementation adds a `game/` package group because no existing group owns g
 |---|---|
 | `packages/game/werewolf/` | `ctx.werewolf`, ids and public types, definition registries, rule compilation, event declarations, reducer, projections, controller, Bot runner, context reducer, invariant, and typed errors |
 | `packages/game/werewolf-classic/` | Classic role, phase, and victory-condition definitions plus the `quick-7` rule set |
-| `packages/client/ui-werewolf/` | `conversation.view` registration, Typert client binding, dedicated table, lobby, role reveal, action forms, timeline, result/replay, responsive layout, accessibility, and localized copy |
-| `packages/bundle/werewolf/` | Optional composition rows and `werewolf` agent preset that mount the Host, classic definitions, Typert remote, and Web plugin |
-| `examples/werewolf/` | Keyless runnable composition, scripted bot provider, replay inputs, and product snapshots |
+| `client/ui-werewolf/` (under `packages/`, stage 4) | `conversation.view` registration, Typert client binding, dedicated table, lobby, role reveal, action forms, timeline, result/replay, responsive layout, accessibility, and localized copy |
+| `bundle/werewolf/` (under `packages/`, stage 4) | Optional composition rows and `werewolf` agent preset that mount the Host, classic definitions, Typert remote, and Web plugin |
+| `examples/werewolf/` (repo root, stage 3) | Keyless runnable composition, scripted bot provider, replay inputs, and product snapshots |
 | `docs/subsystems/werewolf.md` | Current runtime types and Cordis API after implementation |
 
 The core package should use these source modules unless implementation evidence justifies a narrower split: `brand.ts`, `types.ts`, `rules.ts`, `registry.ts`, `events.ts`, `reducer.ts`, `projection.ts`, `bot-context.ts`, `bot-runner.ts`, `engine.ts`, `runtime.ts`, `error.ts`, `invariant.ts`, and `index.ts`. Tests sit beside the owning package and describe behavior rather than repeating this inventory.
@@ -696,6 +696,8 @@ Bot continuity context is private strategy data and the UI does not render it. I
 Version 1 protects against accidental disclosure through normal UI and prompt construction, not against the local machine owner. Full role assignment and bot context are present in raw Session storage for replay. Online or adversarial play would require a server-owned secret store, authenticated per-player projections, and a different transport and threat model.
 
 ## Delivery stages
+
+Stage 1 has landed as [the deterministic-core note](../../implemented/feature/2026-08-21-werewolf-deterministic-core.md); stages 2–5 remain proposed.
 
 1. Add the `game/` group, Werewolf core types, registries, rule compiler, classic definitions, reducer, invariant, and pure tests. No model or UI path is needed to validate deterministic rules and configuration extension.
 2. Add Bot continuity state, observation projection, one-shot Bot runner, scripted provider integration, retry/fallback behavior, cancellation, and replay tests. Prove context revision `N` is included in decision `N + 1` and that another bot's context remains unchanged.

@@ -107,6 +107,7 @@ export const SERVICE_PAGE: Record<string, string> = {
   typertGateway: 'typert.md',
   userQuestions: 'user-questions.md',
   web: 'web.md',
+  werewolf: 'werewolf.md',
   workflowEngine: 'workflow.md',
   workspaceRegistry: 'workspace.md',
 }
@@ -218,6 +219,11 @@ export const EVENT_WALK_EXEMPTIONS: Record<string, string> = {
  * appear on more than one page.
  */
 export const LINK_MAP: Readonly<Record<string, string>> = {
+  WerewolfRoleDefinition: 'werewolf.md',
+  WerewolfPhaseDefinition: 'werewolf.md',
+  WerewolfVictoryConditionDefinition: 'werewolf.md',
+  WerewolfRuleSetInputV1: 'werewolf.md',
+  WerewolfCompiledRuleSetV1: 'werewolf.md',
   Agent: 'core.md',
   AgentCancelCause: 'core.md',
   AgentFactory: 'core.md',
@@ -527,6 +533,7 @@ export const FOUNDATION_TYPE_NAMES: ReadonlySet<string> = new Set([
   'Promise',
   'Record',
   'Readonly',
+  'ReadonlyMap',
   'Uint8Array',
 ])
 

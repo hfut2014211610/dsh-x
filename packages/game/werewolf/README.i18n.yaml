@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/game/werewolf/README.md
+README.md: b5baec672029424de61145972323d7ee1b82488b
+README.zh.md: fb46d4cbaea7d29ed16966aa9358e51ea1bed43d

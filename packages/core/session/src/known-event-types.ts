@@ -65,4 +65,13 @@ export const KNOWN_SESSION_EVENT_TYPES: ReadonlySet<string> = new Set([
   'turn/start',
   'user/message',
   'web/deepseek-search-llm-request',
+  'werewolf/bot-attempt-failed',
+  'werewolf/bot-decision',
+  'werewolf/game-ended',
+  'werewolf/game-paused',
+  'werewolf/game-resumed',
+  'werewolf/game-started',
+  'werewolf/human-action',
+  'werewolf/phase-opened',
+  'werewolf/phase-resolved',
 ])

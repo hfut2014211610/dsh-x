@@ -625,9 +625,9 @@ UI 使用克制的夜间桌游风格，而不是普通聊天卡片：深色中�
 |---|---|
 | `packages/game/werewolf/` | `ctx.werewolf`、id 与公共类型、定义注册表、规则编译、事件声明、reducer、投影、控制器、Bot runner、上下文 reducer、不变量和类型化错误 |
 | `packages/game/werewolf-classic/` | 经典角色、阶段和胜利条件定义，以及 `quick-7` 规则集 |
-| `packages/client/ui-werewolf/` | `conversation.view` 注册、Typert client 绑定、专用游戏桌、大厅、身份揭示、动作表单、时间线、结算/回顾、响应式布局、可访问性和本地化文案 |
-| `packages/bundle/werewolf/` | 挂载 Host、经典定义、Typert remote 和 Web 插件的可选 composition rows 与 `werewolf` agent preset |
-| `examples/werewolf/` | 无密钥可运行 composition、脚本化 Bot provider、回放输入和产品快照 |
+| `client/ui-werewolf/` (under `packages/`, stage 4) | `conversation.view` 注册、Typert client 绑定、专用游戏桌、大厅、身份揭示、动作表单、时间线、结算/回顾、响应式布局、可访问性和本地化文案 |
+| `bundle/werewolf/` (under `packages/`, stage 4) | 挂载 Host、经典定义、Typert remote 和 Web 插件的可选 composition rows 与 `werewolf` agent preset |
+| `examples/werewolf/` (repo root, stage 3) | 无密钥可运行 composition、脚本化 Bot provider、回放输入和产品快照 |
 | `docs/subsystems/werewolf.md` | 实现后的当前运行时类型和 Cordis API |
 
 除非实现证据支持更精简的拆分，核心包应采用以下源模块：`brand.ts`、`types.ts`、`rules.ts`、`registry.ts`、`events.ts`、`reducer.ts`、`projection.ts`、`bot-context.ts`、`bot-runner.ts`、`engine.ts`、`runtime.ts`、`error.ts`、`invariant.ts` 和 `index.ts`。测试与所属包放在一起，描述行为而不是重复此文件清单。
@@ -696,6 +696,8 @@ Bot 连续性上下文属于私有策略数据，UI 不得渲染。它可以包�
 版本 1 防止通过正常 UI 和 prompt 构造意外泄密，但不防范本机所有者。为了回放，完整角色分配和 Bot 上下文存在原始 Session 存储中。在线或对抗性玩法需要服务端秘密存储、按玩家认证的投影，以及完全不同的传输与威胁模型。
 
 ## 交付阶段
+
+阶段1已落地为[确定性核心笔记](../../implemented/feature/2026-08-21-werewolf-deterministic-core.md)；阶段 2–5 仍为 proposed。
 
 1. 增加 `game/` 包组、狼人杀核心类型、注册表、规则编译器、经典定义、reducer、不变量和纯测试。验证确定性规则和配置扩展不需要模型或 UI 路径。
 2. 增加 Bot 连续性状态、观察投影、one-shot Bot runner、脚本化 provider 集成、重试/兜底、取消和回放测试。证明上下文修订 `N` 会传入决策 `N + 1`，且其他 Bot 的上下文不变。

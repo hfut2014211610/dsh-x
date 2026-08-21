@@ -264,6 +264,14 @@ const SERVICE_ROLES: ServiceRole[] = [
     note: 'Projects bounded current-surface conversation snapshots into durable untrusted message context; host adapters own mention syntax.',
   },
   {
+    key: 'werewolf',
+    pkg: 'werewolf',
+    title: 'Werewolf definition registries',
+    mode: 'seam',
+    implementations: ['werewolf-classic'],
+    note: 'Trusted same-process registries for rule sets, roles, phases, and victory conditions; classic definitions register on it and rule compilation resolves exact versions.',
+  },
+  {
     key: 'sessionTitle',
     pkg: 'session-title',
     title: 'Log-backed session titles',

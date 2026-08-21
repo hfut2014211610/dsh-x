@@ -721,6 +721,7 @@ export type Density = 'compact' | 'standard' | 'detailed'
 ```
 
 来源：[`packages/channel/feishu/src/index.ts:75`](../packages/channel/feishu/src/index.ts)
+
 <a id="deepseek-aidsh-file-reference-local"></a>
 
 ## `@deepseek-ai/dsh-file-reference-local`
@@ -3528,6 +3529,7 @@ export interface Config {
 - `@deepseek-ai/dsh-tool-subagent-control` — 需要 `tools` · `subagents`（[`packages/subagent/tool-subagent-control/src/index.ts`](../packages/subagent/tool-subagent-control/src/index.ts)）
 - `@deepseek-ai/dsh-usage-stats` — 需要 `sessionProjections`（[`packages/session/usage-stats/src/index.ts`](../packages/session/usage-stats/src/index.ts)）
 - `@deepseek-ai/dsh-user-questions`（[`packages/interaction/user-questions/src/index.ts`](../packages/interaction/user-questions/src/index.ts)）
+- `@deepseek-ai/dsh-werewolf-classic` — 需要 `werewolf`（[`packages/game/werewolf-classic/src/index.ts`](../packages/game/werewolf-classic/src/index.ts)）
 - `@deepseek-ai/dsh-workspace` — 需要 `storageDomain` · `sessionPersistence`（[`packages/workspace/workspace/src/index.ts`](../packages/workspace/workspace/src/index.ts)）
 - `@deepseek-ai/dsh-writing-mode` — 需要 `systemPrompt`（[`packages/writing/writing-mode/src/index.ts`](../packages/writing/writing-mode/src/index.ts)）
 
@@ -3588,3 +3590,4 @@ export interface Config {
 - `@deepseek-ai/dsh-typert-generator`（[`packages/typert/generator/src/index.ts`](../packages/typert/generator/src/index.ts)）
 - `@deepseek-ai/dsh-typert-protocol`（[`packages/typert/protocol/src/index.ts`](../packages/typert/protocol/src/index.ts)）
 - `@deepseek-ai/dsh-typert-registry`（[`packages/typert/registry/src/index.ts`](../packages/typert/registry/src/index.ts)）
+- `@deepseek-ai/dsh-werewolf`（[`packages/game/werewolf/src/index.ts`](../packages/game/werewolf/src/index.ts)）
