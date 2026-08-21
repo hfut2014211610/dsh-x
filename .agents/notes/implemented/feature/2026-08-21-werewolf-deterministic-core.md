@@ -23,9 +23,9 @@ Landed `packages/game/` with two packages. `@deepseek-ai/dsh-werewolf` owns the 
 ## Consequences
 
 - The lobby's two-rule-set acceptance criterion (different decks, options, phase orders, tie policies, victory conditions without engine changes) is testable today: registering definitions and compiling rule inputs exercises everything the criterion names.
-- The invariant companion validates the full durable contract on append and load: contiguous revisions, one start and at most one terminal event per game, legal transitions, unique action ids, actor eligibility, context revision continuity with recomputed snapshots, resolution reference validity, resource underflow, and victory evidence shape.
+- The invariant companion validates append and load semantics: contiguous revisions, one active game at a time, legal transitions, unique action ids, actor eligibility and ordering, context revision continuity with recomputed snapshots, resolution player references, resource underflow, and victory evidence shape. Candidate events are validated against a staged fold and published only after the event commits.
 - Adding the stage-2 bot runner needs no event or reducer changes: decision entries already carry everything a child prompt reconstructs, and `bot-attempt-failed` exists for retries.
-- Known gaps carried into stage 2: `WerewolfPlayerFactsV1` carries no faction, so the seer phase cannot record an inspected faction (the classic phase records a placeholder until the input grows the field); announcement copy is keyed but not localized; no human projection exists yet.
+- Trusted phase facts carry faction, so the classic seer records the inspected faction in role state and its private notice. Gaps carried into later stages remain: announcement copy is keyed but not localized, and no human projection or dedicated view exists yet.
 
 ## Alternatives considered
 

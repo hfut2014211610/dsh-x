@@ -18,7 +18,7 @@ import {
   MINI_VOTE,
   MINI_WOLF,
 } from './fixtures.ts'
-import type { WerewolfRoleDefinition } from '../src/types.ts'
+import type { WerewolfPhaseDefinition, WerewolfRoleDefinition } from '../src/types.ts'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
 
 /** Villager whose kill binding is optional, for the non-required-binding path. */
@@ -326,6 +326,177 @@ describe('resolveWerewolfRuleSet acceptance', () => {
       },
     }), reg)
     expect(repeatedVote.cycle.day).toHaveLength(2)
+  })
+
+  it('parses phase options once and stores owner-normalized role bindings for runtime', () => {
+    let optionParseCount = 0
+    let compiledBinding: JsonValue | undefined
+    const phase: WerewolfPhaseDefinition = {
+      id: 'night.normalized',
+      version: 1,
+      parseOptions: () => {
+        optionParseCount += 1
+        return { normalizedOption: true }
+      },
+      parseRoleBinding: binding => ({ normalizedBinding: binding.options }),
+      compile(input) {
+        compiledBinding = input.participants[0]?.binding
+        return {
+          id: 'night.normalized',
+          version: 1,
+          open: () => ({ kind: 'skip', reason: 'test' }),
+          resolve: () => ({
+            eliminations: [], prevented: [], resourceReplacements: [], roleStateReplacements: [],
+            privateNotices: [], announcements: [], votes: [], outcome: {},
+          }),
+        }
+      },
+    }
+    const role: WerewolfRoleDefinition = {
+      id: 'normalized-role',
+      version: 1,
+      parseOptions: () => ({}),
+      compile: () => ({
+        id: 'normalized-role',
+        version: 1,
+        faction: 'village',
+        publicName: 'Normalized',
+        initialRoleState: {},
+        phaseBindings: [{
+          phaseId: 'night.normalized',
+          phaseVersion: 1,
+          required: true,
+          kind: 'normalized',
+          options: { raw: true },
+        }],
+        projectPrivateKnowledge: () => ({}),
+      }),
+    }
+    const reg = new WerewolfRegistry()
+    reg.registerRole(role)
+    reg.registerPhase(phase)
+    reg.registerPhase(MINI_TALK)
+    reg.registerVictoryCondition(MINI_NEVER)
+    const compiled = resolveWerewolfRuleSet({
+      schemaVersion: 1,
+      id: 'normalized',
+      revision: 1,
+      displayName: 'Normalized',
+      playerCount: 2,
+      deck: [{ role: 'normalized-role', roleVersion: 1, count: 2 }],
+      cycle: {
+        night: [{ phase: 'night.normalized', phaseVersion: 1 }],
+        day: [{ phase: 'day.talk', phaseVersion: 1 }],
+      },
+      victory: [{ condition: 'mini.never', conditionVersion: 1, priority: 1 }],
+      policies: {
+        voteTie: 'no-elimination', wolfTie: 'no-kill', deadHuman: 'spectate', maxDays: 1, speechMaxChars: 8,
+      },
+    }, reg)
+    expect(optionParseCount).toBe(1)
+    expect(compiledBinding).toEqual({ normalizedBinding: { raw: true } })
+    expect(compiled.roles.get('normalized-role@1')?.phaseBindings[0]?.options)
+      .toEqual({ normalizedBinding: { raw: true } })
+  })
+
+  it('preserves an optional binding when its phase is absent', () => {
+    const input = validInput()
+    const compiled = resolveWerewolfRuleSet(json({
+      ...input,
+      deck: [{ role: 'mini.optional', roleVersion: 1, count: 5 }],
+      cycle: {
+        night: [{ phase: 'night.noop', phaseVersion: 1 }],
+        day: [{ phase: 'day.talk', phaseVersion: 1 }],
+      },
+    }), registry())
+    expect(compiled.roles.get('mini.optional@1')?.phaseBindings[0]?.options).toEqual({ side: 'no' })
+  })
+
+  it('rejects compiled identity drift, duplicate bindings, and an unknown bound phase', () => {
+    const input = validInput()
+    const badRole: WerewolfRoleDefinition = {
+      ...MINI_VILLAGER,
+      id: 'bad-role',
+      compile(compileInput) {
+        return { ...MINI_VILLAGER.compile(compileInput), id: 'other-role' }
+      },
+    }
+    {
+      const reg = registry()
+      reg.registerRole(badRole)
+      expect(() => resolveWerewolfRuleSet(json({
+        ...input,
+        deck: [{ role: 'bad-role', roleVersion: 1, count: 5 }],
+      }), reg)).toThrow(/role bad-role@1 compiled as other-role@1/)
+    }
+    const badPhase: WerewolfPhaseDefinition = {
+      ...MINI_TALK,
+      id: 'day.bad',
+      compile(compileInput) {
+        return { ...MINI_TALK.compile(compileInput), id: 'day.other' }
+      },
+    }
+    {
+      const reg = registry()
+      reg.registerPhase(badPhase)
+      expect(() => resolveWerewolfRuleSet(json({
+        ...input,
+        deck: [{ role: 'mini.villager', roleVersion: 1, count: 5 }],
+        cycle: {
+          night: [{ phase: 'night.noop', phaseVersion: 1 }],
+          day: [{ phase: 'day.bad', phaseVersion: 1 }],
+        },
+      }), reg)).toThrow(/phase day.bad@1 compiled as day.other@1/)
+    }
+    const duplicateBindingRole: WerewolfRoleDefinition = {
+      ...OPTIONAL_KILL_ROLE,
+      id: 'duplicate-binding',
+      compile: () => {
+        const binding = { phaseId: 'night.kill', phaseVersion: 1, required: false, kind: 'kill', options: {} }
+        return {
+          id: 'duplicate-binding',
+          version: 1,
+          faction: 'village',
+          publicName: 'Duplicate',
+          initialRoleState: {},
+          phaseBindings: [binding, binding],
+          projectPrivateKnowledge: () => ({}),
+        }
+      },
+    }
+    {
+      const reg = registry()
+      reg.registerRole(duplicateBindingRole)
+      expect(() => resolveWerewolfRuleSet(json({
+        ...input,
+        deck: [{ role: 'duplicate-binding', roleVersion: 1, count: 5 }],
+      }), reg)).toThrow(/repeats phase binding night.kill@1/)
+    }
+    const unknownBindingRole: WerewolfRoleDefinition = {
+      ...OPTIONAL_KILL_ROLE,
+      id: 'unknown-binding',
+      compile: () => ({
+        id: 'unknown-binding',
+        version: 1,
+        faction: 'village',
+        publicName: 'Unknown',
+        initialRoleState: {},
+        phaseBindings: [{ phaseId: 'night.missing', phaseVersion: 1, required: true, kind: 'act', options: {} }],
+        projectPrivateKnowledge: () => ({}),
+      }),
+    }
+    {
+      const reg = registry()
+      reg.registerRole(unknownBindingRole)
+      expect(() => resolveWerewolfRuleSet(json({
+        ...input,
+        deck: [{ role: 'unknown-binding', roleVersion: 1, count: 5 }],
+        cycle: {
+          night: [{ phase: 'night.missing', phaseVersion: 1 }],
+          day: [{ phase: 'day.talk', phaseVersion: 1 }],
+        },
+      }), reg)).toThrow(/phase night.missing@1 which is not registered/)
+    }
   })
 })
 

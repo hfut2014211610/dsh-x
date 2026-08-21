@@ -4988,7 +4988,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WerewolfPlayerFactsV1',
-    declaration: 'export interface WerewolfPlayerFactsV1 {\n    playerId: WerewolfPlayerId;\n    seat: number;\n    displayName: string;\n    alive: boolean;\n    faction?: string;\n}',
+    declaration: 'export interface WerewolfPlayerFactsV1 {\n    playerId: WerewolfPlayerId;\n    seat: number;\n    displayName: string;\n    alive: boolean;\n    faction: string;\n}',
   },
   {
     name: 'WerewolfPlayerId',

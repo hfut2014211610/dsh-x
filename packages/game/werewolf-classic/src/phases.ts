@@ -285,26 +285,28 @@ export const SEER_INSPECT_PHASE: WerewolfPhaseDefinition = {
     },
     resolve(input) {
       const resolution = emptyResolution()
-      const checks: Array<{ target: WerewolfPlayerId; faction?: string; day: number }> = []
+      const checks: Array<{ target: WerewolfPlayerId; faction: string; day: number }> = []
       for (const entry of actionsBySeat(input)) {
         const target = (entry.action as { value: WerewolfPlayerId }).value
         const seer = participantOf(input, entry.playerId)
         const priorChecks = (seer.roleState as { checks: JsonValue[] }).checks
-        // Player facts carry the secret faction for trusted phase code; an
-        // absent faction keeps the pre-faction placeholder shape.
-        const faction = input.players.find(player => player.playerId === target)?.faction
+        const targetFacts = input.players.find(player => player.playerId === target)
+        if (targetFacts === undefined) {
+          throw new Error(`werewolf-classic: seer target ${target} is not on the roster`)
+        }
+        const faction = targetFacts.faction
         resolution.roleStateReplacements.push({
           playerId: entry.playerId,
           roleState: {
-            checks: [...priorChecks, { target, ...(faction === undefined ? {} : { faction }), day: input.day }],
+            checks: [...priorChecks, { target, faction, day: input.day }],
           },
         })
         resolution.privateNotices.push({
           toPlayerId: entry.playerId,
           kind: 'seer-inspect',
-          data: { target, ...(faction === undefined ? {} : { faction }) },
+          data: { target, faction },
         })
-        checks.push({ target, ...(faction === undefined ? {} : { faction }), day: input.day })
+        checks.push({ target, faction, day: input.day })
       }
       const outcome = { checks }
       return { ...resolution, outcome }

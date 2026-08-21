@@ -583,6 +583,34 @@ describe('engine guard and collection paths', () => {
     expect(buildWerewolfBotRequests(current, ids)).toEqual([])
   })
 
+  it('does not let a public bot act ahead of the human seat', () => {
+    const rules = compileMisc({ cycle: { night: ['night.noop'], day: ['day.talk'] }, maxDays: 1 })
+    const { state } = startWerewolfGame({ ruleSet: rules, seed: 6, humanSeatPreference: 1, ids: counterIds() })
+    const opened = openNextWerewolfPhase(state, rules, counterIds())
+    expect(opened.state.openPhase?.plan.actors[0]?.playerId).toBe(opened.state.humanPlayerId)
+    expect(buildWerewolfBotRequests(opened.state, counterIds())).toEqual([])
+    expect(() => commitWerewolfBotDecisions(opened.state, [], testLimits())).toThrow(/no bot decision is pending/)
+  })
+
+  it('resumes a fully settled phase from recorded action history', () => {
+    const rules = compileMisc({ cycle: { night: ['night.noop'], day: ['day.talk'] }, maxDays: 1 })
+    const started = startWerewolfGame({ ruleSet: rules, seed: 6, humanSeatPreference: 5, ids: counterIds() })
+    const first = driveWerewolfGame(started.state, rules, {
+      bot: _request => ({ action: { value: 'words' }, contextDelta: EMPTY_DELTA }),
+      limits: testLimits(),
+      ids: counterIds(),
+    })
+    expect(first.stop.kind).toBe('awaiting-human')
+    const human = submitWerewolfHumanAction(first.state, { value: 'my words' }, counterIds())
+    const resumed = driveWerewolfGame(human.state, rules, {
+      bot: _request => ({ action: { value: 'words' }, contextDelta: EMPTY_DELTA }),
+      history: [...started.events, ...first.events, ...human.events],
+      limits: testLimits(),
+      ids: counterIds(),
+    })
+    expect(resumed.stop).toMatchObject({ kind: 'ended', result: { outcome: { kind: 'tie' } } })
+  })
+
   it('bounds public speeches by the policy and derives collected speeches from text actions', () => {
     const rules = compileMisc({ cycle: { night: ['night.noop'], day: ['day.talk'] }, maxDays: 2, speechMaxChars: 12 })
     const started = startWerewolfGame({ ruleSet: rules, seed: 6, humanSeatPreference: 2, ids: counterIds() })
@@ -625,6 +653,11 @@ describe('engine guard and collection paths', () => {
       request,
       envelope: { action: { value: 'words' }, contextDelta: EMPTY_DELTA },
     })), testLimits())
+    expect(() => resolveOpenWerewolfPhase(
+      committed.state,
+      rules,
+      actors.slice(1).map(actor => ({ playerId: actor.playerId, action: null })),
+    )).toThrow(/cover every phase actor exactly once/)
     const resolved = resolveOpenWerewolfPhase(committed.state, rules, actors.map(actor => ({ playerId: actor.playerId, action: null })))
     expect(resolved.events[0]?.type).toBe('werewolf/phase-resolved')
     expect(resolved.state.openPhase).toBeNull()

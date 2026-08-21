@@ -303,14 +303,19 @@ function compileSegment(
     if ((occurrenceCounts.get(key) ?? 0) > 1 && definition.repeatable !== true) {
       throw invalid(`rule set.cycle.${segmentName} repeats phase ${key} which is not repeatable`)
     }
+    const options = definition.parseOptions(entry.options)
+    const compiled = definition.compile({
+      options,
+      participants: participantsOf(entry.phase, entry.phaseVersion),
+    })
+    if (compiled.id !== definition.id || compiled.version !== definition.version) {
+      throw invalid(`phase ${key} compiled as ${definitionKey(compiled.id, compiled.version)}`)
+    }
     return {
       phaseId: entry.phase,
       phaseVersion: entry.phaseVersion,
-      options: definition.parseOptions(entry.options),
-      compiled: definition.compile({
-        options: definition.parseOptions(entry.options),
-        participants: participantsOf(entry.phase, entry.phaseVersion),
-      }),
+      options,
+      compiled,
     }
   })
 }
@@ -332,12 +337,40 @@ export function resolveWerewolfRuleSet(input: JsonValue, registry: WerewolfRegis
     throw invalid(`rule set deck counts sum to ${deckTotal}, not playerCount ${parsed.playerCount}`)
   }
   const summary = werewolfRuleSetSummary(parsed)
-  const roles = new Map<string, CompiledWerewolfRole>()
+  const rawRoles = new Map<string, CompiledWerewolfRole>()
   for (const entry of parsed.deck) {
     const definition = registry.getRole(entry.role, entry.roleVersion)
     if (definition === undefined) throw unknownDefinition('role', entry.role, entry.roleVersion)
     const compiled = definition.compile({ options: definition.parseOptions(entry.options), ruleSet: summary })
-    roles.set(definitionKey(compiled.id, compiled.version), compiled)
+    const key = definitionKey(definition.id, definition.version)
+    if (compiled.id !== definition.id || compiled.version !== definition.version) {
+      throw invalid(`role ${key} compiled as ${definitionKey(compiled.id, compiled.version)}`)
+    }
+    rawRoles.set(key, compiled)
+  }
+  const allOccurrences = [...parsed.cycle.setup ?? [], ...parsed.cycle.night, ...parsed.cycle.day]
+  const roles = new Map<string, CompiledWerewolfRole>()
+  for (const role of rawRoles.values()) {
+    const seenBindings = new Set<string>()
+    const phaseBindings = role.phaseBindings.map((binding) => {
+      const key = definitionKey(binding.phaseId, binding.phaseVersion)
+      if (seenBindings.has(key)) {
+        throw invalid(`role ${definitionKey(role.id, role.version)} repeats phase binding ${key}`)
+      }
+      seenBindings.add(key)
+      const matched = allOccurrences.some(entry =>
+        entry.phase === binding.phaseId && entry.phaseVersion === binding.phaseVersion)
+      if (!matched) {
+        if (binding.required) {
+          throw invalid(`role ${definitionKey(role.id, role.version)} requires phase ${key} which the cycle does not include`)
+        }
+        return binding
+      }
+      const definition = registry.getPhase(binding.phaseId, binding.phaseVersion)
+      if (definition === undefined) throw unknownDefinition('phase', binding.phaseId, binding.phaseVersion)
+      return { ...binding, options: definition.parseRoleBinding(binding) }
+    })
+    roles.set(definitionKey(role.id, role.version), { ...role, phaseBindings })
   }
   const roleList = [...roles.values()]
   const participantsOf = (phaseId: string, phaseVersion: number): Array<{ role: CompiledWerewolfRole; binding: JsonValue }> => {
@@ -346,24 +379,9 @@ export function resolveWerewolfRuleSet(input: JsonValue, registry: WerewolfRegis
       const binding = role.phaseBindings.find(candidate =>
         candidate.phaseId === phaseId && candidate.phaseVersion === phaseVersion)
       if (binding === undefined) continue
-      const definition = registry.getPhase(phaseId, phaseVersion)
-      // The phase definition exists: the segment compiler resolved it first.
-      /* v8 ignore next -- participantsOf only runs inside compileSegment, which resolved this exact phase version on the line before */
-      if (definition === undefined) throw unknownDefinition('phase', phaseId, phaseVersion)
-      participants.push({ role, binding: definition.parseRoleBinding(binding) })
+      participants.push({ role, binding: binding.options })
     }
     return participants
-  }
-  const allOccurrences = [...parsed.cycle.setup ?? [], ...parsed.cycle.night, ...parsed.cycle.day]
-  for (const role of roleList) {
-    for (const binding of role.phaseBindings) {
-      if (!binding.required) continue
-      const matched = allOccurrences.some(entry =>
-        entry.phase === binding.phaseId && entry.phaseVersion === binding.phaseVersion)
-      if (!matched) {
-        throw invalid(`role ${definitionKey(role.id, role.version)} requires phase ${definitionKey(binding.phaseId, binding.phaseVersion)} which the cycle does not include`)
-      }
-    }
   }
   const cycle = {
     setup: compileSegment(parsed.cycle.setup ?? [], 'setup', registry, participantsOf),

@@ -134,14 +134,14 @@ export interface WerewolfRng {
   pick<T>(items: readonly T[]): T
 }
 
-/** Public facts about one player, visible to every phase. */
+/** Trusted runtime facts about one player, visible to every phase implementation. */
 export interface WerewolfPlayerFactsV1 {
   playerId: WerewolfPlayerId
   seat: number
   displayName: string
   alive: boolean
-  /** Secret faction, provided to trusted phase code; never a bot observation. */
-  faction?: string
+  /** Secret faction; phase implementations must not copy it into public output. */
+  faction: string
 }
 
 /** Runtime facts about one phase participant, keyed to a parsed binding. */

@@ -2,6 +2,7 @@ import { describe, expect, it } from 'vitest'
 import {
   abortWerewolfGame,
   buildWerewolfBotRequests,
+  collectWerewolfResolveSubmissions,
   commitWerewolfBotDecisions,
   defaultWerewolfEngineIds,
   driveWerewolfGame,
@@ -11,7 +12,6 @@ import {
   startWerewolfGame,
   submitWerewolfHumanAction,
   validateWerewolfAction,
-  werewolfRemainingActors,
   type WerewolfBotActionRequest,
 } from '../src/engine.ts'
 import { WerewolfError } from '../src/error.ts'
@@ -324,6 +324,14 @@ describe('engine step guards', () => {
     expect(() => abortWerewolfGame(aborted.state)).toThrow(/already ended/)
   })
 
+  it('rejects a non-integer persisted seed before producing an event', () => {
+    const { rules } = setup()
+    expect(() => startWerewolfGame({ ruleSet: rules, seed: Number.NaN, ids: counterIds() }))
+      .toThrow(/seed must be a safe integer/)
+    expect(() => startWerewolfGame({ ruleSet: rules, seed: 1.5, ids: counterIds() }))
+      .toThrow(/seed must be a safe integer/)
+  })
+
   it('rejects a human action when the human is not an eligible actor', () => {
     const rules = miniRuleSet({ voteTie: 'no-elimination' })
     let seed = 1
@@ -341,22 +349,30 @@ describe('engine step guards', () => {
   it('rejects a seat-order human action before the human is first', () => {
     const rules = miniRuleSet({ voteTie: 'no-elimination' })
     let seed = 1
-    let stopped: ReturnType<typeof driveWerewolfGame> | undefined
-    for (;;) {
-      const { state } = startWerewolfGame({ ruleSet: rules, seed, ids: counterIds() })
-      stopped = driveWerewolfGame(state, rules, {
-        bot: request => ({ action: { value: targetOf(request) ?? 'words' }, contextDelta: EMPTY_DELTA }),
-        limits: testLimits(),
-        ids: counterIds(),
-      })
-      const openPhase = stopped.state.openPhase
-      const first = openPhase?.plan.mode === 'seat-order-public' ? werewolfRemainingActors(openPhase)[0] : undefined
-      if (first !== undefined && first.playerId !== state.humanPlayerId) break
+    let started = startWerewolfGame({ ruleSet: rules, seed, humanSeatPreference: 5, ids: counterIds() })
+    while (started.state.players.find(player => player.playerId === started.state.humanPlayerId)?.faction !== 'village') {
       seed += 1
-      if (seed > 50) throw new Error('no seat arrangement put a bot before the human')
+      started = startWerewolfGame({ ruleSet: rules, seed, humanSeatPreference: 5, ids: counterIds() })
     }
-    expect(stopped?.state.openPhase).not.toBeNull()
-    expect(() => submitWerewolfHumanAction(stopped?.state, { value: 'hello' }, counterIds()))
+    const ids = counterIds()
+    const night = openNextWerewolfPhase(started.state, rules, ids)
+    const requests = buildWerewolfBotRequests(night.state, ids)
+    const committed = commitWerewolfBotDecisions(night.state, requests.map(request => ({
+      request,
+      envelope: { action: { value: targetOf(request) }, contextDelta: EMPTY_DELTA },
+    })), testLimits())
+    const openNight = committed.state.openPhase
+    if (openNight === null) throw new Error('night phase did not remain open')
+    const resolved = resolveOpenWerewolfPhase(
+      committed.state,
+      rules,
+      collectWerewolfResolveSubmissions([...started.events, ...night.events, ...committed.events], openNight),
+      ids,
+    )
+    const day = openNextWerewolfPhase(resolved.state, rules, ids)
+    expect(day.state.openPhase?.plan.mode).toBe('seat-order-public')
+    expect(day.state.openPhase?.plan.actors[0]?.playerId).not.toBe(day.state.humanPlayerId)
+    expect(() => submitWerewolfHumanAction(day.state, { value: 'hello' }, ids))
       .toThrow(/speaks first/)
   })
 
@@ -424,7 +440,7 @@ describe('action and delta validation', () => {
     })), testLimits())).toThrow(/unknown key/)
   })
 
-  it('rejects a stale phase instance or context revision in a submission', () => {
+  it('rejects a stale game, source revision, phase instance, or context revision in a submission', () => {
     let seed = 1
     let base = state()
     while (base.players.find(player => player.playerId === base.humanPlayerId)?.faction !== 'village') {
@@ -437,6 +453,14 @@ describe('action and delta validation', () => {
     const request = requests[0]
     if (request === undefined) return
     const envelope = { action: { value: targetOf(request) }, contextDelta: EMPTY_DELTA }
+    expect(() => commitWerewolfBotDecisions(opened.state, requests.map(candidate => ({
+      request: candidate.playerId === request.playerId ? { ...candidate, gameId: WerewolfPlayerId('other') as never } : candidate,
+      envelope,
+    })), testLimits())).toThrow(/stale game revision/)
+    expect(() => commitWerewolfBotDecisions(opened.state, requests.map(candidate => ({
+      request: candidate.playerId === request.playerId ? { ...candidate, sourceGameRevision: candidate.sourceGameRevision - 1 } : candidate,
+      envelope,
+    })), testLimits())).toThrow(/stale game revision/)
     expect(() => commitWerewolfBotDecisions(opened.state, requests.map(candidate => ({
       request: candidate.playerId === request.playerId ? { ...candidate, phaseInstanceId: WerewolfPlayerId('other') as never } : candidate,
       envelope,

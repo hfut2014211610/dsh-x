@@ -75,6 +75,9 @@ export interface WerewolfGameStartInput {
 /** One bot actor's pending decision as the driver (later: the runner) sees it. */
 export interface WerewolfBotActionRequest {
   decisionId: WerewolfDecisionId
+  gameId: WerewolfGameId
+  /** Game revision whose observation and legal action produced this request. */
+  sourceGameRevision: number
   playerId: WerewolfPlayerId
   phaseInstanceId: WerewolfPhaseInstanceId
   phaseId: string
@@ -115,6 +118,8 @@ export interface WerewolfDriveOptions {
   bot: (request: WerewolfBotActionRequest) => { action: JsonValue; publicSpeech?: string; contextDelta: unknown }
   /** Without a `human` callback the drive stops when the human must act. */
   human?: (request: Omit<WerewolfBotActionRequest, 'decisionId' | 'priorContext'>) => JsonValue
+  /** Earlier game events needed when this drive resumes an already-settled open phase. */
+  history?: readonly WerewolfEvent[]
   limits: WerewolfContextLimitsV1
   ids?: WerewolfEngineIds
 }
@@ -265,6 +270,9 @@ function shuffleInPlace<T>(items: T[], stream: RngStream): T[] {
  * @returns the `werewolf/game-started` event and the initial state.
  */
 export function startWerewolfGame(input: WerewolfGameStartInput): WerewolfEngineStep {
+  if (!Number.isSafeInteger(input.seed)) {
+    throw new WerewolfError('WEREWOLF_INVALID_RULE_SET', 'game seed must be a safe integer')
+  }
   const ids = input.ids ?? defaultWerewolfEngineIds()
   const stream = createRngStream(input.seed)
   const gameId = ids.game()
@@ -609,6 +617,8 @@ function botRequest(
   }
   return {
     decisionId: ids.decision(),
+    gameId: state.gameId,
+    sourceGameRevision: state.revision,
     playerId: actor.playerId,
     phaseInstanceId: openPhase.phaseInstanceId,
     phaseId: openPhase.phaseId,
@@ -634,11 +644,15 @@ export function buildWerewolfBotRequests(
 ): WerewolfBotActionRequest[] {
   const openPhase = requireOpen(state)
   const remaining = werewolfRemainingActors(openPhase)
-    .filter(actor => actor.playerId !== state.humanPlayerId)
   if (openPhase.plan.mode === 'seat-order-public') {
-    return remaining.length === 0 ? [] : [botRequest(state, openPhase, remaining[0] as WerewolfActionActorV1, ids)]
+    const first = remaining[0]
+    return first === undefined || first.playerId === state.humanPlayerId
+      ? []
+      : [botRequest(state, openPhase, first, ids)]
   }
-  return remaining.map(actor => botRequest(state, openPhase, actor, ids))
+  return remaining
+    .filter(actor => actor.playerId !== state.humanPlayerId)
+    .map(actor => botRequest(state, openPhase, actor, ids))
 }
 
 /**
@@ -663,6 +677,9 @@ export function commitWerewolfBotDecisions(
     throw new WerewolfError('WEREWOLF_NOT_AWAITING_HUMAN', 'the human action commits before the bot batch')
   }
   const pending = buildWerewolfBotRequests(state)
+  if (pending.length === 0) {
+    throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', 'no bot decision is pending for the open phase')
+  }
   const submissionByPlayer = new Map(submissions.map(submission => [submission.request.playerId, submission]))
   const coversPending = pending.length === submissions.length
     && pending.every(request => submissionByPlayer.has(request.playerId))
@@ -679,6 +696,9 @@ export function commitWerewolfBotDecisions(
     /* v8 ignore next 2 -- pending requests are built from this same open plan's actors, so the actor always resolves */
     if (actor === undefined) {
       throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', `player ${request.playerId} is not an actor of the open phase`)
+    }
+    if (submission.request.gameId !== state.gameId || submission.request.sourceGameRevision !== state.revision) {
+      throw new WerewolfError('WEREWOLF_STALE_REVISION', 'submission answers a stale game revision')
     }
     if (submission.request.phaseInstanceId !== openPhase.phaseInstanceId) {
       throw new WerewolfError('WEREWOLF_STALE_REVISION', 'submission answers a different phase instance')
@@ -800,6 +820,15 @@ export function resolveOpenWerewolfPhase(
   }
   const byId = new Map(submissions.map(submission => [submission.playerId, submission]))
   const actors = [...openPhase.plan.actors]
+  const actorIds = new Set(actors.map(actor => actor.playerId))
+  if (
+    submissions.length !== actors.length
+    || byId.size !== submissions.length
+    || actors.some(actor => !byId.has(actor.playerId))
+    || submissions.some(submission => !actorIds.has(submission.playerId))
+  ) {
+    throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', 'resolve submissions must cover every phase actor exactly once')
+  }
   const stream = createRngStream(state.rngState)
   const openInput = buildOpenInput(state, rules, openPhase, stream)
   const resolveInput: WerewolfPhaseResolveInputV1 = {
@@ -815,6 +844,7 @@ export function resolveOpenWerewolfPhase(
   let resolution: WerewolfResolutionV1 = occurrence.compiled.resolve(resolveInput)
   const voteOutcome = resolution.voteOutcome
   let revotePlan: WerewolfOpenPhaseV1['plan'] | undefined
+  let revotePhaseInstanceId: WerewolfPhaseInstanceId | undefined
   if (voteOutcome !== undefined && voteOutcome.eliminated === null) {
     const policy = state.ruleSet.policies.voteTie
     const tieData = { tiedPlayers: [...voteOutcome.tiedPlayers] }
@@ -826,7 +856,7 @@ export function resolveOpenWerewolfPhase(
         announcements: [...resolution.announcements, { kind: 'vote', key: 'vote.eliminated', data: { playerId: chosen } }],
       }
     } else if (policy === 'revote-once' && openPhase.occurrence === 0 && voteOutcome.tiedPlayers.length > 1) {
-      const revotePhaseInstanceId = ids.phaseInstance()
+      revotePhaseInstanceId = ids.phaseInstance()
       const sameDayHistory = [
         ...state.sameDayResolutions,
         { phaseId: openPhase.phaseId, phaseVersion: openPhase.phaseVersion, day: openPhase.day, segment: openPhase.segment, resolution },
@@ -873,14 +903,14 @@ export function resolveOpenWerewolfPhase(
     },
   }
   const events: WerewolfEvent[] = [resolvedEvent]
-  if (revotePlan !== undefined) {
+  if (revotePlan !== undefined && revotePhaseInstanceId !== undefined) {
     events.push({
       type: 'werewolf/phase-opened',
       data: {
         version: 1,
         gameId: state.gameId,
         gameRevision: state.revision + 2,
-        phaseInstanceId: ids.phaseInstance(),
+        phaseInstanceId: revotePhaseInstanceId,
         phaseId: openPhase.phaseId,
         phaseVersion: openPhase.phaseVersion,
         segment: openPhase.segment,
@@ -940,7 +970,12 @@ export function driveWerewolfGame(
   const resolveIfComplete = (): void => {
     const openPhase = current.openPhase
     if (openPhase === null || werewolfRemainingActors(openPhase).length > 0) return
-    const step = resolveOpenWerewolfPhase(current, rules, collectWerewolfResolveSubmissions(events, openPhase), ids)
+    const step = resolveOpenWerewolfPhase(
+      current,
+      rules,
+      collectWerewolfResolveSubmissions([...(options.history ?? []), ...events], openPhase),
+      ids,
+    )
     events.push(...step.events)
     current = step.state
   }
@@ -962,17 +997,20 @@ export function driveWerewolfGame(
     const humanActor = remaining.find(actor => actor.playerId === current.humanPlayerId)
     const humanFirst = humanActor !== undefined && remaining[0]?.playerId === current.humanPlayerId
     const human = options.human
-    if (humanActor !== undefined && human === undefined) {
+    const humanCanAct = humanActor !== undefined
+      && (current.openPhase.plan.mode === 'parallel-private' || humanFirst)
+    if (humanCanAct && human === undefined) {
       return {
         state: current,
         events,
         stop: { kind: 'awaiting-human', phaseInstanceId: current.openPhase.phaseInstanceId },
       }
     }
-    const humanTurn = humanActor !== undefined && human !== undefined
-      && (current.openPhase.plan.mode === 'parallel-private' || humanFirst)
+    const humanTurn = humanCanAct && human !== undefined
     if (humanTurn) {
       const action = human({
+        gameId: current.gameId,
+        sourceGameRevision: current.revision,
         playerId: humanActor.playerId,
         phaseInstanceId: current.openPhase.phaseInstanceId,
         phaseId: current.openPhase.phaseId,

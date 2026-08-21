@@ -32,7 +32,7 @@ export class WerewolfError extends Error {
    * @param message - the exact diagnostic.
    * @param detail - optional detached JSON facts (parsed payload, ids).
    */
-  constructor(code: WerewolfErrorCode, message: string, detail?: JsonValue  ) {
+  constructor(code: WerewolfErrorCode, message: string, detail?: JsonValue) {
     super(message)
     this.name = 'WerewolfError'
     this.code = code

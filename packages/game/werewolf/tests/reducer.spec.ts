@@ -44,6 +44,17 @@ describe('reduceWerewolfGame', () => {
     expect(reduceWerewolfGame([{ type: 'turn/start', data: { turn: 1 } }])).toBeUndefined()
   })
 
+  it('ignores unknown event names that merely share the werewolf prefix', () => {
+    const rules = miniRuleSet({ voteTie: 'no-elimination' })
+    const { state } = startWerewolfGame({ ruleSet: rules, seed: 1, ids: counterIds() })
+    const next = applyWerewolfEvent(state, {
+      type: 'werewolf/not-a-declared-event',
+      data: { version: 1, gameId: state.gameId, gameRevision: state.revision + 1 },
+    })
+    expect(next).toBe(state)
+    expect(next?.status).toBe('running')
+  })
+
   it('resets the fold when a second game starts', () => {
     const rules = miniRuleSet({ voteTie: 'no-elimination' })
     const first = startWerewolfGame({ ruleSet: rules, seed: 1, ids: counterIds() })

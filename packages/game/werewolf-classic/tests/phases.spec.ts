@@ -22,7 +22,7 @@ import {
 } from '../src/phases.ts'
 
 function player(id: string, seat: number, alive = true): WerewolfPlayerFactsV1 {
-  return { playerId: WerewolfPlayerId(id), seat, displayName: `Seat ${seat}`, alive }
+  return { playerId: WerewolfPlayerId(id), seat, displayName: `Seat ${seat}`, alive, faction: 'village' }
 }
 
 function participant(
@@ -316,7 +316,7 @@ describe('night.seer-inspect', () => {
     expect(resolution.outcome).toEqual({ checks: [{ target: WerewolfPlayerId('p4'), faction: 'wolf', day: 3 }] })
   })
 
-  it('omits the faction field when player facts publish none', () => {
+  it('records the faction supplied by trusted player facts', () => {
     const resolution = resolveInput(SEER_INSPECT_PHASE, {
       players: sevenPlayers(),
       day: 1,
@@ -325,11 +325,19 @@ describe('night.seer-inspect', () => {
     })
     expect(resolution.roleStateReplacements).toEqual([{
       playerId: WerewolfPlayerId('p3'),
-      roleState: { checks: [{ target: WerewolfPlayerId('p4'), day: 1 }] },
+      roleState: { checks: [{ target: WerewolfPlayerId('p4'), faction: 'village', day: 1 }] },
     }])
     expect(resolution.privateNotices).toEqual([{
-      toPlayerId: WerewolfPlayerId('p3'), kind: 'seer-inspect', data: { target: WerewolfPlayerId('p4') },
+      toPlayerId: WerewolfPlayerId('p3'), kind: 'seer-inspect', data: { target: WerewolfPlayerId('p4'), faction: 'village' },
     }])
+  })
+
+  it('rejects an inspected target missing from trusted player facts', () => {
+    expect(() => resolveInput(SEER_INSPECT_PHASE, {
+      players: sevenPlayers(),
+      participants: [participant('p3', 3, { roleState: { checks: [] } })],
+      actions: [{ playerId: WerewolfPlayerId('p3'), action: { value: WerewolfPlayerId('ghost') } }],
+    })).toThrow(/is not on the roster/)
   })
 
   it('rejects an action actor that is not a participant', () => {

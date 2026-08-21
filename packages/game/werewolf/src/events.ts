@@ -65,17 +65,22 @@ declare module '@deepseek-ai/dsh-session/types' {
   }
 }
 
+const WEREWOLF_EVENT_TYPES = [
+  'werewolf/game-started',
+  'werewolf/phase-opened',
+  'werewolf/human-action',
+  'werewolf/bot-attempt-failed',
+  'werewolf/bot-decision',
+  'werewolf/phase-resolved',
+  'werewolf/game-paused',
+  'werewolf/game-resumed',
+  'werewolf/game-ended',
+] as const
+
+const WEREWOLF_EVENT_TYPE_SET: ReadonlySet<string> = new Set(WEREWOLF_EVENT_TYPES)
+
 /** Every werewolf event-type key this package declares. */
-export type WerewolfEventType =
-  | 'werewolf/game-started'
-  | 'werewolf/phase-opened'
-  | 'werewolf/human-action'
-  | 'werewolf/bot-attempt-failed'
-  | 'werewolf/bot-decision'
-  | 'werewolf/phase-resolved'
-  | 'werewolf/game-paused'
-  | 'werewolf/game-resumed'
-  | 'werewolf/game-ended'
+export type WerewolfEventType = (typeof WEREWOLF_EVENT_TYPES)[number]
 
 /** The event types that advance `gameRevision` by exactly one. */
 export const WEREWOLF_STATE_CHANGING_EVENTS: ReadonlySet<string> = new Set([
@@ -105,5 +110,5 @@ export type WerewolfEvent<T extends WerewolfEventType = WerewolfEventType> = {
  * @returns whether `event.type` is a declared werewolf event type.
  */
 export function isWerewolfEvent(event: { type: string }): event is WerewolfEvent {
-  return event.type.startsWith('werewolf/')
+  return WEREWOLF_EVENT_TYPE_SET.has(event.type)
 }
