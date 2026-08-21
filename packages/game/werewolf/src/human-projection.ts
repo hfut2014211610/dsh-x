@@ -1,8 +1,7 @@
 /** Human-authorized Werewolf views and terminal replay projection. */
 
-import type { JsonValue } from '@deepseek-ai/dsh-session'
+import type { JsonValue } from '@deepseek-ai/dsh-session/types'
 import { serializeWerewolfActionSpec } from './projection.ts'
-import type { WerewolfRuntime } from './runtime.ts'
 import type { WerewolfCompiledRuleSetV1, WerewolfGameResultV1, WerewolfGameStateV1, WerewolfTimelineEntryV1 } from './types.ts'
 
 /** One rule set selectable by the local game UI. */
@@ -70,10 +69,27 @@ export interface WerewolfReplayV1 {
   checkpoints: Array<{ eventType: string; gameRevision: number; view: WerewolfHumanViewV1 }>
 }
 
-function ruleOptions(runtime: WerewolfRuntime): WerewolfRuleSetOptionV1[] {
+/**
+ * Every registered rule set as a lobby-selectable option, sorted by id then
+ * revision.
+ *
+ * @param runtime - rule registry to list.
+ * @returns the detached rule-set options.
+ */
+export function listWerewolfRuleSetOptions(runtime: WerewolfRuleSetSource): WerewolfRuleSetOptionV1[] {
   return [...runtime.listRuleSets().values()]
     .map(rule => ({ id: rule.id, revision: rule.revision, displayName: rule.displayName, playerCount: rule.playerCount }))
     .sort((left, right) => left.id.localeCompare(right.id) || left.revision - right.revision)
+}
+
+/** Minimal rule-registry face the projections read; WerewolfRuntime satisfies it structurally. */
+export interface WerewolfRuleSetSource {
+  /** Registered rule-set inputs keyed `${id}@${revision}`. */
+  listRuleSets(): ReadonlyMap<string, { id: string; revision: number; displayName: string; playerCount: number }>
+}
+
+function ruleOptions(runtime: WerewolfRuleSetSource): WerewolfRuleSetOptionV1[] {
+  return listWerewolfRuleSetOptions(runtime)
 }
 
 /**
@@ -84,7 +100,7 @@ function ruleOptions(runtime: WerewolfRuntime): WerewolfRuleSetOptionV1[] {
  * @returns authorized view for the bound human seat.
  */
 export function projectWerewolfHumanView(
-  runtime: WerewolfRuntime,
+  runtime: WerewolfRuleSetSource,
   state: WerewolfGameStateV1,
   rules: WerewolfCompiledRuleSetV1,
 ): WerewolfHumanViewV1 {

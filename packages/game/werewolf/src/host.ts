@@ -7,10 +7,12 @@ import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import type {
   WerewolfHostMutationRequestV1,
   WerewolfHumanViewV1,
+  WerewolfLobbyViewV1,
   WerewolfReplayV1,
   WerewolfStartRequestV1,
   WerewolfSubmitActionRequestV1,
 } from './host-types.ts'
+import { listWerewolfRuleSetOptions } from './human-projection.ts'
 import { WerewolfGameModule } from './module-adapter.ts'
 
 declare module '@deepseek-ai/cordis' {
@@ -26,6 +28,15 @@ export class WerewolfGameGateway extends TypertRemoteService {
   constructor(ctx: Context) {
     super(ctx, 'werewolfGame')
     ctx.games.registerModule(new WerewolfGameModule(ctx, ctx.werewolf))
+  }
+
+  /**
+   * List the registered rule sets for the lobby, before any game exists.
+   * @returns rule-set options sorted by id then revision.
+   */
+  @Remote('getLobby')
+  getLobby(): WerewolfLobbyViewV1 {
+    return { version: 1, availableRuleSets: listWerewolfRuleSetOptions(this.ctx.werewolf) }
   }
 
   /**

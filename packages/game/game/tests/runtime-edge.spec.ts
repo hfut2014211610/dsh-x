@@ -6,7 +6,8 @@ import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-test
 import type { JsonValue, Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
-import type { GameAiExecutor, GameModule, GameRequestId } from '../src/types.ts'
+import type { GameAiExecutor, GameModule } from '../src/executor.ts'
+import type { GameRequestId } from '../src/types.ts'
 import {
   canonicalGameJson,
   digestGamePayload,

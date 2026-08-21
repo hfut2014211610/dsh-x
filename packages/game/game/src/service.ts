@@ -3,22 +3,15 @@
 import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import type { JsonValue, Session } from '@deepseek-ai/dsh-session'
-import type { GameId, GameModule, GameProjection, GameRequestId, LocalGamePrincipalV1, PrincipalId } from './types.ts'
+import type { GameId, GameProjection, GameRequestId, LocalGamePrincipalV1, PrincipalId } from './types.ts'
+
+import type { GameModule } from './executor.ts'
+
+export type { GameModule, GameAiExecutor, GameChildStartRequest } from './executor.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {
     games: GameService
-  }
-
-  interface Events {
-    /**
-     * Announce that authorized readers must re-read one game projection.
-     * The event deliberately carries no identity or hidden view data.
-     * @param gameId - changed game.
-     * @param gameRevision - committed domain revision.
-     * @mode emit
-     */
-    'game/projection-invalidated'(gameId: GameId, gameRevision: number): void
   }
 }
 

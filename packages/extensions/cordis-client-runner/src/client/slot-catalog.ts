@@ -1107,6 +1107,7 @@ export const CLIENT_SLOT_API: readonly ClientSlotEntry[] = [
       'client-ui-conversation ChatView id \'chat\'',
       'client-ui-trajectory TrajectoryView id \'trajectory\'',
       'client-ui-ued UedView',
+      'client-ui-werewolf WerewolfView id \'werewolf\'',
       'client-ui-writing WritingView id \'writing\'',
     ],
     replaceRisk: 'none',

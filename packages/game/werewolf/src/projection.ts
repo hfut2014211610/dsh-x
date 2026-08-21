@@ -12,6 +12,8 @@
 import { isDeepStrictEqual } from 'node:util'
 import { WerewolfError } from './error.ts'
 import type {
+  WerewolfActionSpecJsonV1,
+  WerewolfSingleActionSpecJsonV1,
   WerewolfActionSpecV1,
   WerewolfBotContextV1,
   WerewolfBotPromptV1,
@@ -19,7 +21,7 @@ import type {
   WerewolfGameStateV1,
   WerewolfSingleActionSpecV1,
 } from './types.ts'
-import type { WerewolfBotActionRequest } from './engine.ts'
+import type { WerewolfBotActionRequest } from './types.ts'
 
 /** Bounds the projection applies; resolved from plugin configuration. */
 export interface WerewolfProjectionLimitsV1 {
@@ -27,16 +29,7 @@ export interface WerewolfProjectionLimitsV1 {
   publicTimelineEntries: number
 }
 
-/** The JSON view of one non-compound action spec, as the prompt serializes it. */
-export type WerewolfSingleActionSpecJsonV1 =
-  | { kind: 'player-target'; targets: string[]; allowSkip: boolean }
-  | { kind: 'choice'; options: string[]; allowSkip: boolean }
-  | { kind: 'text'; maxChars: number; allowSkip: boolean }
-
-/** The JSON view of one closed action spec, as the prompt serializes it. */
-export type WerewolfActionSpecJsonV1 =
-  | WerewolfSingleActionSpecJsonV1
-  | { kind: 'compound'; fields: Array<{ id: string; spec: WerewolfSingleActionSpecJsonV1 }>; allowSkip: boolean }
+export type { WerewolfActionSpecJsonV1, WerewolfSingleActionSpecJsonV1 } from './types.ts'
 
 /**
  * Serialize one closed action spec to its prompt JSON view.

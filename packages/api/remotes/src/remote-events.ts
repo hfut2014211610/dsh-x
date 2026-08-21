@@ -16,6 +16,7 @@
  */
 export const API_REMOTE_FORWARDED_EVENTS = [
   'agent-preset/selected',
+  'game/projection-invalidated',
   'commands/change',
   'credentials/updated',
   'documents/changed',

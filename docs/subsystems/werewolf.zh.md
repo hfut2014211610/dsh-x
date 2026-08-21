@@ -32,6 +32,10 @@
 
 `WerewolfGameGateway` 暴露类型化 `start`、`getView`、`getReplay`、`submitAction`、`resume`、`abortGame`。它在内部解析版本1本地主体；请求不能选择 Session、participant、player 或座位。`WerewolfHumanViewV1` 投影公开事实，以及仅属于绑定真人的角色、获授权队友、资源、通知与当前表单。最终视图在结果产生后揭示角色。`getReplay` 拒绝活跃游戏，并返回授权检查点而非原始事件、Bot 上下文或子代理 prompt。
 
+## 专用会话视图
+
+`@deepseek-ai/dsh-client-ui-werewolf` 注入 `conversation.view` 条目 `werewolf`，并对 `agentPreset: werewolf` 的会话声明首选视图。注入面包装生成的 `ctx.remote.werewolfGame` 命名空间——`getLobby`（附加的局前规则集列表）、`start`、`getView`、`submitAction`、`resume`、`abortGame`、`getReplay`——并订阅转发的 `game/projection-invalidated` 事件，忽略其他游戏并通过 `getView` 重读。表单只渲染封闭规格词汇（`player-target`、`choice`、`text`、`compound`）；浏览器不会收到 Bot 上下文、子代理 prompt 或原始秘密事件。不存在斜杠命令，Chat 文本不能改变游戏状态。
+
 ## Bot 连续性上下文
 
 每个座位在游戏事件流中拥有一份持久的主观 `WerewolfBotContextV1`——受配置字符与数组限制约束的判断、承诺、策略、记忆摘要与最近决策标识。上下文不是游戏事实：它不能让非法动作变合法，也不能把猜测变成已知信息。每个被接受的决策记录前一个上下文修订、动作、经校验的增量与完整计算的 `contextAfter`，因此每次决策都是独立检查点，增量则解释允许发生的变化。档案由游戏种子确定性分配，并在整局内不可变。
@@ -118,7 +122,7 @@ abstract getHostSession(gameId: GameId): Session | undefined
 
 Types: [Session](session.md)
 
-Source: [`packages/game/game/src/service.ts:26`](../../packages/game/game/src/service.ts)
+Source: [`packages/game/game/src/service.ts:19`](../../packages/game/game/src/service.ts)
 
 <a id="ctxwerewolf--werewolfruntime"></a>
 
@@ -193,6 +197,12 @@ Registers the Werewolf module and exposes the UI-facing typed methods.
 
 ```ts cordis-catalog
 /**
+ * List the registered rule sets for the lobby, before any game exists.
+ * @returns rule-set options sorted by id then revision.
+ */
+@Remote('getLobby') getLobby(): WerewolfLobbyViewV1
+
+/**
  * Start one local single-player game.
  * @param request - rule selection, seed, and caller idempotency key.
  * @returns current human-authorized projection.
@@ -235,7 +245,7 @@ Registers the Werewolf module and exposes the UI-facing typed methods.
 @Remote('abortGame') async abortGame(request: WerewolfHostMutationRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>
 ```
 
-Source: [`packages/game/werewolf/src/host.ts:23`](../../packages/game/werewolf/src/host.ts)
+Source: [`packages/game/werewolf/src/host.ts:25`](../../packages/game/werewolf/src/host.ts)
 
 <a id="game-events"></a>
 
@@ -258,5 +268,5 @@ Announce that authorized readers must re-read one game projection. The event del
 'game/projection-invalidated'(gameId: GameId, gameRevision: number): void
 ```
 
-Source: [`packages/game/game/src/service.ts:21`](../../packages/game/game/src/service.ts)
+Source: [`packages/game/game/src/types.ts:15`](../../packages/game/game/src/types.ts)
 <!-- END GENERATED cordis-surface -->

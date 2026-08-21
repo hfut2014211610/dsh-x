@@ -37,20 +37,9 @@ import { reduceWerewolfGame } from './reducer.ts'
 import type { WerewolfRuntime } from './runtime.ts'
 import type { WerewolfCompiledRuleSetV1, WerewolfGameStateV1 } from './types.ts'
 
-/** User input accepted by the typed start method. */
-export interface WerewolfGameStartV1 {
-  ruleSetId: string
-  ruleSetRevision: number
-  seed: number
-  humanSeatPreference?: number
-  playerNames?: string[]
-}
+import type { WerewolfGameStartV1 } from './host-types.ts'
 
-/** User input accepted by the typed action method. */
-export interface WerewolfGameActionV1 {
-  phaseInstanceId: string
-  action: JsonValue
-}
+export type { WerewolfGameActionV1, WerewolfGameStartV1 } from './host-types.ts'
 
 function asRecord(value: JsonValue, where: string): Record<string, JsonValue> {
   if (typeof value !== 'object' || value === null || Array.isArray(value)) throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', `${where} must be an object`)

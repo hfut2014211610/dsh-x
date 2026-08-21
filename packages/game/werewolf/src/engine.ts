@@ -18,13 +18,13 @@ import {
   validateWerewolfBotContextDelta,
 } from './bot-context.ts'
 import { normalizeWerewolfPublicSpeech } from './submission-validation.ts'
+export type { WerewolfBotActionRequest } from './types.ts'
 import { applyWerewolfEvent } from './reducer.ts'
 import type { WerewolfEvent } from './events.ts'
 import type {
   WerewolfActionActorV1,
-  WerewolfActionSpecV1,
+  WerewolfBotActionRequest,
   WerewolfCompiledPhaseOccurrenceV1,
-  WerewolfBotContextV1,
   WerewolfCompiledRuleSetV1,
   WerewolfContextLimitsV1,
   WerewolfDecisionEntryV1,
@@ -71,22 +71,6 @@ export interface WerewolfGameStartInput {
   /** Display names indexed by seat; missing entries fall back to `Seat N`. */
   playerNames?: readonly string[]
   ids?: WerewolfEngineIds
-}
-
-/** One bot actor's pending decision as the driver (later: the runner) sees it. */
-export interface WerewolfBotActionRequest {
-  decisionId: WerewolfDecisionId
-  gameId: WerewolfGameId
-  /** Game revision whose observation and legal action produced this request. */
-  sourceGameRevision: number
-  playerId: WerewolfPlayerId
-  phaseInstanceId: WerewolfPhaseInstanceId
-  phaseId: string
-  day: number
-  actionKind: string
-  spec: WerewolfActionSpecV1
-  context?: JsonValue
-  priorContext: WerewolfBotContextV1
 }
 
 /** One bot submission: the request it answers and the structured result. */

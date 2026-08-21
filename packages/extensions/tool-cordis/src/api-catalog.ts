@@ -2361,6 +2361,12 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     description: 'Registers the Werewolf module and exposes the UI-facing typed methods.',
     methods: [
       {
+        signature: '@Remote(\'getLobby\') getLobby(): WerewolfLobbyViewV1',
+        description: 'List the registered rule sets for the lobby, before any game exists.',
+        parameters: [],
+        returns: 'rule-set options sorted by id then revision.',
+      },
+      {
         signature: '@Remote(\'start\') async start(request: WerewolfStartRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>',
         description: 'Start one local single-player game.',
         parameters: [{ name: 'request', description: 'rule selection, seed, and caller idempotency key.' }],
@@ -5178,7 +5184,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'WerewolfGameActionV1',
-    declaration: 'export interface WerewolfGameActionV1 {\n    phaseInstanceId: string;\n    action: JsonValue;\n}',
+    declaration: 'export interface WerewolfGameActionV1 {\n    phaseInstanceId: string;\n    action: import(\'@deepseek-ai/dsh-session/types\').JsonValue;\n}',
   },
   {
     name: 'WerewolfGameId',
@@ -5211,6 +5217,10 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   {
     name: 'WerewolfHumanViewV1',
     declaration: 'export interface WerewolfHumanViewV1 {\n    version: 1;\n    gameId: string;\n    gameRevision: number;\n    status: WerewolfGameStateV1[\'status\'];\n    day: number;\n    ruleSet: WerewolfRuleSetOptionV1;\n    availableRuleSets: WerewolfRuleSetOptionV1[];\n    players: Array<{\n        playerId: string;\n        seat: number;\n        displayName: string;\n        alive: boolean;\n        human: boolean;\n        deathDay?: number;\n        deathCause?: string;\n        revealedRole?: {\n            id: string;\n            name: string;\n            faction: string;\n        };\n    }>;\n    self: {\n        playerId: string;\n        seat: number;\n        role: {\n            id: string;\n            name: string;\n            faction: string;\n        };\n        resources: Record<string, number>;\n        teammates: Array<{\n            playerId: string;\n            seat: number;\n            alive: boolean;\n        }>;\n        notices: Array<{\n            kind: string;\n            data: JsonValue;\n        }>;\n    };\n    phase: null | {\n        phaseInstanceId: string;\n        phaseId: string;\n        segment: \'setup\' | \'night\' | \'day\';\n        day: number;\n        mode: \'parallel-private\' | \'seat-order-public\';\n    };\n    actionForm: WerewolfHumanActionFormV1 | null;\n    timeline: WerewolfTimelineEntryV1[];\n    pauseReason: WerewolfGameStateV1[\'pauseReason\'];\n    result: WerewolfGameResultV1 | null;\n}',
+  },
+  {
+    name: 'WerewolfLobbyViewV1',
+    declaration: 'export interface WerewolfLobbyViewV1 {\n    version: 1;\n    availableRuleSets: WerewolfRuleSetOptionV1[];\n}',
   },
   {
     name: 'WerewolfOpenPhaseV1',

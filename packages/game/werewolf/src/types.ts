@@ -6,7 +6,7 @@
  * @module @deepseek-ai/dsh-werewolf/types
  */
 
-import type { JsonValue } from '@deepseek-ai/dsh-session'
+import type { JsonValue } from '@deepseek-ai/dsh-session/types'
 import type {
   WerewolfDecisionId,
   WerewolfGameId,
@@ -201,6 +201,33 @@ export interface WerewolfPhaseDefinition {
     options: JsonValue
     participants: ReadonlyArray<{ role: CompiledWerewolfRole; binding: JsonValue }>
   }): CompiledWerewolfPhase
+}
+
+/** The JSON view of one non-compound action spec, as prompts serialize it. */
+export type WerewolfSingleActionSpecJsonV1 =
+  | { kind: 'player-target'; targets: string[]; allowSkip: boolean }
+  | { kind: 'choice'; options: string[]; allowSkip: boolean }
+  | { kind: 'text'; maxChars: number; allowSkip: boolean }
+
+/** The JSON view of one closed action spec, as prompts serialize it. */
+export type WerewolfActionSpecJsonV1 =
+  | WerewolfSingleActionSpecJsonV1
+  | { kind: 'compound'; fields: Array<{ id: string; spec: WerewolfSingleActionSpecJsonV1 }>; allowSkip: boolean }
+
+/** One bot actor's pending decision as the driver (later: the runner) sees it. */
+export interface WerewolfBotActionRequest {
+  decisionId: WerewolfDecisionId
+  gameId: WerewolfGameId
+  /** Game revision whose observation and legal action produced this request. */
+  sourceGameRevision: number
+  playerId: WerewolfPlayerId
+  phaseInstanceId: WerewolfPhaseInstanceId
+  phaseId: string
+  day: number
+  actionKind: string
+  spec: WerewolfActionSpecV1
+  context?: JsonValue
+  priorContext: WerewolfBotContextV1
 }
 
 /** The compiled, per-game-ready form of one registered phase version. */

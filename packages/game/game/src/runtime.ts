@@ -7,13 +7,12 @@ import { SessionId, snapshotJsonValue } from '@deepseek-ai/dsh-session'
 import type { JsonValue, Session, SessionAppendEntry } from '@deepseek-ai/dsh-session'
 import { isGameCommandReceipt } from './events.ts'
 import { GameService } from './service.ts'
+import type { GameAiExecutor, GameModule } from './executor.ts'
 import {
   GameId,
   PrincipalId,
-  type GameAiExecutor,
   type GameCommandReceiptV1,
   type GameEventCandidate,
-  type GameModule,
   type GameMutationMethod,
   type GameProjection,
   type GameRequestId,

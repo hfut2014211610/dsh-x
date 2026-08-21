@@ -1,0 +1,686 @@
+// @vitest-environment jsdom
+
+import { afterEach, describe, expect, it, vi } from 'vitest'
+import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
+import type { ReactElement } from 'react'
+import {
+  buildAction,
+  fieldChoices,
+  WerewolfView,
+  type WerewolfViewInjected,
+} from '../src/client/WerewolfView.tsx'
+import { en, zh } from '../src/client/locales.ts'
+import type {
+  WerewolfHumanViewV1,
+  WerewolfLobbyViewV1,
+  WerewolfReplayV1,
+} from '@deepseek-ai/dsh-werewolf/types'
+
+const TestView = WerewolfView as unknown as (
+  props: { sessionId: string } & WerewolfViewInjected,
+) => ReactElement
+
+function lobbyFixture(): WerewolfLobbyViewV1 {
+  return {
+    version: 1,
+    availableRuleSets: [
+      { id: 'quick-7', revision: 1, displayName: 'Quick 7-player game', playerCount: 7 },
+    ],
+  }
+}
+
+function viewFixture(overrides: Partial<WerewolfHumanViewV1> = {}): WerewolfHumanViewV1 {
+  return {
+    version: 1,
+    gameId: 'g1',
+    gameRevision: 4,
+    status: 'running',
+    day: 1,
+    ruleSet: { id: 'quick-7', revision: 1, displayName: 'Quick 7-player game', playerCount: 7 },
+    availableRuleSets: [],
+    players: [
+      { playerId: 'p1', seat: 1, displayName: 'Seat 1', alive: true, human: true },
+      { playerId: 'p2', seat: 2, displayName: 'Seat 2', alive: true, human: false },
+      { playerId: 'p3', seat: 3, displayName: 'Seat 3', alive: false, human: false, deathDay: 1, deathCause: 'vote' },
+    ],
+    self: {
+      playerId: 'p1',
+      seat: 1,
+      role: { id: 'seer', name: 'Seer', faction: 'village' },
+      resources: { insight: 1 },
+      teammates: [],
+      notices: [],
+    },
+    phase: { phaseInstanceId: 'i1', phaseId: 'day.discussion', segment: 'day', day: 1, mode: 'seat-order-public' },
+    actionForm: {
+      phaseInstanceId: 'i1',
+      phaseId: 'day.discussion',
+      day: 1,
+      actionKind: 'speech',
+      spec: { kind: 'text', maxChars: 40, allowSkip: true },
+    },
+    timeline: [{ id: '0', day: 1, phaseId: 'day.announce', kind: 'announcement', key: 'announce.no-death' }],
+    pauseReason: null,
+    result: null,
+    ...overrides,
+  }
+}
+
+function replayFixture(): WerewolfReplayV1 {
+  return {
+    version: 1,
+    gameId: 'g1',
+    finalRevision: 9,
+    checkpoints: [
+      { eventType: 'werewolf/game-started', gameRevision: 1, view: viewFixture() },
+      { eventType: 'werewolf/phase-resolved', gameRevision: 8, view: viewFixture() },
+    ],
+  }
+}
+
+function injected(overrides: Partial<WerewolfViewInjected> = {}): WerewolfViewInjected {
+  return {
+    getLobby: vi.fn(async () => lobbyFixture()),
+    start: vi.fn(async () => viewFixture()),
+    getView: vi.fn(async () => viewFixture()),
+    submitAction: vi.fn(async () => viewFixture()),
+    resume: vi.fn(async () => viewFixture()),
+    abortGame: vi.fn(async () => viewFixture({ status: 'ended', result: { outcome: { kind: 'aborted' }, evidence: [{ source: 'human-abort', data: {} }] } })),
+    getReplay: vi.fn(async () => replayFixture()),
+    subscribeInvalidated: vi.fn(() => () => {}),
+    translate: (key, params) => {
+      const template = zh[key]
+      if (params === undefined) return template
+      return template.replace(/\{(\w+)\}/g, (_, name: string) => String(params[name] ?? `{${name}}`))
+    },
+    ...overrides,
+  }
+}
+
+/** Walk lobby → covered reveal by starting the fixture game. */
+async function arriveAtReveal(view: ReturnType<typeof render>): Promise<void> {
+  fireEvent.click(await waitFor(() => view.getByRole('button', { name: zh['lobby.start'] })))
+  await waitFor(() =>{  expect(view.getByTestId('werewolf-reveal')).toBeDefined() })
+}
+
+/** Walk lobby → start → whatever the start projection renders. */
+async function arriveByStart(view: ReturnType<typeof render>): Promise<void> {
+  fireEvent.click(await waitFor(() => view.getByRole('button', { name: zh['lobby.start'] })))
+}
+
+/** Walk lobby → reveal → table. */
+async function arriveAtTable(view: ReturnType<typeof render>): Promise<void> {
+  await arriveAtReveal(view)
+  fireEvent.click(view.getByRole('button', { name: zh['reveal.action'] }))
+  fireEvent.click(view.getByRole('button', { name: zh['reveal.ready'] }))
+  await waitFor(() =>{  expect(view.getByTestId('werewolf-table')).toBeDefined() })
+}
+
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+})
+
+describe('WerewolfView states', () => {
+  it('renders the lobby with one rule-set card and starts through the typed verb', async () => {
+    const face = injected()
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await waitFor(() =>{  expect((view.getByRole('button', { name: zh['lobby.start'] }) as HTMLButtonElement).disabled).toBe(false) })
+    fireEvent.click(view.getByRole('button', { name: zh['lobby.start'] }))
+    await waitFor(() =>{  expect(face.start).toHaveBeenCalledTimes(1) })
+    const request = ((face.start as ReturnType<typeof vi.fn>).mock.calls[0] as unknown[])[0] as {
+      ruleSetId: string
+      ruleSetRevision: number
+      seed: number
+    }
+    expect(request.ruleSetId).toBe('quick-7')
+    expect(request.ruleSetRevision).toBe(1)
+    expect(Number.isSafeInteger(request.seed)).toBe(true)
+    await waitFor(() =>{  expect(view.getByTestId('werewolf-reveal')).toBeDefined() })
+  })
+
+  it('surfaces a lobby load failure as a retryable error', async () => {
+    const view = render(<TestView sessionId="s1" {...injected({ getLobby: async () => { throw new Error('catalog down') } })} />)
+    await waitFor(() =>{  expect(view.getByRole('alert')).toBeDefined() })
+    expect(view.getByRole('alert').textContent).toContain('catalog down')
+  })
+
+  it('fills template params and falls back to the raw key on a missing param', () => {
+    const face = injected()
+    expect(face.translate('lobby.players', { count: 7 })).toBe('7 名玩家')
+    expect(face.translate('table.day', { day: 2 })).toBe('第 2 天')
+  })
+
+  it('reports an empty lobby without a start action', async () => {
+    const view = render(<TestView sessionId="s1" {...injected({ getLobby: async () => ({ version: 1, availableRuleSets: [] }) })} />)
+    await waitFor(() =>{  expect(view.getByText(zh['lobby.unavailable'])).toBeDefined() })
+  })
+
+  it('keeps the role covered behind an explicit reveal, then enters the table', async () => {
+    const view = render(<TestView sessionId="s1" {...injected({ getLobby: async () => lobbyFixture() })} />)
+    await arriveAtReveal(view)
+    expect(view.queryByText('Seer')).toBeNull()
+    fireEvent.click(view.getByRole('button', { name: zh['reveal.action'] }))
+    expect(view.getByText('Seer')).toBeDefined()
+    expect(view.queryByTestId('werewolf-table')).toBeNull()
+    fireEvent.click(view.getByRole('button', { name: zh['reveal.ready'] }))
+    await waitFor(() =>{  expect(view.getByTestId('werewolf-table')).toBeDefined() })
+  })
+
+  it('renders seats with non-color state cues and a sticky phase heading', async () => {
+    const view = render(<TestView sessionId="s1" {...injected({ getLobby: async () => lobbyFixture() })} />)
+    await arriveAtTable(view)
+    const table = view.getByTestId('werewolf-table')
+    expect(table.getAttribute('aria-label')).toBe(zh['table.title'])
+    expect(table.textContent).toContain(zh['table.dead'])
+    expect(table.textContent).toContain(zh['table.deadOn'].replace('{day}', '1'))
+    expect(table.textContent).toContain(zh['table.unknownRole'])
+    const heading = table.querySelector('h2')
+    expect(heading?.getAttribute('tabindex')).toBe('-1')
+  })
+
+  it('submits a text speech through the typed action verb', async () => {
+    const face = injected()
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveAtTable(view)
+    const form = view.getByTestId('werewolf-action-form')
+    fireEvent.change(form.querySelector('textarea') as HTMLTextAreaElement, { target: { value: '我是好人' } })
+    fireEvent.click(view.getByRole('button', { name: zh['speech.speak'] }))
+    await waitFor(() =>{  expect(face.submitAction).toHaveBeenCalledTimes(1) })
+    const request = ((face.submitAction as ReturnType<typeof vi.fn>).mock.calls[0] as unknown[])[0] as { action: { value: unknown } }
+    expect(request.action.value).toBe('我是好人')
+  })
+
+  it('selects a vote target with an explicit confirm and a pass label', async () => {
+    const face = injected()
+    const target = viewFixture({
+      actionForm: {
+        phaseInstanceId: 'i1',
+        phaseId: 'day.vote',
+        day: 1,
+        actionKind: 'vote',
+        spec: { kind: 'player-target', targets: ['p2'], allowSkip: true },
+      },
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ ...face, getView: async () => target, start: async () => target })} />)
+    await arriveAtTable(view)
+    const form = view.getByTestId('werewolf-action-form')
+    const option = form.querySelector('[role="radio"]') as HTMLElement
+    expect(option.getAttribute('aria-checked')).toBe('false')
+    fireEvent.click(option)
+    expect(option.getAttribute('aria-checked')).toBe('true')
+    expect(form.textContent).toContain(zh['vote.selected'].replace('{name}', '2 · Seat 2'))
+    fireEvent.click(view.getByRole('button', { name: zh['vote.confirm'] }))
+    await waitFor(() =>{  expect(face.submitAction).toHaveBeenCalledTimes(1) })
+    const request = ((face.submitAction as ReturnType<typeof vi.fn>).mock.calls[0] as unknown[])[0] as { action: { value: unknown } }
+    expect(request.action.value).toBe('p2')
+  })
+
+  it('labels the spectator state when the human is dead', async () => {
+    const dead = viewFixture({
+      players: [
+        { playerId: 'p1', seat: 1, displayName: 'Seat 1', alive: false, human: true, deathDay: 1, deathCause: 'wolf-kill' },
+        { playerId: 'p2', seat: 2, displayName: 'Seat 2', alive: true, human: false },
+      ],
+      actionForm: null,
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => dead })} />)
+    await arriveAtTable(view)
+    await waitFor(() =>{  expect(view.getByTestId('werewolf-spectator')).toBeDefined() })
+    expect(view.queryByTestId('werewolf-action-form')).toBeNull()
+  })
+
+  it('offers resume and confirm-guarded abort while paused', async () => {
+    const paused = viewFixture({ status: 'paused', pauseReason: 'bot-failure', actionForm: null })
+    const face = injected({ start: async () => paused })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveAtTable(view)
+    const panel = await waitFor(() => view.getByTestId('werewolf-paused'))
+    expect(panel.textContent).toContain(zh['paused.reason'].replace('{reason}', 'bot-failure'))
+    const confirmSpy = vi.spyOn(window, 'confirm').mockReturnValue(true)
+    fireEvent.click(view.getByRole('button', { name: zh['paused.abort'] }))
+    expect(confirmSpy).toHaveBeenCalledWith(zh['paused.confirmAbort'])
+    await waitFor(() =>{  expect(face.abortGame).toHaveBeenCalledTimes(1) })
+    const resumingFace = injected({ start: async () => paused })
+    const resuming = render(<TestView sessionId="s1" {...resumingFace} />)
+    await arriveAtTable(resuming)
+    fireEvent.click(await waitFor(() => resuming.getByRole('button', { name: zh['paused.resume'] })))
+    await waitFor(() =>{  expect(resumingFace.resume).toHaveBeenCalledTimes(1) })
+  })
+
+  it('declines abort when the confirm is dismissed', async () => {
+    const paused = viewFixture({ status: 'paused', pauseReason: 'cancelled', actionForm: null })
+    const face = injected({ start: async () => paused })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveAtTable(view)
+    await waitFor(() => view.getByTestId('werewolf-paused'))
+    vi.spyOn(window, 'confirm').mockReturnValue(false)
+    fireEvent.click(view.getByRole('button', { name: zh['paused.abort'] }))
+    expect(face.abortGame).not.toHaveBeenCalled()
+  })
+
+  it('reveals every role at the result and pages the authorized replay', async () => {
+    const ended = viewFixture({
+      status: 'ended',
+      phase: null,
+      actionForm: null,
+      result: { outcome: { kind: 'faction', factionId: 'village' }, evidence: [] },
+      players: [
+        { playerId: 'p1', seat: 1, displayName: 'Seat 1', alive: true, human: true, revealedRole: { id: 'seer', name: 'Seer', faction: 'village' } },
+        { playerId: 'p2', seat: 2, displayName: 'Seat 2', alive: false, human: false, revealedRole: { id: 'wolf', name: 'Wolf', faction: 'wolf' } },
+      ],
+    })
+    const face = injected({ start: async () => ended })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveByStart(view)
+    await waitFor(() =>{  expect(view.getByTestId('werewolf-result')).toBeDefined() })
+    expect(view.getByText(zh['result.village'])).toBeDefined()
+    expect(view.getByText(content => content.includes('Seer')).textContent).toContain('Seat 1')
+    expect(view.getByText(content => content.includes('Wolf')).textContent).toContain('Seat 2')
+    fireEvent.click(view.getByRole('button', { name: zh['result.review'] }))
+    await waitFor(() =>{  expect(face.getReplay).toHaveBeenCalledWith('g1') })
+    expect(view.getByTestId('werewolf-replay').textContent).toContain('8')
+    fireEvent.click(view.getByRole('button', { name: zh['replay.close'] }))
+    expect(view.queryByTestId('werewolf-replay')).toBeNull()
+  })
+
+  it('returns to the lobby from the result without keeping game state', async () => {
+    const ended = viewFixture({ status: 'ended', phase: null, actionForm: null, result: { outcome: { kind: 'tie' }, evidence: [] } })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => ended })} />)
+    await arriveByStart(view)
+    await waitFor(() =>{  expect(view.getByTestId('werewolf-result')).toBeDefined() })
+    fireEvent.click(view.getByRole('button', { name: zh['result.newGame'] }))
+    await waitFor(() =>{  expect(view.getByTestId('werewolf-lobby')).toBeDefined() })
+  })
+
+  it('refreshes through getView when its own game is invalidated and ignores other games', async () => {
+    let listener: ((gameId: string) => void) | undefined
+    const face = injected({
+      subscribeInvalidated: (hook) => {
+        listener = hook
+        return () => { listener = undefined }
+      },
+    })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveAtTable(view)
+    await waitFor(() =>{  expect(view.getByTestId('werewolf-table')).toBeDefined() })
+    ;(face.getView as ReturnType<typeof vi.fn>).mockClear()
+    listener?.('other-game')
+    await new Promise(resolve => setTimeout(resolve, 5))
+    expect(face.getView).not.toHaveBeenCalled()
+    listener?.('g1')
+    await waitFor(() =>{  expect(face.getView).toHaveBeenCalledWith('g1') })
+  })
+
+  it('shows a retryable inline error when a mutation fails', async () => {
+    const face = injected({
+      start: vi.fn(async () => { throw new Error('seed rejected') }),
+    })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    fireEvent.click(await waitFor(() => view.getByRole('button', { name: zh['lobby.start'] })))
+    await waitFor(() =>{  expect(view.getByRole('alert')).toBeDefined() })
+    expect(view.getByRole('alert').textContent).toContain(zh['error.title'])
+    fireEvent.click(view.getByRole('button', { name: zh['error.retry'] }))
+    expect(view.queryByRole('alert')).toBeNull()
+  })
+
+  it('renders every English key', () => {
+    for (const value of Object.values(en)) {
+      expect(typeof value).toBe('string')
+      expect(value.length).toBeGreaterThan(0)
+    }
+    expect(Object.keys(en).length).toBe(Object.keys(zh).length)
+  })
+})
+
+describe('buildAction', () => {
+  it('wraps single specs in a value object', () => {
+    expect(buildAction({ kind: 'player-target', targets: ['p2'], allowSkip: true }, '', { value: 'p2' }))
+      .toEqual({ value: 'p2' })
+    expect(buildAction({ kind: 'player-target', targets: ['p2'], allowSkip: true }, '', {}))
+      .toEqual({ value: null })
+  })
+
+  it('trims and bounds text drafts', () => {
+    expect(buildAction({ kind: 'text', maxChars: 4, allowSkip: false }, '  hello  ', {}))
+      .toEqual({ value: 'hell' })
+    expect(buildAction({ kind: 'text', maxChars: 4, allowSkip: true }, '   ', {}))
+      .toEqual({ value: null })
+  })
+
+  it('builds compound actions field by field', () => {
+    expect(buildAction(
+      {
+        kind: 'compound',
+        fields: [
+          { id: 'antidote', spec: { kind: 'choice', options: ['use', 'skip'], allowSkip: false } },
+          { id: 'poison', spec: { kind: 'player-target', targets: ['p3'], allowSkip: true } },
+        ],
+        allowSkip: false,
+      },
+      '',
+      { antidote: 'use', poison: 'p3' },
+    )).toEqual({ antidote: 'use', poison: 'p3' })
+  })
+})
+
+describe('WerewolfView display sides', () => {
+  it('covers the wolf-win outcome and the eliminated self summary', async () => {
+    const ended = viewFixture({
+      status: 'ended',
+      phase: null,
+      actionForm: null,
+      result: { outcome: { kind: 'faction', factionId: 'wolf' }, evidence: [] },
+      players: [
+        { playerId: 'p1', seat: 1, displayName: 'Seat 1', alive: false, human: true, deathDay: 2, deathCause: 'vote' },
+        { playerId: 'p2', seat: 2, displayName: 'Seat 2', alive: true, human: false, revealedRole: { id: 'wolf', name: 'Wolf', faction: 'wolf' } },
+      ],
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => ended })} />)
+    await arriveByStart(view)
+    await waitFor(() =>{  expect(view.getByTestId('werewolf-result')).toBeDefined() })
+    expect(view.getByText(zh['result.wolf'])).toBeDefined()
+    expect(view.getByText(zh['result.summary'].replace('{outcome}', zh['result.eliminated']))).toBeDefined()
+  })
+
+  it('renders an empty-message lobby error without a colon suffix', async () => {
+    const view = render(<TestView sessionId="s1" {...injected({ getLobby: async () => { throw new Error('') } })} />)
+    await waitFor(() =>{  expect(view.getByRole('alert')).toBeDefined() })
+    expect(view.getByRole('alert').textContent).toContain(zh['error.title'])
+    expect(view.getByRole('alert').textContent).not.toContain(':')
+  })
+
+  it('renders the result alert with an empty message as bare title', async () => {
+    const ended = viewFixture({ status: 'ended', phase: null, actionForm: null, result: { outcome: { kind: 'tie' }, evidence: [] } })
+    const face = injected({ start: async () => ended, getReplay: async () => { throw new Error('') } })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveByStart(view)
+    await waitFor(() =>{  expect(view.getByTestId('werewolf-result')).toBeDefined() })
+    fireEvent.click(view.getByRole('button', { name: zh['result.review'] }))
+    await waitFor(() =>{  expect(view.getByRole('alert')).toBeDefined() })
+    expect(view.getByRole('alert').textContent).toBe(zh['error.title'])
+  })
+
+  it('reports a replay failure on the result panel without opening the review', async () => {
+    const ended = viewFixture({
+      status: 'ended',
+      phase: null,
+      actionForm: null,
+      result: { outcome: { kind: 'tie' }, evidence: [] },
+    })
+    const view = render(<TestView sessionId="s1" {...injected({
+      start: async () => ended,
+      getReplay: async () => { throw new Error('replay denied') },
+    })} />)
+    await arriveByStart(view)
+    await waitFor(() =>{  expect(view.getByTestId('werewolf-result')).toBeDefined() })
+    fireEvent.click(view.getByRole('button', { name: zh['result.review'] }))
+    await waitFor(() =>{  expect(view.getByRole('alert')).toBeDefined() })
+    expect(view.getByRole('alert').textContent).toContain('replay denied')
+    expect(view.getByRole('alert').textContent).toContain(zh['error.title'])
+    expect(view.queryByTestId('werewolf-replay')).toBeNull()
+  })
+
+  it('lists teammates by name with a seat fallback for departed rosters', async () => {
+    const pack = viewFixture({
+      self: {
+        playerId: 'p1',
+        seat: 1,
+        role: { id: 'wolf', name: 'Wolf', faction: 'wolf' },
+        resources: {},
+        teammates: [
+          { playerId: 'p2', seat: 2, alive: true },
+          { playerId: 'px', seat: 9, alive: false },
+        ],
+        notices: [],
+      },
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => pack })} />)
+    await arriveAtReveal(view)
+    fireEvent.click(view.getByRole('button', { name: zh['reveal.action'] }))
+    expect(view.getByText(zh['reveal.teammates'].replace('{names}', 'Seat 2, 9'))).toBeDefined()
+    expect(view.getByText(zh['reveal.faction'].replace('{faction}', 'wolf'))).toBeDefined()
+    expect(view.queryByText(zh['reveal.resources'])).toBeNull()
+  })
+
+  it('renders a phase-less table with an empty timeline, un-dated deaths, and notices', async () => {
+    const sparse = viewFixture({
+      phase: null,
+      timeline: [],
+      players: [
+        { playerId: 'p1', seat: 1, displayName: 'Seat 1', alive: true, human: true },
+        { playerId: 'p2', seat: 2, displayName: 'Seat 2', alive: false, human: false },
+      ],
+      self: { ...viewFixture().self, notices: [{ kind: 'checked', data: {} }] },
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => sparse })} />)
+    await arriveAtTable(view)
+    const heading = view.getByTestId('werewolf-table').querySelector('h2')
+    expect(heading?.textContent).toContain(zh['table.day'].replace('{day}', '1'))
+    expect(heading?.textContent).toContain(zh['table.empty'])
+    expect(view.getByText(zh['table.empty'])).toBeDefined()
+    expect(view.getByText(zh['table.dead'])).toBeDefined()
+    expect(view.getByText('checked')).toBeDefined()
+  })
+
+  it('treats a roster without a human seat as still playing', async () => {
+    const bots = viewFixture({
+      players: [{ playerId: 'p2', seat: 2, displayName: 'Seat 2', alive: true, human: false }],
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => bots })} />)
+    await arriveAtTable(view)
+    expect(view.queryByTestId('werewolf-spectator')).toBeNull()
+    expect(view.getByTestId('werewolf-action-form')).toBeDefined()
+  })
+
+  it('renders a paused game without a pause reason', async () => {
+    const paused = viewFixture({ status: 'paused', pauseReason: null, actionForm: null })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => paused })} />)
+    await arriveAtTable(view)
+    const panel = await waitFor(() => view.getByTestId('werewolf-paused'))
+    expect(panel.textContent).toContain(zh['paused.reason'].replace('{reason}', ''))
+  })
+
+  it('keeps an unmatched template placeholder visible in the translation', async () => {
+    const face = injected({
+      translate: key => key === 'table.day' ? '第 {day} 天（{ghost}）' : zh[key],
+    })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveAtTable(view)
+    const heading = view.getByTestId('werewolf-table').querySelector('h2')
+    expect(heading?.textContent).toContain('第 1 天（{ghost}）')
+  })
+})
+
+describe('WerewolfView mutation feedback', () => {
+  it('marks the table busy while a submit is pending and clears it after', async () => {
+    let release: (value: WerewolfHumanViewV1) => void = () => {}
+    const pending = new Promise<WerewolfHumanViewV1>((resolve) => { release = resolve })
+    const face = injected({ submitAction: vi.fn(() => pending) })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveAtTable(view)
+    fireEvent.change(
+      view.getByTestId('werewolf-action-form').querySelector('textarea') as HTMLTextAreaElement,
+      { target: { value: '我是预言家' } },
+    )
+    fireEvent.click(view.getByRole('button', { name: zh['speech.speak'] }))
+    await waitFor(() =>{  expect(view.getByText(zh['busy.label'])).toBeDefined() })
+    release(viewFixture())
+    await waitFor(() =>{  expect(view.queryByText(zh['busy.label'])).toBeNull() })
+  })
+
+  it('surfaces a failing table mutation with retry and clears it', async () => {
+    const face = injected({ submitAction: vi.fn(async () => { throw new Error('stale revision') }) })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveAtTable(view)
+    fireEvent.change(
+      view.getByTestId('werewolf-action-form').querySelector('textarea') as HTMLTextAreaElement,
+      { target: { value: '我是好人' } },
+    )
+    fireEvent.click(view.getByRole('button', { name: zh['speech.speak'] }))
+    await waitFor(() =>{  expect(view.getByRole('alert')).toBeDefined() })
+    expect(view.getByRole('alert').textContent).toContain(': stale revision')
+    fireEvent.click(view.getByRole('button', { name: zh['error.retry'] }))
+    expect(view.queryByRole('alert')).toBeNull()
+  })
+
+  it('renders an empty mutation message without a colon at the table', async () => {
+    const face = injected({ submitAction: vi.fn(async () => { throw new Error('') }) })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveAtTable(view)
+    fireEvent.change(
+      view.getByTestId('werewolf-action-form').querySelector('textarea') as HTMLTextAreaElement,
+      { target: { value: '我是好人' } },
+    )
+    fireEvent.click(view.getByRole('button', { name: zh['speech.speak'] }))
+    await waitFor(() =>{  expect(view.getByRole('alert')).toBeDefined() })
+    expect(view.getByRole('alert').textContent).toContain(zh['error.title'])
+    expect(view.getByRole('alert').textContent).not.toContain(':')
+  })
+})
+
+describe('WerewolfView action-form gates', () => {
+  it('requires a vote target when skipping is disallowed and toggles the selection off', async () => {
+    const target = viewFixture({
+      actionForm: {
+        phaseInstanceId: 'i1',
+        phaseId: 'day.vote',
+        day: 1,
+        actionKind: 'vote',
+        spec: { kind: 'player-target', targets: ['p2'], allowSkip: false },
+      },
+    })
+    const face = injected({ start: async () => target, getView: async () => target })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveAtTable(view)
+    const form = view.getByTestId('werewolf-action-form')
+    const confirm = view.getByRole('button', { name: zh['vote.confirm'] }) as HTMLButtonElement
+    expect(confirm.disabled).toBe(true)
+    fireEvent.submit(form)
+    expect(face.submitAction).not.toHaveBeenCalled()
+    const option = form.querySelector('[role="radio"]') as HTMLElement
+    fireEvent.click(option)
+    expect(confirm.disabled).toBe(false)
+    expect(form.textContent).toContain(zh['vote.selected'].replace('{name}', '2 · Seat 2'))
+    fireEvent.click(option)
+    expect(option.getAttribute('aria-checked')).toBe('false')
+    expect(confirm.disabled).toBe(true)
+    expect(view.queryByTestId('werewolf-selected-target')).toBeNull()
+  })
+
+  it('requires speech text when skipping is disallowed and trims on submit', async () => {
+    const speech = viewFixture({
+      actionForm: {
+        phaseInstanceId: 'i1',
+        phaseId: 'day.discussion',
+        day: 1,
+        actionKind: 'speech',
+        spec: { kind: 'text', maxChars: 40, allowSkip: false },
+      },
+    })
+    const face = injected({ start: async () => speech, getView: async () => speech })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveAtTable(view)
+    const speak = view.getByRole('button', { name: zh['speech.speak'] }) as HTMLButtonElement
+    expect(speak.disabled).toBe(true)
+    expect(view.queryByRole('button', { name: zh['speech.pass'] })).toBeNull()
+    fireEvent.change(
+      view.getByTestId('werewolf-action-form').querySelector('textarea') as HTMLTextAreaElement,
+      { target: { value: '  我是守卫  ' } },
+    )
+    expect(speak.disabled).toBe(false)
+    fireEvent.click(speak)
+    await waitFor(() =>{  expect(face.submitAction).toHaveBeenCalledTimes(1) })
+    const request = ((face.submitAction as ReturnType<typeof vi.fn>).mock.calls[0] as unknown[])[0] as { action: { value: unknown } }
+    expect(request.action.value).toBe('我是守卫')
+  })
+
+  it('clears the speech draft through the pass button', async () => {
+    const view = render(<TestView sessionId="s1" {...injected()} />)
+    await arriveAtTable(view)
+    const form = view.getByTestId('werewolf-action-form')
+    const textarea = form.querySelector('textarea') as HTMLTextAreaElement
+    const pass = view.getByRole('button', { name: zh['speech.pass'] })
+    expect(pass.getAttribute('title')).toBe(zh['action.passLabel'])
+    fireEvent.change(textarea, { target: { value: '过' } })
+    fireEvent.click(pass)
+    expect(textarea.value).toBe('')
+  })
+
+  it('abstains a vote through the pass button and drops the selection', async () => {
+    const target = viewFixture({
+      actionForm: {
+        phaseInstanceId: 'i1',
+        phaseId: 'day.vote',
+        day: 1,
+        actionKind: 'vote',
+        spec: { kind: 'player-target', targets: ['p2'], allowSkip: true },
+      },
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => target, getView: async () => target })} />)
+    await arriveAtTable(view)
+    const form = view.getByTestId('werewolf-action-form')
+    const option = form.querySelector('[role="radio"]') as HTMLElement
+    fireEvent.click(option)
+    expect(view.getByTestId('werewolf-selected-target')).toBeDefined()
+    fireEvent.click(view.getByRole('button', { name: zh['vote.abstain'] }))
+    expect(option.getAttribute('aria-checked')).toBe('false')
+    expect(view.queryByTestId('werewolf-selected-target')).toBeNull()
+  })
+
+  it('builds compound actions mixing a text field and a target', async () => {
+    const compound = viewFixture({
+      actionForm: {
+        phaseInstanceId: 'i1',
+        phaseId: 'night.guard',
+        day: 1,
+        actionKind: 'act',
+        spec: {
+          kind: 'compound',
+          fields: [
+            { id: 'speech', spec: { kind: 'text', maxChars: 30, allowSkip: false } },
+            { id: 'target', spec: { kind: 'player-target', targets: ['p2'], allowSkip: false } },
+          ],
+          allowSkip: false,
+        },
+      },
+    })
+    const face = injected({ start: async () => compound, getView: async () => compound })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    await arriveAtTable(view)
+    const form = view.getByTestId('werewolf-action-form')
+    const submit = view.getByRole('button', { name: zh['action.submit'] }) as HTMLButtonElement
+    expect(submit.disabled).toBe(true)
+    fireEvent.click(form.querySelector('[role="radio"]') as HTMLElement)
+    expect(submit.disabled).toBe(false)
+    fireEvent.change(form.querySelector('textarea') as HTMLTextAreaElement, { target: { value: '守护 2 号' } })
+    fireEvent.click(submit)
+    await waitFor(() =>{  expect(face.submitAction).toHaveBeenCalledTimes(1) })
+    const request = ((face.submitAction as ReturnType<typeof vi.fn>).mock.calls[0] as unknown[])[0] as { action: Record<string, unknown> }
+    expect(request.action).toEqual({ speech: '守护 2 号', target: 'p2' })
+  })
+})
+
+describe('fieldChoices', () => {
+  it('labels player targets by seat and marks dead seats disabled', () => {
+    const choices = fieldChoices(
+      { kind: 'player-target', targets: ['p2', 'p3'], allowSkip: false },
+      viewFixture().players,
+    )
+    expect(choices[0]).toMatchObject({ id: 'p2', label: '2 · Seat 2' })
+    expect(choices[1]).toMatchObject({ id: 'p3', disabledReason: 'dead' })
+  })
+
+  it('falls back to the raw target id for a player no longer seated', () => {
+    expect(fieldChoices(
+      { kind: 'player-target', targets: ['ghost'], allowSkip: false },
+      viewFixture().players,
+    )).toEqual([{ id: 'ghost', label: 'ghost' }])
+  })
+
+  it('lists choice options verbatim and nothing for text', () => {
+    expect(fieldChoices({ kind: 'choice', options: ['use'], allowSkip: false }, []))
+      .toEqual([{ id: 'use', label: 'use' }])
+    expect(fieldChoices({ kind: 'text', maxChars: 5, allowSkip: false }, [])).toEqual([])
+  })
+})

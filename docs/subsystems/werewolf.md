@@ -32,6 +32,10 @@ The phase engine is pure: each step computes the next events and folds them thro
 
 `WerewolfGameGateway` exposes typed `start`, `getView`, `getReplay`, `submitAction`, `resume`, and `abortGame`. It resolves the version-1 local principal internally; requests cannot select a Session, participant, player, or seat. `WerewolfHumanViewV1` projects public facts plus only the bound human's role, entitled teammates, resources, notices, and current form. Final views reveal roles after the result. `getReplay` rejects active games and returns authorized checkpoints instead of raw events, bot contexts, or child prompts.
 
+## Dedicated conversation view
+
+`@deepseek-ai/dsh-client-ui-werewolf` injects the `conversation.view` entry `werewolf` and declares it preferred for `agentPreset: werewolf` sessions. The inject face wraps the generated `ctx.remote.werewolfGame` namespace — `getLobby` (the additive pre-game rule-set listing), `start`, `getView`, `submitAction`, `resume`, `abortGame`, `getReplay` — and subscribes to the forwarded `game/projection-invalidated` event, ignoring other games and re-reading through `getView`. Forms render only the closed spec vocabulary (`player-target`, `choice`, `text`, `compound`); the browser never receives bot contexts, child prompts, or raw secret events. No slash command exists and Chat text cannot mutate game state.
+
 ## Bot continuity context
 
 Every seat owns one durable subjective `WerewolfBotContextV1` inside the game's event stream — beliefs, commitments, strategy, memory summary, and the last decision identity under configured character and array limits. A context is not game truth: it can never make an illegal action legal or turn a belief into knowledge. Each accepted decision records the prior context revision, the action, the validated delta, and the full computed `contextAfter`, so every decision is an independent checkpoint while the delta explains the permitted change. Profiles are assigned deterministically from the game seed and are immutable for the game.
@@ -118,7 +122,7 @@ abstract getHostSession(gameId: GameId): Session | undefined
 
 Types: [Session](session.md)
 
-Source: [`packages/game/game/src/service.ts:26`](../../packages/game/game/src/service.ts)
+Source: [`packages/game/game/src/service.ts:19`](../../packages/game/game/src/service.ts)
 
 <a id="ctxwerewolf--werewolfruntime"></a>
 
@@ -193,6 +197,12 @@ Registers the Werewolf module and exposes the UI-facing typed methods.
 
 ```ts cordis-catalog
 /**
+ * List the registered rule sets for the lobby, before any game exists.
+ * @returns rule-set options sorted by id then revision.
+ */
+@Remote('getLobby') getLobby(): WerewolfLobbyViewV1
+
+/**
  * Start one local single-player game.
  * @param request - rule selection, seed, and caller idempotency key.
  * @returns current human-authorized projection.
@@ -235,7 +245,7 @@ Registers the Werewolf module and exposes the UI-facing typed methods.
 @Remote('abortGame') async abortGame(request: WerewolfHostMutationRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>
 ```
 
-Source: [`packages/game/werewolf/src/host.ts:23`](../../packages/game/werewolf/src/host.ts)
+Source: [`packages/game/werewolf/src/host.ts:25`](../../packages/game/werewolf/src/host.ts)
 
 <a id="game-events"></a>
 
@@ -258,5 +268,5 @@ Announce that authorized readers must re-read one game projection. The event del
 'game/projection-invalidated'(gameId: GameId, gameRevision: number): void
 ```
 
-Source: [`packages/game/game/src/service.ts:21`](../../packages/game/game/src/service.ts)
+Source: [`packages/game/game/src/types.ts:15`](../../packages/game/game/src/types.ts)
 <!-- END GENERATED cordis-surface -->

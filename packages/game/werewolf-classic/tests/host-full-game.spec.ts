@@ -31,6 +31,21 @@ function firstAction(spec: WerewolfActionSpecJsonV1): Record<string, unknown> {
 }
 
 describe('quick-7 Session Host', () => {
+  it('lists the registered rule sets through the typed lobby method', async () => {
+    const ctx = new Context()
+    await mountAgentLoopTestDependencies(ctx)
+    await ctx.plugin(SubagentRuntime)
+    await ctx.plugin(SessionGameService)
+    await ctx.plugin(WerewolfRuntime)
+    await ctx.plugin(werewolfClassic)
+    await ctx.plugin(WerewolfGameGateway)
+    const lobby = await ctx.werewolfGame.getLobby()
+    expect(lobby.version).toBe(1)
+    expect(lobby.availableRuleSets).toContainEqual({
+      id: 'quick-7', revision: 1, displayName: 'Quick 7-player game', playerCount: 7,
+    })
+  })
+
   it('plays a complete keyless game through fresh isolated children without a Host model call', async () => {
     const ctx = new Context()
     const root = await mkdtemp(join(tmpdir(), 'dsh-werewolf-game-loader-'))
