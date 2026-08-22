@@ -69,4 +69,6 @@ export interface GameModule<
   replay(state: TState, history: readonly SessionEvent[], participantId: ParticipantId): TReplay
   /** Optional Host route; omission uses deployment defaults and never drives it. */
   hostAgentOptions?: AgentOptions
+  /** Optional Agent preset recorded on the dedicated Host Session. */
+  hostAgentPreset?: string
 }

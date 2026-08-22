@@ -6,7 +6,7 @@ The reusable `ctx.games` capability for durable, turn-based game modules. The de
 
 ## Lifecycle
 
-`start()` validates the module before creating a Host. The first `game/command-receipt` and the module's start events enter the Session through `Session.appendBatch()`. Later `submitAction`, `resume`, and `abortGame` calls use `{ method, requestId }` receipts, payload SHA-256 digests, and `expectedGameRevision`: an equal duplicate returns the current projection, a changed payload conflicts, and a new stale request rejects. Each game has one serialized operation queue. A known `GameId` can cold-resume its deterministic `game-<GameId>` Host through the Agent persistence path.
+`start()` validates the module before creating a Host. The first `game/command-receipt` and the module's start events enter the Session through `Session.appendBatch()`. Later `submitAction`, `resume`, and `abortGame` calls use `{ method, requestId }` receipts, payload SHA-256 digests, and `expectedGameRevision`: an equal duplicate returns the current projection, a changed payload conflicts, and a new stale request rejects. Each game has one serialized operation queue. A known `GameId` can cold-resume its deterministic `game-<GameId>` Host through the Agent persistence path. A module may stamp that Host with `hostAgentPreset` so a client can select the module's dedicated view without changing game authority.
 
 ## Module contract
 
@@ -36,4 +36,4 @@ The Host creates no model request and therefore no game-specific Host cache entr
 
 ## Known Limitations and Deferred Work
 
-- Version 1 has one loopback local principal. Online identity, multiplayer authorization, product game forks, and the dedicated Werewolf UI are later layers. Start-request discovery across a cold persistence store is not enumerable; recovery from a known `GameId` is supported.
+- Version 1 has one loopback local principal. Online identity, multiplayer authorization, and product game forks are later layers. Start-request discovery across a cold persistence store is not enumerable; recovery from a known `GameId` is supported.

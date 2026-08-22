@@ -102,7 +102,7 @@ function viewFixture(): WerewolfHumanViewV1 {
 const REPLAY = { version: 1 as const, gameId: 'g1', finalRevision: 2, checkpoints: [] }
 
 /** Boot the plugin over fake faces; the werewolfGame namespace answers per script. */
-async function bench(options: { failWith?: string } = {}) {
+async function bench(options: { failWith?: string; hostInitiallyVisible?: boolean } = {}) {
   const ctx = new Context()
   const remote = new RemoteDouble(ctx)
   const answer = <T,>(value: T) => async () =>
@@ -127,6 +127,13 @@ async function bench(options: { failWith?: string } = {}) {
   } as never, (() => null) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
   const preferred: Array<(sessionId: SessionId) => string | null> = []
+  const sessionListeners = new Set<() => void>()
+  const open = vi.fn()
+  const byId: Record<string, { agentPreset: string }> = {
+    s1: { agentPreset: 'werewolf' },
+    s2: { agentPreset: 'coding' },
+    ...(options.hostInitiallyVisible === false ? {} : { 'game-g1': { agentPreset: 'werewolf' } }),
+  }
   ctx.provide('conversation', {
     declarePreferredView: (resolver: (sessionId: SessionId) => string | null) => {
       preferred.push(resolver)
@@ -137,10 +144,14 @@ async function bench(options: { failWith?: string } = {}) {
     },
   })
   ctx.provide('sessions', {
-    list: { getSnapshot: () => ({ byId: {
-      s1: { agentPreset: 'werewolf' },
-      s2: { agentPreset: 'coding' },
-    } }) },
+    list: {
+      getSnapshot: () => ({ byId }),
+      subscribe: (listener: () => void) => {
+        sessionListeners.add(listener)
+        return () => { sessionListeners.delete(listener) }
+      },
+    },
+    open,
   })
   const fiber = ctx.plugin({ inject: [...inject], apply: clientApply })
   const entry = () => {
@@ -158,8 +169,14 @@ async function bench(options: { failWith?: string } = {}) {
     remote,
     preferred,
     werewolfGame,
+    open,
     entry,
     verbs: () => entry()?.inject?.(sid('s1')) as WerewolfViewInjected,
+    hostVerbs: () => entry()?.inject?.(sid('game-g1')) as WerewolfViewInjected,
+    publishHost: () => {
+      byId['game-g1'] = { agentPreset: 'werewolf' }
+      for (const listener of [...sessionListeners]) listener()
+    },
   }
 }
 
@@ -180,6 +197,24 @@ describe('ui-werewolf browser plugin', () => {
     expect(b.preferred[0]!(sid('s1'))).toBe('werewolf')
     expect(b.preferred[0]!(sid('s2'))).toBeNull()
     expect(b.preferred[0]!(sid('unknown'))).toBeNull()
+  })
+
+  it('binds Host Sessions to their game and opens the dedicated Host after start', async () => {
+    const b = await bench()
+    await b.fiber.await()
+    expect(b.hostVerbs().initialGameId).toBe('g1')
+    expect(b.verbs().initialGameId).toBeUndefined()
+    b.verbs().openGame('g1')
+    expect(b.open).toHaveBeenCalledWith(sid('game-g1'))
+  })
+
+  it('waits for a newly published Host before navigating to it', async () => {
+    const b = await bench({ hostInitiallyVisible: false })
+    await b.fiber.await()
+    b.verbs().openGame('g1')
+    expect(b.open).not.toHaveBeenCalled()
+    b.publishHost()
+    expect(b.open).toHaveBeenCalledWith(sid('game-g1'))
   })
 
   it('unwraps each Remote verb and forwards requests verbatim', async () => {

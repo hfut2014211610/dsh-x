@@ -127,6 +127,7 @@ export class SessionGameService extends GameService {
       }
       const handle = await this.ctx.agents.create({
         sessionId: SessionId(`game-${prepared.gameId}`),
+        ...(module.hostAgentPreset === undefined ? {} : { meta: { agentPreset: module.hostAgentPreset } }),
         ...(module.hostAgentOptions === undefined ? {} : { agentOptions: module.hostAgentOptions }),
       })
       const record: HostRecord = {

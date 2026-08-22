@@ -595,7 +595,7 @@ describe('context revision continuity through the runner', () => {
 describe('runtime bot configuration', () => {
   it('loads reviewed defaults and resolves the runner config', async () => {
     const ctx = new Context()
-    await ctx.plugin(WerewolfRuntime, { subagentProvider: 'spawn' })
+    await ctx.plugin(WerewolfRuntime)
     const resolved = ctx.werewolf.botRunnerConfig()
     expect(resolved.provider).toBe('spawn')
     expect(resolved.retryLimit).toBe(2)

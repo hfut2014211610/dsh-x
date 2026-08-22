@@ -6,7 +6,7 @@
 
 ## 生命周期
 
-`start()` 在创建 Host 前完成模块校验。第一条 `game/command-receipt` 与模块开始事件通过 `Session.appendBatch()` 进入 Session。后续 `submitAction`、`resume`、`abortGame` 使用 `{ method, requestId }` 回执、payload SHA-256 摘要和 `expectedGameRevision`：相同重复请求返回当前投影，修改 payload 会发生冲突，新请求携带过期修订则拒绝。每局只有一个串行操作队列。已知 `GameId` 可经 Agent 持久化路径冷恢复其确定性的 `game-<GameId>` Host。
+`start()` 在创建 Host 前完成模块校验。第一条 `game/command-receipt` 与模块开始事件通过 `Session.appendBatch()` 进入 Session。后续 `submitAction`、`resume`、`abortGame` 使用 `{ method, requestId }` 回执、payload SHA-256 摘要和 `expectedGameRevision`：相同重复请求返回当前投影，修改 payload 会发生冲突，新请求携带过期修订则拒绝。每局只有一个串行操作队列。已知 `GameId` 可经 Agent 持久化路径冷恢复其确定性的 `game-<GameId>` Host。模块可通过 `hostAgentPreset` 标记该 Host，使客户端在不改变游戏权威的前提下选择模块专用视图。
 
 ## 模块约定
 
@@ -36,4 +36,4 @@ Host 不创建模型请求，因此没有游戏专属 Host cache。fresh 子代�
 
 ## 已知限制与暂缓事项
 
-- 版本1只有一个 loopback 本地主体。在线身份、多人授权、产品级游戏 fork 与狼人杀专用 UI 属于后续层。冷持久化存储无法枚举开始请求；支持从已知 `GameId` 恢复。
+- 版本1只有一个 loopback 本地主体。在线身份、多人授权与产品级游戏 fork 属于后续层。冷持久化存储无法枚举开始请求；支持从已知 `GameId` 恢复。

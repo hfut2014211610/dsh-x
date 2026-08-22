@@ -16,6 +16,13 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
     阶段：night.witch
   </h2>
   <p
+    aria-live="polite"
+    class="_srOnly_0c2d30"
+    role="status"
+  >
+    第 2 夜 · 阶段：night.witch
+  </p>
+  <p
     class="_hint_0c2d30"
   >
     夜间行动是私密的，只显示你自己的视野。
@@ -217,7 +224,9 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
         <button
           aria-checked="false"
           class=""
+          data-choice-id="use"
           role="radio"
+          tabindex="0"
           type="button"
         >
           use
@@ -225,7 +234,9 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
         <button
           aria-checked="false"
           class=""
+          data-choice-id="skip"
           role="radio"
+          tabindex="-1"
           type="button"
         >
           skip
@@ -244,7 +255,9 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
         <button
           aria-checked="false"
           class=""
+          data-choice-id="p2"
           role="radio"
+          tabindex="0"
           type="button"
         >
           2 · Seat 2
@@ -252,7 +265,9 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
         <button
           aria-checked="false"
           class=""
+          data-choice-id="p3"
           role="radio"
+          tabindex="-1"
           type="button"
         >
           3 · Seat 3
@@ -260,8 +275,9 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
         <button
           aria-checked="false"
           class=""
-          disabled=""
+          data-choice-id="p5"
           role="radio"
+          tabindex="-1"
           type="button"
         >
           5 · Seat 5
@@ -298,287 +314,12 @@ exports[`WerewolfView responsive snapshots > matches the desktop layout snapshot
     阶段：night.witch
   </h2>
   <p
-    class="_hint_0c2d30"
+    aria-live="polite"
+    class="_srOnly_0c2d30"
+    role="status"
   >
-    夜间行动是私密的，只显示你自己的视野。
+    第 2 夜 · 阶段：night.witch
   </p>
-  <div
-    class="_columns_0c2d30"
-  >
-    <aside
-      aria-label="公开时间线"
-      class="_timeline_0c2d30"
-    >
-      <h3>
-        公开时间线
-      </h3>
-      <ol>
-        <li>
-          1
-          ·
-          day.announce
-          ·
-          announcement
-        </li>
-        <li>
-          1
-          ·
-          day.vote
-          ·
-          vote
-        </li>
-      </ol>
-    </aside>
-    <div
-      class="_seats_0c2d30"
-      role="list"
-    >
-      <div
-        class="_seat_0c2d30 _self_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
-        >
-          1 号位
-          ·
-          Seat 1
-           (你)
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
-        >
-          2 号位
-          ·
-          Seat 2
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
-        >
-          3 号位
-          ·
-          Seat 3
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
-        >
-          4 号位
-          ·
-          Seat 4
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30 _dead_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
-        >
-          5 号位
-          ·
-          Seat 5
-        </span>
-        <span>
-          第 1 天出局
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
-        >
-          6 号位
-          ·
-          Seat 6
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
-        >
-          7 号位
-          ·
-          Seat 7
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-    </div>
-    <aside
-      aria-label="私密通知"
-      class="_selfPane_0c2d30"
-    >
-      <h3>
-        身份
-      </h3>
-      <p>
-        Witch
-      </p>
-      <h3>
-        私密通知
-      </h3>
-      <p>
-        暂无私密通知。
-      </p>
-    </aside>
-  </div>
-  <form
-    aria-label="选择你的行动"
-    class="_actionForm_0c2d30"
-    data-testid="werewolf-action-form"
-  >
-    <h3>
-      选择你的行动
-    </h3>
-    <fieldset>
-      <legend>
-        antidote
-      </legend>
-      <div
-        aria-label="antidote"
-        class="_choices_0c2d30"
-        role="radiogroup"
-      >
-        <button
-          aria-checked="false"
-          class=""
-          role="radio"
-          type="button"
-        >
-          use
-        </button>
-        <button
-          aria-checked="false"
-          class=""
-          role="radio"
-          type="button"
-        >
-          skip
-        </button>
-      </div>
-    </fieldset>
-    <fieldset>
-      <legend>
-        poison
-      </legend>
-      <div
-        aria-label="poison"
-        class="_choices_0c2d30"
-        role="radiogroup"
-      >
-        <button
-          aria-checked="false"
-          class=""
-          role="radio"
-          type="button"
-        >
-          2 · Seat 2
-        </button>
-        <button
-          aria-checked="false"
-          class=""
-          role="radio"
-          type="button"
-        >
-          3 · Seat 3
-        </button>
-        <button
-          aria-checked="false"
-          class=""
-          disabled=""
-          role="radio"
-          type="button"
-        >
-          5 · Seat 5
-        </button>
-      </div>
-    </fieldset>
-    <div
-      class="_actions_0c2d30"
-    >
-      <button
-        disabled=""
-        type="submit"
-      >
-        提交
-      </button>
-    </div>
-  </form>
-</section>
-`;
-
-exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot at 820px 1`] = `
-<section
-  aria-label="游戏桌"
-  aria-live="off"
-  class="_table_0c2d30 _night_0c2d30"
-  data-testid="werewolf-table"
->
-  <h2
-    class="_phaseHeading_0c2d30"
-    tabindex="-1"
-  >
-    第 2 夜
-    ·
-    阶段：night.witch
-  </h2>
   <p
     class="_hint_0c2d30"
   >
@@ -781,7 +522,9 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
         <button
           aria-checked="false"
           class=""
+          data-choice-id="use"
           role="radio"
+          tabindex="0"
           type="button"
         >
           use
@@ -789,7 +532,9 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
         <button
           aria-checked="false"
           class=""
+          data-choice-id="skip"
           role="radio"
+          tabindex="-1"
           type="button"
         >
           skip
@@ -808,7 +553,9 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
         <button
           aria-checked="false"
           class=""
+          data-choice-id="p2"
           role="radio"
+          tabindex="0"
           type="button"
         >
           2 · Seat 2
@@ -816,7 +563,9 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
         <button
           aria-checked="false"
           class=""
+          data-choice-id="p3"
           role="radio"
+          tabindex="-1"
           type="button"
         >
           3 · Seat 3
@@ -824,8 +573,307 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
         <button
           aria-checked="false"
           class=""
-          disabled=""
+          data-choice-id="p5"
           role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          5 · Seat 5
+        </button>
+      </div>
+    </fieldset>
+    <div
+      class="_actions_0c2d30"
+    >
+      <button
+        disabled=""
+        type="submit"
+      >
+        提交
+      </button>
+    </div>
+  </form>
+</section>
+`;
+
+exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot at 820px 1`] = `
+<section
+  aria-label="游戏桌"
+  aria-live="off"
+  class="_table_0c2d30 _night_0c2d30"
+  data-testid="werewolf-table"
+>
+  <h2
+    class="_phaseHeading_0c2d30"
+    tabindex="-1"
+  >
+    第 2 夜
+    ·
+    阶段：night.witch
+  </h2>
+  <p
+    aria-live="polite"
+    class="_srOnly_0c2d30"
+    role="status"
+  >
+    第 2 夜 · 阶段：night.witch
+  </p>
+  <p
+    class="_hint_0c2d30"
+  >
+    夜间行动是私密的，只显示你自己的视野。
+  </p>
+  <div
+    class="_columns_0c2d30"
+  >
+    <aside
+      aria-label="公开时间线"
+      class="_timeline_0c2d30"
+    >
+      <h3>
+        公开时间线
+      </h3>
+      <ol>
+        <li>
+          1
+          ·
+          day.announce
+          ·
+          announcement
+        </li>
+        <li>
+          1
+          ·
+          day.vote
+          ·
+          vote
+        </li>
+      </ol>
+    </aside>
+    <div
+      class="_seats_0c2d30"
+      role="list"
+    >
+      <div
+        class="_seat_0c2d30 _self_0c2d30"
+        role="listitem"
+      >
+        <span
+          class="_seatName_0c2d30"
+        >
+          1 号位
+          ·
+          Seat 1
+           (你)
+        </span>
+        <span>
+          存活
+        </span>
+        <span>
+          身份未知
+        </span>
+      </div>
+      <div
+        class="_seat_0c2d30"
+        role="listitem"
+      >
+        <span
+          class="_seatName_0c2d30"
+        >
+          2 号位
+          ·
+          Seat 2
+        </span>
+        <span>
+          存活
+        </span>
+        <span>
+          身份未知
+        </span>
+      </div>
+      <div
+        class="_seat_0c2d30"
+        role="listitem"
+      >
+        <span
+          class="_seatName_0c2d30"
+        >
+          3 号位
+          ·
+          Seat 3
+        </span>
+        <span>
+          存活
+        </span>
+        <span>
+          身份未知
+        </span>
+      </div>
+      <div
+        class="_seat_0c2d30"
+        role="listitem"
+      >
+        <span
+          class="_seatName_0c2d30"
+        >
+          4 号位
+          ·
+          Seat 4
+        </span>
+        <span>
+          存活
+        </span>
+        <span>
+          身份未知
+        </span>
+      </div>
+      <div
+        class="_seat_0c2d30 _dead_0c2d30"
+        role="listitem"
+      >
+        <span
+          class="_seatName_0c2d30"
+        >
+          5 号位
+          ·
+          Seat 5
+        </span>
+        <span>
+          第 1 天出局
+        </span>
+        <span>
+          身份未知
+        </span>
+      </div>
+      <div
+        class="_seat_0c2d30"
+        role="listitem"
+      >
+        <span
+          class="_seatName_0c2d30"
+        >
+          6 号位
+          ·
+          Seat 6
+        </span>
+        <span>
+          存活
+        </span>
+        <span>
+          身份未知
+        </span>
+      </div>
+      <div
+        class="_seat_0c2d30"
+        role="listitem"
+      >
+        <span
+          class="_seatName_0c2d30"
+        >
+          7 号位
+          ·
+          Seat 7
+        </span>
+        <span>
+          存活
+        </span>
+        <span>
+          身份未知
+        </span>
+      </div>
+    </div>
+    <aside
+      aria-label="私密通知"
+      class="_selfPane_0c2d30"
+    >
+      <h3>
+        身份
+      </h3>
+      <p>
+        Witch
+      </p>
+      <h3>
+        私密通知
+      </h3>
+      <p>
+        暂无私密通知。
+      </p>
+    </aside>
+  </div>
+  <form
+    aria-label="选择你的行动"
+    class="_actionForm_0c2d30"
+    data-testid="werewolf-action-form"
+  >
+    <h3>
+      选择你的行动
+    </h3>
+    <fieldset>
+      <legend>
+        antidote
+      </legend>
+      <div
+        aria-label="antidote"
+        class="_choices_0c2d30"
+        role="radiogroup"
+      >
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="use"
+          role="radio"
+          tabindex="0"
+          type="button"
+        >
+          use
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="skip"
+          role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          skip
+        </button>
+      </div>
+    </fieldset>
+    <fieldset>
+      <legend>
+        poison
+      </legend>
+      <div
+        aria-label="poison"
+        class="_choices_0c2d30"
+        role="radiogroup"
+      >
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p2"
+          role="radio"
+          tabindex="0"
+          type="button"
+        >
+          2 · Seat 2
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p3"
+          role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          3 · Seat 3
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p5"
+          role="radio"
+          tabindex="-1"
           type="button"
         >
           5 · Seat 5

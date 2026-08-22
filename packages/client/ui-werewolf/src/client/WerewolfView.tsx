@@ -20,11 +20,14 @@ import styles from './WerewolfView.module.css'
 interface FieldChoice {
   id: string
   label: string
-  disabledReason?: string
 }
 
 /** The inject face: typed Remote verbs plus the invalidation feed. */
 export interface WerewolfViewInjected {
+  /** Game bound to the rendered Host Session, when this is not a launcher. */
+  initialGameId?: string
+  /** Navigate from a launcher session to the dedicated game Host Session. */
+  openGame: (gameId: string) => void
   /** Lobby listing available before any game exists. */
   getLobby: () => Promise<WerewolfLobbyViewV1>
   /** Start one game on the exact rule-set pair with a fresh seed. */
@@ -69,7 +72,9 @@ function fill(template: string, params?: Record<string, string | number>): strin
 
 /** The main view component; see the module doc for the interaction states. */
 export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected): React.JSX.Element {
-  const { sessionId, translate } = props
+  const {
+    sessionId, translate, initialGameId, getLobby, getView, subscribeInvalidated, openGame,
+  } = props
   const t = useCallback((key: WerewolfKey, params?: Record<string, string | number>) => fill(translate(key), params), [translate])
   const [lobby, setLobby] = useState<WerewolfLobbyViewV1 | null>(null)
   const [view, setView] = useState<WerewolfHumanViewV1 | null>(null)
@@ -77,75 +82,137 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
   const [error, setError] = useState<string | null>(null)
   const [revealed, setRevealed] = useState(false)
   const [ready, setReady] = useState(false)
-  const [draft, setDraft] = useState('')
+  const [drafts, setDrafts] = useState<Record<string, string>>({})
   const [selected, setSelected] = useState<Record<string, string | null>>({})
   const [replay, setReplay] = useState<WerewolfReplayV1 | null>(null)
+  const [retry, setRetry] = useState<(() => void) | null>(null)
   const viewRef = useRef<WerewolfHumanViewV1 | null>(null)
+  const phaseHeadingRef = useRef<HTMLHeadingElement | null>(null)
+  const priorPhaseRef = useRef<string | undefined>(undefined)
   viewRef.current = view
 
   const applyResult = useCallback((next: WerewolfHumanViewV1) => {
+    const current = viewRef.current
+    if (current?.gameId === next.gameId && next.gameRevision < current.gameRevision) return false
+    const sameForm = current?.gameId === next.gameId
+      && current.actionForm?.phaseInstanceId === next.actionForm?.phaseInstanceId
+    const changedGame = current?.gameId !== next.gameId
+    viewRef.current = next
     setView(next)
     setError(null)
-    setDraft('')
-    setSelected({})
+    setRetry(null)
+    if (!sameForm) {
+      setDrafts({})
+      setSelected({})
+    }
+    if (changedGame) {
+      setRevealed(false)
+      setReady(false)
+      setReplay(null)
+    }
+    return true
   }, [])
 
-  useEffect(() => {
-    void (async () => {
+  const fail = useCallback((cause: unknown, rerun: () => void) => {
+    setError(cause instanceof Error ? cause.message : String(cause))
+    setRetry(() => rerun)
+  }, [])
+
+  const loadLobby = useCallback(() => {
+    const run = (): void => { void (async () => {
       setBusy(true)
       try {
-        setLobby(await props.getLobby())
+        setLobby(await getLobby())
+        setError(null)
+        setRetry(null)
       } catch (cause) {
-        setError((cause as Error).message)
+        fail(cause, run)
       } finally {
         setBusy(false)
       }
-    })()
-    return props.subscribeInvalidated((gameId) => {
+    })() }
+    run()
+  }, [getLobby, fail])
+
+  const loadGame = useCallback((gameId: string) => {
+    const run = (): void => { void (async () => {
+      setBusy(true)
+      try {
+        applyResult(await getView(gameId))
+      } catch (cause) {
+        fail(cause, run)
+      } finally {
+        setBusy(false)
+      }
+    })() }
+    run()
+  }, [getView, applyResult, fail])
+
+  useEffect(() => {
+    const refresh = (gameId: string): void => {
+      void getView(gameId)
+        .then(applyResult)
+        .catch((cause: unknown) => { fail(cause, () => { refresh(gameId) }) })
+    }
+    const stop = subscribeInvalidated((gameId) => {
       if (viewRef.current?.gameId !== gameId) return
-      void (async () => {
-        try {
-          applyResult(await props.getView(gameId))
-        } catch {
-          // The invalidation lost a race with a newer mutation response; the
-          // next mutation or invalidation carries the fresh projection.
-        }
-      })()
+      refresh(gameId)
     })
-    // The inject face is stable for the session lifetime.
-  }, [sessionId])
+    if (initialGameId === undefined) loadLobby()
+    else loadGame(initialGameId)
+    return stop
+  }, [sessionId, initialGameId, subscribeInvalidated, getView, applyResult, fail, loadLobby, loadGame])
+
+  const phaseInstanceId = view?.phase?.phaseInstanceId
+  useEffect(() => {
+    const prior = priorPhaseRef.current
+    priorPhaseRef.current = phaseInstanceId
+    if (ready && prior !== undefined && phaseInstanceId !== prior) phaseHeadingRef.current?.focus()
+  }, [phaseInstanceId, ready])
 
   const onStart = useCallback((ruleSetId: string, ruleSetRevision: number) => {
-    void (async () => {
+    const request = {
+      requestId: newRequestId(),
+      expectedGameRevision: 0 as const,
+      ruleSetId,
+      ruleSetRevision,
+      seed: Math.floor(Math.random() * Number.MAX_SAFE_INTEGER),
+    }
+    const run = (): void => { void (async () => {
       setBusy(true)
       try {
-        applyResult(await props.start({
-          requestId: newRequestId(),
-          expectedGameRevision: 0,
-          ruleSetId,
-          ruleSetRevision,
-          seed: Math.floor(Math.random() * Number.MAX_SAFE_INTEGER),
-        }))
-        setRevealed(false)
-        setReady(false)
+        const next = await props.start(request)
+        applyResult(next)
+        openGame(next.gameId)
       } catch (cause) {
-        setError((cause as Error).message)
+        fail(cause, run)
       } finally {
         setBusy(false)
       }
-    })()
-  }, [props, applyResult])
+    })() }
+    run()
+  }, [props.start, applyResult, openGame, fail])
 
-  const mutate = useCallback(async (run: () => Promise<WerewolfHumanViewV1>) => {
+  const mutate = useCallback(async (input: {
+    gameId: string
+    run: () => Promise<WerewolfHumanViewV1>
+    retry: () => void
+    applicable: () => boolean
+  }) => {
     setBusy(true)
     try {
-      applyResult(await run())
+      applyResult(await input.run())
     } catch (cause) {
-      setError((cause as Error).message)
+      try {
+        applyResult(await getView(input.gameId))
+      } catch {
+        // Preserve the mutation diagnostic; the same idempotency key remains retryable.
+      }
+      if (input.applicable()) fail(cause, input.retry)
     } finally {
       setBusy(false)
     }
-  }, [applyResult])
+  }, [applyResult, getView, fail])
 
   if (view === null) {
     return (
@@ -174,14 +241,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
                 ))}
             </ul>
           )}
-        {error !== null && (
-          <p role="alert">
-            {t('error.title')}
-            {error === '' ? '' : `: ${error}`}
-            {' '}
-            <button type="button" onClick={() =>{  setError(null) }}>{t('error.retry')}</button>
-          </p>
-        )}
+        {error !== null && <ErrorAlert error={error} retry={retry} busy={busy} t={t} />}
         {busy && <p role="status" aria-live="polite">{t('busy.label')}</p>}
       </section>
     )
@@ -189,6 +249,9 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
 
   if (view.result !== null) {
     const self = view.players.find(player => player.playerId === view.self.playerId)
+    const review = (): void => {
+      void mutateReplay(props, view.gameId, setReplay, setBusy, setError, setRetry, fail, review)
+    }
     return (
       <section className={styles.result} aria-label={t('result.title')} data-testid="werewolf-result">
         <h2>{t('result.title')}</h2>
@@ -211,11 +274,22 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
           <button
             type="button"
             disabled={busy}
-            onClick={() => void mutateReplay(props, view.gameId, setReplay, setBusy, setError)}
+            onClick={review}
           >
             {t('result.review')}
           </button>
-          <button type="button" onClick={() => { setView(null); setRevealed(false); setReady(false) }}>
+          <button
+            type="button"
+            disabled={busy}
+            onClick={() => {
+              viewRef.current = null
+              setView(null)
+              setRevealed(false)
+              setReady(false)
+              setReplay(null)
+              loadLobby()
+            }}
+          >
             {t('result.newGame')}
           </button>
         </div>
@@ -230,12 +304,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
             <button type="button" onClick={() =>{  setReplay(null) }}>{t('replay.close')}</button>
           </div>
         )}
-        {error !== null && (
-          <p role="alert">
-            {t('error.title')}
-            {error === '' ? '' : `: ${error}`}
-          </p>
-        )}
+        {error !== null && <ErrorAlert error={error} retry={retry} busy={busy} t={t} />}
       </section>
     )
   }
@@ -286,6 +355,63 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
   const humanSeat = view.players.find(player => player.human)
   const selfAlive = humanSeat?.alive ?? true
   const form = view.actionForm
+  const resume = (): void => {
+    const current = viewRef.current
+    if (current?.gameId !== view.gameId || current.status !== 'paused') return
+    const requestId = newRequestId()
+    const run = (): void => {
+      const latest = viewRef.current
+      if (latest?.gameId !== view.gameId || latest.status !== 'paused') return
+      void mutate({
+        gameId: view.gameId,
+        run: async () => await props.resume({
+          gameId: view.gameId, requestId, expectedGameRevision: latest.gameRevision,
+        }),
+        retry: run,
+        applicable: () => viewRef.current?.gameId === view.gameId && viewRef.current.status === 'paused',
+      })
+    }
+    run()
+  }
+  const abort = (): void => {
+    const requestId = newRequestId()
+    const run = (): void => {
+      const latest = viewRef.current
+      if (latest?.gameId !== view.gameId || latest.status === 'ended') return
+      void mutate({
+        gameId: view.gameId,
+        run: async () => await props.abortGame({
+          gameId: view.gameId, requestId, expectedGameRevision: latest.gameRevision,
+        }),
+        retry: run,
+        applicable: () => viewRef.current?.gameId === view.gameId && viewRef.current.status !== 'ended',
+      })
+    }
+    run()
+  }
+  const submit = (action: import('@deepseek-ai/dsh-session/types').JsonValue): void => {
+    if (form === null) return
+    const requestId = newRequestId()
+    const phase = form.phaseInstanceId
+    const run = (): void => {
+      const latest = viewRef.current
+      if (latest?.gameId !== view.gameId || latest.actionForm?.phaseInstanceId !== phase) return
+      void mutate({
+        gameId: view.gameId,
+        run: async () => await props.submitAction({
+          gameId: view.gameId,
+          requestId,
+          expectedGameRevision: latest.gameRevision,
+          phaseInstanceId: phase,
+          action,
+        }),
+        retry: run,
+        applicable: () => viewRef.current?.gameId === view.gameId
+          && viewRef.current.actionForm?.phaseInstanceId === phase,
+      })
+    }
+    run()
+  }
   return (
     <section
       className={night ? `${styles.table} ${styles.night}` : styles.table}
@@ -293,11 +419,16 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
       data-testid="werewolf-table"
       aria-live="off"
     >
-      <h2 className={styles.phaseHeading} tabIndex={-1}>
+      <h2 ref={phaseHeadingRef} className={styles.phaseHeading} tabIndex={-1}>
         {night ? t('table.night', { day: view.day }) : t('table.day', { day: view.day })}
         {'·'}
         {view.phase !== null ? t('table.phase', { phase: view.phase.phaseId }) : t('table.empty')}
       </h2>
+      <p className={styles.srOnly} role="status" aria-live="polite">
+        {`${night ? t('table.night', { day: view.day }) : t('table.day', { day: view.day })} · ${
+          view.phase !== null ? t('table.phase', { phase: view.phase.phaseId }) : t('table.empty')
+        }`}
+      </p>
       {night && <p className={styles.hint}>{t('night.privateHint')}</p>}
       <div className={styles.columns}>
         <aside className={styles.timeline} aria-label={t('table.timeline')}>
@@ -370,9 +501,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
           <button
             type="button"
             disabled={busy}
-            onClick={() => void mutate(() => props.resume({
-              gameId: view.gameId, requestId: newRequestId(), expectedGameRevision: view.gameRevision,
-            }))}
+            onClick={resume}
           >
             {busy ? t('paused.resuming') : t('paused.resume')}
           </button>
@@ -381,9 +510,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
             disabled={busy}
             onClick={() => {
               if (window.confirm(t('paused.confirmAbort'))) {
-                void mutate(() => props.abortGame({
-                  gameId: view.gameId, requestId: newRequestId(), expectedGameRevision: view.gameRevision,
-                }))
+                abort()
               }
             }}
           >
@@ -395,33 +522,20 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
         <ActionForm
           form={form}
           players={view.players}
-          draft={draft}
+          drafts={drafts}
           selected={selected}
           busy={busy}
-          onDraft={setDraft}
+          onDraft={(fieldId, value) => { setDrafts(current => ({ ...current, [fieldId]: value })) }}
           onSelect={(fieldId, value) =>{  setSelected(current => ({ ...current, [fieldId]: value })) }}
           onSubmit={() => {
-            const action = buildAction(form.spec, draft, selected)
-            void mutate(() => props.submitAction({
-              gameId: view.gameId,
-              requestId: newRequestId(),
-              expectedGameRevision: view.gameRevision,
-              phaseInstanceId: form.phaseInstanceId,
-              action,
-            }))
+            submit(buildAction(form.spec, drafts, selected))
           }}
+          onSkip={() => { submit(buildSkippedAction(form.spec)) }}
           t={t}
         />
       )}
       {busy && <p role="status" aria-live="polite">{t('busy.label')}</p>}
-      {error !== null && (
-        <p role="alert">
-          {t('error.title')}
-          {error === '' ? '' : `: ${error}`}
-          {' '}
-          <button type="button" onClick={() =>{  setError(null) }}>{t('error.retry')}</button>
-        </p>
-      )}
+      {error !== null && <ErrorAlert error={error} retry={retry} busy={busy} t={t} />}
     </section>
   )
 }
@@ -439,41 +553,74 @@ async function mutateReplay(
   setReplay: (replay: WerewolfReplayV1 | null) => void,
   setBusy: (busy: boolean) => void,
   setError: (error: string | null) => void,
+  setRetry: (retry: (() => void) | null) => void,
+  fail: (cause: unknown, retry: () => void) => void,
+  retry: () => void,
 ): Promise<void> {
   setBusy(true)
   try {
     setReplay(await props.getReplay(gameId))
+    setError(null)
+    setRetry(null)
   } catch (cause) {
-    setError((cause as Error).message)
+    fail(cause, retry)
   } finally {
     setBusy(false)
   }
 }
 
+function ErrorAlert(input: {
+  error: string
+  retry: (() => void) | null
+  busy: boolean
+  t: (key: WerewolfKey, params?: Record<string, string | number>) => string
+}): React.JSX.Element {
+  return (
+    <p role="alert">
+      {input.t('error.title')}
+      {input.error === '' ? '' : `: ${input.error}`}
+      {input.retry !== null && (
+        <>
+          {' '}
+          <button type="button" disabled={input.busy} onClick={input.retry}>{input.t('error.retry')}</button>
+        </>
+      )}
+    </p>
+  )
+}
+
 /** Build the action JSON one form submit sends. */
 export function buildAction(
   spec: WerewolfActionSpecJsonV1,
-  draft: string,
+  drafts: Record<string, string>,
   selected: Record<string, string | null>,
 ): import('@deepseek-ai/dsh-session/types').JsonValue {
   if (spec.kind === 'compound') {
     const action: Record<string, import('@deepseek-ai/dsh-session/types').JsonValue> = {}
     for (const field of spec.fields) {
-      action[field.id] = fieldValue(field.spec, field.id, draft, selected)
+      action[field.id] = fieldValue(field.spec, field.id, drafts, selected)
     }
     return action
   }
-  return { value: fieldValue(spec, 'value', draft, selected) }
+  return { value: fieldValue(spec, 'value', drafts, selected) }
+}
+
+/** Build the explicit null action sent by a visible skip control. */
+export function buildSkippedAction(
+  spec: WerewolfActionSpecJsonV1,
+): import('@deepseek-ai/dsh-session/types').JsonValue {
+  if (spec.kind !== 'compound') return { value: null }
+  return Object.fromEntries(spec.fields.map(field => [field.id, null]))
 }
 
 function fieldValue(
   spec: WerewolfSingleActionSpecJsonV1,
   fieldId: string,
-  draft: string,
+  drafts: Record<string, string>,
   selected: Record<string, string | null>,
 ): string | null {
   if (spec.kind === 'text') {
-    const trimmed = draft.trim()
+    const trimmed = (drafts[fieldId] ?? '').trim()
     return trimmed.length > 0 ? trimmed.slice(0, spec.maxChars) : null
   }
   const value = selected[fieldId] ?? null
@@ -491,7 +638,6 @@ export function fieldChoices(
       return {
         id: target,
         label: player === undefined ? target : `${player.seat} · ${player.displayName}`,
-        ...(player?.alive === false ? { disabledReason: 'dead' } : {}),
       }
     })
   }
@@ -505,26 +651,29 @@ export function fieldChoices(
 function ActionForm(input: {
   form: NonNullable<WerewolfHumanViewV1['actionForm']>
   players: WerewolfHumanViewV1['players']
-  draft: string
+  drafts: Record<string, string>
   selected: Record<string, string | null>
   busy: boolean
-  onDraft: (draft: string) => void
+  onDraft: (fieldId: string, draft: string) => void
   onSelect: (fieldId: string, value: string | null) => void
   onSubmit: () => void
+  onSkip: () => void
   t: (key: WerewolfKey, params?: Record<string, string | number>) => string
 }): React.JSX.Element {
-  const { form, players, draft, selected, busy, onDraft, onSelect, onSubmit, t } = input
+  const { form, players, drafts, selected, busy, onDraft, onSelect, onSubmit, onSkip, t } = input
   const spec = form.spec
   const fields = spec.kind === 'compound' ? spec.fields : [{ id: 'value', spec }]
   const allowSkip = spec.allowSkip
   const canSubmit = useMemo(() => {
-    if (spec.kind === 'text') return allowSkip || draft.trim().length > 0
+    if (spec.kind === 'text') return allowSkip || (drafts.value ?? '').trim().length > 0
     if (spec.kind === 'compound') {
       return spec.fields.every(field =>
-        field.spec.kind === 'text' ? true : (selected[field.id] ?? null) !== null)
+        field.spec.kind === 'text'
+          ? field.spec.allowSkip || (drafts[field.id] ?? '').trim().length > 0
+          : field.spec.allowSkip || (selected[field.id] ?? null) !== null)
     }
     return allowSkip || (selected.value ?? null) !== null
-  }, [spec, draft, selected, allowSkip])
+  }, [spec, drafts, selected, allowSkip])
   return (
     <form
       className={styles.actionForm}
@@ -556,28 +705,51 @@ function ActionForm(input: {
                 <label>
                   <span className={styles.speechLabel}>{t('speech.placeholder')}</span>
                   <textarea
-                    value={draft}
+                    value={drafts[field.id] ?? ''}
                     maxLength={field.spec.maxChars}
                     placeholder={t('speech.placeholder')}
-                    onChange={(event) =>{  onDraft(event.target.value) }}
+                    onChange={(event) =>{  onDraft(field.id, event.target.value) }}
                     aria-describedby={`${field.id}-remaining`}
                   />
                 </label>
                 <p id={`${field.id}-remaining`}>
-                  {t('speech.remaining', { count: Math.max(0, field.spec.maxChars - draft.length) })}
+                  {t('speech.remaining', { count: Math.max(0, field.spec.maxChars - (drafts[field.id]?.length ?? 0)) })}
                 </p>
               </>
             )
             : (
-              <div className={styles.choices} role="radiogroup" aria-label={field.id}>
-                {fieldChoices(field.spec, players).map(choice => (
+              <div
+                className={styles.choices}
+                role="radiogroup"
+                aria-label={field.id}
+                onKeyDown={(event) => {
+                  if (event.key === 'Escape') {
+                    event.preventDefault()
+                    onSelect(field.id, null)
+                    return
+                  }
+                  if (!['ArrowLeft', 'ArrowRight', 'ArrowUp', 'ArrowDown'].includes(event.key)) return
+                  event.preventDefault()
+                  const buttons = [...event.currentTarget.querySelectorAll<HTMLButtonElement>('[role="radio"]')]
+                    .filter(button => !button.disabled)
+                  if (buttons.length === 0) return
+                  const current = Math.max(0, buttons.indexOf(document.activeElement as HTMLButtonElement))
+                  const delta = event.key === 'ArrowLeft' || event.key === 'ArrowUp' ? -1 : 1
+                  const next = buttons[(current + delta + buttons.length) % buttons.length]
+                  next?.focus()
+                  const value = next?.dataset.choiceId
+                  if (value !== undefined) onSelect(field.id, value)
+                }}
+              >
+                {fieldChoices(field.spec, players).map((choice, index) => (
                   <button
                     key={choice.id}
                     type="button"
                     role="radio"
+                    data-choice-id={choice.id}
                     aria-checked={selected[field.id] === choice.id}
+                    tabIndex={selected[field.id] === choice.id || ((selected[field.id] ?? null) === null && index === 0) ? 0 : -1}
                     className={selected[field.id] === choice.id ? styles.selected : ''}
-                    disabled={choice.disabledReason !== undefined}
                     onClick={() =>{  onSelect(field.id, selected[field.id] === choice.id ? null : choice.id) }}
                   >
                     {choice.label}
@@ -596,10 +768,7 @@ function ActionForm(input: {
             type="button"
             title={t('action.passLabel')}
             disabled={busy}
-            onClick={() => {
-              for (const field of fields) onSelect(field.id, null)
-              if (spec.kind === 'text') onDraft('')
-            }}
+            onClick={onSkip}
           >
             {spec.kind === 'text' ? t('speech.pass') : t('vote.abstain')}
           </button>

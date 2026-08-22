@@ -77,6 +77,7 @@ function candidates(events: readonly WerewolfEvent[]): GameEventCandidate[] {
 export class WerewolfGameModule implements GameModule<WerewolfGameStateV1, JsonValue, JsonValue, WerewolfHumanViewV1, WerewolfReplayV1> {
   readonly id = 'werewolf'
   readonly version = 1
+  readonly hostAgentPreset = 'werewolf'
 
   constructor(
     private readonly ctx: Context,

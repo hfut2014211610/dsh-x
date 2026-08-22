@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/module-graph.md
 module-graph.md: f057b3229d5c4dbe54dfdbc6909e3d126359b1f1
-module-graph.zh.md: e19f6ab2589b946cae4af81ec80d66623b5b23a8
+module-graph.zh.md: 645f401a736d7f2fd8ac9bd9ff2f90feeedfff92

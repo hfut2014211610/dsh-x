@@ -63,7 +63,7 @@ export interface WerewolfRuntimeConfig {
 export class WerewolfRuntime extends Service {
   /** Validated deployment input; `botRunnerConfig()` applies the reviewed defaults. */
   static Config: z<WerewolfRuntimeConfig> = z.object({
-    subagentProvider: z.string(),
+    subagentProvider: z.string().default('spawn'),
     botAgent: z.object({
       provider: z.string(),
       model: z.string(),

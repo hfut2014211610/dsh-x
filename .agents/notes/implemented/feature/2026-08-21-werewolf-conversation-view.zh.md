@@ -12,17 +12,17 @@ Status: implemented
 
 阶段4新增 `@deepseek-ai/dsh-client-ui-werewolf`——一个 ui-writing 血统的浏览器插件——以及装载它的组合：
 
-1. **视图是投影消费者，不是状态持有者。** `WerewolfView` 的全部值与动词都经槽位注入面获得：该面包装生成的 `ctx.remote.werewolfGame` 命名空间（`getLobby`、`start`、`getView`、`submitAction`、`resume`、`abortGame`、`getReplay`），把 `RemoteResult` 解包为视图值或抛出诊断并以内联可重试错误呈现。每次变更后，响应投影直接替换当前投影；客户端仅存的展示局部状态是揭示步骤、草稿、选择与复盘面板。
+1. **视图是投影消费者，不是状态持有者。** `WerewolfView` 的全部值与动词都经槽位注入面获得：该面包装生成的 `ctx.remote.werewolfGame` 命名空间（`getLobby`、`start`、`getView`、`submitAction`、`resume`、`abortGame`、`getReplay`），把 `RemoteResult` 解包为视图值或抛出诊断并以内联可重试错误呈现。修订检查会拒绝旧响应，同阶段刷新则保留展示局部的草稿与选择。重试复用原变更的幂等键；若协调读取表明阶段已经推进，则不再提供过期重试。
 2. **刷新只依赖一个转发事件。** `game/projection-invalidated` 加入 `API_REMOTE_FORWARDED_EVENTS`；视图在首次读取前订阅，忽略其他游戏的 id，并通过 `getView` 重读。事件不携带秘密字段，授权完全保留在 Host 投影器中。
 3. **大厅需要局前列表。** Gateway 增加附加的 `getLobby` 远端方法，返回按 `{ id, revision }` 排序的已注册规则集选项——这是大厅在游戏尚不存在时唯一可调用的宿主面。
 4. **客户端安全迫使三处小型宿主重构。** `@deepseek-ai/dsh-game/types` 不再引用 Agent 或 subagent 类型（执行器契约移入宿主侧 `executor.ts` 模块）；`@deepseek-ai/dsh-werewolf/types` 改为从永不导入引擎或运行器类的模块再导出线类型；投影的注册表依赖改为结构化的 `WerewolfRuleSetSource`。没有这些改动，导入生成的 remote 声明会把宿主专用模块拖进客户端编译面。
-5. **表单只渲染封闭词汇。** `player-target`、`choice`、`text` 与 `compound` 分别映射为座位按钮、选项单选、受限文本域与嵌套 fieldset；`buildAction` 与 `fieldChoices` 是规格的纯函数，投票确认、发言边界与跳过可见性全部由权威阶段数据派生。
-6. **组合是数据。** web-app bundle 新增宿主行（`dsh-game`、`dsh-werewolf`、`dsh-werewolf-classic`、`dsh-werewolf/host`），复用基础 bundle 的 `spawn` provider；浏览器行为视图；`werewolf` agent preset 只贡献一个 persona：preset 会话仍是普通活跃 Agent，其伴随面即游戏视图。
+5. **表单只渲染封闭词汇。** `player-target`、`choice`、`text` 与 `compound` 分别映射为座位按钮、选项单选、受限文本域与嵌套 fieldset；复合文本字段各自保留草稿，必填子字段控制提交，可见的“过/弃票”发送显式 null 动作。`buildAction` 与 `fieldChoices` 仍是权威阶段规格的纯函数，包括未来角色可能合法选择、但当前名册状态不同的目标。
+6. **组合与 Host 导航是数据。** web-app bundle 新增宿主行（`dsh-game`、`dsh-werewolf`、`dsh-werewolf-classic`、`dsh-werewolf/host`）与浏览器视图行。狼人杀运行时把 `subagentProvider` 默认设为基础 bundle 的 `spawn` provider，而 `werewolf` agent preset 只贡献一个 persona。`GameModule.hostAgentPreset` 标记专用 `game-<GameId>` Host Session，因此成功开始后会打开该 Session，重新进入时也会直接恢复游戏投影。
 
 ## 后果
 
 - 八个产品状态全部由 jsdom 行为测试覆盖；桌面/820px/390px 布局快照固定了确定性座位顺序、粘性阶段状态与移动端座位轮播。
-- 无障碍是结构性的：带 `aria-checked` 的单选组、`role="status"`/`role="alert"` 区域、非颜色座位提示、44px 目标与提交后可恢复焦点的阶段标题。
+- 无障碍是结构性的：支持方向键选择、Escape 清除并带 `aria-checked` 的单选组，实时状态与错误区域、非颜色座位提示、44px 目标、可见焦点，以及已提交阶段切换后的阶段标题焦点恢复。
 - Bot 子代理面未变：阶段4不增加任何模型可见的父输入，因此视图包的 Model Experience 段以“不存在”作为契约记录。
 - 复盘仍是检查点索引；按天/阶段 scrub 与展示 store 已推迟并记录在包 README 的限制中。
 

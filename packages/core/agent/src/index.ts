@@ -83,8 +83,9 @@ export interface CreateAgentOptions {
   /**
    * Session creation metadata: validated absolute `cwd`, `parentSession`
    * fork lineage, the `seedLength` seed boundary, the coarse `origin`
-   * classification, and the `delegationDepth` recursion budget. Mirrors the
-   * `cwd`/`parentSession`/`seedLength`/`origin`/`delegationDepth` fields of
+   * classification, the `delegationDepth` recursion budget, and the optional
+   * `agentPreset` view identity. Mirrors the
+   * `cwd`/`parentSession`/`seedLength`/`origin`/`delegationDepth`/`agentPreset` fields of
    * {@link CreateSessionOptions.meta} in dsh-session (the internal-only
    * `createdAt`, used when reconstructing a persisted session, is deliberately
    * excluded — a factory caller never sets it). This is durable session data,

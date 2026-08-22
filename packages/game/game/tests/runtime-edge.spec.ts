@@ -39,6 +39,7 @@ class EdgeModule implements GameModule<EdgeState> {
   readonly id: string
   readonly version: number
   hostAgentOptions?: AgentOptions
+  hostAgentPreset?: string
   gameIdValue = 'edge'
   preparedStatus: EdgeState['status'] = 'running'
   preparedEvents: ReadonlyArray<{ type: string; data: JsonValue }> | undefined
@@ -156,8 +157,10 @@ describe('game Host utility and service edges', () => {
   it('uses explicit Host options and rejects a second start for the same game id', async () => {
     const module = new EdgeModule()
     module.hostAgentOptions = {}
+    module.hostAgentPreset = 'game-test'
     const { ctx } = await setup(module)
     await start(ctx)
+    expect(ctx.games.getHostSession(GameId('edge'))?.header.agentPreset).toBe('game-test')
     await expect(start(ctx, 'start-edge-2')).rejects.toMatchObject({ code: 'GAME_INVALID_TRANSITION' })
   })
 

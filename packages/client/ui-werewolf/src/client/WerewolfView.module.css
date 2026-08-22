@@ -4,6 +4,7 @@
   padding: 24px;
   max-width: 720px;
   margin: 0 auto;
+  color: var(--dsw-alias-label-primary);
 }
 
 .rules {
@@ -15,13 +16,13 @@
 }
 
 .ruleCard {
-  border: 1px solid #3a3f4b;
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
   padding: 16px;
   display: flex;
   flex-direction: column;
   gap: 8px;
-  background: #1c2029;
+  background: var(--dsw-alias-bg-layer-2);
 }
 
 .ruleName {
@@ -33,15 +34,22 @@
   max-width: 480px;
   margin: 0 auto;
   text-align: center;
+  color: var(--dsw-alias-label-primary);
 }
 
 .cardBack {
   width: 160px;
   height: 220px;
   border-radius: 12px;
-  border: 1px solid #4a5060;
-  background: repeating-linear-gradient(45deg, #232833, #232833 8px, #1c2029 8px, #1c2029 16px);
-  color: #cfd4e0;
+  border: 1px solid var(--dsw-alias-border-l2);
+  background: repeating-linear-gradient(
+    45deg,
+    var(--dsw-alias-bg-layer-2),
+    var(--dsw-alias-bg-layer-2) 8px,
+    var(--dsw-alias-bg-layer-3) 8px,
+    var(--dsw-alias-bg-layer-3) 16px
+  );
+  color: var(--dsw-alias-label-primary);
   font-size: 1rem;
   cursor: pointer;
 }
@@ -51,20 +59,26 @@
   flex-direction: column;
   gap: 16px;
   padding: 16px;
+  color: var(--dsw-alias-label-primary);
 }
 
 .night {
-  background: #12141b;
+  background: color-mix(in srgb, var(--dsw-alias-bg-layer-1) 92%, #111827 8%);
 }
 
 .phaseHeading {
   font-family: Georgia, 'Times New Roman', serif;
   font-size: 1.25rem;
   margin: 0;
+  position: sticky;
+  top: 0;
+  z-index: 2;
+  padding: 8px 0;
+  background: var(--dsw-alias-bg-base);
 }
 
 .hint {
-  color: #9aa3b5;
+  color: var(--dsw-alias-label-tertiary);
 }
 
 .columns {
@@ -76,10 +90,10 @@
 
 .timeline,
 .selfPane {
-  border: 1px solid #3a3f4b;
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
   padding: 12px;
-  background: #1c2029;
+  background: var(--dsw-alias-bg-layer-2);
   font-size: 0.875rem;
   overflow-wrap: anywhere;
 }
@@ -91,13 +105,13 @@
 }
 
 .seat {
-  border: 1px solid #3a3f4b;
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
   padding: 12px;
   display: flex;
   flex-direction: column;
   gap: 4px;
-  background: #232833;
+  background: var(--dsw-alias-bg-layer-3);
 }
 
 .seat::before {
@@ -115,12 +129,13 @@
 }
 
 .self {
-  border-color: #7a6448;
-  background: #2a2417;
+  border-color: var(--dsw-alias-state-warn-secondary);
+  background: var(--dsw-alias-state-warn-tertiary);
 }
 
 .selected {
-  outline: 2px solid #b08a4f;
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
 }
 
 .seatName {
@@ -129,20 +144,24 @@
 
 .spectator,
 .paused {
-  border: 1px solid #3a3f4b;
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
   padding: 12px;
-  background: #1c2029;
+  background: var(--dsw-alias-bg-layer-2);
 }
 
 .actionForm {
-  border: 1px solid #3a3f4b;
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
   padding: 16px;
-  background: #1c2029;
+  background: var(--dsw-alias-bg-layer-2);
   display: flex;
   flex-direction: column;
   gap: 12px;
+  position: sticky;
+  bottom: 0;
+  z-index: 2;
+  box-shadow: var(--dsw-shadow-lv2);
 }
 
 .actionForm textarea {
@@ -163,6 +182,15 @@
   padding: 8px 12px;
 }
 
+.table button:focus-visible,
+.lobby button:focus-visible,
+.reveal button:focus-visible,
+.result button:focus-visible,
+.table textarea:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
 .actions {
   display: flex;
   gap: 12px;
@@ -173,6 +201,7 @@
   padding: 24px;
   max-width: 640px;
   margin: 0 auto;
+  color: var(--dsw-alias-label-primary);
 }
 
 .outcome {
@@ -186,10 +215,10 @@
 }
 
 .replay {
-  border: 1px solid #3a3f4b;
+  border: 1px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
   padding: 16px;
-  background: #1c2029;
+  background: var(--dsw-alias-bg-layer-2);
   max-height: 320px;
   overflow-y: auto;
 }
@@ -197,6 +226,18 @@
 .speechLabel {
   display: block;
   margin-bottom: 4px;
+}
+
+.srOnly {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  padding: 0;
+  margin: -1px;
+  overflow: hidden;
+  clip: rect(0, 0, 0, 0);
+  white-space: nowrap;
+  border: 0;
 }
 
 @media (max-width: 1023px) {

@@ -6,12 +6,13 @@
 
 ## 它做什么
 
-- **视图注册** —— 注入 `conversation.view` 槽条目 `werewolf`（顺序 6）并带双语标签；对 `agentPreset` 为 `werewolf` 的会话声明首选视图，但不覆盖用户持久化的 tab 选择。
+- **视图注册** —— 注入 `conversation.view` 槽条目 `werewolf`（顺序 6）并带双语标签；对 `agentPreset` 为 `werewolf` 的会话声明首选视图，但不覆盖用户持久化的 tab 选择。开始游戏后打开其专用 `game-<GameId>` Host Session；重新打开该 Host 时直接恢复授权投影，而不是返回启动页。
 - **类型化 Remote 动词** —— 注入面包装 `ctx.remote.werewolfGame`（`getLobby`、`start`、`getView`、`submitAction`、`resume`、`abortGame`、`getReplay`），把 `RemoteResult` 解包为视图值或抛出诊断，前端以内联可重试错误呈现。
-- **失效刷新** —— 首次读取前订阅转发的 `game/projection-invalidated` 宿主事件，忽略其他游戏的事件并通过 `getView` 重读；变更响应直接替换投影，因此客户端除展示偏好外不持有任何游戏状态。
+- **失效刷新** —— 首次读取前订阅转发的 `game/projection-invalidated` 宿主事件，忽略其他游戏的事件并通过 `getView` 重读；旧修订不能覆盖当前投影，同一阶段刷新会保留仍适用的草稿与选择。
 - **交互状态** —— 大厅、遮盖揭示（两步交互，不依赖翻牌动画）、以图标/文字/样式共同表达座位状态并有粘性阶段标题的游戏桌、带隐私提示的夜间聚焦、带字数上限文本编辑器的白天发言、带单选组选择与粘性确认的投票、观战标注，以及带复盘检查点的结算。
-- **通用动作表单** —— 只渲染封闭规格词汇：`player-target`、`choice`、`text`、`compound`；字段 id 稳定，文本草稿受 `maxChars` 限制，仅当 `allowSkip` 允许时出现跳过。配置无法携带 HTML、CSS、回调或组件名。
-- **无障碍** —— 座位以文字公告状态，键盘按 DOM 顺序可达所有控件，单选组使用 `role="radio"` 与 `aria-checked`，忙碌与错误区域使用 `role="status"`/`role="alert"`，阶段标题带 `tabindex={-1}` 以便提交后恢复焦点。
+- **通用动作表单** —— 只渲染封闭规格词汇：`player-target`、`choice`、`text`、`compound`；字段 id 稳定，复合文本字段各自保留草稿，必填字段控制提交可用性，可见的“过/弃票”会提交显式 null 动作。配置无法携带 HTML、CSS、回调或组件名。
+- **无障碍** —— 座位以文字公告状态，键盘按 DOM 顺序可达所有控件，单选组支持方向键选择与 Escape 清除并使用 `role="radio"`/`aria-checked`，忙碌、阶段与错误区域使用实时语义，已提交的阶段切换后焦点返回阶段标题。
+- **失败恢复** —— 内联重试使用原幂等键重发同一逻辑变更。客户端在提供变更重试前会先刷新授权投影；若阶段已经推进，则不再保留过期动作。
 
 ## 模型体验
 
