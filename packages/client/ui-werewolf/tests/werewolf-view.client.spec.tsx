@@ -10,6 +10,7 @@ import {
   WerewolfView,
   type WerewolfViewInjected,
 } from '../src/client/WerewolfView.tsx'
+import { WerewolfSurface } from '../src/client/WerewolfSurface.tsx'
 import { en, zh } from '../src/client/locales.ts'
 import type {
   WerewolfHumanViewV1,
@@ -19,6 +20,10 @@ import type {
 
 const TestView = WerewolfView as unknown as (
   props: { sessionId: string } & WerewolfViewInjected,
+) => ReactElement
+
+const TestSurface = WerewolfSurface as unknown as (
+  props: { sessionId: string; view: WerewolfViewInjected; exitMode: () => void },
 ) => ReactElement
 
 function lobbyFixture(): WerewolfLobbyViewV1 {
@@ -135,6 +140,15 @@ afterEach(() => {
 })
 
 describe('WerewolfView states', () => {
+  it('wraps the game in exclusive chrome with one dedicated exit action', async () => {
+    const exitMode = vi.fn()
+    const view = render(<TestSurface sessionId="s1" view={injected()} exitMode={exitMode} />)
+    expect(view.getByTestId('werewolf-exclusive-surface').hasAttribute('data-shell-exclusive')).toBe(true)
+    fireEvent.click(view.getByRole('button', { name: zh['shell.exit'] }))
+    expect(exitMode).toHaveBeenCalledOnce()
+    await waitFor(() => { expect(view.getByRole('button', { name: zh['lobby.start'] })).toBeDefined() })
+  })
+
   it('renders the lobby with one rule-set card and starts through the typed verb', async () => {
     const face = injected()
     const view = render(<TestView sessionId="s1" {...face} />)

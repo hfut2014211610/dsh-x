@@ -1,16 +1,14 @@
 // @vitest-environment jsdom
 /**
- * ui-werewolf browser half on a real cordis Context with fake conversation/
- * sessions faces and a Service-based Remote double whose `werewolfGame`
- * namespace answers per script: the plugin registers the `werewolf`
- * conversation view (id, order, locale namespace, localized label), declares
- * it preferred only for werewolf-preset sessions, and the inject face unwraps
+ * ui-werewolf browser half on a real cordis Context with a fake sessions face
+ * and a Service-based Remote double whose `werewolfGame` namespace answers per
+ * script: the plugin claims the whole-frame shell for Werewolf sessions, and
+ * the inject face unwraps
  * each Remote verb's ok/error strip (a not-ok answer throws the error
  * message), forwards start/getView/submitAction/resume/abortGame/getReplay
  * requests verbatim, fans `game/projection-invalidated` into the
  * invalidation feed, and translates through the bound namespace. Fiber
- * disposal drops the view entry and the preferred-view resolver. The node
- * half apply() is an inert loader seat.
+ * disposal drops the shell entry. The node half apply() is an inert loader seat.
  */
 import { Context, Service } from '@deepseek-ai/cordis'
 import { afterEach, describe, expect, it, vi } from 'vitest'
@@ -18,9 +16,9 @@ import { cleanup } from '@testing-library/react'
 import { SlotRegistry, type SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply as clientApply, inject } from '../src/client/index.ts'
-import type { WerewolfViewInjected } from '../src/client/WerewolfView.tsx'
-import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
-import { en, NS, zh } from '../src/client/locales.ts'
+import type { ShellSurfaceOwnerProps } from '@deepseek-ai/dsh-client-ui-layout/client'
+import type { WerewolfSurfaceInjected } from '../src/client/WerewolfSurface.tsx'
+import { en, zh } from '../src/client/locales.ts'
 import type {
   WerewolfHumanViewV1,
   WerewolfLobbyViewV1,
@@ -130,28 +128,18 @@ async function bench(options: { failWith?: string; hostInitiallyVisible?: boolea
   await ctx.plugin(SlotRegistry).await()
   ctx.slots.register({
     name: 'root', children: {
-      'conversation.view': { kind: 'list', scope: 'session' },
-      'conversation.composer': { kind: 'chain', scope: 'session' },
+      'shell.surface': { kind: 'chain', scope: 'session-maybe' },
     },
   } as never, (() => null) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
-  const preferred: Array<(sessionId: SessionId) => string | null> = []
   const sessionListeners = new Set<() => void>()
   const open = vi.fn()
+  const clear = vi.fn()
   const byId: Record<string, { agentPreset: string }> = {
     s1: { agentPreset: 'werewolf' },
     s2: { agentPreset: 'coding' },
     ...(options.hostInitiallyVisible === false ? {} : { 'game-g1': { agentPreset: 'werewolf' } }),
   }
-  ctx.provide('conversation', {
-    declarePreferredView: (resolver: (sessionId: SessionId) => string | null) => {
-      preferred.push(resolver)
-      return () => {
-        const index = preferred.indexOf(resolver)
-        if (index >= 0) preferred.splice(index, 1)
-      }
-    },
-  })
   ctx.provide('sessions', {
     list: {
       getSnapshot: () => ({ byId }),
@@ -161,29 +149,22 @@ async function bench(options: { failWith?: string; hostInitiallyVisible?: boolea
       },
     },
     open,
+    clear,
   })
   const fiber = ctx.plugin({ inject: [...inject], apply: clientApply })
-  const entry = () => {
-    const found = ctx.slots.entries('conversation.view')[0]
-    if (found === undefined) return undefined
-    return {
-      options: found.options as { id: string; order: number; label?: () => string },
-      locale: found.locale,
-      inject: found.inject as unknown as ((sessionId: SessionId) => WerewolfViewInjected) | undefined,
-    }
-  }
-  const composerEntry = () => ctx.slots.entries('conversation.composer')[0]
+  const surfaceEntry = () => ctx.slots.entries('shell.surface')[0]
+  const surfaceInjected = (sessionId: SessionId): WerewolfSurfaceInjected =>
+    (surfaceEntry()?.inject as unknown as ((id: SessionId | undefined) => WerewolfSurfaceInjected))(sessionId)
   return {
     ctx,
     fiber,
     remote,
-    preferred,
     werewolfGame,
     open,
-    entry,
-    composerEntry,
-    verbs: () => entry()?.inject?.(sid('s1')) as WerewolfViewInjected,
-    hostVerbs: () => entry()?.inject?.(sid('game-g1')) as WerewolfViewInjected,
+    clear,
+    surfaceEntry,
+    verbs: () => surfaceInjected(sid('s1')).view,
+    hostVerbs: () => surfaceInjected(sid('game-g1')).view,
     publishHost: () => {
       byId['game-g1'] = { agentPreset: 'werewolf' }
       for (const listener of [...sessionListeners]) listener()
@@ -192,33 +173,17 @@ async function bench(options: { failWith?: string; hostInitiallyVisible?: boolea
 }
 
 describe('ui-werewolf browser plugin', () => {
-  it('registers the werewolf conversation view over the locale namespace', async () => {
+  it('claims the whole frame only for Werewolf sessions and exits through the dedicated action', async () => {
     const b = await bench()
     await b.fiber.await()
-    const entry = b.entry()
-    expect(entry?.options).toMatchObject({ id: 'werewolf', order: 6 })
-    expect(entry?.locale).toBe(NS)
-    expect([zh['view.werewolf'], en['view.werewolf']]).toContain(entry?.options.label?.())
-  })
-
-  it('declares the view preferred only for werewolf-preset sessions', async () => {
-    const b = await bench()
-    await b.fiber.await()
-    expect(b.preferred).toHaveLength(1)
-    expect(b.preferred[0]!(sid('s1'))).toBe('werewolf')
-    expect(b.preferred[0]!(sid('s2'))).toBeNull()
-    expect(b.preferred[0]!(sid('unknown'))).toBeNull()
-  })
-
-  it('suppresses the generic composer only for werewolf-preset sessions', async () => {
-    const b = await bench()
-    await b.fiber.await()
-    const entry = b.composerEntry()
-    const select = entry?.select as ((owner: ComposerChainProps) => unknown) | undefined
-    expect(select?.({ interactions: [], session: undefined, agentPreset: 'werewolf' })).toEqual({ agentPreset: 'werewolf' })
-    expect(select?.({ interactions: [], session: undefined, agentPreset: 'coding' })).toBeNull()
-    expect(select?.({ interactions: [], session: undefined, agentPreset: undefined })).toBeNull()
-    expect((entry?.component as (() => unknown) | undefined)?.()).toBeNull()
+    const entry = b.surfaceEntry()
+    const select = entry?.select as ((owner: ShellSurfaceOwnerProps) => unknown) | undefined
+    expect(select?.({ agentPreset: 'werewolf' })).toEqual({ agentPreset: 'werewolf' })
+    expect(select?.({ agentPreset: 'coding' })).toBeNull()
+    expect(select?.({})).toBeNull()
+    const injected = (entry?.inject as unknown as ((sessionId: SessionId | undefined) => WerewolfSurfaceInjected) | undefined)?.(sid('s1'))
+    injected?.exitMode()
+    expect(b.clear).toHaveBeenCalledOnce()
   })
 
   it('binds Host Sessions to their game and opens the dedicated Host after start', async () => {
@@ -309,16 +274,12 @@ describe('ui-werewolf browser plugin', () => {
     expect([zh['lobby.title'], en['lobby.title']]).toContain(verbs.translate('lobby.title'))
   })
 
-  it('drops the view entry and the preferred resolver when the fiber unloads', async () => {
+  it('drops the whole-frame entry when the fiber unloads', async () => {
     const b = await bench()
     await b.fiber.await()
-    expect(b.entry()).toBeDefined()
-    expect(b.composerEntry()).toBeDefined()
-    expect(b.preferred).toHaveLength(1)
+    expect(b.surfaceEntry()).toBeDefined()
     await b.fiber.dispose()
-    expect(b.entry()).toBeUndefined()
-    expect(b.composerEntry()).toBeUndefined()
-    expect(b.preferred).toHaveLength(0)
+    expect(b.surfaceEntry()).toBeUndefined()
   })
 })
 

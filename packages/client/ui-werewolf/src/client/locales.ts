@@ -6,6 +6,7 @@ export const NS = 'ui-werewolf'
 /** The Werewolf dictionary key set. */
 export type WerewolfKey =
   | 'view.werewolf'
+  | 'shell.eyebrow' | 'shell.title' | 'shell.mode' | 'shell.exit' | 'shell.exitHint'
   | 'lobby.title' | 'lobby.subtitle' | 'lobby.players' | 'lobby.roles' | 'lobby.start' | 'lobby.starting'
   | 'lobby.unavailable'
   | 'reveal.title' | 'reveal.covered' | 'reveal.action' | 'reveal.ready' | 'reveal.faction' | 'reveal.teammates'
@@ -33,6 +34,11 @@ export type WerewolfKey =
 /** English copy. */
 export const en: Record<WerewolfKey, string> = {
   'view.werewolf': 'Werewolf',
+  'shell.eyebrow': 'SIGNAL CIRCLE',
+  'shell.title': 'Werewolf',
+  'shell.mode': 'Solo game',
+  'shell.exit': 'Exit Werewolf',
+  'shell.exitHint': 'Leave the game view. Your current game remains available.',
   'lobby.title': 'Werewolf lobby',
   'lobby.subtitle': 'Pick a rule set and take your seat.',
   'lobby.players': '{count} players',
@@ -137,6 +143,11 @@ export const en: Record<WerewolfKey, string> = {
 /** Chinese copy. */
 export const zh: Record<WerewolfKey, string> = {
   'view.werewolf': '狼人杀',
+  'shell.eyebrow': 'SIGNAL CIRCLE',
+  'shell.title': '狼人杀',
+  'shell.mode': '单机对局',
+  'shell.exit': '退出狼人杀',
+  'shell.exitHint': '退出游戏界面，当前对局仍会保留。',
   'lobby.title': '狼人杀大厅',
   'lobby.subtitle': '选择一套规则，坐下入局。',
   'lobby.players': '{count} 名玩家',

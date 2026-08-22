@@ -72,6 +72,8 @@
       "@deepseek-ai/dsh-plan-mode/types": ["./packages/plan/plan-mode/src/types.ts"],
       "@deepseek-ai/dsh-plan-mode/client": ["./packages/plan/plan-mode/src/client.ts"],
       "@deepseek-ai/dsh-agent-presets/types": ["./packages/preset/agent-presets/src/types.ts"],
+      "@deepseek-ai/dsh-game/types": ["./packages/game/game/src/types.ts"],
+      "@deepseek-ai/dsh-werewolf/types": ["./packages/game/werewolf/src/host-types.ts"],
       "@deepseek-ai/dsh-pwsh-local": ["./packages/shell/pwsh-local/src/index.ts"],
       "@deepseek-ai/dsh-tool-pwsh": ["./packages/shell/tool-pwsh/src/index.ts"],
       "@deepseek-ai/dsh-shell-env": ["./packages/shell/shell-env/src/index.ts"],
