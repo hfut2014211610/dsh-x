@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-Game capabilities and hidden-role engines that keep authoritative state in the session log. The engine — never a model — owns rules, secrecy, legality, and victory; model-backed bots run as fresh one-shot structured-output subagents.
+Game capabilities and hidden-role engines that keep authoritative state in the session log. The engine — never a model — owns rules, secrecy, legality, and victory; model-backed Bots use one hidden, game-owned Agent Session per seat for the whole game.
 
 | Package | Role | ctx key |
 |---|---|---|

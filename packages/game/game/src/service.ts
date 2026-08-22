@@ -7,7 +7,13 @@ import type { GameId, GameProjection, GameRequestId, LocalGamePrincipalV1, Princ
 
 import type { GameModule } from './executor.ts'
 
-export type { GameModule, GameAiExecutor, GameChildStartRequest } from './executor.ts'
+export type {
+  GameModule,
+  GameAiExecutor,
+  GameBotProvisionRequest,
+  GameBotTurnResult,
+  GameChildStartRequest,
+} from './executor.ts'
 
 declare module '@deepseek-ai/cordis' {
   interface Context {

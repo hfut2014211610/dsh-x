@@ -14,7 +14,30 @@ import type {
   WerewolfReplayV1,
 } from '@deepseek-ai/dsh-werewolf/types'
 import type { WerewolfActionSpecJsonV1, WerewolfSingleActionSpecJsonV1 } from '@deepseek-ai/dsh-werewolf/types'
+import sigil01 from './assets/sigils/sigil-01.png'
+import sigil02 from './assets/sigils/sigil-02.png'
+import sigil03 from './assets/sigils/sigil-03.png'
+import sigil04 from './assets/sigils/sigil-04.png'
+import sigil05 from './assets/sigils/sigil-05.png'
+import sigil06 from './assets/sigils/sigil-06.png'
+import sigil07 from './assets/sigils/sigil-07.png'
 import styles from './WerewolfView.module.css'
+
+const SIGIL_URLS = [
+  sigil01, sigil02, sigil03, sigil04, sigil05, sigil06, sigil07,
+]
+
+/** Per-seat identity sigil asset names, stable-mapped 1..7. */
+export function sigilForSeat(seat: number): string {
+  const clamped = seat >= 1 && seat <= 7 ? seat : ((seat - 1) % 7 + 7) % 7 + 1
+  return `sigil-0${clamped}.png`
+}
+
+/** Browser URL for one sigil, served as a static package source. */
+function sigilUrl(seat: number): string {
+  const index = Number(sigilForSeat(seat).slice(6, 8)) - 1
+  return SIGIL_URLS[index] ?? sigil01
+}
 
 /** One value a closed spec field accepts, derived for the shared renderer. */
 interface FieldChoice {
@@ -86,6 +109,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
   const [selected, setSelected] = useState<Record<string, string | null>>({})
   const [replay, setReplay] = useState<WerewolfReplayV1 | null>(null)
   const [retry, setRetry] = useState<(() => void) | null>(null)
+  const [finding, setFinding] = useState<number | null>(null)
   const viewRef = useRef<WerewolfHumanViewV1 | null>(null)
   const phaseHeadingRef = useRef<HTMLHeadingElement | null>(null)
   const priorPhaseRef = useRef<string | undefined>(undefined)
@@ -109,6 +133,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
       setRevealed(false)
       setReady(false)
       setReplay(null)
+      setFinding(null)
     }
     return true
   }, [])
@@ -287,6 +312,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
               setRevealed(false)
               setReady(false)
               setReplay(null)
+              setFinding(null)
               loadLobby()
             }}
           >
@@ -352,6 +378,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
   }
 
   const night = view.phase !== null && view.phase.segment === 'night'
+  const speechFlow = view.phase?.speech ?? null
   const humanSeat = view.players.find(player => player.human)
   const selfAlive = humanSeat?.alive ?? true
   const form = view.actionForm
@@ -420,9 +447,15 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
       aria-live="off"
     >
       <h2 ref={phaseHeadingRef} className={styles.phaseHeading} tabIndex={-1}>
-        {night ? t('table.night', { day: view.day }) : t('table.day', { day: view.day })}
-        {'·'}
-        {view.phase !== null ? t('table.phase', { phase: view.phase.phaseId }) : t('table.empty')}
+        <span className={styles.signalBrand}>
+          <span>{t('table.signalTitle')}</span>
+          <small>{t('table.solo')}</small>
+        </span>
+        <span className={styles.phaseTitle}>
+          {night ? t('table.night', { day: view.day }) : t('table.day', { day: view.day })}
+          {'·'}
+          {view.phase !== null ? t('table.phase', { phase: view.phase.phaseId }) : t('table.empty')}
+        </span>
       </h2>
       <p className={styles.srOnly} role="status" aria-live="polite">
         {`${night ? t('table.night', { day: view.day }) : t('table.day', { day: view.day })} · ${
@@ -430,7 +463,34 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
         }`}
       </p>
       {night && <p className={styles.hint}>{t('night.privateHint')}</p>}
+      {speechFlow !== null && (
+        <section className={styles.flowStatus} aria-label={t('speech.title')} data-testid="werewolf-speech-flow">
+          <div>
+            <span className={styles.flowKicker}>{t('flow.progress', {
+              completed: speechFlow.completed,
+              total: speechFlow.total,
+            })}</span>
+            <strong>
+              {speechFlow.current?.human === true
+                ? t('flow.yourTurn')
+                : speechFlow.current === null
+                  ? t('flow.progress', { completed: speechFlow.total, total: speechFlow.total })
+                  : t('flow.speaking', {
+                    seat: speechFlow.current.seat,
+                    name: speechFlow.current.displayName,
+                  })}
+            </strong>
+          </div>
+          <p>{t('flow.afterSpeeches')}</p>
+        </section>
+      )}
       <div className={styles.columns}>
+        <div className={styles.track} data-testid="werewolf-track" aria-hidden="true">
+          {t('table.track', {
+            day: view.day,
+            phase: view.phase !== null ? view.phase.phaseId : '—',
+          })}
+        </div>
         <aside className={styles.timeline} aria-label={t('table.timeline')}>
           <h3>{t('table.timeline')}</h3>
           {view.timeline.length === 0
@@ -438,52 +498,99 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
             : (
               <ol>
                 {view.timeline.map(entry => (
-                  <li key={entry.id}>
-                    {entry.day}
-                    {'·'}
-                    {entry.phaseId}
-                    {'·'}
-                    {entry.kind}
-                  </li>
+                  <TimelineEntry key={entry.id} entry={entry} players={view.players} t={t} />
                 ))}
               </ol>
             )}
         </aside>
-        <div className={styles.seats} role="list">
-          {view.players.map(player => (
-            <div
-              key={player.playerId}
-              role="listitem"
-              className={[
-                styles.seat,
-                player.alive ? '' : styles.dead,
-                player.human ? styles.self : '',
-                selectedTargetOf(selected) === player.playerId ? styles.selected : '',
-              ].filter(Boolean).join(' ')}
-            >
-              <span className={styles.seatName}>
-                {t('table.seat', { seat: player.seat })}
-                {'·'}
-                {player.displayName}
-                {player.human ? ` (${t('table.you')})` : ''}
-              </span>
-              <span>{player.alive ? t('table.alive') : player.deathDay !== undefined ? t('table.deadOn', { day: player.deathDay }) : t('table.dead')}</span>
-              <span>{player.revealedRole?.name ?? t('table.unknownRole')}</span>
-            </div>
-          ))}
+        <div className={styles.circle} role="list">
+          <ul className={styles.circleList}>
+            {view.players.map((player, index) => {
+              const count = view.players.length
+              const angle = count > 0 ? (index / count) * 360 - 90 : 0
+              const findingIndex = latestNoticeIndexForTarget(view.self.notices, player.playerId)
+              const known = findingIndex >= 0
+              return (
+                <li
+                  key={player.playerId}
+                  role="listitem"
+                  className={[
+                    styles.seat,
+                    player.alive ? '' : styles.dead,
+                    player.human ? styles.self : '',
+                    known ? styles.known : '',
+                    selectedTargetOf(selected) === player.playerId ? styles.selected : '',
+                  ].filter(Boolean).join(' ')}
+                  style={{ '--seat-angle': `${angle}deg` } as React.CSSProperties}
+                >
+                  <img
+                    className={styles.sigil}
+                    src={sigilUrl(player.seat)}
+                    data-sigil={sigilForSeat(player.seat)}
+                    alt={t('table.seat', { seat: player.seat })}
+                  />
+                  <span className={styles.seatName}>
+                    {t('table.seat', { seat: player.seat })}
+                    {'·'}
+                    {player.displayName}
+                    {player.human ? ` (${t('table.you')})` : ''}
+                  </span>
+                  {player.alive
+                    ? player.human
+                      ? <span>{view.self.role.name}</span>
+                      : known ? null : <span>{t('table.knownNone')}</span>
+                    : (
+                      <span>
+                        {player.revealedRole?.name ?? t('table.dead')}
+                        {player.deathDay !== undefined ? ` · ${t('table.deadOn', { day: player.deathDay })}` : ''}
+                      </span>
+                    )}
+                  {known && (
+                    <button
+                      type="button"
+                      className={styles.findingOpen}
+                      aria-label={t('table.openFinding')}
+                      onClick={() => { setFinding(findingIndex) }}
+                    >
+                      {t('table.openFinding')}
+                    </button>
+                  )}
+                </li>
+              )
+            })}
+          </ul>
         </div>
         <aside className={styles.selfPane} aria-label={t('table.notices')}>
-          <h3>{t('table.role')}</h3>
-          <p>{view.self.role.name}</p>
-          <h3>{t('table.notices')}</h3>
-          {view.self.notices.length === 0
-            ? <p>{t('table.noNotices')}</p>
+          {finding === null
+            ? (
+              <>
+                <h3>{t('table.role')}</h3>
+                <p>{view.self.role.name}</p>
+                <h3>{t('finding.title')}</h3>
+                {view.self.notices.length === 0
+                  ? <p>{t('table.noNotices')}</p>
+                  : (
+                    <ul>
+                      {view.self.notices.map((notice, index) => (
+                        <li key={index}>
+                          <button type="button" className={styles.findingLink} onClick={() => { setFinding(index) }}>
+                            {noticeLabel(notice, t)}
+                          </button>
+                        </li>
+                      ))}
+                    </ul>
+                  )}
+              </>
+            )
             : (
-              <ul>
-                {view.self.notices.map((notice, index) => (
-                  <li key={index}>{notice.kind}</li>
-                ))}
-              </ul>
+              <FindingDetail
+                notices={view.self.notices}
+                players={view.players}
+                finding={finding}
+                onBack={() => { setFinding(null) }}
+                onPick={(index) => { setFinding(index) }}
+                t={t}
+              />
             )}
         </aside>
       </div>
@@ -540,11 +647,193 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
   )
 }
 
+/** Render public game events as readable statements instead of raw event tags. */
+function TimelineEntry(input: {
+  entry: WerewolfHumanViewV1['timeline'][number]
+  players: WerewolfHumanViewV1['players']
+  t: (key: WerewolfKey, params?: Record<string, string | number>) => string
+}): React.JSX.Element {
+  const { entry, players, t } = input
+  const actor = entry.actorId === undefined
+    ? undefined
+    : players.find(player => player.playerId === entry.actorId)
+  const actorLabel = actor === undefined
+    ? entry.actorId ?? ''
+    : t(entry.kind === 'vote' ? 'timeline.vote' : 'timeline.speech', {
+      seat: actor.seat,
+      name: actor.displayName,
+    })
+  const data = entry.data !== undefined && entry.data !== null
+    && typeof entry.data === 'object' && !Array.isArray(entry.data)
+    ? entry.data as Record<string, unknown>
+    : undefined
+  const speech = entry.kind === 'speech' && typeof data?.text === 'string' ? data.text : undefined
+  return (
+    <li className={entry.kind === 'speech' ? styles.timelineSpeech : styles.timelineEvent}>
+      <span className={styles.timelineMeta}>
+        {actorLabel !== '' ? actorLabel : t('timeline.event', { day: entry.day, phase: entry.phaseId })}
+      </span>
+      {entry.kind === 'speech' && <p>{speech ?? t('timeline.pass')}</p>}
+    </li>
+  )
+}
+
 function selectedTargetOf(selected: Record<string, string | null>): string | null {
   for (const value of Object.values(selected)) {
     if (value !== null) return value
   }
   return null
+}
+
+/** Latest private notice that names one player, so a known seat opens current information. */
+function latestNoticeIndexForTarget(
+  notices: Array<{ kind: string; data: import('@deepseek-ai/dsh-session/types').JsonValue }>,
+  playerId: string,
+): number {
+  for (let index = notices.length - 1; index >= 0; index -= 1) {
+    const notice = notices[index]
+    if (notice !== undefined && noticeTargetId(notice) === playerId) return index
+  }
+  return -1
+}
+
+/** Resolve the player a notice speaks about, when its data names one id. */
+function noticeTargetId(notice: { kind: string; data: import('@deepseek-ai/dsh-session/types').JsonValue }): string | null {
+  if (notice.data === null || typeof notice.data !== 'object' || Array.isArray(notice.data)) return null
+  const target = (notice.data as Record<string, unknown>).target
+  return typeof target === 'string' ? target : null
+}
+
+/** Short label one notice gets in the findings list. */
+function noticeLabel(
+  notice: { kind: string; data: import('@deepseek-ai/dsh-session/types').JsonValue },
+  t: (key: WerewolfKey, params?: Record<string, string | number>) => string,
+): string {
+  if (notice.kind === 'seer-inspect') return t('finding.seer')
+  if (notice.kind === 'wolf-kill-result') return t('finding.wolfKill')
+  return notice.kind
+}
+
+/** Render one JSON scalar safely; structured payloads fall back to JSON text. */
+function findingValue(value: import('@deepseek-ai/dsh-session/types').JsonValue): string {
+  if (value === null) return '—'
+  if (typeof value === 'string') return value
+  if (typeof value === 'number' || typeof value === 'boolean') return String(value)
+  return JSON.stringify(value)
+}
+
+/** Localize built-in factions while preserving configured extension ids. */
+function findingFaction(
+  faction: string,
+  t: (key: WerewolfKey, params?: Record<string, string | number>) => string,
+): string {
+  if (faction === 'wolf') return t('finding.factionWolf')
+  if (faction === 'village') return t('finding.factionVillage')
+  return faction
+}
+
+/** Private finding detail: one notice at a time with list-driven switching. */
+function FindingDetail(input: {
+  notices: Array<{ kind: string; data: import('@deepseek-ai/dsh-session/types').JsonValue }>
+  players: WerewolfHumanViewV1['players']
+  finding: number
+  onBack: () => void
+  onPick: (index: number) => void
+  t: (key: WerewolfKey, params?: Record<string, string | number>) => string
+}): React.JSX.Element {
+  const { notices, players, finding, onBack, onPick, t } = input
+  const notice = notices[Math.min(finding, notices.length - 1)]
+  if (notice === undefined) return <></>
+  const targetId = noticeTargetId(notice)
+  const data = notice.data !== null && typeof notice.data === 'object' && !Array.isArray(notice.data)
+    ? notice.data as Record<string, import('@deepseek-ai/dsh-session/types').JsonValue>
+    : {}
+  const { faction, day, ...rest } = data
+  const victim = notice.kind === 'wolf-kill-result' ? data.victim : undefined
+  delete rest.target
+  if (notice.kind === 'wolf-kill-result') delete rest.victim
+  const extraEntries = Object.entries(rest)
+  return (
+    <div className={styles.finding} data-testid="werewolf-finding">
+      <header className={styles.findingHeader}>
+        <div>
+          <p className={styles.findingScope}>{t('finding.scope')}</p>
+          <h3>{t('finding.title')}</h3>
+        </div>
+        <span className={styles.findingCount}>{finding + 1} / {notices.length}</span>
+      </header>
+      <div className={styles.findingLead}>
+        <span>{t('finding.type')}</span>
+        <strong>{noticeLabel(notice, t)}</strong>
+      </div>
+      <dl className={styles.findingFacts}>
+        {targetId !== null && (
+          <div className={styles.findingFact}>
+            <dt>{t('finding.target')}</dt>
+            <dd>{findingPlayer(targetId, players, t)}</dd>
+          </div>
+        )}
+        {typeof faction === 'string' && (
+          <div className={`${styles.findingFact} ${styles.findingResult}`}>
+            <dt>{t('finding.faction')}</dt>
+            <dd>{findingFaction(faction, t)}</dd>
+          </div>
+        )}
+        {(typeof victim === 'string' || victim === null) && (
+          <div className={`${styles.findingFact} ${styles.findingResult}`}>
+            <dt>{t('finding.victim')}</dt>
+            <dd>{victim === null ? t('finding.noVictim') : findingPlayer(victim, players, t)}</dd>
+          </div>
+        )}
+        {typeof day === 'number' && (
+          <div className={styles.findingFact}>
+            <dt>{t('finding.when')}</dt>
+            <dd>{t('finding.day', { day })}</dd>
+          </div>
+        )}
+        {extraEntries.map(([key, value]) => (
+          <FindingFact key={key} label={key} value={findingValue(value)} />
+        ))}
+      </dl>
+      {notices.length > 1 && (
+        <ul className={styles.findingNav}>
+          {notices.map((entry, index) => (
+            <li key={index}>
+              <button
+                type="button"
+                aria-current={index === finding}
+                className={index === finding ? styles.findingCurrent : styles.findingLink}
+                onClick={() => { onPick(index) }}
+              >
+                {noticeLabel(entry, t)}
+              </button>
+            </li>
+          ))}
+        </ul>
+      )}
+      <button type="button" className={styles.findingBack} onClick={onBack}>{t('finding.back')}</button>
+    </div>
+  )
+}
+
+/** Resolve an authorized notice player id to its seat label without exposing any role. */
+function findingPlayer(
+  playerId: string,
+  players: WerewolfHumanViewV1['players'],
+  t: (key: WerewolfKey, params?: Record<string, string | number>) => string,
+): string {
+  const player = players.find(candidate => candidate.playerId === playerId)
+  return player === undefined ? playerId : `${t('table.seat', { seat: player.seat })}·${player.displayName}`
+}
+
+/** Pair one extra notice key with its readable value. */
+function FindingFact(input: { label: string; value: string }): React.JSX.Element {
+  return (
+    <div className={styles.findingFact}>
+      <dt>{input.label}</dt>
+      <dd>{input.value}</dd>
+    </div>
+  )
 }
 
 async function mutateReplay(
@@ -684,7 +973,14 @@ function ActionForm(input: {
         if (canSubmit && !busy) onSubmit()
       }}
     >
-      <h3>{spec.kind === 'text' ? t('speech.title') : t('action.title')}</h3>
+      <header className={styles.actionHeader}>
+        <div>
+          <p className={styles.actionKicker}>
+            {spec.kind === 'text' ? t('speech.audience') : t('action.hint')}
+          </p>
+          <h3>{spec.kind === 'text' ? t('speech.title') : t('action.title')}</h3>
+        </div>
+      </header>
       {spec.kind === 'player-target' && (selected.value ?? null) !== null && (
         <p className={styles.selectedName} data-testid="werewolf-selected-target">
           {t('vote.selected', {
@@ -697,25 +993,23 @@ function ActionForm(input: {
         </p>
       )}
       {fields.map(field => (
-        <fieldset key={field.id}>
-          <legend>{field.id}</legend>
+        <fieldset key={field.id} className={styles.actionField}>
+          <legend className={field.id === 'value' ? styles.srOnly : undefined}>{field.id}</legend>
           {field.spec.kind === 'text'
             ? (
-              <>
-                <label>
-                  <span className={styles.speechLabel}>{t('speech.placeholder')}</span>
-                  <textarea
-                    value={drafts[field.id] ?? ''}
-                    maxLength={field.spec.maxChars}
-                    placeholder={t('speech.placeholder')}
-                    onChange={(event) =>{  onDraft(field.id, event.target.value) }}
-                    aria-describedby={`${field.id}-remaining`}
-                  />
-                </label>
-                <p id={`${field.id}-remaining`}>
+              <label className={styles.speechComposer}>
+                <span className={styles.srOnly}>{t('speech.placeholder')}</span>
+                <textarea
+                  value={drafts[field.id] ?? ''}
+                  maxLength={field.spec.maxChars}
+                  placeholder={t('speech.placeholder')}
+                  onChange={(event) =>{  onDraft(field.id, event.target.value) }}
+                  aria-describedby={`${field.id}-remaining`}
+                />
+                <span className={styles.speechCounter} id={`${field.id}-remaining`}>
                   {t('speech.remaining', { count: Math.max(0, field.spec.maxChars - (drafts[field.id]?.length ?? 0)) })}
-                </p>
-              </>
+                </span>
+              </label>
             )
             : (
               <div
@@ -759,13 +1053,14 @@ function ActionForm(input: {
             )}
         </fieldset>
       ))}
-      <div className={styles.actions}>
-        <button type="submit" disabled={busy || !canSubmit}>
+      <div className={`${styles.actions} ${styles.actionButtons}`}>
+        <button className={styles.primaryAction} type="submit" disabled={busy || !canSubmit}>
           {spec.kind === 'text' ? t('speech.speak') : spec.kind === 'player-target' ? t('vote.confirm') : t('action.submit')}
         </button>
         {allowSkip && (
           <button
             type="button"
+            className={styles.secondaryAction}
             title={t('action.passLabel')}
             disabled={busy}
             onClick={onSkip}

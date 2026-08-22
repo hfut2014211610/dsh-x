@@ -3492,7 +3492,15 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GameAiExecutor',
-    declaration: 'export interface GameAiExecutor {\n    readonly host: Agent;\n    readonly signal: AbortSignal;\n    start(provider: string, request: GameChildStartRequest): Promise<SubagentRun>;\n    map<T, R>(items: readonly T[], maxConcurrency: number, worker: (item: T) => Promise<R>): Promise<R[]>;\n}',
+    declaration: 'export interface GameAiExecutor {\n    readonly host: Agent;\n    readonly signal: AbortSignal;\n    start(provider: string, request: GameChildStartRequest): Promise<SubagentRun>;\n    provisionBot(request: GameBotProvisionRequest): Promise<void>;\n    turnBot(childId: SessionId, prompt: SubagentStartRequest[\'prompt\'], timeoutMs: number): Promise<GameBotTurnResult>;\n    map<T, R>(items: readonly T[], maxConcurrency: number, worker: (item: T) => Promise<R>): Promise<R[]>;\n}',
+  },
+  {
+    name: 'GameBotProvisionRequest',
+    declaration: 'export interface GameBotProvisionRequest {\n    readonly childId: SessionId;\n    readonly label: string;\n    readonly agentOptions?: AgentOptions;\n    readonly maxDepth?: number;\n    readonly persona: string;\n    readonly toolFilter?: SubagentStartRequest[\'toolFilter\'];\n}',
+  },
+  {
+    name: 'GameBotTurnResult',
+    declaration: 'export interface GameBotTurnResult {\n    readonly childId: SessionId;\n    readonly output: SubagentResult[\'output\'];\n    readonly stopReason: SubagentResult[\'stopReason\'];\n    readonly timedOut: boolean;\n}',
   },
   {
     name: 'GameChildStartRequest',
@@ -3508,7 +3516,7 @@ export const TYPE_API: readonly TypeApiEntry[] = [
   },
   {
     name: 'GameModule',
-    declaration: 'export interface GameModule<TState = unknown, TStart = JsonValue, TMutation = JsonValue, TView = unknown, TReplay = unknown> {\n    readonly id: string;\n    readonly version: number;\n    prepareStart(input: TStart, principal: LocalGamePrincipalV1, requestId: GameRequestId, payloadDigest: string): Promise<PreparedGameStart<TState>>;\n    restore(events: readonly SessionEvent[]): TState | undefined;\n    gameId(state: TState): GameId;\n    revision(state: TState): number;\n    status(state: TState): \'running\' | \'paused\' | \'ended\';\n    mutate(state: TState, request: GameMutationRequest<TMutation>): Promise<GameTransition<TState>>;\n    advance(state: TState, history: readonly SessionEvent[], executor: GameAiExecutor): Promise<GameAdvance<TState>>;\n    project(state: TState, participantId: ParticipantId): TView;\n    replay(state: TState, history: readonly SessionEvent[], participantId: ParticipantId): TReplay;\n    hostAgentOptions?: AgentOptions;\n}',
+    declaration: 'export interface GameModule<TState = unknown, TStart = JsonValue, TMutation = JsonValue, TView = unknown, TReplay = unknown> {\n    readonly id: string;\n    readonly version: number;\n    prepareStart(input: TStart, principal: LocalGamePrincipalV1, requestId: GameRequestId, payloadDigest: string): Promise<PreparedGameStart<TState>>;\n    restore(events: readonly SessionEvent[]): TState | undefined;\n    gameId(state: TState): GameId;\n    revision(state: TState): number;\n    status(state: TState): \'running\' | \'paused\' | \'ended\';\n    mutate(state: TState, request: GameMutationRequest<TMutation>): Promise<GameTransition<TState>>;\n    advance(state: TState, history: readonly SessionEvent[], executor: GameAiExecutor): Promise<GameAdvance<TState>>;\n    project(state: TState, participantId: ParticipantId): TView;\n    replay(state: TState, history: readonly SessionEvent[], participantId: ParticipantId): TReplay;\n    hostAgentOptions?: AgentOptions;\n    hostAgentPreset?: string;\n}',
   },
   {
     name: 'GameModuleVersion',
@@ -5207,16 +5215,12 @@ export const TYPE_API: readonly TypeApiEntry[] = [
     declaration: 'export interface WerewolfHostMutationRequestV1 {\n    gameId: string;\n    requestId: string;\n    expectedGameRevision: number;\n}',
   },
   {
-    name: 'WerewolfHumanActionFormV1',
-    declaration: 'export interface WerewolfHumanActionFormV1 {\n    phaseInstanceId: string;\n    phaseId: string;\n    day: number;\n    actionKind: string;\n    spec: ReturnType<typeof serializeWerewolfActionSpec>;\n}',
-  },
-  {
     name: 'WerewolfHumanActionId',
     declaration: 'export type WerewolfHumanActionId = Branded<\'WerewolfHumanActionId\'>;',
   },
   {
     name: 'WerewolfHumanViewV1',
-    declaration: 'export interface WerewolfHumanViewV1 {\n    version: 1;\n    gameId: string;\n    gameRevision: number;\n    status: WerewolfGameStateV1[\'status\'];\n    day: number;\n    ruleSet: WerewolfRuleSetOptionV1;\n    availableRuleSets: WerewolfRuleSetOptionV1[];\n    players: Array<{\n        playerId: string;\n        seat: number;\n        displayName: string;\n        alive: boolean;\n        human: boolean;\n        deathDay?: number;\n        deathCause?: string;\n        revealedRole?: {\n            id: string;\n            name: string;\n            faction: string;\n        };\n    }>;\n    self: {\n        playerId: string;\n        seat: number;\n        role: {\n            id: string;\n            name: string;\n            faction: string;\n        };\n        resources: Record<string, number>;\n        teammates: Array<{\n            playerId: string;\n            seat: number;\n            alive: boolean;\n        }>;\n        notices: Array<{\n            kind: string;\n            data: JsonValue;\n        }>;\n    };\n    phase: null | {\n        phaseInstanceId: string;\n        phaseId: string;\n        segment: \'setup\' | \'night\' | \'day\';\n        day: number;\n        mode: \'parallel-private\' | \'seat-order-public\';\n    };\n    actionForm: WerewolfHumanActionFormV1 | null;\n    timeline: WerewolfTimelineEntryV1[];\n    pauseReason: WerewolfGameStateV1[\'pauseReason\'];\n    result: WerewolfGameResultV1 | null;\n}',
+    declaration: 'export interface WerewolfHumanViewV1 {\n    version: 1;\n    gameId: string;\n    gameRevision: number;\n    status: WerewolfGameStateV1[\'status\'];\n    day: number;\n    ruleSet: WerewolfRuleSetOptionV1;\n    availableRuleSets: WerewolfRuleSetOptionV1[];\n    players: Array<{\n        playerId: string;\n        seat: number;\n        displayName: string;\n        alive: boolean;\n        human: boolean;\n        deathDay?: number;\n        deathCause?: string;\n        revealedRole?: {\n            id: string;\n            name: string;\n            faction: string;\n        };\n    }>;\n    self: {\n        playerId: string;\n        seat: number;\n        role: {\n            id: string;\n            name: string;\n            faction: string;\n        };\n        resources: Record<string, number>;\n        teammates: Array<{\n            playerId: string;\n            seat: number;\n            alive: boolean;\n        }>;\n        notices: Array<{\n            kind: string;\n            data: JsonValue;\n        }>;\n    };\n    phase: null | {\n        phaseInstanceId: string;\n        phaseId: string;\n        segment: \'setup\' | \'night\' | \'day\';\n        day: number;\n        mode: \'parallel-private\' | \'seat-order-public\';\n        speech: null | {\n            completed: number;\n            total: number;\n            current: null | {\n                playerId: string;\n                seat: number;\n                displayName: string;\n                human: boolean;\n            };\n        };\n    };\n    actionForm: W /* …truncated — full shape in source */',
   },
   {
     name: 'WerewolfLobbyViewV1',

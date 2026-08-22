@@ -1,8 +1,8 @@
 /** Host-side execution contracts that name Agent and subagent types. @module @deepseek-ai/dsh-game/executor */
 
 import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
-import type { SubagentRun, SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
-import type { JsonValue, SessionEvent } from '@deepseek-ai/dsh-session'
+import type { SubagentResult, SubagentRun, SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
+import type { JsonValue, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {
   GameAdvance,
   GameId,
@@ -17,14 +17,46 @@ import type {
 /** Provider request with Host-owned parent and cancellation removed. */
 export type GameChildStartRequest = Omit<SubagentStartRequest, 'parent' | 'signal'>
 
+/** One game-owned Bot agent created once and retained for the whole game. */
+export interface GameBotProvisionRequest {
+  /** Stable per-game identity reused for every decision by this Bot. */
+  readonly childId: SessionId
+  /** Human-readable seat label used in diagnostics. */
+  readonly label: string
+  /** Per-Bot model route; omission inherits the Host route. */
+  readonly agentOptions?: AgentOptions
+  /** Absolute delegation-depth cap for the Bot agent. */
+  readonly maxDepth?: number
+  /** Fixed per-game persona containing this seat's immutable identity. */
+  readonly persona: string
+  /** Fixed tool restriction; Werewolf Bots use an empty allowlist. */
+  readonly toolFilter?: SubagentStartRequest['toolFilter']
+}
+
+/** Result of one turn in an already-provisioned game Bot session. */
+export interface GameBotTurnResult {
+  /** Stable Bot session identity. */
+  readonly childId: SessionId
+  /** The last non-empty assistant output from this turn. */
+  readonly output: SubagentResult['output']
+  /** Terminal reason mapped from the Bot agent's durable turn end. */
+  readonly stopReason: SubagentResult['stopReason']
+  /** Whether the Host cancelled this turn after its wall-clock budget elapsed. */
+  readonly timedOut: boolean
+}
+
 /** AI execution authority created for one serialized Host operation. */
 export interface GameAiExecutor {
-  /** The exact idle Host agent that parents every one-shot child. */
+  /** The exact idle Host agent that parents every game-owned child. */
   readonly host: Agent
   /** Cancellation for the complete Host operation. */
   readonly signal: AbortSignal
   /** Start one child with the Host parent and operation cancellation. */
   start(provider: string, request: GameChildStartRequest): Promise<SubagentRun>
+  /** Create one hidden game Bot once; repeated calls for the same id are no-ops. */
+  provisionBot(request: GameBotProvisionRequest): Promise<void>
+  /** Run one FIFO decision turn in an already-provisioned Bot session. */
+  turnBot(childId: SessionId, prompt: SubagentStartRequest['prompt'], timeoutMs: number): Promise<GameBotTurnResult>
   /** Run independent items with a bounded worker pool while preserving result order. */
   map<T, R>(items: readonly T[], maxConcurrency: number, worker: (item: T) => Promise<R>): Promise<R[]>
 }

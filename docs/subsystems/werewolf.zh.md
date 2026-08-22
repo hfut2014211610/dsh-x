@@ -2,7 +2,7 @@
 
 [English](werewolf.md) | 中文
 
-确定性、事件溯源的单机狼人杀运行时由 [dsh-werewolf](../../packages/game/werewolf)（`ctx.werewolf`）承载，经典定义位于 [dsh-werewolf-classic](../../packages/game/werewolf-classic)，通用 Session Host 位于 [dsh-game](../../packages/game/game)（`ctx.games`）。角色、合法动作、效果、阶段与胜负只由引擎裁决；模型输出始终是不可信结构化输入。阶段1–3已交付确定性核心、带每座位持久上下文的 fresh one-shot Bot、每局一个专用 Host Agent 和 Session、原子命令批次、类型化 Host 方法、真人授权投影与终局回放。专用 Web 游戏视图仍在[交付计划](../../.agents/notes/proposed/feature/2026-08-20-configurable-werewolf-mode.md)中。
+确定性、事件溯源的单机狼人杀运行时由 [dsh-werewolf](../../packages/game/werewolf)（`ctx.werewolf`）承载，经典定义位于 [dsh-werewolf-classic](../../packages/game/werewolf-classic)，通用 Session Host 位于 [dsh-game](../../packages/game/game)（`ctx.games`）。角色、合法动作、效果、阶段与胜负只由引擎裁决；模型输出始终是不可信结构化输入。已交付模式包含确定性核心、每个非真人座位一个整局固定且保留上下文的 Bot Agent、每局一个专用 Host Agent 和 Session、原子命令批次、类型化 Host 方法、真人授权投影、终局回放与专用 Web 游戏视图。
 
 源码：[`packages/game/werewolf/src/`](../../packages/game/werewolf/src/)
 
@@ -20,13 +20,13 @@
 
 阶段引擎是纯函数：每一步计算下一批事件并用与回放相同的 reducer 折叠，因此实况对局与回放共用一条代码路径。一个周期按记录顺序遍历 `setup`、`night`、`day` 阶段列表；阶段以不可变动作计划（封闭动作规格词汇：`player-target`、`choice`、`text`、`compound`）开启或跳过；结算按固定记录顺序应用。平票策略由引擎拥有（`no-elimination`、`revote-once`、`seeded-random`），夜间击杀的平刀策略由阶段拥有。胜利在 setup 与每次结算后评估：条件按优先级提出主张，含主张的最低优先级获胜，相同结果合并证据，同一优先级上的分歧结果属于不变量失败。`maxDays` 耗尽仍无其他结果时以平局结束；只有 `abortGame` 能产生 `aborted` 结果。
 
-## One-shot Bot 运行器与观察投影
+## 固定 Bot Agent 与观察投影
 
-`projectWerewolfBotObservation` 首先证明请求仍匹配折叠状态中的游戏标识与修订、已开启阶段与动作计划、编译规则摘要、待决策行动者及其准确的当前连续性上下文，再构造授权视图：经注册角色投影器得到行动者角色与私有知识（仅当角色声明 `seesFactionTeammates` 时包含队友），公开状态包含玩家 id、名册事实与配置数量的尾部时间线，合法动作与先前上下文均取自权威状态。`runWerewolfBotDecision` 在配置 provider 上启动全新子代理，携带对象根 schema、固定 Bot persona、`toolFilter: { allow: [] }`、委派深度上限与可选子代理路由。provider 必须声明全部所需能力且 `inheritsParentContext === false`。结构化结果保持不可信，先校验动作，再校验上下文增量。失败尝试保留准确类别；取消与结果及超时竞速，并在返回前 dispose 子代理。重试耗尽后执行确定性托管动作或暂停游戏。Session Host 的 `GameAiExecutor` 补入准确 Host 父节点和操作 signal，执行 `maxConcurrentBots`，保持结果顺序，且绝不调用 Host 模型。
+`projectWerewolfBotObservation` 首先证明请求仍匹配折叠状态中的游戏标识与修订、已开启阶段与动作计划、编译规则摘要、待决策行动者及其准确的当前连续性上下文，再构造授权视图：经注册角色投影器得到行动者角色与私有知识（仅当角色声明 `seesFactionTeammates` 时包含队友），公开状态包含玩家 id、名册事实与配置数量的尾部时间线，合法动作与先前上下文均取自权威状态。游戏开始时，`WerewolfGameModule` 通过 Session Host 的 `GameAiExecutor` 为每个非真人座位创建一个确定性、禁用工具的 Bot Agent Session。不可变 persona 在整局内固定座位、角色、阵营与性格；后续每次决策都按 FIFO 送入同一个 Agent Session，因此先前请求与回答持续留在模型上下文中。这些游戏自有 Session 记录 Host 父标识，但不带通用子代理 origin descriptor，所以不会出现在普通子代理目录或弹窗中。结构化结果仍是不可信输入，依次校验动作与上下文增量；失败尝试保留准确类别并在同一 Bot Session 上重试。重试耗尽后执行确定性托管动作或暂停游戏。`GameAiExecutor` 补入操作 signal，执行 `maxConcurrentBots`，保持结果顺序，且绝不调用 Host 模型。
 
 ## Session Host、命令与真人投影
 
-`WerewolfGameModule` 是注册到 `ctx.games` 的薄领域适配器。`start` 在 Host 存在前校验准确规则集修订和隔离型子代理 provider。通用 provider 创建 `game-<GameId>`，原子提交 `game/command-receipt` 与 `werewolf/game-started`，并推进阶段直到真人表单、暂停或结果。`submitAction`、`resume`、`abortGame` 携带调用方 request id 与 expected revision。相同 payload 的重复请求在自动推进后返回当前视图；同一键配另一 payload 会冲突，新请求携带过期修订则拒绝。全部变更按局串行。
+`WerewolfGameModule` 是注册到 `ctx.games` 的薄领域适配器。`start` 在 Host 存在前校验准确规则集修订。通用 provider 创建 `game-<GameId>`，原子提交 `game/command-receipt` 与 `werewolf/game-started`，创建固定 Bot Agent，并推进阶段直到真人表单、暂停或结果。`seat-order-public` 阶段每次只结算尚未发言的首个存活座位；该发言记录前下一座位不能行动，全部计划发言完成前投票阶段不能开启。`submitAction`、`resume`、`abortGame` 携带调用方 request id 与 expected revision。相同 payload 的重复请求在自动推进后返回当前视图；同一键配另一 payload 会冲突，新请求携带过期修订则拒绝。全部变更按局串行。
 
 `Session.appendBatch()` 在改变实时日志前，针对影子前缀校验 JSON、完整 surface 转换和同步注册不变量。拒绝时事件、surface、观察者与修订均不改变。成功时完整批次先变得可见，再按顺序发布事件。通用回执与狼人杀事件均为 log-only。
 
@@ -34,7 +34,7 @@
 
 ## 专用会话视图
 
-`@deepseek-ai/dsh-client-ui-werewolf` 注入 `conversation.view` 条目 `werewolf`，并对 `agentPreset: werewolf` 的会话声明首选视图。注入面包装生成的 `ctx.remote.werewolfGame` 命名空间——`getLobby`（附加的局前规则集列表）、`start`、`getView`、`submitAction`、`resume`、`abortGame`、`getReplay`——并订阅转发的 `game/projection-invalidated` 事件，忽略其他游戏并通过 `getView` 重读。表单只渲染封闭规格词汇（`player-target`、`choice`、`text`、`compound`）；浏览器不会收到 Bot 上下文、子代理 prompt 或原始秘密事件。不存在斜杠命令，Chat 文本不能改变游戏状态。
+`@deepseek-ai/dsh-client-ui-werewolf` 注入 `conversation.view` 条目 `werewolf`，并对 `agentPreset: werewolf` 的会话声明首选视图。注入面包装生成的 `ctx.remote.werewolfGame` 命名空间——`getLobby`（附加的局前规则集列表）、`start`、`getView`、`submitAction`、`resume`、`abortGame`、`getReplay`——并订阅转发的 `game/projection-invalidated` 事件，忽略其他游戏并通过 `getView` 重读。白天讨论时，视图会显示当前发言人、已完成/总发言数，以及按公开顺序记录的每条发言或明确过麦，并说明最后一席完成后才进入投票。表单只渲染封闭规格词汇（`player-target`、`choice`、`text`、`compound`）；浏览器不会收到 Bot 上下文、Agent prompt 或原始秘密事件。不存在斜杠命令，狼人杀 Host 会隐藏普通 Chat 输入框，因此只有游戏动作表单能改变游戏状态；更高优先级的系统提问与审批仍可回答。
 
 ## Bot 连续性上下文
 
@@ -122,7 +122,7 @@ abstract getHostSession(gameId: GameId): Session | undefined
 
 Types: [Session](session.md)
 
-Source: [`packages/game/game/src/service.ts:19`](../../packages/game/game/src/service.ts)
+Source: [`packages/game/game/src/service.ts:25`](../../packages/game/game/src/service.ts)
 
 <a id="ctxwerewolf--werewolfruntime"></a>
 

@@ -40,6 +40,7 @@ function applyResolution(
   resolution: WerewolfResolutionV1,
   timeline: WerewolfTimelineEntryV1[],
   timelineIdBase: number,
+  revealVotes: boolean,
 ): void {
   const find = (playerId: WerewolfPlayerId): WerewolfPlayerRuntimeV1 | undefined =>
     players.find(player => player.playerId === playerId)
@@ -76,17 +77,19 @@ function applyResolution(
       ...(announcement.data === undefined ? {} : { data: announcement.data }),
     })
   })
-  resolution.votes.forEach((vote, index) => {
-    timeline.push({
-      id: `${timelineIdBase}:v${index}`,
-      day,
-      phaseId,
-      kind: 'vote',
-      actorId: vote.voterId,
-      key: 'vote.cast',
-      data: { voterId: vote.voterId, targetId: vote.targetId },
+  if (revealVotes) {
+    resolution.votes.forEach((vote, index) => {
+      timeline.push({
+        id: `${timelineIdBase}:v${index}`,
+        day,
+        phaseId,
+        kind: 'vote',
+        actorId: vote.voterId,
+        key: 'vote.cast',
+        data: { voterId: vote.voterId, targetId: vote.targetId },
+      })
     })
-  })
+  }
 }
 
 /**
@@ -112,7 +115,7 @@ function speechEntry(
   actorId: WerewolfPlayerId,
   day: number,
   phaseId: string,
-  text: string,
+  text: string | undefined,
   revision: number,
   index: number,
 ): WerewolfTimelineEntryV1 {
@@ -122,8 +125,8 @@ function speechEntry(
     phaseId,
     kind: 'speech',
     actorId,
-    key: 'speech',
-    data: { text },
+    key: text === undefined ? 'speech.pass' : 'speech',
+    ...(text === undefined ? {} : { data: { text } }),
   }
 }
 
@@ -137,6 +140,13 @@ function isOpenTextAction(openPhase: WerewolfOpenPhaseV1, playerId: WerewolfPlay
   if (typeof action !== 'object' || action === null || Array.isArray(action)) return false
   const value = (action as { value?: unknown }).value
   return typeof value === 'string' && value.length > 0
+}
+
+function isOpenTextPass(openPhase: WerewolfOpenPhaseV1, playerId: WerewolfPlayerId, action: unknown): action is { value: null } {
+  const actor = actorSpec(openPhase, playerId)
+  if (actor === undefined || actor.spec.kind !== 'text') return false
+  if (typeof action !== 'object' || action === null || Array.isArray(action)) return false
+  return (action as { value?: unknown }).value === null
 }
 
 /**
@@ -248,12 +258,13 @@ export function applyWerewolfEvent(
         settled: [...openPhase.settled, { playerId: data.playerId, humanActionId: data.humanActionId }],
       },
     }
-    if (openPhase !== null && isOpenTextAction(openPhase, data.playerId, data.action)) {
+    if (openPhase !== null && (isOpenTextAction(openPhase, data.playerId, data.action)
+      || isOpenTextPass(openPhase, data.playerId, data.action))) {
       next.timeline = [...next.timeline, speechEntry(
         data.playerId,
         openPhase.day,
         openPhase.phaseId,
-        data.action.value,
+        isOpenTextAction(openPhase, data.playerId, data.action) ? data.action.value : undefined,
         data.gameRevision,
         next.timeline.length,
       )]
@@ -281,7 +292,7 @@ export function applyWerewolfEvent(
     for (const entry of data.entries) {
       contexts[entry.playerId] = entry.contextAfter
       settled.push({ playerId: entry.playerId, decisionId: entry.decisionId })
-      if (entry.publicSpeech !== undefined && entry.publicSpeech.length > 0 && openPhase !== null) {
+      if (openPhase !== null && actorSpec(openPhase, entry.playerId)?.spec.kind === 'text') {
         timeline.push(speechEntry(
           entry.playerId,
           openPhase.day,
@@ -305,7 +316,15 @@ export function applyWerewolfEvent(
     const openPhase = state.openPhase
     const players = copyPlayers(state.players)
     const timeline = [...state.timeline]
-    applyResolution(players, openPhase?.day ?? state.day, openPhase?.phaseId ?? '', data.resolution, timeline, data.gameRevision)
+    applyResolution(
+      players,
+      openPhase?.day ?? state.day,
+      openPhase?.phaseId ?? '',
+      data.resolution,
+      timeline,
+      data.gameRevision,
+      openPhase?.segment === 'day',
+    )
     const prior: WerewolfPriorResolutionV1 = {
       phaseId: openPhase?.phaseId ?? '',
       phaseVersion: openPhase?.phaseVersion ?? 0,

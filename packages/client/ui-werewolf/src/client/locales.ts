@@ -10,13 +10,19 @@ export type WerewolfKey =
   | 'lobby.unavailable'
   | 'reveal.title' | 'reveal.covered' | 'reveal.action' | 'reveal.ready' | 'reveal.faction' | 'reveal.teammates'
   | 'reveal.resources' | 'reveal.none'
-  | 'table.title' | 'table.day' | 'table.night' | 'table.phase' | 'table.seat' | 'table.you'
+  | 'table.title' | 'table.signalTitle' | 'table.solo' | 'table.day' | 'table.night' | 'table.phase' | 'table.seat' | 'table.you'
   | 'table.alive' | 'table.dead' | 'table.deadOn' | 'table.unknownRole' | 'table.role'
   | 'table.timeline' | 'table.notices' | 'table.noNotices' | 'table.empty'
+  | 'table.track' | 'table.known' | 'table.knownNone' | 'table.openFinding'
+  | 'finding.title' | 'finding.seer' | 'finding.wolfKill' | 'finding.scope'
+  | 'finding.type' | 'finding.target' | 'finding.victim' | 'finding.noVictim' | 'finding.faction' | 'finding.factionWolf' | 'finding.factionVillage'
+  | 'finding.when' | 'finding.day' | 'finding.back'
   | 'night.title' | 'night.privateHint'
-  | 'speech.title' | 'speech.placeholder' | 'speech.remaining' | 'speech.speak' | 'speech.pass'
+  | 'speech.title' | 'speech.audience' | 'speech.placeholder' | 'speech.remaining' | 'speech.speak' | 'speech.pass'
+  | 'flow.speaking' | 'flow.yourTurn' | 'flow.progress' | 'flow.afterSpeeches'
+  | 'timeline.speech' | 'timeline.pass' | 'timeline.vote' | 'timeline.event'
   | 'vote.title' | 'vote.selected' | 'vote.confirm' | 'vote.abstain'
-  | 'action.title' | 'action.submit' | 'action.pass' | 'action.passLabel'
+  | 'action.title' | 'action.hint' | 'action.submit' | 'action.pass' | 'action.passLabel'
   | 'spectator.title' | 'spectator.hint'
   | 'paused.title' | 'paused.reason' | 'paused.resume' | 'paused.resuming' | 'paused.abort' | 'paused.confirmAbort'
   | 'result.title' | 'result.village' | 'result.wolf' | 'result.tie' | 'result.aborted'
@@ -43,6 +49,8 @@ export const en: Record<WerewolfKey, string> = {
   'reveal.resources': 'Resources',
   'reveal.none': 'None',
   'table.title': 'Game table',
+  'table.signalTitle': 'Signal Circle',
+  'table.solo': 'Solo practice',
   'table.day': 'Day {day}',
   'table.night': 'Night {day}',
   'table.phase': 'Phase: {phase}',
@@ -57,18 +65,46 @@ export const en: Record<WerewolfKey, string> = {
   'table.notices': 'Private notices',
   'table.noNotices': 'No private notices.',
   'table.empty': 'Nothing has happened yet.',
+  'table.track': 'Day {day} · Phase {phase}',
+  'table.known': 'Known',
+  'table.knownNone': 'Unknown',
+  'table.openFinding': 'View finding',
+  'finding.title': 'Findings',
+  'finding.seer': 'Inspect',
+  'finding.wolfKill': 'Wolf attack',
+  'finding.scope': 'Visible only to you',
+  'finding.type': 'Finding type',
+  'finding.target': 'Target',
+  'finding.victim': 'Attacked player',
+  'finding.noVictim': 'No victim',
+  'finding.faction': 'Faction',
+  'finding.factionWolf': 'Wolf faction',
+  'finding.factionVillage': 'Village faction',
+  'finding.when': 'Source turn',
+  'finding.day': 'Day {day}',
+  'finding.back': 'Back to my identity',
   'night.title': 'Night falls',
   'night.privateHint': 'Night actions are private. Only your own view is shown.',
   'speech.title': 'Your statement',
+  'speech.audience': 'Public channel · everyone at the table can hear this',
   'speech.placeholder': 'Address the table…',
   'speech.remaining': '{count} characters left',
   'speech.speak': 'Speak',
   'speech.pass': 'Pass',
+  'flow.speaking': '{seat} · {name} is speaking',
+  'flow.yourTurn': 'It is your turn to speak',
+  'flow.progress': '{completed} of {total} statements completed',
+  'flow.afterSpeeches': 'Voting opens only after every living player has finished speaking.',
+  'timeline.speech': '{seat} · {name}',
+  'timeline.pass': 'Passed without a statement',
+  'timeline.vote': '{seat} · {name} cast a vote',
+  'timeline.event': 'Day {day} · {phase}',
   'vote.title': 'Cast your vote',
   'vote.selected': 'Voting: {name}',
   'vote.confirm': 'Confirm vote',
   'vote.abstain': 'Abstain',
   'action.title': 'Choose your action',
+  'action.hint': 'Private action · confirm before the phase advances',
   'action.submit': 'Submit',
   'action.pass': 'Pass',
   'action.passLabel': 'Skip this action',
@@ -117,6 +153,8 @@ export const zh: Record<WerewolfKey, string> = {
   'reveal.resources': '资源',
   'reveal.none': '无',
   'table.title': '游戏桌',
+  'table.signalTitle': 'Signal Circle',
+  'table.solo': '单人练习局',
   'table.day': '第 {day} 天',
   'table.night': '第 {day} 夜',
   'table.phase': '阶段：{phase}',
@@ -131,18 +169,46 @@ export const zh: Record<WerewolfKey, string> = {
   'table.notices': '私密通知',
   'table.noNotices': '暂无私密通知。',
   'table.empty': '还没有任何事发生。',
+  'table.track': '第 {day} 天 · 阶段 {phase}',
+  'table.known': '已知',
+  'table.knownNone': '未知',
+  'table.openFinding': '查看发现',
+  'finding.title': '发现档案',
+  'finding.seer': '查验',
+  'finding.wolfKill': '狼人袭击',
+  'finding.scope': '仅你可见',
+  'finding.type': '发现类型',
+  'finding.target': '目标',
+  'finding.victim': '被袭击玩家',
+  'finding.noVictim': '无人被袭击',
+  'finding.faction': '阵营',
+  'finding.factionWolf': '狼人阵营',
+  'finding.factionVillage': '好人阵营',
+  'finding.when': '来源回合',
+  'finding.day': '第 {day} 天',
+  'finding.back': '返回我的身份',
   'night.title': '夜幕降临',
   'night.privateHint': '夜间行动是私密的，只显示你自己的视野。',
   'speech.title': '轮到你发言',
+  'speech.audience': '公开频道 · 全桌玩家均可听见',
   'speech.placeholder': '向全桌发言…',
   'speech.remaining': '还可输入 {count} 字',
   'speech.speak': '发言',
   'speech.pass': '过麦',
+  'flow.speaking': '{seat} 号位 · {name} 正在发言',
+  'flow.yourTurn': '现在轮到你发言',
+  'flow.progress': '已完成 {completed} / {total} 位发言',
+  'flow.afterSpeeches': '所有存活玩家依次发言完毕后，才会进入投票。',
+  'timeline.speech': '{seat} 号位 · {name}',
+  'timeline.pass': '本轮过麦',
+  'timeline.vote': '{seat} 号位 · {name} 已投票',
+  'timeline.event': '第 {day} 天 · {phase}',
   'vote.title': '投出你的一票',
   'vote.selected': '投票对象：{name}',
   'vote.confirm': '确认投票',
   'vote.abstain': '弃票',
   'action.title': '选择你的行动',
+  'action.hint': '私密行动 · 确认后进入下一阶段',
   'action.submit': '提交',
   'action.pass': '跳过',
   'action.passLabel': '跳过本次行动',

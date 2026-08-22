@@ -172,6 +172,35 @@ describe('driveWerewolfGame', () => {
     expect(driven.state.timeline.some(entry => entry.kind === 'speech' && entry.data !== undefined)).toBe(true)
   })
 
+  it('finishes every seat-ordered statement before opening the vote phase', () => {
+    const rules = miniRuleSet({ voteTie: 'no-elimination' })
+    const { state } = startWerewolfGame({ ruleSet: rules, seed: 5, ids: counterIds() })
+    const driven = driveWerewolfGame(state, rules, { ...villageWinBots(state), limits: testLimits(), ids: counterIds() })
+    const talkIndex = driven.events.findIndex(event => (
+      event.type === 'werewolf/phase-opened' && event.data.phaseId === 'day.talk'
+    ))
+    const voteIndex = driven.events.findIndex((event, index) => (
+      index > talkIndex && event.type === 'werewolf/phase-opened' && event.data.phaseId === 'day.vote'
+    ))
+    const talk = driven.events[talkIndex]
+    if (talk?.type !== 'werewolf/phase-opened') throw new Error('missing day discussion fixture')
+    const speakers = driven.events.slice(talkIndex + 1, voteIndex).flatMap((event) => {
+      if (event.type === 'werewolf/human-action' && typeof (event.data.action as { value?: unknown }).value === 'string') {
+        return [event.data.playerId]
+      }
+      if (event.type === 'werewolf/bot-decision') {
+        return event.data.entries
+          .filter(entry => entry.publicSpeech !== undefined)
+          .map(entry => entry.playerId)
+      }
+      return []
+    })
+    const plannedSpeakers = talk.data.plan?.actors.map(actor => actor.playerId)
+    if (plannedSpeakers === undefined) throw new Error('day discussion has no speaking plan')
+    expect(voteIndex).toBeGreaterThan(talkIndex)
+    expect(speakers).toEqual(plannedSpeakers)
+  })
+
   it('keeps bot context revisions contiguous per actor and siblings untouched', () => {
     const rules = miniRuleSet({ voteTie: 'no-elimination' })
     const { state } = startWerewolfGame({ ruleSet: rules, seed: 11, ids: counterIds() })

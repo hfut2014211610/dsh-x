@@ -14,7 +14,11 @@ import {
   type PreparedGameStart,
 } from '@deepseek-ai/dsh-game'
 import type { JsonValue, SessionEvent } from '@deepseek-ai/dsh-session'
-import { assertWerewolfBotProvider, runWerewolfBotDecision } from './bot-runner.ts'
+import {
+  runWerewolfBotDecision,
+  werewolfBotPersona,
+  werewolfBotSessionId,
+} from './bot-runner.ts'
 import {
   abortWerewolfGame,
   buildWerewolfBotRequests,
@@ -86,14 +90,12 @@ export class WerewolfGameModule implements GameModule<WerewolfGameStateV1, JsonV
   ) {}
 
   /** @inheritdoc */
-  // oxlint-disable-next-line typescript/require-await -- the interface requires synchronous domain failures to reject asynchronously
   async prepareStart(
     input: JsonValue,
     _principal: LocalGamePrincipalV1,
     requestId: GameRequestId,
     payloadDigest: string,
   ): Promise<PreparedGameStart<WerewolfGameStateV1>> {
-    assertWerewolfBotProvider(this.ctx.subagents, this.runtime.botRunnerConfig().provider)
     const parsed = parseStart(input)
     const raw = this.runtime.listRuleSets().get(`${parsed.ruleSetId}@${parsed.ruleSetRevision}`)
     if (raw === undefined) throw new WerewolfError('WEREWOLF_UNKNOWN_DEFINITION', `rule set ${parsed.ruleSetId}@${parsed.ruleSetRevision} is not registered`)
@@ -127,7 +129,6 @@ export class WerewolfGameModule implements GameModule<WerewolfGameStateV1, JsonV
   status(state: WerewolfGameStateV1): WerewolfGameStateV1['status'] { return state.status }
 
   /** @inheritdoc */
-  // oxlint-disable-next-line typescript/require-await -- the interface requires synchronous domain failures to reject asynchronously
   async mutate(state: WerewolfGameStateV1, request: GameMutationRequest) {
     if (request.participantId !== ParticipantId(state.humanPlayerId)) throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', 'participant is not the human seat')
     const mutation = { requestId: request.requestId as string, digest: request.payloadDigest }
@@ -139,7 +140,6 @@ export class WerewolfGameModule implements GameModule<WerewolfGameStateV1, JsonV
       return { state: step.state, events: candidates(step.events) }
     }
     if (request.method === 'resume') {
-      assertWerewolfBotProvider(this.ctx.subagents, this.runtime.botRunnerConfig().provider)
       const step = resumeWerewolfGame(state, mutation)
       return { state: step.state, events: candidates(step.events) }
     }
@@ -154,6 +154,17 @@ export class WerewolfGameModule implements GameModule<WerewolfGameStateV1, JsonV
     executor: GameAiExecutor,
   ): Promise<GameAdvance<WerewolfGameStateV1>> {
     const rules = this.rules(state)
+    const config = this.runtime.botRunnerConfig()
+    const bots = state.players.filter(player => !player.human)
+    await executor.map(bots, config.maxConcurrentBots, async (player) => {
+      await executor.provisionBot({
+        childId: werewolfBotSessionId(state, player.playerId),
+        label: `Werewolf seat ${player.seat} · ${player.displayName}`,
+        ...(config.botAgent === undefined ? {} : { agentOptions: config.botAgent }),
+        persona: werewolfBotPersona(state, rules, player.playerId),
+        toolFilter: { allow: [] },
+      })
+    })
     if (state.openPhase === null) {
       const step = openNextWerewolfPhase(state, rules, this.ids)
       return { state: step.state, events: candidates(step.events), stop: step.state.status !== 'running' }
@@ -172,7 +183,6 @@ export class WerewolfGameModule implements GameModule<WerewolfGameStateV1, JsonV
     const requests = buildWerewolfBotRequests(state, this.ids)
     /* v8 ignore next -- a non-human pending actor always produces one request */
     if (requests.length === 0) return { state, events: [], stop: true }
-    const config = this.runtime.botRunnerConfig()
     const outcomes = await executor.map(requests, config.maxConcurrentBots, async request => await runWerewolfBotDecision({
       ctx: this.ctx,
       config,

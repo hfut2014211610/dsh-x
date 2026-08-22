@@ -78,7 +78,11 @@ const idleExecutor = (outcomes: unknown[] = []): GameAiExecutor => ({
   host: undefined as never,
   signal: new AbortController().signal,
   start: async () => { throw new Error('unexpected child start') },
-  map: async () => outcomes as never,
+  provisionBot: async () => {},
+  turnBot: async () => { throw new Error('unexpected Bot turn') },
+  map: async <T, R>(items: readonly T[], _max: number, worker: (item: T) => Promise<R>): Promise<R[]> => outcomes.length > 0
+    ? outcomes as R[]
+    : await Promise.all(items.map(worker)),
 })
 
 describe('WerewolfGameModule input and mutation boundaries', () => {
@@ -117,9 +121,9 @@ describe('WerewolfGameModule input and mutation boundaries', () => {
     expect(named.state.players.map(player => player.displayName)).toEqual(['A', 'B', 'C', 'D', 'E'])
   })
 
-  it('rejects inherited parent history before creating domain state', async () => {
+  it('does not depend on one-shot provider history semantics when preparing a game', async () => {
     const { module } = await setup({ inheritsParentContext: true })
-    await expect(prepared(module)).rejects.toThrow(/inherits parent context/)
+    await expect(prepared(module)).resolves.toMatchObject({ gameId: GameId('g1') })
   })
 
   it('validates participant, phase identity, and action presence', async () => {
@@ -176,7 +180,7 @@ describe('WerewolfGameModule input and mutation boundaries', () => {
     expect(bareResumeData).not.toHaveProperty('request')
   })
 
-  it('resumes paused games, aborts games, and rechecks provider isolation on resume', async () => {
+  it('resumes paused games and aborts games without recreating one-shot children', async () => {
     const first = await setup()
     const start = await prepared(first.module)
     const paused = pauseWerewolfGame(start.state, 'bot-failure').state
@@ -194,7 +198,7 @@ describe('WerewolfGameModule input and mutation boundaries', () => {
     await expect(inherited.module.mutate(inheritedState, {
       method: 'resume', participantId: start.participantId, payload: null,
       requestId: GameRequestId('resume-inherited'), payloadDigest: 'e'.repeat(64),
-    })).rejects.toThrow(/inherits parent context/)
+    })).resolves.toMatchObject({ state: { status: 'running' } })
   })
 })
 
@@ -334,7 +338,11 @@ describe('projectWerewolfHumanView', () => {
       humanPlayerId: human.playerId,
       openPhase: { ...opened.openPhase, plan: { ...opened.openPhase.plan, mode: 'seat-order-public' } },
     }
-    expect(projectWerewolfHumanView(runtime, publicState, rules).actionForm).toBeNull()
+    const publicView = projectWerewolfHumanView(runtime, publicState, rules)
+    expect(publicView.actionForm).toBeNull()
+    expect(publicView.phase?.speech?.completed).toBe(0)
+    expect(publicView.phase?.speech?.total).toBe(actors?.length)
+    expect(publicView.phase?.speech?.current?.playerId).toBe(actors?.[0]?.playerId)
     const settled: WerewolfGameStateV1 = {
       ...opened,
       humanPlayerId: human.playerId,

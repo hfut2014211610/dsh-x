@@ -2,7 +2,7 @@
 
 English | [中文](README.zh.md)
 
-The reusable `ctx.games` capability for durable, turn-based game modules. The default provider creates one idle Host Agent and Session per game, serializes mutations, binds the local principal to one participant, atomically commits command receipts with domain events, invalidates authorized projections, and schedules fresh one-shot AI children without invoking the Host model.
+The reusable `ctx.games` capability for durable, turn-based game modules. The default provider creates one idle Host Agent and Session per game, serializes mutations, binds the local principal to one participant, atomically commits command receipts with domain events, invalidates authorized projections, and owns fixed per-game Bot Agents without invoking the Host model.
 
 ## Lifecycle
 
@@ -12,7 +12,7 @@ The reusable `ctx.games` capability for durable, turn-based game modules. The de
 
 A `GameModule` owns domain rules, event folding, revision and status, mutations, automatic advancement, authorized projection, and replay. The Host owns Agent/Session lifetime, principal binding, idempotency, atomic publication, cancellation, bounded concurrency, and child start authority. Module events are log-only; they never enter the Host model surface.
 
-`GameAiExecutor.map()` preserves input order under the requested concurrency bound. `GameAiExecutor.start()` supplies the exact Host parent and operation signal, so modules construct prompts and schemas while the common Host retains child lineage and cancellation authority.
+`GameAiExecutor.map()` preserves input order under the requested concurrency bound. `provisionBot()` creates one stable Bot identity under the exact Host and is idempotent for that game; `turnBot()` sends later decisions through the same FIFO Agent Session. Game Bot Sessions record `parentSession` but not `origin: subagent`, so generic subagent catalogs cannot enumerate or open private game reasoning. `start()` remains the one-shot authority for modules that need it.
 
 ## Export shape
 
@@ -24,7 +24,7 @@ The default export is `SessionGameService`; the abstract Service Definition is `
 
 #### What the model sees
 
-Nothing. A Host remains idle while `ctx.games` appends ordinary mutations as log-only events. Only a module-requested one-shot child receives its module-authorized prompt.
+Nothing. A Host remains idle while `ctx.games` appends ordinary mutations as log-only events. Only the module's game-owned Bot Agent receives its authorized decision prompt.
 
 #### Token effect
 
@@ -32,7 +32,7 @@ The Host consumes no model tokens. Child token usage belongs to the selected mod
 
 #### KV Cache effect
 
-The Host creates no model request and therefore no game-specific Host cache entry. Fresh children do not reuse a previous decision transcript.
+The Host creates no model request and therefore no game-specific Host cache entry. Each Bot reuses its own completed-turn prefix across decisions until the game ends.
 
 ## Known Limitations and Deferred Work
 

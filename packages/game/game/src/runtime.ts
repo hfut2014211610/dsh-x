@@ -3,8 +3,18 @@
 import { createHash } from 'node:crypto'
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle } from '@deepseek-ai/dsh-agent'
+import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import { SessionId, snapshotJsonValue } from '@deepseek-ai/dsh-session'
-import type { JsonValue, Session, SessionAppendEntry } from '@deepseek-ai/dsh-session'
+import type { JsonValue, Session, SessionAppendEntry, TurnEndReason } from '@deepseek-ai/dsh-session'
+import {
+  appendDelegatedPolicyOverrides,
+  applyChildComposition,
+  captureDelegatedPolicyOverrides,
+  finalAssistantOutput,
+  resolveChildAgentOptions,
+  resolveChildDepth,
+  type SubagentStopReason,
+} from '@deepseek-ai/dsh-subagent'
 import { isGameCommandReceipt } from './events.ts'
 import { GameService } from './service.ts'
 import type { GameAiExecutor, GameModule } from './executor.ts'
@@ -28,6 +38,49 @@ interface HostRecord {
   participantId: ParticipantId
   session: Session
   handle?: AgentHandle
+  botHandles: Map<SessionId, AgentHandle>
+}
+
+function botStopReason(reason: TurnEndReason): SubagentStopReason {
+  switch (reason.kind) {
+    case 'completed': return 'completed'
+    case 'aborted': return 'aborted'
+    case 'max-tokens': return 'max-tokens'
+    case 'blocked': return 'refusal'
+    case 'error':
+    case 'interrupted': return 'error'
+    default: return 'error'
+  }
+}
+
+async function awaitBotTurn(agent: Agent, timeoutMs: number, signal: AbortSignal): Promise<boolean> {
+  let timer: ReturnType<typeof setTimeout> | undefined
+  let onAbort: (() => void) | undefined
+  const timeout = new Promise<'timeout'>((resolve) => {
+    timer = setTimeout(() => { resolve('timeout') }, timeoutMs)
+  })
+  const cancelled = new Promise<'cancelled'>((resolve) => {
+    onAbort = () => { resolve('cancelled') }
+    if (signal.aborted) onAbort()
+    else signal.addEventListener('abort', onAbort, { once: true })
+  })
+  try {
+    const outcome = await Promise.race([
+      agent.whenIdle().then(() => 'idle' as const),
+      timeout,
+      cancelled,
+    ])
+    if (outcome === 'idle') return false
+    agent.cancel(outcome === 'timeout'
+      ? { kind: 'hook', reason: 'game Bot decision timeout' }
+      : { kind: 'parent' })
+    await agent.whenIdle()
+    if (outcome === 'cancelled') throw signal.reason ?? new Error('game AI operation cancelled')
+    return true
+  } finally {
+    clearTimeout(timer)
+    if (onAbort !== undefined) signal.removeEventListener('abort', onAbort)
+  }
 }
 
 /** Stable game-host failure with a machine-readable code. */
@@ -79,8 +132,11 @@ export class SessionGameService extends GameService {
     for (const session of ctx.sessions.list()) this.indexSession(session)
     ctx.on('session/created', (session) => { this.indexSession(session) })
     ctx.effect(() => async () => {
-      const handles = [...this.hosts.values()].flatMap(record => record.handle === undefined ? [] : [record.handle])
-      await Promise.allSettled(handles.map(handle => handle.dispose()))
+      const records = [...this.hosts.values()]
+      const botHandles = records.flatMap(record => [...record.botHandles.values()])
+      await Promise.allSettled(botHandles.map(handle => handle.dispose()))
+      const hostHandles = records.flatMap(record => record.handle === undefined ? [] : [record.handle])
+      await Promise.allSettled(hostHandles.map(handle => handle.dispose()))
     }, 'games.hostLifecycle()')
   }
 
@@ -138,6 +194,7 @@ export class SessionGameService extends GameService {
         participantId: prepared.participantId,
         session: handle.agent.session,
         handle,
+        botHandles: new Map(),
       }
       try {
         const receipt: GameCommandReceiptV1 = {
@@ -260,6 +317,7 @@ export class SessionGameService extends GameService {
         this.invalidate(record.gameId, module.revision(transition.state))
         if (autoAdvance) await this.advance(record, module, transition.state, agent, signal)
       })
+      if (module.status(transition.state) === 'ended') await this.releaseBots(record)
       return this.project<TView>(record)
     })
   }
@@ -267,7 +325,7 @@ export class SessionGameService extends GameService {
   private async advance(record: HostRecord, module: GameModule, initial: unknown, agent: Agent, signal: AbortSignal): Promise<void> {
     let state = initial
     while (module.status(state) === 'running') {
-      const executor = this.executor(agent, signal)
+      const executor = this.executor(record, agent, signal)
       const step = await module.advance(state, record.session.events, executor)
       if (step.events.length === 0) {
         if (!step.stop) throw new GameHostError('GAME_INVALID_TRANSITION', `game module ${module.id} returned an empty non-stopping advance`)
@@ -281,13 +339,68 @@ export class SessionGameService extends GameService {
       if (module.revision(state) !== previousRevision) this.invalidate(record.gameId, module.revision(state))
       if (step.stop) return
     }
+    await this.releaseBots(record)
   }
 
-  private executor(host: Agent, signal: AbortSignal): GameAiExecutor {
+  private executor(record: HostRecord, host: Agent, signal: AbortSignal): GameAiExecutor {
     return {
       host,
       signal,
       start: async (provider, request) => await this.ctx.subagents.start(provider, { ...request, parent: host, signal }),
+      provisionBot: async (request) => {
+        if (record.botHandles.has(request.childId)) return
+        if (this.ctx.agents.get(request.childId) !== undefined) {
+          throw new Error(`game Bot agent ${request.childId} already exists outside game ${record.gameId}`)
+        }
+        const childDepth = resolveChildDepth(host, request.maxDepth)
+        const policies = captureDelegatedPolicyOverrides(host)
+        const handle = await this.ctx.agents.create({
+          sessionId: request.childId,
+          meta: {
+            ...(host.session.header.cwd === undefined ? {} : { cwd: host.session.header.cwd }),
+            parentSession: host.id,
+            delegationDepth: childDepth,
+          },
+          agentOptions: resolveChildAgentOptions(host, request.agentOptions, childDepth),
+          signal,
+          setup: (childCtx) => {
+            applyChildComposition(childCtx, host, {
+              persona: request.persona,
+              ...(request.toolFilter === undefined ? {} : { toolFilter: request.toolFilter }),
+            })
+          },
+        })
+        try {
+          appendDelegatedPolicyOverrides(handle.agent.session, policies)
+          record.botHandles.set(request.childId, handle)
+        } catch (error) {
+          await handle.dispose()
+          throw new Error(`game Bot ${request.label} could not be provisioned`, { cause: error })
+        }
+      },
+      turnBot: async (childId, prompt, timeoutMs) => {
+        if (!Number.isSafeInteger(timeoutMs) || timeoutMs < 1) {
+          throw new Error('game Bot timeoutMs must be a positive integer')
+        }
+        const handle = record.botHandles.get(childId)
+        if (handle === undefined) throw new Error(`game Bot agent ${childId} is not provisioned`)
+        if (signal.aborted) throw signal.reason ?? new Error('game AI operation cancelled')
+        const startSeq = handle.agent.session.seq
+        handle.agent.followup(createUserMessage({
+          content: prompt,
+          source: { kind: 'plugin', plugin: 'game' },
+        }))
+        const timedOut = await awaitBotTurn(handle.agent, timeoutMs, signal)
+        const events = handle.agent.session.events.filter(event => event.seq >= startSeq)
+        const end = events.findLast(event => event.type === 'turn/end')
+        if (end?.type !== 'turn/end') throw new Error(`game Bot agent ${childId} ended without a turn boundary`)
+        return {
+          childId,
+          output: finalAssistantOutput(events) ?? [],
+          stopReason: botStopReason(end.data.reason),
+          timedOut,
+        }
+      },
       map: async <T, R>(items: readonly T[], maxConcurrency: number, worker: (item: T) => Promise<R>): Promise<R[]> => {
         if (!Number.isSafeInteger(maxConcurrency) || maxConcurrency < 1) throw new Error('game AI maxConcurrency must be a positive integer')
         const results = new Array<R>(items.length)
@@ -302,6 +415,19 @@ export class SessionGameService extends GameService {
         await Promise.all(Array.from({ length: Math.min(maxConcurrency, items.length) }, run))
         return results
       },
+    }
+  }
+
+  private async releaseBots(record: HostRecord): Promise<void> {
+    const handles = [...record.botHandles.values()]
+    record.botHandles.clear()
+    const settled = await Promise.allSettled(handles.map(async (handle) => {
+      await this.ctx.sessions.flush(handle.agent.session)
+      await handle.dispose()
+    }))
+    const failures = settled.filter(result => result.status === 'rejected')
+    if (failures.length > 0) {
+      this.ctx.logger.warn(`game ${record.gameId} failed to release ${failures.length} Bot agent(s)`)
     }
   }
 
@@ -416,6 +542,7 @@ export class SessionGameService extends GameService {
       principalId: receipt.principalId,
       participantId: receipt.participantId,
       session,
+      botHandles: new Map(),
     }
     this.hosts.set(record.gameId, record)
     this.startReceipts.set(`${record.principalId}\u0000${receipt.requestId}`, record.gameId)

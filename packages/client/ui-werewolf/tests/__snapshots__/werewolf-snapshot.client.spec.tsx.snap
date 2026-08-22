@@ -11,9 +11,23 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
     class="_phaseHeading_0c2d30"
     tabindex="-1"
   >
-    第 2 夜
-    ·
-    阶段：night.witch
+    <span
+      class="_signalBrand_0c2d30"
+    >
+      <span>
+        Signal Circle
+      </span>
+      <small>
+        单人练习局
+      </small>
+    </span>
+    <span
+      class="_phaseTitle_0c2d30"
+    >
+      第 2 夜
+      ·
+      阶段：night.witch
+    </span>
   </h2>
   <p
     aria-live="polite"
@@ -30,6 +44,13 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
   <div
     class="_columns_0c2d30"
   >
+    <div
+      aria-hidden="true"
+      class="_track_0c2d30"
+      data-testid="werewolf-track"
+    >
+      第 2 天 · 阶段 night.witch
+    </div>
     <aside
       aria-label="公开时间线"
       class="_timeline_0c2d30"
@@ -38,153 +59,190 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
         公开时间线
       </h3>
       <ol>
-        <li>
-          1
-          ·
-          day.announce
-          ·
-          announcement
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.announce
+          </span>
         </li>
-        <li>
-          1
-          ·
-          day.vote
-          ·
-          vote
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.vote
+          </span>
         </li>
       </ol>
     </aside>
     <div
-      class="_seats_0c2d30"
+      class="_circle_0c2d30"
       role="list"
     >
-      <div
-        class="_seat_0c2d30 _self_0c2d30"
-        role="listitem"
+      <ul
+        class="_circleList_0c2d30"
       >
-        <span
-          class="_seatName_0c2d30"
+        <li
+          class="_seat_0c2d30 _self_0c2d30"
+          role="listitem"
+          style="--seat-angle: -90deg;"
         >
-          1 号位
-          ·
-          Seat 1
-           (你)
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="1 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-01.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-01.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            1 号位
+            ·
+            Seat 1
+             (你)
+          </span>
+          <span>
+            Witch
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: -38.57142857142858deg;"
         >
-          2 号位
-          ·
-          Seat 2
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="2 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-02.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-02.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            2 号位
+            ·
+            Seat 2
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 12.857142857142847deg;"
         >
-          3 号位
-          ·
-          Seat 3
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="3 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-03.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-03.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            3 号位
+            ·
+            Seat 3
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 64.28571428571428deg;"
         >
-          4 号位
-          ·
-          Seat 4
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30 _dead_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="4 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-04.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-04.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            4 号位
+            ·
+            Seat 4
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30 _dead_0c2d30"
+          role="listitem"
+          style="--seat-angle: 115.7142857142857deg;"
         >
-          5 号位
-          ·
-          Seat 5
-        </span>
-        <span>
-          第 1 天出局
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="5 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-05.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-05.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            5 号位
+            ·
+            Seat 5
+          </span>
+          <span>
+            出局
+             · 第 1 天出局
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 167.14285714285717deg;"
         >
-          6 号位
-          ·
-          Seat 6
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="6 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-06.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-06.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            6 号位
+            ·
+            Seat 6
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 218.57142857142856deg;"
         >
-          7 号位
-          ·
-          Seat 7
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
+          <img
+            alt="7 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-07.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-07.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            7 号位
+            ·
+            Seat 7
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+      </ul>
     </div>
     <aside
       aria-label="私密通知"
@@ -197,7 +255,7 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
         Witch
       </p>
       <h3>
-        私密通知
+        发现档案
       </h3>
       <p>
         暂无私密通知。
@@ -209,10 +267,23 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
     class="_actionForm_0c2d30"
     data-testid="werewolf-action-form"
   >
-    <h3>
-      选择你的行动
-    </h3>
-    <fieldset>
+    <header
+      class="_actionHeader_0c2d30"
+    >
+      <div>
+        <p
+          class="_actionKicker_0c2d30"
+        >
+          私密行动 · 确认后进入下一阶段
+        </p>
+        <h3>
+          选择你的行动
+        </h3>
+      </div>
+    </header>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
       <legend>
         antidote
       </legend>
@@ -243,7 +314,9 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
         </button>
       </div>
     </fieldset>
-    <fieldset>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
       <legend>
         poison
       </legend>
@@ -285,9 +358,10 @@ exports[`WerewolfView responsive snapshots > matches the 390px mobile layout sna
       </div>
     </fieldset>
     <div
-      class="_actions_0c2d30"
+      class="_actions_0c2d30 _actionButtons_0c2d30"
     >
       <button
+        class="_primaryAction_0c2d30"
         disabled=""
         type="submit"
       >
@@ -309,9 +383,23 @@ exports[`WerewolfView responsive snapshots > matches the desktop layout snapshot
     class="_phaseHeading_0c2d30"
     tabindex="-1"
   >
-    第 2 夜
-    ·
-    阶段：night.witch
+    <span
+      class="_signalBrand_0c2d30"
+    >
+      <span>
+        Signal Circle
+      </span>
+      <small>
+        单人练习局
+      </small>
+    </span>
+    <span
+      class="_phaseTitle_0c2d30"
+    >
+      第 2 夜
+      ·
+      阶段：night.witch
+    </span>
   </h2>
   <p
     aria-live="polite"
@@ -328,6 +416,13 @@ exports[`WerewolfView responsive snapshots > matches the desktop layout snapshot
   <div
     class="_columns_0c2d30"
   >
+    <div
+      aria-hidden="true"
+      class="_track_0c2d30"
+      data-testid="werewolf-track"
+    >
+      第 2 天 · 阶段 night.witch
+    </div>
     <aside
       aria-label="公开时间线"
       class="_timeline_0c2d30"
@@ -336,153 +431,190 @@ exports[`WerewolfView responsive snapshots > matches the desktop layout snapshot
         公开时间线
       </h3>
       <ol>
-        <li>
-          1
-          ·
-          day.announce
-          ·
-          announcement
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.announce
+          </span>
         </li>
-        <li>
-          1
-          ·
-          day.vote
-          ·
-          vote
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.vote
+          </span>
         </li>
       </ol>
     </aside>
     <div
-      class="_seats_0c2d30"
+      class="_circle_0c2d30"
       role="list"
     >
-      <div
-        class="_seat_0c2d30 _self_0c2d30"
-        role="listitem"
+      <ul
+        class="_circleList_0c2d30"
       >
-        <span
-          class="_seatName_0c2d30"
+        <li
+          class="_seat_0c2d30 _self_0c2d30"
+          role="listitem"
+          style="--seat-angle: -90deg;"
         >
-          1 号位
-          ·
-          Seat 1
-           (你)
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="1 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-01.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-01.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            1 号位
+            ·
+            Seat 1
+             (你)
+          </span>
+          <span>
+            Witch
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: -38.57142857142858deg;"
         >
-          2 号位
-          ·
-          Seat 2
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="2 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-02.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-02.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            2 号位
+            ·
+            Seat 2
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 12.857142857142847deg;"
         >
-          3 号位
-          ·
-          Seat 3
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="3 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-03.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-03.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            3 号位
+            ·
+            Seat 3
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 64.28571428571428deg;"
         >
-          4 号位
-          ·
-          Seat 4
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30 _dead_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="4 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-04.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-04.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            4 号位
+            ·
+            Seat 4
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30 _dead_0c2d30"
+          role="listitem"
+          style="--seat-angle: 115.7142857142857deg;"
         >
-          5 号位
-          ·
-          Seat 5
-        </span>
-        <span>
-          第 1 天出局
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="5 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-05.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-05.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            5 号位
+            ·
+            Seat 5
+          </span>
+          <span>
+            出局
+             · 第 1 天出局
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 167.14285714285717deg;"
         >
-          6 号位
-          ·
-          Seat 6
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="6 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-06.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-06.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            6 号位
+            ·
+            Seat 6
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 218.57142857142856deg;"
         >
-          7 号位
-          ·
-          Seat 7
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
+          <img
+            alt="7 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-07.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-07.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            7 号位
+            ·
+            Seat 7
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+      </ul>
     </div>
     <aside
       aria-label="私密通知"
@@ -495,7 +627,7 @@ exports[`WerewolfView responsive snapshots > matches the desktop layout snapshot
         Witch
       </p>
       <h3>
-        私密通知
+        发现档案
       </h3>
       <p>
         暂无私密通知。
@@ -507,10 +639,23 @@ exports[`WerewolfView responsive snapshots > matches the desktop layout snapshot
     class="_actionForm_0c2d30"
     data-testid="werewolf-action-form"
   >
-    <h3>
-      选择你的行动
-    </h3>
-    <fieldset>
+    <header
+      class="_actionHeader_0c2d30"
+    >
+      <div>
+        <p
+          class="_actionKicker_0c2d30"
+        >
+          私密行动 · 确认后进入下一阶段
+        </p>
+        <h3>
+          选择你的行动
+        </h3>
+      </div>
+    </header>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
       <legend>
         antidote
       </legend>
@@ -541,7 +686,9 @@ exports[`WerewolfView responsive snapshots > matches the desktop layout snapshot
         </button>
       </div>
     </fieldset>
-    <fieldset>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
       <legend>
         poison
       </legend>
@@ -583,9 +730,10 @@ exports[`WerewolfView responsive snapshots > matches the desktop layout snapshot
       </div>
     </fieldset>
     <div
-      class="_actions_0c2d30"
+      class="_actions_0c2d30 _actionButtons_0c2d30"
     >
       <button
+        class="_primaryAction_0c2d30"
         disabled=""
         type="submit"
       >
@@ -607,9 +755,23 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
     class="_phaseHeading_0c2d30"
     tabindex="-1"
   >
-    第 2 夜
-    ·
-    阶段：night.witch
+    <span
+      class="_signalBrand_0c2d30"
+    >
+      <span>
+        Signal Circle
+      </span>
+      <small>
+        单人练习局
+      </small>
+    </span>
+    <span
+      class="_phaseTitle_0c2d30"
+    >
+      第 2 夜
+      ·
+      阶段：night.witch
+    </span>
   </h2>
   <p
     aria-live="polite"
@@ -626,6 +788,13 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
   <div
     class="_columns_0c2d30"
   >
+    <div
+      aria-hidden="true"
+      class="_track_0c2d30"
+      data-testid="werewolf-track"
+    >
+      第 2 天 · 阶段 night.witch
+    </div>
     <aside
       aria-label="公开时间线"
       class="_timeline_0c2d30"
@@ -634,153 +803,190 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
         公开时间线
       </h3>
       <ol>
-        <li>
-          1
-          ·
-          day.announce
-          ·
-          announcement
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.announce
+          </span>
         </li>
-        <li>
-          1
-          ·
-          day.vote
-          ·
-          vote
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.vote
+          </span>
         </li>
       </ol>
     </aside>
     <div
-      class="_seats_0c2d30"
+      class="_circle_0c2d30"
       role="list"
     >
-      <div
-        class="_seat_0c2d30 _self_0c2d30"
-        role="listitem"
+      <ul
+        class="_circleList_0c2d30"
       >
-        <span
-          class="_seatName_0c2d30"
+        <li
+          class="_seat_0c2d30 _self_0c2d30"
+          role="listitem"
+          style="--seat-angle: -90deg;"
         >
-          1 号位
-          ·
-          Seat 1
-           (你)
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="1 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-01.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-01.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            1 号位
+            ·
+            Seat 1
+             (你)
+          </span>
+          <span>
+            Witch
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: -38.57142857142858deg;"
         >
-          2 号位
-          ·
-          Seat 2
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="2 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-02.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-02.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            2 号位
+            ·
+            Seat 2
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 12.857142857142847deg;"
         >
-          3 号位
-          ·
-          Seat 3
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="3 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-03.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-03.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            3 号位
+            ·
+            Seat 3
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 64.28571428571428deg;"
         >
-          4 号位
-          ·
-          Seat 4
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30 _dead_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="4 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-04.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-04.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            4 号位
+            ·
+            Seat 4
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30 _dead_0c2d30"
+          role="listitem"
+          style="--seat-angle: 115.7142857142857deg;"
         >
-          5 号位
-          ·
-          Seat 5
-        </span>
-        <span>
-          第 1 天出局
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="5 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-05.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-05.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            5 号位
+            ·
+            Seat 5
+          </span>
+          <span>
+            出局
+             · 第 1 天出局
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 167.14285714285717deg;"
         >
-          6 号位
-          ·
-          Seat 6
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
-      <div
-        class="_seat_0c2d30"
-        role="listitem"
-      >
-        <span
-          class="_seatName_0c2d30"
+          <img
+            alt="6 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-06.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-06.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            6 号位
+            ·
+            Seat 6
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 218.57142857142856deg;"
         >
-          7 号位
-          ·
-          Seat 7
-        </span>
-        <span>
-          存活
-        </span>
-        <span>
-          身份未知
-        </span>
-      </div>
+          <img
+            alt="7 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-07.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-07.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            7 号位
+            ·
+            Seat 7
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+      </ul>
     </div>
     <aside
       aria-label="私密通知"
@@ -793,7 +999,7 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
         Witch
       </p>
       <h3>
-        私密通知
+        发现档案
       </h3>
       <p>
         暂无私密通知。
@@ -805,10 +1011,23 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
     class="_actionForm_0c2d30"
     data-testid="werewolf-action-form"
   >
-    <h3>
-      选择你的行动
-    </h3>
-    <fieldset>
+    <header
+      class="_actionHeader_0c2d30"
+    >
+      <div>
+        <p
+          class="_actionKicker_0c2d30"
+        >
+          私密行动 · 确认后进入下一阶段
+        </p>
+        <h3>
+          选择你的行动
+        </h3>
+      </div>
+    </header>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
       <legend>
         antidote
       </legend>
@@ -839,7 +1058,9 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
         </button>
       </div>
     </fieldset>
-    <fieldset>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
       <legend>
         poison
       </legend>
@@ -881,9 +1102,10 @@ exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot 
       </div>
     </fieldset>
     <div
-      class="_actions_0c2d30"
+      class="_actions_0c2d30 _actionButtons_0c2d30"
     >
       <button
+        class="_primaryAction_0c2d30"
         disabled=""
         type="submit"
       >

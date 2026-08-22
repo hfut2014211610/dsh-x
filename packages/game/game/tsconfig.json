@@ -11,6 +11,7 @@
     { "path": "../../util/brand" },
     { "path": "../../core/agent" },
     { "path": "../../core/session" },
+    { "path": "../../llm/llm" },
     { "path": "../../runtime-diagnostics/invariants" },
     { "path": "../../subagent/subagent" }
   ]

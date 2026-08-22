@@ -1,6 +1,6 @@
 {
   "name": "@deepseek-ai/dsh-werewolf",
-  "description": "Event-sourced Werewolf core with configurable rules, bot observation projection, and fresh one-shot decision runner",
+  "description": "Event-sourced Werewolf core with configurable rules, authorized projections, and fixed per-game Bot sessions",
   "version": "0.1.0-rc.8",
   "publishConfig": {
     "access": "public"

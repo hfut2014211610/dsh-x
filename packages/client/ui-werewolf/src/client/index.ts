@@ -2,16 +2,16 @@
  * Browser Werewolf plugin: registers the dedicated `werewolf`
  * conversation view, declares it preferred for `werewolf`-preset sessions,
  * and supplies the typed Remote verbs plus the invalidation feed as the
- * injected face. The plugin registers no command and mutates nothing
- * through the Chat composer.
+ * injected face. Werewolf-preset sessions claim the composer replacement
+ * chain so the game-owned action surface remains the only input.
  * @module @deepseek-ai/dsh-client-ui-werewolf/client
  */
 
 import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 // Type-only: pulls the generated Remote API and ctx.remote merge.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
-// Type-only: the 'conversation.view' SlotMap row and ctx.conversation face.
-import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+// Type-only: the conversation SlotMap rows and ctx.conversation face.
+import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { WerewolfView, type WerewolfViewInjected } from './WerewolfView.tsx'
@@ -19,6 +19,21 @@ import { en, NS, zh } from './locales.ts'
 
 /** Required services: conversation slot and service, sessions, remote namespace, locale. */
 export const inject = ['slots', 'conversation', 'sessions', 'remote', 'remote.werewolfGame', 'locale']
+
+/** Composer-chain match owned by the confirmed Werewolf preset. */
+interface WerewolfComposerMatch {
+  agentPreset: 'werewolf'
+}
+
+/** Claim only Werewolf sessions; pending question and approval entries run first. */
+function selectWerewolfComposer(owner: ComposerChainProps): WerewolfComposerMatch | null {
+  return owner.agentPreset === 'werewolf' ? { agentPreset: 'werewolf' } : null
+}
+
+/** An elected empty replacement removes the generic agent composer from a game session. */
+function WerewolfComposerSuppression(): null {
+  return null
+}
 
 /**
  * Client plugin body: the dedicated view tab for `werewolf` sessions.
@@ -56,6 +71,12 @@ export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.conversation.declarePreferredView(
     (sessionId: SessionId) => isWerewolfSession(sessionId) ? 'werewolf' : null,
   ), 'ui-werewolf: preferred view')
+
+  ctx.slots.inject('conversation.composer', () => ctx.slots.register({
+    name: 'conversation.composer',
+    priority: 10,
+    select: selectWerewolfComposer,
+  }, WerewolfComposerSuppression))
 
   ctx.slots.inject('conversation.view', () => ctx.slots.register({
     name: 'conversation.view',

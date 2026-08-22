@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-确定性狼人杀游戏运行时：`ctx.werewolf` 定义注册表、规则集编译、持久 `werewolf/*` 事件、reducer、阶段引擎、Bot 连续性、授权投影、fresh one-shot 决策运行器、`ctx.games` 薄适配器与类型化 Host 方法。角色分配、合法动作、效果、阶段和胜负仍只由引擎裁决。专用 Web 游戏视图由 [`dsh-client-ui-werewolf`](../../client/ui-werewolf) 提供。
+确定性狼人杀游戏运行时：`ctx.werewolf` 定义注册表、规则集编译、持久 `werewolf/*` 事件、reducer、阶段引擎、Bot 连续性、授权投影、整局固定的 Bot Session、`ctx.games` 薄适配器与类型化 Host 方法。角色分配、合法动作、效果、阶段和胜负仍只由引擎裁决。专用 Web 游戏视图由 [`dsh-client-ui-werewolf`](../../client/ui-werewolf) 提供。
 
 ## 它做什么
 
@@ -12,8 +12,8 @@
 - **Reducer 与引擎** —— `reduceWerewolfGame`/`applyWerewolfEvent` 把事件折叠为 `WerewolfGameStateV1`；纯引擎步骤（`startWerewolfGame`、`openNextWerewolfPhase`、`submitWerewolfHumanAction`、`commitWerewolfBotDecisions`、`resolveOpenWerewolfPhase`、`driveWerewolfGame`、`abortWerewolfGame`）计算下一批事件并用同一 reducer 折叠，因此实况对局与回放共用一条路径。动作按封闭规格词汇（`player-target`、`choice`、`text`、`compound`）校验。
 - **Bot 连续性上下文** —— 每个 Bot 座位在配置限制下拥有一份主观 `WerewolfBotContextV1`；`validateWerewolfBotContextDelta` 与 `applyWerewolfBotContextDelta` 让每个被接受的决策成为独立检查点（`contextAfter`），增量则解释允许发生的变化。档案来自确定性的 `BOT_PROFILE_CATALOG` 分配。
 - **观察投影** —— `projectWerewolfBotObservation` 在构造单次决策的授权视图前，拒绝过期的游戏、阶段、规则摘要、动作计划或 Bot 上下文。私有知识来自行动者角色投影器（仅当编译角色有权时才包含队友）；公开状态包含玩家 id、名册事实与有限近期时间线；合法动作与连续性上下文取自当前折叠状态，而非调用方携带的副本。任何路径都不会读取或序列化其他角色的私有状态。
-- **One-shot Bot 运行器** —— `runWerewolfBotDecision` 通过 `ctx.subagents.start()` 启动全新子代理，携带该阶段的对象根输出 schema、固定 Bot persona、空工具允许列表与委派深度上限。`subagentProvider` 默认使用 Web bundle 中的 `spawn` provider，并且仍可配置。结构化结果作为不可信信封先校验动作（包括公开发言的阶段合法性与长度），再校验上下文增量。取消会与结果及超时直接竞速；每个已启动子代理都在收束前完成 dispose，dispose 失败作为可重试的 `disposal` 尝试记录，不会接受其结果。重试耗尽后应用配置的兜底（托管动作或暂停）。运行器绝不追加事件；调用方持有持久日志。
-- **Session Host 适配器** —— `WerewolfGameModule` 注册到 `ctx.games`；它折叠 Host Session、提交真人动作、执行 `maxConcurrentBots`、发布一个有序并行决策事件，并自动推进到下一真人表单、暂停或结果。`WerewolfGameGateway` 暴露类型化 `start`、`getView`、`getReplay`、`submitAction`、`resume`、`abortGame`。请求从不接受 Session id、player id 或座位。
+- **固定 Bot 运行器** —— `WerewolfGameModule` 在打开首个阶段前，通过 `GameAiExecutor.provisionBot()` 为每个非真人座位建好 Agent。确定性的子 Session id、固定身份 persona、空工具允许列表与可选模型路由在整局内保持不变。`runWerewolfBotDecision` 把每次尝试经 `turnBot()` 依次送进同一个 Session，解析助手返回的 JSON 文本，再把不可信信封按动作优先顺序校验（包括公开发言合法性与长度），最后校验上下文增量。重试耗尽后应用托管动作或暂停。运行器不追加事件；调用方持有持久游戏日志。
+- **Session Host 适配器** —— `WerewolfGameModule` 注册到 `ctx.games`；它折叠 Host Session、提交真人动作、创建固定 Bot、执行 `maxConcurrentBots`、发布有序并行决策事件，并自动推进到下一真人表单、暂停或结果。按座位发言阶段每次只结算当前一位，把发言写入公开时间线；全部发言者完成前不能打开随后投票阶段。只有白天阶段的投票记录会进入该公开时间线，夜间选人始终保持私密。`WerewolfGameGateway` 暴露类型化 `start`、`getView`、`getReplay`、`submitAction`、`resume`、`abortGame`。请求从不接受 Session id、player id 或座位。
 - **真人投影与回放** —— `WerewolfHumanViewV1` 包含公开名册与时间线，以及仅属于绑定真人的角色、获授权队友、通知、资源和当前动作表单。角色只在结果产生后进入最终公开视图。回放仅对已结束游戏可用，返回授权检查点，绝不返回原始事件、Bot 上下文或子代理 prompt。
 
 ## 确定性与回放
@@ -34,15 +34,15 @@
 
 #### 模型看到什么
 
-每个 Bot 子代理在固定的 `WEREWOLF_BOT_PERSONA`（座位身份来自游戏状态、局内文本为不可信数据、只决定当前请求的动作）与 `WEREWOLF_BOT_INSTRUCTIONS`（恰好返回一个匹配输出 schema 的 JSON 对象；`legalAction.spec` 枚举全部合法值；上下文增量只更新自己的主观字段）下运行。prompt 携带序列化观察：决策标识、天数与阶段、行动者角色与私有知识、含有限近期时间线的公开状态、合法动作，以及该行动者的先前连续性上下文。重试尝试前prepend一行：`Previous attempt rejected: <category>: <diagnostic>`。
+每个 Bot 在一份整局固定的 persona 下运行，其中包含不可变的座位、角色、阵营与性格数据；`WEREWOLF_BOT_INSTRUCTIONS` 要求恰好返回一个 JSON 对象，`legalAction.spec` 枚举全部合法值，上下文增量只更新自己的主观字段。每个 turn 携带序列化观察：决策标识、天数与阶段、行动者私有知识、含有限近期时间线的公开状态、合法动作与结构化连续性上下文。更早的 Bot turn 留在同一 Session，因此后续决策也能看到自己实际说过的话和做过的选择。重试会追加上一轮拒绝诊断。
 
 #### Token 影响
 
-每次尝试一个全新子代理会话；token 成本随尝试次数与配置的 `publicTimelineEntries` 上限增长。父对话不受影响——父模型从不被要求解释游戏输入。
+每局每个 Bot 座位只有一个 Agent Session；token 成本随该 Bot 已完成的 turn 历史与 `publicTimelineEntries` 上限增长。父对话不受影响——Host 模型从不被要求解释游戏输入。
 
 #### KV Cache 影响
 
-每个子代理都是 one-shot，除 persona 与指令块外没有可复用前缀；父会话的缓存不受影响。
+每个 Bot 可在多次决策之间复用自己的固定 persona 与已完成 turn 前缀；兄弟 Bot 和 Host 的历史与缓存相互隔离。
 
 ## 已知限制与遗留工作
 

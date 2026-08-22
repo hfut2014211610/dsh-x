@@ -31,7 +31,7 @@ declare module '@deepseek-ai/cordis' {
 
 /** Deployment-varying bot runner input; `botRunnerConfig()` resolves defaults. */
 export interface WerewolfRuntimeConfig {
-  /** Registered subagent provider name the bot children start on. */
+  /** Standalone runner fallback provider; hosted games use fixed game-owned Bot Agents. */
   subagentProvider: string
   /** Per-child model route; omission inherits the parent agent's route. */
   botAgent?: AgentOptions

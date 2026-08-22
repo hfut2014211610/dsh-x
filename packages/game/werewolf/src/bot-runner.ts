@@ -1,8 +1,7 @@
 /**
- * The one-shot bot runner. Each decision starts a fresh child through
- * `ctx.subagents.start()` with the phase's object-rooted output schema, a
- * fixed persona, an empty tool allowlist, and a delegation-depth cap; the
- * structured result is validated as an untrusted envelope (action first,
+ * The Bot decision runner. The game Host provisions one fixed per-seat agent
+ * at game start and sends every later decision through that agent's FIFO
+ * session. The result is validated as an untrusted envelope (action first,
  * then context delta). Failed attempts surface as detached
  * `werewolf/bot-attempt-failed` payloads with an exact failure category;
  * after the configured retry budget the configured fallback takes over
@@ -14,11 +13,11 @@
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
 import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import type { JsonValue } from '@deepseek-ai/dsh-session'
+import { SessionId, type JsonValue } from '@deepseek-ai/dsh-session'
 import type { JsonSchemaNode, ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
-import type { SubagentRuntime } from '@deepseek-ai/dsh-subagent'
+import type { SubagentResult, SubagentRun, SubagentRuntime } from '@deepseek-ai/dsh-subagent'
 import { delegationDepthOf } from '@deepseek-ai/dsh-subagent'
-import type { GameAiExecutor } from '@deepseek-ai/dsh-game'
+import type { GameAiExecutor, GameBotTurnResult } from '@deepseek-ai/dsh-game'
 import { WerewolfError } from './error.ts'
 import { validateWerewolfAction, type WerewolfBotActionRequest, type WerewolfBotSubmission } from './engine.ts'
 import { projectWerewolfBotObservation } from './projection.ts'
@@ -35,7 +34,7 @@ import type { WerewolfEvent } from './events.ts'
 
 /** Deployment-resolved runner settings; the runtime Config owns the values. */
 export interface WerewolfBotRunnerConfigV1 {
-  /** Registered subagent provider name the children start on. */
+  /** Standalone runner fallback provider; the game Host provisions fixed Bot Agents directly. */
   provider: string
   /** Per-child model route; omission inherits the parent agent's route. */
   botAgent?: AgentOptions
@@ -74,6 +73,47 @@ export const WEREWOLF_BOT_INSTRUCTIONS = [
   'The legalAction.spec field enumerates every legal value; anything else is rejected and retried.',
   'The context delta updates only your own subjective beliefs, commitments, strategy, and memory summary.',
 ].join(' ')
+
+/**
+ * Stable game-owned agent identity for one non-human seat.
+ * @param state - current authoritative game state.
+ * @param playerId - exact non-human player identity.
+ * @returns the deterministic Bot Agent Session identity.
+ */
+export function werewolfBotSessionId(state: WerewolfGameStateV1, playerId: string): SessionId {
+  return SessionId(`game-${state.gameId}-bot-${playerId}`)
+}
+
+/**
+ * Fixed system persona for one Bot across every decision in its game.
+ * @param state - current authoritative game state containing the immutable roster profile.
+ * @param rules - compiled definitions that resolve the player's role.
+ * @param playerId - exact non-human player identity.
+ * @returns the immutable game persona supplied to the Bot Agent.
+ */
+export function werewolfBotPersona(
+  state: WerewolfGameStateV1,
+  rules: WerewolfCompiledRuleSetV1,
+  playerId: string,
+): string {
+  const player = state.players.find(candidate => candidate.playerId === playerId)
+  if (player === undefined || player.human) {
+    throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', `player ${playerId} is not a Bot seat`)
+  }
+  const role = rules.roles.get(`${player.roleId}@${player.roleVersion}`)
+  if (role === undefined) {
+    throw new WerewolfError('WEREWOLF_UNKNOWN_DEFINITION', `role ${player.roleId}@${player.roleVersion} is unavailable`)
+  }
+  const identity = {
+    gameId: state.gameId,
+    playerId: player.playerId,
+    seat: player.seat,
+    displayName: player.displayName,
+    role: { id: role.id, name: role.publicName, faction: role.faction },
+    personality: state.botProfiles[player.playerId],
+  }
+  return `${WEREWOLF_BOT_PERSONA} Your immutable game identity is the following JSON data: ${JSON.stringify(identity)}`
+}
 
 /**
  * Whether the named provider can host bot children: all four start-time
@@ -292,6 +332,16 @@ function parseEnvelope(structured: unknown): WerewolfBotEnvelopeResult {
   }
 }
 
+function parseAssistantEnvelope(output: readonly ContentBlock[]): WerewolfBotEnvelopeResult {
+  const text = output
+    .filter((block): block is Extract<ContentBlock, { type: 'text' }> => block.type === 'text')
+    .map(block => block.text)
+    .join('')
+    .trim()
+  if (text.length === 0) throw new Error('assistant result has no JSON text')
+  return parseEnvelope(JSON.parse(text) as unknown)
+}
+
 /**
  * Run one bot decision to an accepted submission, a trustee fallback, a
  * pause request, or cancellation. The caller owns appending every returned
@@ -309,8 +359,8 @@ export async function runWerewolfBotDecision(input: {
   rules: WerewolfCompiledRuleSetV1
   request: WerewolfBotActionRequest
   agent: Agent
-  /** Host-owned child starter; omission preserves the direct runner API. */
-  executor?: Pick<GameAiExecutor, 'start'>
+  /** Host-owned fixed Bot executor; omission preserves the isolated runner test face. */
+  executor?: Pick<GameAiExecutor, 'turnBot'>
   signal?: AbortSignal
 }): Promise<WerewolfBotRunOutcome> {
   const { ctx, config, state, rules, request, agent, executor, signal } = input
@@ -331,98 +381,125 @@ export async function runWerewolfBotDecision(input: {
       return { kind: 'cancelled', attempts }
     }
     const label = `werewolf ${request.phaseId} seat ${actor.seat} attempt ${attempt}`
-    let run
+    const stableChildId = werewolfBotSessionId(state, request.playerId)
+    let childSessionId = executor === undefined ? '(none)' : stableChildId as string
+    let settled: AttemptWait<GameBotTurnResult> | undefined
+    let oneShotRun: SubagentRun | undefined
+    let oneShotResult: AttemptWait<SubagentResult | ResultFault> | undefined
     try {
-      const childRequest = {
-        label,
-        prompt: promptBlocks(JSON.stringify(prompt), attempt > 1 ? diagnostic : undefined),
-        ...(config.botAgent === undefined ? {} : { agentOptions: config.botAgent }),
-        outputSchema: werewolfEnvelopeSchema(actor.spec),
-        maxDepth: delegationDepthOf(agent) + 1,
-        toolFilter: { allow: [] },
-        persona: WEREWOLF_BOT_PERSONA,
-      }
-      run = executor === undefined
-        ? await ctx.subagents.start(config.provider, {
-          ...childRequest,
+      const blocks = promptBlocks(JSON.stringify(prompt), attempt > 1 ? diagnostic : undefined)
+      if (executor !== undefined) {
+        settled = { kind: 'result', value: await executor.turnBot(stableChildId, blocks, config.decisionTimeoutMs) }
+      } else {
+        oneShotRun = await ctx.subagents.start(config.provider, {
+          label,
+          prompt: blocks,
+          ...(config.botAgent === undefined ? {} : { agentOptions: config.botAgent }),
+          outputSchema: werewolfEnvelopeSchema(actor.spec),
+          maxDepth: delegationDepthOf(agent) + 1,
+          toolFilter: { allow: [] },
+          persona: WEREWOLF_BOT_PERSONA,
           parent: agent,
           signal: signal ?? new AbortController().signal,
         })
-        : await executor.start(config.provider, childRequest)
+        childSessionId = oneShotRun.id
+        oneShotResult = await waitForAttempt(
+          oneShotRun.result.then(
+            value => value,
+            (error: unknown) => new ResultFault(error),
+          ),
+          config.decisionTimeoutMs,
+          signal,
+        )
+      }
     } catch (error) {
       if (isAborted()) return { kind: 'cancelled', attempts }
       diagnostic = `provider-setup: ${errorMessage(error)}`
-      attempts.push(attemptEvent(state, request, attempt, '(none)', 'provider-setup'))
+      attempts.push(attemptEvent(state, request, attempt, childSessionId, 'provider-setup'))
       continue
     }
-    const settled = await waitForAttempt(
-      run.result.then(
-        value => value,
-        (error: unknown) => new ResultFault(error),
-      ),
-      config.decisionTimeoutMs,
-      signal,
-    )
     let failure: { category: WerewolfBotFailureCategoryV1; diagnostic: string } | undefined
     let envelope: WerewolfBotEnvelopeResult
     let publicSpeech: string | undefined
-    if (settled.kind === 'timeout') {
+    if (settled?.kind === 'result' && settled.value.timedOut) {
+      failure = { category: 'timeout', diagnostic: 'timeout: the Bot did not settle within the decision budget' }
+      envelope = { action: null, contextDelta: {} }
+    } else if (oneShotResult?.kind === 'timeout') {
       failure = { category: 'timeout', diagnostic: 'timeout: the child did not settle within the decision budget' }
       envelope = { action: null, contextDelta: {} }
-    } else if (settled.kind === 'cancelled') {
+    } else if (oneShotResult?.kind === 'cancelled') {
       envelope = { action: null, contextDelta: {} }
-    } else if (settled.value instanceof ResultFault) {
-      failure = { category: 'result-rejected', diagnostic: `result-rejected: ${errorMessage(settled.value.error)}` }
-      envelope = { action: null, contextDelta: {} }
-    } else if (settled.value.stopReason !== 'completed') {
-      failure = { category: 'result-rejected', diagnostic: `result-rejected: stopReason ${settled.value.stopReason}` }
-      envelope = { action: null, contextDelta: {} }
-    } else {
-      try {
-        envelope = parseEnvelope(settled.value.structured)
-      } catch (error) {
+    } else if (settled?.kind === 'result') {
+      const result = settled.value
+      if (result.stopReason !== 'completed') {
+        failure = { category: 'result-rejected', diagnostic: `result-rejected: stopReason ${result.stopReason}` }
         envelope = { action: null, contextDelta: {} }
-        failure = { category: 'invalid-output', diagnostic: `invalid-output: ${errorMessage(error)}` }
-      }
-      if (failure === undefined) {
-        const actionError = validateWerewolfAction(actor, envelope.action)
-        if (actionError !== undefined) {
-          failure = { category: 'illegal-action', diagnostic: `illegal-action: ${actionError}` }
-        }
-      }
-      if (failure === undefined) {
+      } else {
         try {
-          publicSpeech = normalizeWerewolfPublicSpeech(
-            actor.spec,
-            envelope.publicSpeech,
-            state.ruleSet.policies.speechMaxChars,
-          )
+          envelope = parseAssistantEnvelope(result.output)
         } catch (error) {
-          failure = { category: 'illegal-action', diagnostic: `illegal-action: ${errorMessage(error)}` }
+          envelope = { action: null, contextDelta: {} }
+          failure = { category: 'invalid-output', diagnostic: `invalid-output: ${errorMessage(error)}` }
         }
       }
-      if (failure === undefined) {
+    } else if (oneShotResult?.kind === 'result') {
+      const result = oneShotResult.value
+      if (result instanceof ResultFault) {
+        failure = { category: 'result-rejected', diagnostic: `result-rejected: ${errorMessage(result.error)}` }
+        envelope = { action: null, contextDelta: {} }
+      } else if (result.stopReason !== 'completed') {
+        failure = { category: 'result-rejected', diagnostic: `result-rejected: stopReason ${result.stopReason}` }
+        envelope = { action: null, contextDelta: {} }
+      } else {
         try {
-          validateWerewolfBotContextDelta(envelope.contextDelta, prompt.priorContext, roster, config.limits)
+          envelope = parseEnvelope(result.structured)
         } catch (error) {
-          failure = { category: 'invalid-context-delta', diagnostic: `invalid-context-delta: ${errorMessage(error)}` }
+          envelope = { action: null, contextDelta: {} }
+          failure = { category: 'invalid-output', diagnostic: `invalid-output: ${errorMessage(error)}` }
         }
+      }
+    } else {
+      failure = { category: 'result-rejected', diagnostic: 'result-rejected: missing Bot result' }
+      envelope = { action: null, contextDelta: {} }
+    }
+    if (failure === undefined) {
+      const actionError = validateWerewolfAction(actor, envelope.action)
+      if (actionError !== undefined) {
+        failure = { category: 'illegal-action', diagnostic: `illegal-action: ${actionError}` }
       }
     }
-    const disposal = await disposeAttempt(run)
+    if (failure === undefined) {
+      try {
+        publicSpeech = normalizeWerewolfPublicSpeech(
+          actor.spec,
+          envelope.publicSpeech,
+          state.ruleSet.policies.speechMaxChars,
+        )
+      } catch (error) {
+        failure = { category: 'illegal-action', diagnostic: `illegal-action: ${errorMessage(error)}` }
+      }
+    }
+    if (failure === undefined) {
+      try {
+        validateWerewolfBotContextDelta(envelope.contextDelta, prompt.priorContext, roster, config.limits)
+      } catch (error) {
+        failure = { category: 'invalid-context-delta', diagnostic: `invalid-context-delta: ${errorMessage(error)}` }
+      }
+    }
+    const disposal = oneShotRun === undefined ? { ok: true as const } : await disposeAttempt(oneShotRun)
     if (!disposal.ok) {
       const preceding = failure === undefined ? '' : `; preceding ${failure.diagnostic}`
       diagnostic = `disposal: ${errorMessage(disposal.error)}${preceding}`
-      attempts.push(attemptEvent(state, request, attempt, run.id, 'disposal'))
-      if (settled.kind === 'cancelled' || isAborted()) return { kind: 'cancelled', attempts }
+      attempts.push(attemptEvent(state, request, attempt, childSessionId, 'disposal'))
+      if (oneShotResult?.kind === 'cancelled' || isAborted()) return { kind: 'cancelled', attempts }
       continue
     }
-    if (settled.kind === 'cancelled' || isAborted()) {
+    if (oneShotResult?.kind === 'cancelled' || isAborted()) {
       return { kind: 'cancelled', attempts }
     }
     if (failure !== undefined) {
       diagnostic = failure.diagnostic
-      attempts.push(attemptEvent(state, request, attempt, run.id, failure.category))
+      attempts.push(attemptEvent(state, request, attempt, childSessionId, failure.category))
       continue
     }
     return {

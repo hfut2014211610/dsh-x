@@ -609,6 +609,8 @@ export interface ComposerChainProps {
   interactions: readonly PendingInteraction[]
   /** Current conversation facts for feature-owned takeover selectors. */
   session: ConversationSnapshot | undefined
+  /** Preset confirmed by the Host, for preset-owned composer replacements. */
+  agentPreset?: string | undefined
 }
 
 /** Presentation props supplied to the blank-session brand-mark occupant. */

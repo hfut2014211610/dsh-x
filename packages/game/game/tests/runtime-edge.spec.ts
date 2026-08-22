@@ -5,6 +5,7 @@ import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
 import type { JsonValue, Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import SubagentRuntime from '@deepseek-ai/dsh-subagent'
 import type { GameAiExecutor, GameModule } from '../src/executor.ts'
 import type { GameRequestId } from '../src/types.ts'
@@ -19,6 +20,7 @@ import {
   SessionGameService,
 } from '../src/index.ts'
 import { GameService } from '../src/service.ts'
+import { MockAdapter, textResponse } from '../../../core/agent-loop/tests/mock-adapter.ts'
 
 interface EdgeState {
   gameId: string
@@ -101,6 +103,7 @@ interface IndexedHost {
   gameId: ReturnType<typeof GameId>
   session: Session
   handle?: AgentHandle
+  botHandles: Map<SessionId, AgentHandle>
 }
 
 interface GameInternals {
@@ -108,7 +111,7 @@ interface GameInternals {
   hosts: Map<ReturnType<typeof GameId>, IndexedHost>
   startReceipts: Map<string, ReturnType<typeof GameId>>
   recoveries: Map<ReturnType<typeof GameId>, Promise<IndexedHost>>
-  executor(host: Agent, signal: AbortSignal): GameAiExecutor
+  executor(record: IndexedHost, host: Agent, signal: AbortSignal): GameAiExecutor
   indexSession(session: Session): void
 }
 
@@ -118,6 +121,7 @@ async function setup(module = new EdgeModule()) {
   const ctx = new Context()
   await mountAgentLoopTestDependencies(ctx)
   await ctx.plugin(AgentLoop, { agents: [] })
+  await ctx.plugin(SessionProjectionRegistry)
   await ctx.plugin(SubagentRuntime)
   const fiber = await ctx.plugin(SessionGameService)
   const disposeModule = ctx.games.registerModule(module)
@@ -278,8 +282,10 @@ describe('game Host utility and service edges', () => {
     const started = await start(ctx)
     const host = ctx.agents.get(SessionId(`game-${started.gameId}`))
     if (host === undefined) throw new Error('missing Host fixture')
+    const record = internals(ctx.games).hosts.get(started.gameId)
+    if (record === undefined) throw new Error('missing Host record fixture')
     const controller = new AbortController()
-    const executor = internals(ctx.games).executor(host, controller.signal)
+    const executor = internals(ctx.games).executor(record, host, controller.signal)
     const run = { id: 'child', localAgent: undefined, result: Promise.resolve({ output: [], stopReason: 'completed' }), dispose: async () => {} }
     const startSpy = vi.spyOn(ctx.subagents, 'start').mockResolvedValue(run as never)
     const prompt = [{ type: 'text' as const, text: 'decide' }]
@@ -309,15 +315,53 @@ describe('game Host utility and service edges', () => {
     await expect(executor.map([1], 1.5, async value => value)).rejects.toThrow(/positive integer/)
   })
 
+  it('reuses one hidden Bot session for consecutive game decisions', async () => {
+    const { ctx } = await setup()
+    const adapter = new MockAdapter([textResponse('{"turn":1}'), textResponse('{"turn":2}')])
+    ctx.llm.registerAdapter(['mock'], adapter)
+    const started = await start(ctx)
+    const host = ctx.agents.get(SessionId(`game-${started.gameId}`))
+    const record = internals(ctx.games).hosts.get(started.gameId)
+    if (host === undefined || record === undefined) throw new Error('missing Host fixture')
+    const executor = internals(ctx.games).executor(record, host, new AbortController().signal)
+    const childId = SessionId(`game-${started.gameId}-bot-seat-1`)
+    const provision = {
+      childId,
+      label: 'Seat 1',
+      agentOptions: { provider: 'mock', model: 'mock' },
+      persona: 'You are fixed Seat 1 for this game.',
+      toolFilter: { allow: [] },
+    }
+    await executor.provisionBot(provision)
+    const child = ctx.agents.get(childId)
+    expect(child?.session.header).toMatchObject({ parentSession: host.id })
+    expect(child?.session.header.origin).toBeUndefined()
+    await executor.provisionBot(provision)
+    expect(ctx.agents.get(childId)).toBe(child)
+
+    const first = await executor.turnBot(childId, [{ type: 'text', text: 'decision 1' }], 1_000)
+    const second = await executor.turnBot(childId, [{ type: 'text', text: 'decision 2' }], 1_000)
+    expect(first).toMatchObject({ childId, output: [{ type: 'text', text: '{"turn":1}' }], stopReason: 'completed' })
+    expect(second).toMatchObject({ childId, output: [{ type: 'text', text: '{"turn":2}' }], stopReason: 'completed' })
+    expect(child?.session.events.filter(event => event.type === 'turn/start')).toHaveLength(2)
+    expect(adapter.requests[1]?.messages.some(message => (
+      message.role === 'assistant'
+      && message.content.some(block => block.type === 'text' && block.text === '{"turn":1}')
+    ))).toBe(true)
+    expect(await ctx.subagents.listChildren(host.id)).toEqual([])
+  })
+
   it('stops mapping on cancellation with and without a reason', async () => {
     const { ctx } = await setup()
     const started = await start(ctx)
     const host = ctx.agents.get(SessionId(`game-${started.gameId}`))
     if (host === undefined) throw new Error('missing Host fixture')
+    const record = internals(ctx.games).hosts.get(started.gameId)
+    if (record === undefined) throw new Error('missing Host record fixture')
     const reason = new Error('cancelled')
-    const withReason = internals(ctx.games).executor(host, { aborted: true, reason } as AbortSignal)
+    const withReason = internals(ctx.games).executor(record, host, { aborted: true, reason } as AbortSignal)
     await expect(withReason.map([1], 1, async value => value)).rejects.toBe(reason)
-    const withoutReason = internals(ctx.games).executor(host, { aborted: true, reason: undefined } as unknown as AbortSignal)
+    const withoutReason = internals(ctx.games).executor(record, host, { aborted: true, reason: undefined } as unknown as AbortSignal)
     await expect(withoutReason.map([1], 1, async value => value)).rejects.toThrow('game AI operation cancelled')
   })
 

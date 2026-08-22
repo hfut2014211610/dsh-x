@@ -36,7 +36,7 @@ function tableFixture(): WerewolfHumanViewV1 {
       teammates: [],
       notices: [],
     },
-    phase: { phaseInstanceId: 'i1', phaseId: 'night.witch', segment: 'night', day: 2, mode: 'parallel-private' },
+    phase: { phaseInstanceId: 'i1', phaseId: 'night.witch', segment: 'night', day: 2, mode: 'parallel-private', speech: null },
     actionForm: {
       phaseInstanceId: 'i1',
       phaseId: 'night.witch',

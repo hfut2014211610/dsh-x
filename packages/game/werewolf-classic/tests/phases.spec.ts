@@ -185,8 +185,8 @@ describe('night.wolf-kill', () => {
       { voterId: WerewolfPlayerId('p4'), targetId: WerewolfPlayerId('p5') },
     ])
     expect(resolution.privateNotices).toEqual([
-      { toPlayerId: WerewolfPlayerId('p2'), kind: 'wolf-kill-result', data: { victim: WerewolfPlayerId('p5') } },
-      { toPlayerId: WerewolfPlayerId('p4'), kind: 'wolf-kill-result', data: { victim: WerewolfPlayerId('p5') } },
+      { toPlayerId: WerewolfPlayerId('p2'), kind: 'wolf-kill-result', data: { victim: WerewolfPlayerId('p5'), day: 1 } },
+      { toPlayerId: WerewolfPlayerId('p4'), kind: 'wolf-kill-result', data: { victim: WerewolfPlayerId('p5'), day: 1 } },
     ])
     expect(resolution.outcome).toEqual({ victim: WerewolfPlayerId('p5'), proposed: [WerewolfPlayerId('p5')] })
     expect(resolution.eliminations).toEqual([])
@@ -206,7 +206,7 @@ describe('night.wolf-kill', () => {
       proposed: [WerewolfPlayerId('p5'), WerewolfPlayerId('p3')],
     })
     expect(resolution.privateNotices[0]).toEqual({
-      toPlayerId: WerewolfPlayerId('p2'), kind: 'wolf-kill-result', data: { victim: null },
+      toPlayerId: WerewolfPlayerId('p2'), kind: 'wolf-kill-result', data: { victim: null, day: 1 },
     })
   })
 
@@ -311,7 +311,7 @@ describe('night.seer-inspect', () => {
       ] },
     }])
     expect(resolution.privateNotices).toEqual([{
-      toPlayerId: WerewolfPlayerId('p3'), kind: 'seer-inspect', data: { target: WerewolfPlayerId('p4'), faction: 'wolf' },
+      toPlayerId: WerewolfPlayerId('p3'), kind: 'seer-inspect', data: { target: WerewolfPlayerId('p4'), faction: 'wolf', day: 3 },
     }])
     expect(resolution.outcome).toEqual({ checks: [{ target: WerewolfPlayerId('p4'), faction: 'wolf', day: 3 }] })
   })
@@ -328,7 +328,7 @@ describe('night.seer-inspect', () => {
       roleState: { checks: [{ target: WerewolfPlayerId('p4'), faction: 'village', day: 1 }] },
     }])
     expect(resolution.privateNotices).toEqual([{
-      toPlayerId: WerewolfPlayerId('p3'), kind: 'seer-inspect', data: { target: WerewolfPlayerId('p4'), faction: 'village' },
+      toPlayerId: WerewolfPlayerId('p3'), kind: 'seer-inspect', data: { target: WerewolfPlayerId('p4'), faction: 'village', day: 1 },
     }])
   })
 

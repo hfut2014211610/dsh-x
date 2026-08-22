@@ -19,6 +19,7 @@ import { SlotRegistry, type SessionId } from '@deepseek-ai/dsh-client-runtime/cl
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply as clientApply, inject } from '../src/client/index.ts'
 import type { WerewolfViewInjected } from '../src/client/WerewolfView.tsx'
+import type { ComposerChainProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import { en, NS, zh } from '../src/client/locales.ts'
 import type {
   WerewolfHumanViewV1,
@@ -91,7 +92,14 @@ function viewFixture(): WerewolfHumanViewV1 {
       teammates: [],
       notices: [],
     },
-    phase: { phaseInstanceId: 'i1', phaseId: 'day.discussion', segment: 'day', day: 1, mode: 'seat-order-public' },
+    phase: {
+      phaseInstanceId: 'i1',
+      phaseId: 'day.discussion',
+      segment: 'day',
+      day: 1,
+      mode: 'seat-order-public',
+      speech: { completed: 0, total: 1, current: { playerId: 'p1', seat: 1, displayName: 'Seat 1', human: true } },
+    },
     actionForm: null,
     timeline: [],
     pauseReason: null,
@@ -123,6 +131,7 @@ async function bench(options: { failWith?: string; hostInitiallyVisible?: boolea
   ctx.slots.register({
     name: 'root', children: {
       'conversation.view': { kind: 'list', scope: 'session' },
+      'conversation.composer': { kind: 'chain', scope: 'session' },
     },
   } as never, (() => null) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
@@ -163,6 +172,7 @@ async function bench(options: { failWith?: string; hostInitiallyVisible?: boolea
       inject: found.inject as unknown as ((sessionId: SessionId) => WerewolfViewInjected) | undefined,
     }
   }
+  const composerEntry = () => ctx.slots.entries('conversation.composer')[0]
   return {
     ctx,
     fiber,
@@ -171,6 +181,7 @@ async function bench(options: { failWith?: string; hostInitiallyVisible?: boolea
     werewolfGame,
     open,
     entry,
+    composerEntry,
     verbs: () => entry()?.inject?.(sid('s1')) as WerewolfViewInjected,
     hostVerbs: () => entry()?.inject?.(sid('game-g1')) as WerewolfViewInjected,
     publishHost: () => {
@@ -197,6 +208,17 @@ describe('ui-werewolf browser plugin', () => {
     expect(b.preferred[0]!(sid('s1'))).toBe('werewolf')
     expect(b.preferred[0]!(sid('s2'))).toBeNull()
     expect(b.preferred[0]!(sid('unknown'))).toBeNull()
+  })
+
+  it('suppresses the generic composer only for werewolf-preset sessions', async () => {
+    const b = await bench()
+    await b.fiber.await()
+    const entry = b.composerEntry()
+    const select = entry?.select as ((owner: ComposerChainProps) => unknown) | undefined
+    expect(select?.({ interactions: [], session: undefined, agentPreset: 'werewolf' })).toEqual({ agentPreset: 'werewolf' })
+    expect(select?.({ interactions: [], session: undefined, agentPreset: 'coding' })).toBeNull()
+    expect(select?.({ interactions: [], session: undefined, agentPreset: undefined })).toBeNull()
+    expect((entry?.component as (() => unknown) | undefined)?.()).toBeNull()
   })
 
   it('binds Host Sessions to their game and opens the dedicated Host after start', async () => {
@@ -291,9 +313,11 @@ describe('ui-werewolf browser plugin', () => {
     const b = await bench()
     await b.fiber.await()
     expect(b.entry()).toBeDefined()
+    expect(b.composerEntry()).toBeDefined()
     expect(b.preferred).toHaveLength(1)
     await b.fiber.dispose()
     expect(b.entry()).toBeUndefined()
+    expect(b.composerEntry()).toBeUndefined()
     expect(b.preferred).toHaveLength(0)
   })
 })

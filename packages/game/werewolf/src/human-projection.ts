@@ -54,6 +54,12 @@ export interface WerewolfHumanViewV1 {
     segment: 'setup' | 'night' | 'day'
     day: number
     mode: 'parallel-private' | 'seat-order-public'
+    /** Public speaking progress; null for private or non-speaking phases. */
+    speech: null | {
+      completed: number
+      total: number
+      current: null | { playerId: string; seat: number; displayName: string; human: boolean }
+    }
   }
   actionForm: WerewolfHumanActionFormV1 | null
   timeline: WerewolfTimelineEntryV1[]
@@ -111,10 +117,26 @@ export function projectWerewolfHumanView(
   const roleFor = (roleId: string, roleVersion: number) => rules.roles.get(`${roleId}@${roleVersion}`)
   const open = state.openPhase
   let actionForm: WerewolfHumanActionFormV1 | null = null
+  let speech: NonNullable<WerewolfHumanViewV1['phase']>['speech'] = null
   if (open !== null) {
     const actor = open.plan.actors.find(candidate => candidate.playerId === self.playerId)
     const settled = open.settled.some(candidate => candidate.playerId === self.playerId)
     const firstRemaining = open.plan.actors.find(candidate => !open.settled.some(entry => entry.playerId === candidate.playerId))
+    if (open.plan.mode === 'seat-order-public') {
+      const current = firstRemaining === undefined
+        ? undefined
+        : state.players.find(player => player.playerId === firstRemaining.playerId)
+      speech = {
+        completed: open.settled.length,
+        total: open.plan.actors.length,
+        current: current === undefined ? null : {
+          playerId: current.playerId,
+          seat: current.seat,
+          displayName: current.displayName,
+          human: current.human,
+        },
+      }
+    }
     if (actor !== undefined && !settled
       && (open.plan.mode === 'parallel-private' || firstRemaining?.playerId === self.playerId)) {
       actionForm = {
@@ -170,6 +192,7 @@ export function projectWerewolfHumanView(
       segment: open.segment,
       day: open.day,
       mode: open.plan.mode,
+      speech,
     },
     actionForm,
     timeline: state.timeline.map(entry => structuredClone(entry)),

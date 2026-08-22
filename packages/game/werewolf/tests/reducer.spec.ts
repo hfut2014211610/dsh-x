@@ -37,6 +37,9 @@ describe('reduceWerewolfGame', () => {
     const opened = events.filter(event => event.type === 'werewolf/phase-opened')
     const days = new Set(opened.map(event => event.data.day))
     expect(days.size).toBeGreaterThanOrEqual(1)
+    const publicVotes = folded?.timeline.filter(entry => entry.kind === 'vote') ?? []
+    expect(publicVotes.length).toBeGreaterThan(0)
+    expect(publicVotes.every(entry => entry.phaseId === 'day.vote')).toBe(true)
   })
 
   it('returns undefined without werewolf events and ignores foreign events', () => {
@@ -100,7 +103,7 @@ describe('reduceWerewolfGame', () => {
     expect(next?.players[1]?.roleState).toEqual({ saved: true })
     expect(next?.players[0]?.notices).toHaveLength(1)
     expect(next?.timeline.some(entry => entry.kind === 'death' && entry.key === 'announce.death')).toBe(true)
-    expect(next?.timeline.some(entry => entry.kind === 'vote' && entry.actorId === saved.playerId as never)).toBe(true)
+    expect(next?.timeline.some(entry => entry.kind === 'vote')).toBe(false)
     expect(next?.positionConsumed).toBe(true)
   })
 
@@ -268,6 +271,8 @@ describe('reduceWerewolfGame', () => {
     const rules = miniRuleSet({ voteTie: 'no-elimination' })
     const { state } = startWerewolfGame({ ruleSet: rules, seed: 7, ids: counterIds() })
     const opened = openNextWerewolfPhase(state, rules, counterIds())
+    const botPlayer = state.players.find(player => !player.human)
+    if (botPlayer === undefined) throw new Error('missing Bot timeline fixture')
     const textPhase: WerewolfEvent<'werewolf/phase-opened'> = {
       type: 'werewolf/phase-opened',
       data: {
@@ -284,12 +289,20 @@ describe('reduceWerewolfGame', () => {
         outcome: 'awaiting',
         plan: {
           mode: 'seat-order-public',
-          actors: [{
-            playerId: state.humanPlayerId,
-            seat: 1,
-            actionKind: 'speech',
-            spec: { kind: 'text', maxChars: 40, allowSkip: true },
-          }],
+          actors: [
+            {
+              playerId: state.humanPlayerId,
+              seat: 1,
+              actionKind: 'speech',
+              spec: { kind: 'text', maxChars: 40, allowSkip: true },
+            },
+            {
+              playerId: botPlayer.playerId,
+              seat: botPlayer.seat,
+              actionKind: 'speech',
+              spec: { kind: 'text', maxChars: 40, allowSkip: true },
+            },
+          ],
         },
         rngState: state.rngState,
       },
@@ -309,6 +322,19 @@ describe('reduceWerewolfGame', () => {
     })
     expect(human?.timeline.some(entry => entry.kind === 'speech' && (entry.data as { text: string }).text === 'hello  world')).toBe(true)
     expect(human?.openPhase?.settled).toHaveLength(1)
+    const humanPass = applyWerewolfEvent(withPhase, {
+      type: 'werewolf/human-action',
+      data: {
+        version: 1,
+        gameId: state.gameId,
+        gameRevision: 4,
+        humanActionId: 'h-pass' as never,
+        phaseInstanceId: WerewolfPhaseInstanceId('i1'),
+        playerId: state.humanPlayerId,
+        action: { value: null },
+      },
+    })
+    expect(humanPass?.timeline.some(entry => entry.kind === 'speech' && entry.key === 'speech.pass')).toBe(true)
     const nonText = applyWerewolfEvent(withPhase, {
       type: 'werewolf/human-action',
       data: {
@@ -333,17 +359,38 @@ describe('reduceWerewolfGame', () => {
         mode: 'seat-order-public',
         entries: [{
           decisionId: 'd1' as never,
-          playerId: (state.players.find(player => !player.human)?.playerId ?? WerewolfPlayerId('p')) as never,
+          playerId: botPlayer.playerId,
           phaseInstanceId: WerewolfPhaseInstanceId('i1'),
           actorContextRevision: 0,
           action: { value: null },
           publicSpeech: 'real words',
           contextDelta: {},
-          contextAfter: { version: 1, gameId: state.gameId, playerId: WerewolfPlayerId('p'), revision: 1, profile: { personalityId: 'x', speakingStyle: 'y', riskStyle: 'balanced' }, beliefs: [], commitments: [], strategy: { objective: 'o', priorityTargets: [] }, memorySummary: 'm' },
+          contextAfter: { version: 1, gameId: state.gameId, playerId: botPlayer.playerId, revision: 1, profile: { personalityId: 'x', speakingStyle: 'y', riskStyle: 'balanced' }, beliefs: [], commitments: [], strategy: { objective: 'o', priorityTargets: [] }, memorySummary: 'm' },
         }],
       },
     })
     expect(bot?.timeline.filter(entry => entry.kind === 'speech')).toHaveLength(1)
+    const botPass = applyWerewolfEvent(withPhase, {
+      type: 'werewolf/bot-decision',
+      data: {
+        version: 1,
+        gameId: state.gameId,
+        gameRevision: 6,
+        sourceGameRevision: 3,
+        phaseInstanceId: WerewolfPhaseInstanceId('i1'),
+        mode: 'seat-order-public',
+        entries: [{
+          decisionId: 'd-pass' as never,
+          playerId: botPlayer.playerId,
+          phaseInstanceId: WerewolfPhaseInstanceId('i1'),
+          actorContextRevision: 0,
+          action: { value: null },
+          contextDelta: {},
+          contextAfter: { version: 1, gameId: state.gameId, playerId: botPlayer.playerId, revision: 1, profile: { personalityId: 'x', speakingStyle: 'y', riskStyle: 'balanced' }, beliefs: [], commitments: [], strategy: { objective: 'o', priorityTargets: [] }, memorySummary: 'm' },
+        }],
+      },
+    })
+    expect(botPass?.timeline.some(entry => entry.kind === 'speech' && entry.key === 'speech.pass')).toBe(true)
     void opened
   })
 

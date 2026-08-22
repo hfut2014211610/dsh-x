@@ -240,7 +240,7 @@ export const WOLF_KILL_PHASE: WerewolfPhaseDefinition = {
       resolution.privateNotices = actions.map(entry => ({
         toPlayerId: entry.playerId,
         kind: 'wolf-kill-result',
-        data: { victim },
+        data: { victim, day: input.day },
       }))
       const outcome = { victim, proposed }
       return { ...resolution, outcome }
@@ -304,7 +304,7 @@ export const SEER_INSPECT_PHASE: WerewolfPhaseDefinition = {
         resolution.privateNotices.push({
           toPlayerId: entry.playerId,
           kind: 'seer-inspect',
-          data: { target, faction },
+          data: { target, faction, day: input.day },
         })
         checks.push({ target, faction, day: input.day })
       }

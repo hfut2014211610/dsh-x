@@ -69,8 +69,8 @@
       name: '@deepseek-ai/dsh-documents-local'
 
     # Werewolf game host: deterministic session-backed runtime, classic rule
-    # definitions, the typed game gateway, and the subagent seam its bots use.
-    # The base bundle's `spawn` provider carries the one-shot bot children.
+    # definitions, typed game gateway, and fixed game-owned Bot Agents. Bot
+    # Sessions stay outside the generic subagent catalog.
     - id: game
       name: '@deepseek-ai/dsh-game'
 

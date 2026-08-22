@@ -52,7 +52,18 @@ function viewFixture(overrides: Partial<WerewolfHumanViewV1> = {}): WerewolfHuma
       teammates: [],
       notices: [],
     },
-    phase: { phaseInstanceId: 'i1', phaseId: 'day.discussion', segment: 'day', day: 1, mode: 'seat-order-public' },
+    phase: {
+      phaseInstanceId: 'i1',
+      phaseId: 'day.discussion',
+      segment: 'day',
+      day: 1,
+      mode: 'seat-order-public',
+      speech: {
+        completed: 0,
+        total: 2,
+        current: { playerId: 'p1', seat: 1, displayName: 'Seat 1', human: true },
+      },
+    },
     actionForm: {
       phaseInstanceId: 'i1',
       phaseId: 'day.discussion',
@@ -192,9 +203,56 @@ describe('WerewolfView states', () => {
     expect(table.getAttribute('aria-label')).toBe(zh['table.title'])
     expect(table.textContent).toContain(zh['table.dead'])
     expect(table.textContent).toContain(zh['table.deadOn'].replace('{day}', '1'))
-    expect(table.textContent).toContain(zh['table.unknownRole'])
+    expect(table.textContent).toContain(zh['table.knownNone'])
+    expect(table.querySelector('[data-sigil="sigil-01.png"]')).not.toBeNull()
+    expect(table.querySelector('[data-sigil="sigil-02.png"]')).not.toBeNull()
     const heading = table.querySelector('h2')
     expect(heading?.getAttribute('tabindex')).toBe('-1')
+  })
+
+  it('shows ordered speaking progress and readable statements before voting', async () => {
+    const speaking = viewFixture({
+      phase: {
+        phaseInstanceId: 'i1',
+        phaseId: 'day.discussion',
+        segment: 'day',
+        day: 1,
+        mode: 'seat-order-public',
+        speech: {
+          completed: 1,
+          total: 2,
+          current: { playerId: 'p1', seat: 1, displayName: 'Seat 1', human: true },
+        },
+      },
+      timeline: [
+        {
+          id: 'speech-1',
+          day: 1,
+          phaseId: 'day.discussion',
+          kind: 'speech',
+          key: 'speech',
+          actorId: 'p2' as NonNullable<WerewolfHumanViewV1['timeline'][number]['actorId']>,
+          data: { text: '我先听一轮，再判断谁的逻辑有问题。' },
+        },
+        {
+          id: 'speech-pass',
+          day: 1,
+          phaseId: 'day.discussion',
+          kind: 'speech',
+          key: 'speech.pass',
+          actorId: 'p3' as NonNullable<WerewolfHumanViewV1['timeline'][number]['actorId']>,
+        },
+      ],
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => speaking, getView: async () => speaking })} />)
+    await arriveAtTable(view)
+    const flow = view.getByTestId('werewolf-speech-flow')
+    expect(flow.textContent).toContain('已完成 1 / 2 位发言')
+    expect(flow.textContent).toContain(zh['flow.yourTurn'])
+    expect(flow.textContent).toContain(zh['flow.afterSpeeches'])
+    expect(view.getByText('2 号位 · Seat 2')).toBeDefined()
+    expect(view.getByText('我先听一轮，再判断谁的逻辑有问题。')).toBeDefined()
+    expect(view.getByText(zh['timeline.pass'])).toBeDefined()
   })
 
   it('submits a text speech through the typed action verb', async () => {
@@ -356,7 +414,7 @@ describe('WerewolfView states', () => {
     const next = viewFixture({
       gameRevision: 5,
       day: 2,
-      phase: { phaseInstanceId: 'i2', phaseId: 'day.vote', segment: 'day', day: 2, mode: 'parallel-private' },
+      phase: { phaseInstanceId: 'i2', phaseId: 'day.vote', segment: 'day', day: 2, mode: 'parallel-private', speech: null },
       actionForm: null,
     })
     const face = injected({
@@ -590,6 +648,94 @@ describe('WerewolfView display sides', () => {
     await arriveAtTable(view)
     const heading = view.getByTestId('werewolf-table').querySelector('h2')
     expect(heading?.textContent).toContain('第 1 天（{ghost}）')
+  })
+
+  it('maps seats to stable sigils and marks known seats from notices', async () => {
+    const known = viewFixture({
+      players: Array.from({ length: 7 }, (_, index) => ({
+        playerId: `p${index + 1}`,
+        seat: index + 1,
+        displayName: `Seat ${index + 1}`,
+        alive: true,
+        human: index === 0,
+      })),
+      self: {
+        ...viewFixture().self,
+        notices: [{ kind: 'seer-inspect', data: { target: 'p2', faction: 'village', day: 1 } }],
+      },
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => known })} />)
+    await arriveAtTable(view)
+    for (let seat = 1; seat <= 7; seat += 1) {
+      expect(view.getByAltText(zh['table.seat'].replace('{seat}', String(seat))).getAttribute('data-sigil')).toBe(`sigil-0${seat}.png`)
+    }
+    expect(view.getByRole('button', { name: zh['table.openFinding'] })).toBeDefined()
+    expect(view.getByTestId('werewolf-table').textContent).toContain(`(${zh['table.you']})`)
+  })
+
+  it('opens a finding detail, switches between notices, and returns to identity', async () => {
+    const noticed = viewFixture({
+      self: {
+        ...viewFixture().self,
+        notices: [
+          { kind: 'seer-inspect', data: { target: 'p2', faction: 'village', day: 1 } },
+          { kind: 'seer-inspect', data: { target: 'p3', faction: 'wolf', day: 2 } },
+        ],
+      },
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => noticed })} />)
+    await arriveAtTable(view)
+    fireEvent.click(view.getAllByRole('button', { name: zh['table.openFinding'] })[0]!)
+    const detail = await waitFor(() => view.getByTestId('werewolf-finding'))
+    expect(detail.textContent).toContain(zh['finding.scope'])
+    expect(detail.textContent).toContain('Seat 2')
+    expect(detail.textContent).toContain(zh['finding.factionVillage'])
+    expect(detail.textContent).toContain(zh['finding.when'])
+    expect(detail.textContent).toContain(zh['finding.day'].replace('{day}', '1'))
+    const nav = detail.querySelectorAll('[aria-current="true"]')
+    expect(nav).toHaveLength(1)
+    fireEvent.click(view.getAllByRole('button', { name: zh['finding.seer'] })[1]!)
+    await waitFor(() =>{  expect(view.getByTestId('werewolf-finding').textContent).toContain('Seat 3') })
+    expect(view.getByTestId('werewolf-finding').textContent).toContain(zh['finding.factionWolf'])
+    fireEvent.click(view.getByRole('button', { name: zh['finding.back'] }))
+    await waitFor(() =>{  expect(view.queryByTestId('werewolf-finding')).toBeNull() })
+    expect(view.getByText(zh['table.role'])).toBeDefined()
+  })
+
+  it('renders generic notices with a safe key-value fallback and keeps unmapped ones', async () => {
+    const generic = viewFixture({
+      self: {
+        ...viewFixture().self,
+        notices: [
+          { kind: 'configured-result', data: { victim: 'p9', count: 2 } },
+          { kind: 'checked', data: {} },
+        ],
+      },
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => generic })} />)
+    await arriveAtTable(view)
+    fireEvent.click(view.getByRole('button', { name: 'configured-result' }))
+    const detail = await waitFor(() => view.getByTestId('werewolf-finding'))
+    expect(detail.textContent).toContain('victim')
+    expect(detail.textContent).toContain('p9')
+    expect(detail.textContent).toContain('count')
+    expect(detail.querySelectorAll('li button')).toHaveLength(2)
+  })
+
+  it('renders the built-in wolf result as a player label with its source day', async () => {
+    const noticed = viewFixture({
+      self: {
+        ...viewFixture().self,
+        notices: [{ kind: 'wolf-kill-result', data: { victim: 'p2', day: 1 } }],
+      },
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => noticed })} />)
+    await arriveAtTable(view)
+    fireEvent.click(view.getByRole('button', { name: zh['finding.wolfKill'] }))
+    const detail = await waitFor(() => view.getByTestId('werewolf-finding'))
+    expect(detail.textContent).toContain(zh['finding.victim'])
+    expect(detail.textContent).toContain('2 号位·Seat 2')
+    expect(detail.textContent).toContain(zh['finding.day'].replace('{day}', '1'))
   })
 })
 
