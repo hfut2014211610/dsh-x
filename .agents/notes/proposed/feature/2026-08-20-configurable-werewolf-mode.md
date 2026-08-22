@@ -14,7 +14,7 @@ Fresh one-shot subagents provide the right isolation and structured-result contr
 
 ## Proposal
 
-Add an optional Werewolf bundle whose Host runtime owns a deterministic, event-sourced game. One parent Session contains the game events and acts as the lineage parent for bot runs. A dedicated Web game view calls the runtime through typed Typert methods, so ordinary game input does not invoke the parent model or pass through the Chat composer.
+Add an optional Werewolf bundle whose deterministic engine is hosted by the common `ctx.games` runtime. Starting a game creates one dedicated idle Host Agent and Session; that Session contains the game events and is the lineage parent for bot runs. A dedicated Web game view calls the Host through typed Typert methods, so ordinary game input does not invoke the Host model or pass through the Chat composer.
 
 Each seat has one durable logical `BotActor`. Every bot decision starts a fresh one-shot child through `ctx.subagents.start()`, using a complete authoritative observation plus that bot's latest `BotContinuityContext`. The child returns a phase action and a bounded `BotContextDelta` under an object-rooted JSON Schema. The runtime validates both, computes the next context, and appends the accepted action, delta, and full resulting context in one `werewolf/bot-decision` event. A later decision for that actor always starts from the latest accepted context revision.
 
@@ -28,7 +28,7 @@ Version 1 includes one human, configurable bot seats, configurable rule sets, re
 
 Version 1 does not provide online multiplayer, adversarial anti-cheat, voice chat, generated role code, arbitrary configuration expressions, long-lived bot subagent conversations, or a model moderator. Sheriff elections, hunter shots, guards, special victory rules, and other roles are admitted through the extension contracts but need not ship in the first implementation.
 
-The parent agent remains an ordinary live `Agent` because the subagent service requires an exact parent and the Session owns durable game events. The parent model is not asked to interpret game input, validate actions, summarize bots, or decide outcomes.
+The Host remains an ordinary live `Agent` because the subagent service requires an exact parent and the Session owns durable game events. It is dedicated to one game instance and remains idle: its model is not asked to interpret game input, validate actions, summarize bots, or decide outcomes. Starting another game creates another Host rather than reusing a completed game's Session.
 
 ## Runtime architecture
 
@@ -36,10 +36,11 @@ The parent agent remains an ordinary live `Agent` because the subagent service r
 flowchart LR
   User[User] --> View[Dedicated Werewolf view]
   View --> Remote[Typed Typert remote]
-  Remote --> Runtime[ctx.werewolf]
+  Remote --> Host[ctx.games]
+  Host --> Runtime[ctx.werewolf module]
   Runtime --> Rules[Compiled rule set]
-  Runtime --> Log[Parent Session werewolf events]
-  Runtime --> BotRunner[Bot runner]
+  Host --> Log[Dedicated game Session]
+  Host --> BotRunner[Werewolf Bot runner]
   BotRunner --> Subagents[ctx.subagents.start]
   Subagents --> Child[Fresh one-shot child]
   Child --> BotRunner
@@ -48,9 +49,13 @@ flowchart LR
   Remote --> View
 ```
 
-`WerewolfRuntime` is a concrete Cordis service, not a new capability seam. It owns the game controller and four extension registries: rule sets, roles, phases, and victory conditions. Registrations are effects and duplicate identifiers at one version fail during registration. The runtime depends only on Service Definitions such as `dsh-subagent`, `dsh-session`, and `dsh-agent`, never on a concrete subagent provider package.
+Stage 3 introduces the minimal common `ctx.games` capability seam as one complete package: Service Definition, default Session-backed Host provider, and the typed Host consumer used by Werewolf. It exclusively owns game-instance creation, Host Agent and Session binding, per-game serialization, idempotency receipts, atomic Session batches, principal-to-participant binding, projection invalidation, and AI scheduling. This is the reusable boundary for later card and DND modules, not a second Werewolf controller.
 
-The optional composition bundle mounts the concrete `spawn` provider, the Werewolf runtime, classic definitions, the Host remote, and the Web Client plugin. Another profile may select a different provider only when it advertises `outputSchema`, `persona`, `toolFilter`, and `depthLimit`; game start fails before appending `werewolf/game-started` when any required capability is absent.
+`WerewolfRuntime` remains a concrete Cordis domain service. It owns rule-set, role, phase, and victory-condition registries, rule compilation, the deterministic engine and reducer, projections, invariants, and Bot policy. It registers a thin module adapter with `ctx.games`; it does not own Host lifecycle, external identity, RPC mutation serialization, or Session persistence. Registrations are effects and duplicate identifiers at one version fail during registration. Both services depend on capability Service Definitions rather than concrete provider packages.
+
+The Stage 1–2 public contracts remain intact. `buildWerewolfBotRequests()` supplies the common Host with stable pending-decision descriptors; its observation and output schema become `prepareAiTurn()` input. Existing domain events, reducer, action specifications, seeded randomness, continuity context, projections, and Bot result validation remain authoritative. Stage 3 injects the common AI executor into the runner so `ctx.games` owns provider invocation, cancellation, concurrency, and child evidence while Werewolf continues to own prompt construction, schema, result parsing, retry diagnostics, fallback, and pause policy.
+
+The optional composition bundle mounts `ctx.games`, the concrete `spawn` provider, the Werewolf runtime, classic definitions, the Host remote, and the Web Client plugin. Model selection resolves through `model-hub` with seat override, game default, then Host default precedence. Another profile may select a different subagent provider only when it advertises `outputSchema`, `persona`, `toolFilter`, `depthLimit`, cancellation, and `inheritsParentContext === false`; game start fails before appending `werewolf/game-started` when any required capability is absent.
 
 ## Configurable rules
 
@@ -252,9 +257,9 @@ policies:
 
 ## Game lifecycle and scheduling
 
-One Session may have at most one active game. A finished or aborted game remains in the log, and a later `start` creates a new `GameId`. Forking a Session creates an alternate game timeline in the forked Session; it does not join or mutate the source Session's game.
+Each game instance owns one dedicated Host Agent and Session, and that Session contains exactly one game. A finished or aborted game remains in its log. A later `start` creates a new `GameId`, Host, and Session and may record lineage to the prior game. A product game fork also creates a new Host and Session, derives fresh server entropy from the parent revision plus new entropy, and records the parent game and revision. Raw Session fork remains a diagnostic mechanism; it is not the product game-fork command.
 
-The runtime serializes every state-changing operation for one live Agent. Each mutation carries a caller-generated UUID `requestId` and `expectedGameRevision`. Its durable idempotency key is `{ sessionId, method, requestId }`; the committed event also stores a digest of the normalized mutation payload. `game-started`, `human-action`, `game-resumed`, and terminal `game-ended` own the keys for `start`, `submitAction`, `resume`, and `abortGame` respectively. On restart the reducer rebuilds the key index from those events. Repeating the same key and digest performs no transition and returns the current authorized projection; reusing a key with a different digest is an idempotency conflict. A new key with a stale expected revision is rejected. Otherwise the runtime folds current state, validates, appends events, and auto-advances until the next human action, game end, pause, or cancellation checkpoint.
+`ctx.games` serializes every state-changing operation for one game Host. Each mutation carries a caller-generated UUID `requestId` and `expectedGameRevision`. Its durable idempotency key is `{ gameId, method, requestId }`; the committed command receipt stores a digest of the normalized mutation payload. On restart the common Host projection rebuilds the receipt index. Repeating the same key and digest performs no transition and returns the current authorized projection; reusing a key with a different digest is an idempotency conflict. A new key with a stale expected revision is rejected. Otherwise the Host folds current state, asks the Werewolf module to validate and transition, commits the receipt and domain events as one batch, and auto-advances until the next human action, game end, pause, or cancellation checkpoint.
 
 Each cycle walks the recorded phase lists in order. A phase may skip when it has no eligible living actor or its role resources make it inactive. The runtime evaluates configured victory conditions after setup and after every resolved phase that may alter living players, factions, or a condition-owned role state. Lower numeric `priority` wins: the runtime selects the lowest priority containing any non-null claim. Outcome equivalence uses the stable key `faction:<factionId>` or `tie`; equal keys combine evidence, while different keys at that selected priority pause the game as an invariant failure. Lower-priority conditions are then irrelevant. This dynamic conflict cannot be rejected during rule compilation because it depends on live state. When the configured `maxDays` finishes without another result, the engine emits `{ kind: 'tie' }` with `max-days` evidence after the final day cycle. `abortGame` alone emits `{ kind: 'aborted' }`; victory plugins cannot return it.
 
@@ -264,7 +269,7 @@ When the human and bots participate in the same `parallel-private` phase, the ru
 
 ## Durable game events
 
-The parent Session log is the authoritative game record. Werewolf events are log-only and never enter the parent model history. Public and human-private client views are projections of these events. Bot prompts and outputs are independently logged in each child Session under the existing model-visible-means-logged rule.
+The dedicated Host Session log is the authoritative game record. Common command receipts and Werewolf events are log-only and never enter the Host model history. Public and human-private client views are projections of these events. Bot prompts and outputs are independently logged in each child Session under the existing model-visible-means-logged rule.
 
 ```ts ignore-check
 interface WerewolfSessionEventMap {
@@ -282,7 +287,7 @@ interface WerewolfSessionEventMap {
 
 Every payload starts with `{ version, gameId, gameRevision }`. State-changing revisions are contiguous and increase by one. Phase events additionally carry a stable `PhaseInstanceId`; each bot decision entry carries a stable `DecisionId`, and each human action event carries a stable `HumanActionId`. `game-ended` is terminal for that `GameId`, while `game-paused` retains a resumable phase and typed reason.
 
-`WerewolfBotDecision` carries the source game revision and one or more ordered decision entries. A sequential public phase appends one entry; a parallel private phase appends every accepted or trustee entry in one Session event. The single synchronous `Session.append()` is the atomic batch boundary, so the design does not require a new multi-event transaction API.
+`WerewolfBotDecision` carries the source game revision and one or more ordered decision entries. A sequential public phase produces one entry; a parallel private phase produces every accepted or trustee entry in one domain event. Stage 3 adds a real `Session.appendBatch()` boundary because a common command receipt and one or more domain events must commit together. Before touching the live log, surface, or persistence observers, it checks the complete candidate batch against one shadow fold and every registered invariant. If any candidate fails, none of the batch is visible and the game revision does not advance. After successful atomic commit, ordinary per-event observers may be notified in order.
 
 `werewolf/game-started` contains the shuffled roster, full secret role assignment, initial role state, human player id, immutable bot profiles, random seed state, normalized rule set, and definition versions. This makes one Session sufficient for replay and recovery. The normal UI and bot observation projectors hide unauthorized fields, but a local user who reads raw Session storage can inspect secrets; version 1 does not claim adversarial anti-cheat.
 
@@ -396,9 +401,9 @@ interface BotDecisionEnvelopeV1 {
 
 `self.role` and `privateKnowledge` come from the actor's registered role projector. `publicState` contains only public roster state, bounded recent messages, announcements, deaths, and vote history. `legalAction` is generated by the opened phase and enumerates every allowed target or choice. No projector receives or serializes another role's private state unless the actor is explicitly entitled to it, such as wolf teammates.
 
-The child persona fixes seat identity, immutable profile, game conduct, information-isolation rules, and the instruction to return only the structured result without hidden reasoning. Public speech is quoted as untrusted in-game data. The child receives `toolFilter: { allow: [] }`, an absolute depth limit that prevents descendants, configured provider/model/max tokens, the phase's object-rooted output schema, and the parent operation's cancellation signal.
+The child persona fixes seat identity, immutable profile, game conduct, information-isolation rules, and the instruction to return only the structured result without hidden reasoning. Public speech is quoted as untrusted in-game data. The child receives `toolFilter: { allow: [] }`, an absolute depth limit that prevents descendants, `inheritsParentContext: false`, the model-hub-resolved provider/model/max tokens, the phase's object-rooted output schema, and the Host operation's cancellation signal. The child Session records the actual selected route and model as execution evidence.
 
-The runtime accepts a result only when all of these values still match: `DecisionId`, `GameId`, phase instance, source game revision, actor, and prior context revision. It validates the phase action before the context delta. An invalid action cannot update context. A sequential phase re-enters the per-game serial queue, repeats the checks, computes `contextAfter`, and appends a one-entry event. A parallel coordinator holds validated detached results only in memory; after every actor settles, it re-enters the queue once, rechecks the source game revision and every actor context revision, computes all contexts, and appends one ordered batch event. A late or duplicate child result is disposed and cannot alter the log.
+The runtime accepts a result only when all of these values still match: `DecisionId`, `GameId`, phase instance, source game revision, actor, and prior context revision. It validates the phase action before the context delta. An invalid action cannot update context. A sequential phase re-enters the `ctx.games` per-game queue, repeats the checks, computes `contextAfter`, and proposes a one-entry domain event. A parallel coordinator holds validated detached results only in memory; after every actor settles, it re-enters the queue once, rechecks the source game revision and every actor context revision, computes all contexts, and proposes one ordered domain event. The Host commits it with the command or scheduler receipt through `appendBatch()`. A late or duplicate child result is disposed and cannot alter the log.
 
 Retries use the same logical `DecisionId`, a new attempt number, and a fresh child Session. No failed attempt changes bot context. The retry prompt includes only a concise validation diagnostic, not the prior child's unrestricted output. After the configured retry limit, `auto-action` selects a legal action with the recorded seeded PRNG and applies an engine-authored context delta noting the trustee action; `pause-game` appends `werewolf/game-paused`. Both outcomes remain visible facts rather than silent degradation.
 
@@ -408,24 +413,22 @@ This mode is UI-only. It does not register slash commands, reuse the Chat compos
 
 ### Dedicated conversation view
 
-The Web Client injects a `conversation.view` slot entry with id `werewolf`, following the existing dedicated-view pattern. An empty view renders the game lobby. `ctx.conversation.declarePreferredView()` selects it for Sessions whose `agentPreset` is `werewolf` without overwriting the user's persisted tab. This matches the current resolver input and makes reopening that preset return directly to the lobby, active table, or paused table. The slot registration is global within a Web composition because the current view ring has no per-session availability resolver; an ordinary Session may open the tab manually, but only the Werewolf view can start or mutate a game.
+The Web Client injects a `conversation.view` slot entry with id `werewolf`, following the existing dedicated-view pattern. In an ordinary Session it acts only as a launcher and renders the game lobby; `start` creates the dedicated Host and then navigates the view to that Host Session. `ctx.conversation.declarePreferredView()` selects it for Host Sessions whose `agentPreset` is `werewolf` without overwriting the user's persisted tab, so reopening a game returns directly to its active or paused table. The slot registration is global within a Web composition because the current view ring has no per-session availability resolver. Only a bound game Host accepts mutation methods.
 
-The React component receives all data and callbacks through injected props. It does not access Cordis context directly. Authoritative game state lives in the Host Session projection; a small registered client store may retain only presentation preferences such as the open side panel, muted animation, and the user's unsubmitted discussion draft.
+The React component receives all data and callbacks through injected props. It does not access Cordis context directly. The view resolves `gameId` to its dedicated Host through `ctx.games`; authoritative game state lives in that Host Session projection. A small registered client store may retain only presentation preferences such as the open side panel, muted animation, and the user's unsubmitted discussion draft.
 
 The view calls a versioned Typert namespace whose mutating requests include `requestId` and `expectedGameRevision`.
 
 ```ts ignore-check
 interface WerewolfRemoteV1 {
   getView(input: {
-    sessionId: SessionId
+    gameId: GameId
   }): Promise<WerewolfHumanViewV1>
   getReplay(input: {
-    sessionId: SessionId
     gameId: GameId
     cursor?: string
   }): Promise<WerewolfReplayPageV1>
   start(input: {
-    sessionId: SessionId
     requestId: string
     expectedGameRevision: 0
     ruleSetId: string
@@ -433,28 +436,28 @@ interface WerewolfRemoteV1 {
     humanSeatPreference?: number
   }): Promise<WerewolfHumanViewV1>
   submitAction(input: {
-    sessionId: SessionId
+    gameId: GameId
     requestId: string
     expectedGameRevision: number
     phaseInstanceId: PhaseInstanceId
     action: JsonValue
   }): Promise<WerewolfHumanViewV1>
   resume(input: {
-    sessionId: SessionId
+    gameId: GameId
     requestId: string
     expectedGameRevision: number
   }): Promise<WerewolfHumanViewV1>
   abortGame(input: {
-    sessionId: SessionId
+    gameId: GameId
     requestId: string
     expectedGameRevision: number
   }): Promise<WerewolfHumanViewV1>
 }
 ```
 
-The namespace forwards a lightweight `werewolf/view-invalidated` event carrying only `sessionId`, `gameId`, and the new revision. The client subscribes before the first read, ignores events for other Sessions, and refreshes through `getView()`. Connection reset also triggers a refresh. The invalidation event never carries secret game fields, so authorization remains in one Host projector.
+The namespace forwards a lightweight `werewolf/view-invalidated` event carrying only `gameId` and the new revision. The client subscribes before the first read, ignores events for other games, and refreshes through `getView()`. Connection reset also triggers a refresh. The invalidation event never carries secret game fields, so authorization remains in one Host projector.
 
-Every handler resolves `sessionId` through the existing Gateway and Session access policy and rejects an unknown, unavailable, or non-top-level Session. Requests never accept a `playerId`: `werewolf/game-started` binds exactly one `humanPlayerId`, and every later projection and action derives that identity from the active game. In version 1, any loopback same-origin client already authorized to operate that Session acts as this one human. Calling the Typert method outside the rendered view has the same local authority and does not create a multiplayer identity boundary; online play remains out of scope.
+Every handler resolves the authenticated or local platform principal first, then asks `ctx.games` for that principal's participant binding and Host. Requests never accept `sessionId` or `playerId`, so a caller cannot select an arbitrary Host or seat. Version 1 maps the loopback same-origin Web client to one local principal and binds that principal to the sole human participant at start. A future Feishu adapter maps `open_id` to the same platform-principal contract and invokes the same command path; Feishu delivery is not part of Stage 3. Online adversarial identity remains out of scope.
 
 ### Human-authorized projection
 
@@ -463,7 +466,6 @@ The UI never folds raw Session events. The Host returns one complete projection 
 ```ts ignore-check
 interface WerewolfHumanViewV1 {
   version: 1
-  sessionId: SessionId
   game: null | {
     gameId: GameId
     revision: number
@@ -623,14 +625,15 @@ The implementation adds a `game/` package group because no existing group owns g
 
 | Package or path | Responsibility |
 |---|---|
-| `packages/game/werewolf/` | `ctx.werewolf`, ids and public types, definition registries, rule compilation, event declarations, reducer, projections, controller, Bot runner, context reducer, invariant, and typed errors |
+| `packages/game/game/` (stage 3) | Complete `ctx.games` capability seam: module contract and registry, default Session Host provider, mailbox, binding, idempotency, batch commit, identity, projection invalidation, and internal AI executor |
+| `packages/game/werewolf/` | `ctx.werewolf`, ids and public types, definition registries, rule compilation, event declarations, reducer, projections, thin game-module adapter, Bot domain policy, context reducer, invariant, and typed errors |
 | `packages/game/werewolf-classic/` | Classic role, phase, and victory-condition definitions plus the `quick-7` rule set |
-| `packages/client/ui-werewolf/` | `conversation.view` registration, Typert client binding, dedicated table, lobby, role reveal, action forms, timeline, result/replay, responsive layout, accessibility, and localized copy |
-| `packages/bundle/werewolf/` | Optional composition rows and `werewolf` agent preset that mount the Host, classic definitions, Typert remote, and Web plugin |
-| `examples/werewolf/` | Keyless runnable composition, scripted bot provider, replay inputs, and product snapshots |
+| `client/ui-werewolf/` (under `packages/`, stage 4) | `conversation.view` registration, Typert client binding, dedicated table, lobby, role reveal, action forms, timeline, result/replay, responsive layout, accessibility, and localized copy |
+| `bundle/werewolf/` (under `packages/`, stage 4) | Optional composition rows and `werewolf` agent preset that mount the Host, classic definitions, Typert remote, and Web plugin |
+| `examples/werewolf/` (repo root, stage 3) | Keyless runnable composition, scripted bot provider, replay inputs, and product snapshots |
 | `docs/subsystems/werewolf.md` | Current runtime types and Cordis API after implementation |
 
-The core package should use these source modules unless implementation evidence justifies a narrower split: `brand.ts`, `types.ts`, `rules.ts`, `registry.ts`, `events.ts`, `reducer.ts`, `projection.ts`, `bot-context.ts`, `bot-runner.ts`, `engine.ts`, `runtime.ts`, `error.ts`, `invariant.ts`, and `index.ts`. Tests sit beside the owning package and describe behavior rather than repeating this inventory.
+The Werewolf package should use these source modules unless implementation evidence justifies a narrower split: `brand.ts`, `types.ts`, `rules.ts`, `registry.ts`, `events.ts`, `reducer.ts`, `projection.ts`, `bot-context.ts`, `bot-runner.ts`, `engine.ts`, `module-adapter.ts`, `error.ts`, `invariant.ts`, and `index.ts`. Stage 3 keeps the complete common seam in `packages/game/game/`; it must not create separate `game-session-runtime` or `game-agent` packages before a second game demonstrates a real split. Tests sit beside the owning package and describe behavior rather than repeating this inventory.
 
 Package READMEs document configuration, lifecycle semantics, failure behavior, extension registration, model-visible effects, token impact, and known limitations. Type declarations update the Werewolf subsystem reference. Generated config, Cordis, persistence, event producer/consumer, and module-graph artifacts update from their sources rather than by hand. The Agent Note moves to `implemented/feature` and is rewritten to describe shipped reality in the implementation PR.
 
@@ -667,13 +670,13 @@ interface Config {
 }
 ```
 
-The bundle may provide reviewed defaults, but the runtime reads only the resolved `Config`. `defaultRuleSet` must resolve to one exact registered pair during plugin load. `botAgent` omission deliberately inherits the parent agent's provider and model through the existing subagent request contract. Model temperature and route-wide tuning remain owned by the existing model-tuning layer rather than a Werewolf-specific duplicate.
+The bundle may provide reviewed defaults, but the runtime reads only the resolved `Config`. `defaultRuleSet` must resolve to one exact registered pair during plugin load. `subagentProvider` selects the capability provider, while provider/model routing resolves through `model-hub`: an explicit seat override wins over the game default, which wins over the dedicated Host default. Omission never means transcript inheritance; every bot request sets `inheritsParentContext: false`. Model temperature, route failover, credentials, and route-wide tuning remain owned by `model-hub` and the existing model-tuning layer rather than a Werewolf-specific duplicate.
 
 Rule-set `policies` control game behavior; top-level `Config` controls deployment resources, failure handling, and reviewed UI defaults. A rule set therefore replays identically under its recorded policy snapshot, while an operator can change future concurrency, timeout, model route, retry, context-size limits, and presentation defaults without inventing a new game variant. Per-user presentation preferences override only `ui` defaults and never enter game events.
 
 ## Failure, cancellation, and recovery
 
-Game start validates the selected rule set, referenced definitions, provider capabilities, context limits, parent Agent, and absence of another active game before appending any Werewolf event. A failure leaves no partial game.
+Game start validates the selected rule set, referenced definitions, model-hub route, provider capabilities, context limits, platform-principal binding, and dedicated Host creation before appending any command receipt or Werewolf event. A failure disposes the unpublished Host and leaves no partial game.
 
 Each external operation and automatic phase drive obeys one caller signal until an event commits. Cancellation aborts active child runs and disposes every published run. If the process remains live and an opened phase is incomplete, the runtime appends `game-paused` with reason `cancelled`; after an unclean process stop, loading an active incomplete phase derives a non-durable `interrupted` pause until `resume` is called. An event that already committed remains authoritative even when the caller disconnects immediately afterwards.
 
@@ -689,7 +692,7 @@ The deterministic engine is the only authority for role assignment, legal action
 
 Every bot observation is allowlisted by role and phase. Tests compare the serialized prompt against forbidden role assignments and private notices, not merely against expected fields. Public player text is encoded as data and accompanied by a fixed instruction that it cannot alter rules, tools, output format, or identity.
 
-Bot children receive no global tools and may not spawn descendants. A selected subagent provider must enforce the requested filter and depth capabilities. The game plugin never grants file, shell, network, command, game-controller, Session-query, or subagent-control tools to a bot.
+Bot children receive no global tools, may not spawn descendants, and never inherit the Host transcript. A selected subagent provider must enforce the requested filter, depth, cancellation, and `inheritsParentContext === false` capabilities. The game plugin never grants file, shell, network, command, game-controller, Session-query, or subagent-control tools to a bot.
 
 Bot continuity context is private strategy data and the UI does not render it. It may contain beliefs that contradict game truth; this is expected and cannot grant knowledge. The runtime never feeds one bot's context to another bot.
 
@@ -697,9 +700,11 @@ Version 1 protects against accidental disclosure through normal UI and prompt co
 
 ## Delivery stages
 
+Stages 1–4 have landed ([deterministic core](../../implemented/feature/2026-08-21-werewolf-deterministic-core.md), [bot runner](../../implemented/feature/2026-08-21-werewolf-bot-runner.md), [Session Host](../../implemented/feature/2026-08-21-werewolf-session-host.md), [conversation view](../../implemented/feature/2026-08-21-werewolf-conversation-view.md)); stage 5 remains proposed.
+
 1. Add the `game/` group, Werewolf core types, registries, rule compiler, classic definitions, reducer, invariant, and pure tests. No model or UI path is needed to validate deterministic rules and configuration extension.
 2. Add Bot continuity state, observation projection, one-shot Bot runner, scripted provider integration, retry/fallback behavior, cancellation, and replay tests. Prove context revision `N` is included in decision `N + 1` and that another bot's context remains unchanged.
-3. Add `WerewolfRuntime`, Session projections, Typert methods and invalidation event, a keyless runnable example, and snapshots that complete a full `quick-7` game without invoking the parent model.
+3. Add the complete single-package `ctx.games` seam, real `Session.appendBatch()`, one-game-per-Host ownership, principal binding, model-hub-backed AI execution, and the thin Werewolf module adapter. Add Session projections, typed Typert methods and invalidation, a keyless runnable example, and snapshots that complete a full `quick-7` game without invoking the Host model. Preserve Stage 1–2 domain behavior through adapter-equivalence tests.
 4. Add the dedicated `werewolf` conversation view, lobby, covered role reveal, table, generic human action form, spectator state, result/replay, responsive and accessibility tests, and the optional bundle composition. Do not add a slash command or Chat-composer route.
 5. Update package READMEs, the Werewolf subsystem reference, both SDK expected outputs affected by new Session events, generated catalogs and graphs, and rewrite this Agent Note as implemented reality.
 
@@ -732,15 +737,15 @@ Independent stages may land as a deliberate PR stack, but every published branch
 - The lobby can select two exact `{ id, revision }` rule-set pairs with different decks, role options, phase sequences, tie policies, and victory conditions without changing engine code. Role, phase, condition, and rule-set versions never select latest implicitly; invalid references or cross-field invariants disable start before the first game event.
 - A test-only role can join an existing exact phase version through a validated `phaseBindings` entry. A separate role and phase plugin can register a new mechanic, collect a legal action, resolve declarative effects and a non-classic faction result, replay without invoking the plugin, and resume only while every recorded definition version is available.
 - Every logical bot has an immutable profile and independent `BotContinuityContextV1`; decision `N` atomically records its action, delta, and computed context revision `N`, and decision `N + 1` receives that exact context while every sibling bot context is unchanged.
-- A parallel private phase commits all bot entries in one `werewolf/bot-decision` append. Tests cover all-bot and human-plus-bot phases, cancellation before the batch, restart after a human action, restart after the batch, and prove that no sibling private action enters another bot's observation.
+- A parallel private phase produces all bot entries in one `werewolf/bot-decision` event. `appendBatch()` atomically commits the scheduler receipt and domain event after one shadow fold; failure injection proves that an invalid second candidate leaves the log, surface, invariants, and game revision unchanged. Tests also cover all-bot and human-plus-bot phases, cancellation before the batch, restart after a human action, restart after the batch, and prove that no sibling private action enters another bot's observation.
 - Bot context contains no unrestricted reasoning transcript. Invalid context references, unknown fields, over-limit text, illegal commitment transitions, and mismatched recomputed snapshots reject the decision without changing game or context state.
 - Each bot prompt contains only authorized private knowledge, public state, legal actions, and its own context. Tests prove a villager cannot see role assignment, a seer sees only completed investigations, a wolf sees only entitled teammates, and no bot receives another bot's context.
-- Bot children use a provider that enforces structured output, persona, empty tool allowlist, and depth limit. Missing capability fails game start; bots cannot call game, Session, shell, file, Web, command, or subagent tools.
-- The classic `quick-7` composition can complete village win, wolf win, tie, human death with spectating, retry/fallback, pause/resume with a new retry epoch, abort-game, cancellation, process restart, and Session fork scenarios with deterministic rule outcomes.
+- Bot children use a provider that enforces structured output, persona, empty tool allowlist, depth limit, cancellation, and `inheritsParentContext === false`. Model-hub precedence and the actual selected route/model are covered by tests. Missing capability fails game start; bots cannot call game, Session, shell, file, Web, command, or subagent tools.
+- The classic `quick-7` composition can complete village win, wolf win, tie, human death with spectating, retry/fallback, pause/resume with a new retry epoch, abort-game, cancellation, process restart, and product game-fork scenarios with deterministic rule outcomes. Every game and fork has its own dedicated Host Session; raw Session fork is tested only as a diagnostic projection case.
 - Duplicate mutation keys with the same digest return a current projection without a second transition; key reuse with a different digest fails. Duplicate child results, late child results, stale game revisions, stale context revisions, invalid targets, dead actors, exhausted resources, and events after game end also cannot produce a second state transition.
-- Lobby, role reveal, night action, day discussion, vote, spectator, pause/resume, result, review, and new-game flows work entirely inside the dedicated `werewolf` view. The plugin registers no slash command, and Chat text cannot mutate game state.
-- View actions do not create a parent model request. Child model requests and outputs remain reconstructable from their child Session logs, and the parent Session retains every accepted domain decision.
-- Initial load, invalidation refresh, connection reset, process restart, and Session fork produce the same `WerewolfHumanViewV1` for the same committed events. Paged `getReplay()` returns the same authorized historical frames with no backward secret leakage. The UI reveals only the human player's entitled private view and never folds raw secret events in the browser.
+- Lobby, role reveal, night action, day discussion, vote, spectator, pause/resume, result, review, and new-game flows work entirely inside the dedicated `werewolf` view. The plugin registers no slash command, and Chat text cannot mutate game state. RPC tests prove that the runtime derives the participant from the platform principal and rejects caller-selected Host Sessions or seats.
+- View actions do not create a Host model request. Child model requests and outputs remain reconstructable from their child Session logs, and the dedicated Host Session retains every accepted domain decision.
+- Initial load, invalidation refresh, connection reset, process restart, and diagnostic Session fork produce the same `WerewolfHumanViewV1` for the same committed events. Paged `getReplay()` returns the same authorized historical frames with no backward secret leakage. The UI reveals only the bound human participant's entitled private view and never folds raw secret events in the browser.
 - Desktop, intermediate, and 390-pixel snapshots cover deterministic seat layout, sticky phase status, side-panel or bottom-sheet action forms, covered role reveal, and result replay. Keyboard-only play, screen-reader phase announcements, reduced motion, focus restoration, non-color status cues, and WCAG AA contrast pass client tests.
 - The implementation includes focused package tests, invariant rejection cases, a scripted-provider integration, a keyless assembled product snapshot, client refresh, replay and accessibility tests, updated TypeScript and Python SDK expected outputs, bilingual package and subsystem documentation, generated artifacts, and applicable pre-push checks.
 

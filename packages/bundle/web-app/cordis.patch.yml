@@ -68,6 +68,21 @@
     - id: documents-local
       name: '@deepseek-ai/dsh-documents-local'
 
+    # Werewolf game host: deterministic session-backed runtime, classic rule
+    # definitions, typed game gateway, and fixed game-owned Bot Agents. Bot
+    # Sessions stay outside the generic subagent catalog.
+    - id: game
+      name: '@deepseek-ai/dsh-game'
+
+    - id: werewolf
+      name: '@deepseek-ai/dsh-werewolf'
+
+    - id: werewolf-classic
+      name: '@deepseek-ai/dsh-werewolf-classic'
+
+    - id: werewolf-game
+      name: '@deepseek-ai/dsh-werewolf/host'
+
 
     # Browser Session export: `/export` command plus the shared download dialog.
     - id: session-log-download
@@ -348,6 +363,9 @@
 
     - id: ui-writing
       name: '@deepseek-ai/dsh-client-ui-writing'
+
+    - id: ui-werewolf
+      name: '@deepseek-ai/dsh-client-ui-werewolf'
 
     - id: ui-ued
       name: '@deepseek-ai/dsh-client-ui-ued'

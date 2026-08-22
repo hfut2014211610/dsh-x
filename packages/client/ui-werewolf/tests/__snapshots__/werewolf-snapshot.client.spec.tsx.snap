@@ -1,0 +1,1117 @@
+// Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
+
+exports[`WerewolfView responsive snapshots > matches the 390px mobile layout snapshot with the seat carousel 1`] = `
+<section
+  aria-label="游戏桌"
+  aria-live="off"
+  class="_table_0c2d30 _night_0c2d30"
+  data-testid="werewolf-table"
+>
+  <h2
+    class="_phaseHeading_0c2d30"
+    tabindex="-1"
+  >
+    <span
+      class="_signalBrand_0c2d30"
+    >
+      <span>
+        Signal Circle
+      </span>
+      <small>
+        单人练习局
+      </small>
+    </span>
+    <span
+      class="_phaseTitle_0c2d30"
+    >
+      第 2 夜
+      ·
+      阶段：night.witch
+    </span>
+  </h2>
+  <p
+    aria-live="polite"
+    class="_srOnly_0c2d30"
+    role="status"
+  >
+    第 2 夜 · 阶段：night.witch
+  </p>
+  <p
+    class="_hint_0c2d30"
+  >
+    夜间行动是私密的，只显示你自己的视野。
+  </p>
+  <div
+    class="_columns_0c2d30"
+  >
+    <div
+      aria-hidden="true"
+      class="_track_0c2d30"
+      data-testid="werewolf-track"
+    >
+      第 2 天 · 阶段 night.witch
+    </div>
+    <aside
+      aria-label="公开时间线"
+      class="_timeline_0c2d30"
+    >
+      <h3>
+        公开时间线
+      </h3>
+      <ol>
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.announce
+          </span>
+        </li>
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.vote
+          </span>
+        </li>
+      </ol>
+    </aside>
+    <div
+      class="_circle_0c2d30"
+      role="list"
+    >
+      <ul
+        class="_circleList_0c2d30"
+      >
+        <li
+          class="_seat_0c2d30 _self_0c2d30"
+          role="listitem"
+          style="--seat-angle: -90deg;"
+        >
+          <img
+            alt="1 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-01.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-01.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            1 号位
+            ·
+            Seat 1
+             (你)
+          </span>
+          <span>
+            Witch
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: -38.57142857142858deg;"
+        >
+          <img
+            alt="2 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-02.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-02.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            2 号位
+            ·
+            Seat 2
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 12.857142857142847deg;"
+        >
+          <img
+            alt="3 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-03.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-03.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            3 号位
+            ·
+            Seat 3
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 64.28571428571428deg;"
+        >
+          <img
+            alt="4 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-04.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-04.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            4 号位
+            ·
+            Seat 4
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30 _dead_0c2d30"
+          role="listitem"
+          style="--seat-angle: 115.7142857142857deg;"
+        >
+          <img
+            alt="5 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-05.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-05.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            5 号位
+            ·
+            Seat 5
+          </span>
+          <span>
+            出局
+             · 第 1 天出局
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 167.14285714285717deg;"
+        >
+          <img
+            alt="6 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-06.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-06.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            6 号位
+            ·
+            Seat 6
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 218.57142857142856deg;"
+        >
+          <img
+            alt="7 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-07.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-07.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            7 号位
+            ·
+            Seat 7
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+      </ul>
+    </div>
+    <aside
+      aria-label="私密通知"
+      class="_selfPane_0c2d30"
+    >
+      <h3>
+        身份
+      </h3>
+      <p>
+        Witch
+      </p>
+      <h3>
+        发现档案
+      </h3>
+      <p>
+        暂无私密通知。
+      </p>
+    </aside>
+  </div>
+  <form
+    aria-label="选择你的行动"
+    class="_actionForm_0c2d30"
+    data-testid="werewolf-action-form"
+  >
+    <header
+      class="_actionHeader_0c2d30"
+    >
+      <div>
+        <p
+          class="_actionKicker_0c2d30"
+        >
+          私密行动 · 确认后进入下一阶段
+        </p>
+        <h3>
+          选择你的行动
+        </h3>
+      </div>
+    </header>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
+      <legend>
+        antidote
+      </legend>
+      <div
+        aria-label="antidote"
+        class="_choices_0c2d30"
+        role="radiogroup"
+      >
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="use"
+          role="radio"
+          tabindex="0"
+          type="button"
+        >
+          use
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="skip"
+          role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          skip
+        </button>
+      </div>
+    </fieldset>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
+      <legend>
+        poison
+      </legend>
+      <div
+        aria-label="poison"
+        class="_choices_0c2d30"
+        role="radiogroup"
+      >
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p2"
+          role="radio"
+          tabindex="0"
+          type="button"
+        >
+          2 · Seat 2
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p3"
+          role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          3 · Seat 3
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p5"
+          role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          5 · Seat 5
+        </button>
+      </div>
+    </fieldset>
+    <div
+      class="_actions_0c2d30 _actionButtons_0c2d30"
+    >
+      <button
+        class="_primaryAction_0c2d30"
+        disabled=""
+        type="submit"
+      >
+        提交
+      </button>
+    </div>
+  </form>
+</section>
+`;
+
+exports[`WerewolfView responsive snapshots > matches the desktop layout snapshot at 1280px 1`] = `
+<section
+  aria-label="游戏桌"
+  aria-live="off"
+  class="_table_0c2d30 _night_0c2d30"
+  data-testid="werewolf-table"
+>
+  <h2
+    class="_phaseHeading_0c2d30"
+    tabindex="-1"
+  >
+    <span
+      class="_signalBrand_0c2d30"
+    >
+      <span>
+        Signal Circle
+      </span>
+      <small>
+        单人练习局
+      </small>
+    </span>
+    <span
+      class="_phaseTitle_0c2d30"
+    >
+      第 2 夜
+      ·
+      阶段：night.witch
+    </span>
+  </h2>
+  <p
+    aria-live="polite"
+    class="_srOnly_0c2d30"
+    role="status"
+  >
+    第 2 夜 · 阶段：night.witch
+  </p>
+  <p
+    class="_hint_0c2d30"
+  >
+    夜间行动是私密的，只显示你自己的视野。
+  </p>
+  <div
+    class="_columns_0c2d30"
+  >
+    <div
+      aria-hidden="true"
+      class="_track_0c2d30"
+      data-testid="werewolf-track"
+    >
+      第 2 天 · 阶段 night.witch
+    </div>
+    <aside
+      aria-label="公开时间线"
+      class="_timeline_0c2d30"
+    >
+      <h3>
+        公开时间线
+      </h3>
+      <ol>
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.announce
+          </span>
+        </li>
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.vote
+          </span>
+        </li>
+      </ol>
+    </aside>
+    <div
+      class="_circle_0c2d30"
+      role="list"
+    >
+      <ul
+        class="_circleList_0c2d30"
+      >
+        <li
+          class="_seat_0c2d30 _self_0c2d30"
+          role="listitem"
+          style="--seat-angle: -90deg;"
+        >
+          <img
+            alt="1 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-01.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-01.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            1 号位
+            ·
+            Seat 1
+             (你)
+          </span>
+          <span>
+            Witch
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: -38.57142857142858deg;"
+        >
+          <img
+            alt="2 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-02.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-02.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            2 号位
+            ·
+            Seat 2
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 12.857142857142847deg;"
+        >
+          <img
+            alt="3 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-03.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-03.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            3 号位
+            ·
+            Seat 3
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 64.28571428571428deg;"
+        >
+          <img
+            alt="4 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-04.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-04.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            4 号位
+            ·
+            Seat 4
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30 _dead_0c2d30"
+          role="listitem"
+          style="--seat-angle: 115.7142857142857deg;"
+        >
+          <img
+            alt="5 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-05.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-05.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            5 号位
+            ·
+            Seat 5
+          </span>
+          <span>
+            出局
+             · 第 1 天出局
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 167.14285714285717deg;"
+        >
+          <img
+            alt="6 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-06.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-06.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            6 号位
+            ·
+            Seat 6
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 218.57142857142856deg;"
+        >
+          <img
+            alt="7 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-07.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-07.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            7 号位
+            ·
+            Seat 7
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+      </ul>
+    </div>
+    <aside
+      aria-label="私密通知"
+      class="_selfPane_0c2d30"
+    >
+      <h3>
+        身份
+      </h3>
+      <p>
+        Witch
+      </p>
+      <h3>
+        发现档案
+      </h3>
+      <p>
+        暂无私密通知。
+      </p>
+    </aside>
+  </div>
+  <form
+    aria-label="选择你的行动"
+    class="_actionForm_0c2d30"
+    data-testid="werewolf-action-form"
+  >
+    <header
+      class="_actionHeader_0c2d30"
+    >
+      <div>
+        <p
+          class="_actionKicker_0c2d30"
+        >
+          私密行动 · 确认后进入下一阶段
+        </p>
+        <h3>
+          选择你的行动
+        </h3>
+      </div>
+    </header>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
+      <legend>
+        antidote
+      </legend>
+      <div
+        aria-label="antidote"
+        class="_choices_0c2d30"
+        role="radiogroup"
+      >
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="use"
+          role="radio"
+          tabindex="0"
+          type="button"
+        >
+          use
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="skip"
+          role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          skip
+        </button>
+      </div>
+    </fieldset>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
+      <legend>
+        poison
+      </legend>
+      <div
+        aria-label="poison"
+        class="_choices_0c2d30"
+        role="radiogroup"
+      >
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p2"
+          role="radio"
+          tabindex="0"
+          type="button"
+        >
+          2 · Seat 2
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p3"
+          role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          3 · Seat 3
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p5"
+          role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          5 · Seat 5
+        </button>
+      </div>
+    </fieldset>
+    <div
+      class="_actions_0c2d30 _actionButtons_0c2d30"
+    >
+      <button
+        class="_primaryAction_0c2d30"
+        disabled=""
+        type="submit"
+      >
+        提交
+      </button>
+    </div>
+  </form>
+</section>
+`;
+
+exports[`WerewolfView responsive snapshots > matches the tablet layout snapshot at 820px 1`] = `
+<section
+  aria-label="游戏桌"
+  aria-live="off"
+  class="_table_0c2d30 _night_0c2d30"
+  data-testid="werewolf-table"
+>
+  <h2
+    class="_phaseHeading_0c2d30"
+    tabindex="-1"
+  >
+    <span
+      class="_signalBrand_0c2d30"
+    >
+      <span>
+        Signal Circle
+      </span>
+      <small>
+        单人练习局
+      </small>
+    </span>
+    <span
+      class="_phaseTitle_0c2d30"
+    >
+      第 2 夜
+      ·
+      阶段：night.witch
+    </span>
+  </h2>
+  <p
+    aria-live="polite"
+    class="_srOnly_0c2d30"
+    role="status"
+  >
+    第 2 夜 · 阶段：night.witch
+  </p>
+  <p
+    class="_hint_0c2d30"
+  >
+    夜间行动是私密的，只显示你自己的视野。
+  </p>
+  <div
+    class="_columns_0c2d30"
+  >
+    <div
+      aria-hidden="true"
+      class="_track_0c2d30"
+      data-testid="werewolf-track"
+    >
+      第 2 天 · 阶段 night.witch
+    </div>
+    <aside
+      aria-label="公开时间线"
+      class="_timeline_0c2d30"
+    >
+      <h3>
+        公开时间线
+      </h3>
+      <ol>
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.announce
+          </span>
+        </li>
+        <li
+          class="_timelineEvent_0c2d30"
+        >
+          <span
+            class="_timelineMeta_0c2d30"
+          >
+            第 1 天 · day.vote
+          </span>
+        </li>
+      </ol>
+    </aside>
+    <div
+      class="_circle_0c2d30"
+      role="list"
+    >
+      <ul
+        class="_circleList_0c2d30"
+      >
+        <li
+          class="_seat_0c2d30 _self_0c2d30"
+          role="listitem"
+          style="--seat-angle: -90deg;"
+        >
+          <img
+            alt="1 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-01.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-01.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            1 号位
+            ·
+            Seat 1
+             (你)
+          </span>
+          <span>
+            Witch
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: -38.57142857142858deg;"
+        >
+          <img
+            alt="2 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-02.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-02.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            2 号位
+            ·
+            Seat 2
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 12.857142857142847deg;"
+        >
+          <img
+            alt="3 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-03.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-03.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            3 号位
+            ·
+            Seat 3
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 64.28571428571428deg;"
+        >
+          <img
+            alt="4 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-04.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-04.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            4 号位
+            ·
+            Seat 4
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30 _dead_0c2d30"
+          role="listitem"
+          style="--seat-angle: 115.7142857142857deg;"
+        >
+          <img
+            alt="5 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-05.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-05.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            5 号位
+            ·
+            Seat 5
+          </span>
+          <span>
+            出局
+             · 第 1 天出局
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 167.14285714285717deg;"
+        >
+          <img
+            alt="6 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-06.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-06.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            6 号位
+            ·
+            Seat 6
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+        <li
+          class="_seat_0c2d30"
+          role="listitem"
+          style="--seat-angle: 218.57142857142856deg;"
+        >
+          <img
+            alt="7 号位"
+            class="_sigil_0c2d30"
+            data-sigil="sigil-07.png"
+            src="/packages/client/ui-werewolf/src/client/assets/sigils/sigil-07.png"
+          />
+          <span
+            class="_seatName_0c2d30"
+          >
+            7 号位
+            ·
+            Seat 7
+          </span>
+          <span>
+            未知
+          </span>
+        </li>
+      </ul>
+    </div>
+    <aside
+      aria-label="私密通知"
+      class="_selfPane_0c2d30"
+    >
+      <h3>
+        身份
+      </h3>
+      <p>
+        Witch
+      </p>
+      <h3>
+        发现档案
+      </h3>
+      <p>
+        暂无私密通知。
+      </p>
+    </aside>
+  </div>
+  <form
+    aria-label="选择你的行动"
+    class="_actionForm_0c2d30"
+    data-testid="werewolf-action-form"
+  >
+    <header
+      class="_actionHeader_0c2d30"
+    >
+      <div>
+        <p
+          class="_actionKicker_0c2d30"
+        >
+          私密行动 · 确认后进入下一阶段
+        </p>
+        <h3>
+          选择你的行动
+        </h3>
+      </div>
+    </header>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
+      <legend>
+        antidote
+      </legend>
+      <div
+        aria-label="antidote"
+        class="_choices_0c2d30"
+        role="radiogroup"
+      >
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="use"
+          role="radio"
+          tabindex="0"
+          type="button"
+        >
+          use
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="skip"
+          role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          skip
+        </button>
+      </div>
+    </fieldset>
+    <fieldset
+      class="_actionField_0c2d30"
+    >
+      <legend>
+        poison
+      </legend>
+      <div
+        aria-label="poison"
+        class="_choices_0c2d30"
+        role="radiogroup"
+      >
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p2"
+          role="radio"
+          tabindex="0"
+          type="button"
+        >
+          2 · Seat 2
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p3"
+          role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          3 · Seat 3
+        </button>
+        <button
+          aria-checked="false"
+          class=""
+          data-choice-id="p5"
+          role="radio"
+          tabindex="-1"
+          type="button"
+        >
+          5 · Seat 5
+        </button>
+      </div>
+    </fieldset>
+    <div
+      class="_actions_0c2d30 _actionButtons_0c2d30"
+    >
+      <button
+        class="_primaryAction_0c2d30"
+        disabled=""
+        type="submit"
+      >
+        提交
+      </button>
+    </div>
+  </form>
+</section>
+`;

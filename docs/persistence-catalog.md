@@ -90,7 +90,7 @@ export type SessionEvent<T extends SessionEventType = SessionEventType> = {
 }[T]
 ```
 
-Sources: [`packages/core/session/src/types.ts:340`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:347`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:376`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:408`](../packages/core/session/src/types.ts)
+Sources: [`packages/core/session/src/types.ts:340`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:347`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:376`](../packages/core/session/src/types.ts) · [`packages/core/session/src/types.ts:420`](../packages/core/session/src/types.ts)
 
 ## Events
 
@@ -408,6 +408,19 @@ Source: [`packages/compaction/compaction/src/types.ts:33`](../packages/compactio
 ```
 
 Source: [`packages/feedback/command-feedback/src/index.ts:62`](../packages/feedback/command-feedback/src/index.ts)
+
+### `game/*`
+
+<a id="gamecommand-receipt--log-only"></a>
+
+#### `game/command-receipt` — log-only
+
+```ts persistence-catalog
+/** Atomic command receipt and principal-to-participant binding. */
+'game/command-receipt': GameCommandReceiptV1
+```
+
+Source: [`packages/game/game/src/events.ts:8`](../packages/game/game/src/events.ts)
 
 ### `goal/*`
 
@@ -1005,3 +1018,128 @@ Source: [`packages/core/session/src/types.ts:264`](../packages/core/session/src/
 ```
 
 Source: [`packages/web/web-search-deepseek/src/provider.ts:83`](../packages/web/web-search-deepseek/src/provider.ts)
+
+### `werewolf/*`
+
+<a id="werewolfbot-attempt-failed--log-only"></a>
+
+#### `werewolf/bot-attempt-failed` — log-only
+
+```ts persistence-catalog
+/**
+ * One failed bot child attempt: decision id, attempt number, retry epoch,
+ * child session id, and exact failure category. Log-only; changes neither
+ * game revision nor bot context.
+ */
+'werewolf/bot-attempt-failed': WerewolfBotAttemptFailedV1
+```
+
+Source: [`packages/game/werewolf/src/events.ts:45`](../packages/game/werewolf/src/events.ts)
+
+<a id="werewolfbot-decision--log-only"></a>
+
+#### `werewolf/bot-decision` — log-only
+
+```ts persistence-catalog
+/**
+ * Accepted bot decisions for one open phase: one entry per sequential
+ * actor, or one seat-ordered batch per parallel phase. Log-only; each
+ * entry records the prior context revision, action, optional speech,
+ * validated delta, and full computed `contextAfter`.
+ */
+'werewolf/bot-decision': WerewolfBotDecisionV1
+```
+
+Source: [`packages/game/werewolf/src/events.ts:52`](../packages/game/werewolf/src/events.ts)
+
+<a id="werewolfgame-ended--log-only"></a>
+
+#### `werewolf/game-ended` — log-only
+
+```ts persistence-catalog
+/** Terminal result for one game id. Log-only; no later event may follow for that game. */
+'werewolf/game-ended': WerewolfGameEndedV1
+```
+
+Source: [`packages/game/werewolf/src/events.ts:64`](../packages/game/werewolf/src/events.ts)
+
+<a id="werewolfgame-paused--log-only"></a>
+
+#### `werewolf/game-paused` — log-only
+
+```ts persistence-catalog
+/** Log-only pause marker with a typed reason and the resumable phase. */
+'werewolf/game-paused': WerewolfGamePausedV1
+```
+
+Source: [`packages/game/werewolf/src/events.ts:60`](../packages/game/werewolf/src/events.ts)
+
+<a id="werewolfgame-resumed--log-only"></a>
+
+#### `werewolf/game-resumed` — log-only
+
+```ts persistence-catalog
+/** Log-only resume marker; increments the retry epoch. */
+'werewolf/game-resumed': WerewolfGameResumedV1
+```
+
+Source: [`packages/game/werewolf/src/events.ts:62`](../packages/game/werewolf/src/events.ts)
+
+<a id="werewolfgame-started--log-only"></a>
+
+#### `werewolf/game-started` — log-only
+
+```ts persistence-catalog
+/**
+ * Complete start-of-game facts: shuffled roster, secret role assignment,
+ * initial role state and resources, human player id, immutable bot
+ * profiles, seed, normalized rule set, digest, and definition versions.
+ * Log-only; one Session may start a new game after an earlier one ended.
+ */
+'werewolf/game-started': WerewolfGameStartedV1
+```
+
+Source: [`packages/game/werewolf/src/events.ts:29`](../packages/game/werewolf/src/events.ts)
+
+<a id="werewolfhuman-action--log-only"></a>
+
+#### `werewolf/human-action` — log-only
+
+```ts persistence-catalog
+/**
+ * One committed human action inside an open phase. Log-only; committed
+ * before sibling bot requests start so commit order cannot disclose it.
+ */
+'werewolf/human-action': WerewolfHumanActionV1
+```
+
+Source: [`packages/game/werewolf/src/events.ts:39`](../packages/game/werewolf/src/events.ts)
+
+<a id="werewolfphase-opened--log-only"></a>
+
+#### `werewolf/phase-opened` — log-only
+
+```ts persistence-catalog
+/**
+ * One phase occurrence opened (awaiting actions) or skipped. Log-only;
+ * carries the immutable action plan or the skip reason.
+ */
+'werewolf/phase-opened': WerewolfPhaseOpenedV1
+```
+
+Source: [`packages/game/werewolf/src/events.ts:34`](../packages/game/werewolf/src/events.ts)
+
+<a id="werewolfphase-resolved--log-only"></a>
+
+#### `werewolf/phase-resolved` — log-only
+
+```ts persistence-catalog
+/**
+ * One resolved phase occurrence: accepted decision and human-action ids
+ * plus the complete declarative resolution. Log-only; replay applies only
+ * the recorded effects and never re-runs role or phase code.
+ */
+'werewolf/phase-resolved': WerewolfPhaseResolvedV1
+```
+
+Source: [`packages/game/werewolf/src/events.ts:58`](../packages/game/werewolf/src/events.ts)
