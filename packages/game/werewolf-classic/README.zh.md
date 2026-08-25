@@ -2,7 +2,7 @@
 
 [English](README.md) | 中文
 
-经典狼人杀定义：平民、狼人、预言家、女巫角色，标准夜晚与白天阶段，阵营胜利条件，以及 `quick-7` 规则集。全部注册到 [`ctx.werewolf`](../../game/werewolf/README.md)；本包不含引擎代码，也没有模型可见面。
+经典狼人杀定义：平民、狼人、预言家、女巫角色，标准夜晚与白天阶段，阵营胜利条件，以及 `quick-7` 规则集。全部注册到 [`ctx.werewolf`](../../game/werewolf/README.zh.md)；本包不含引擎代码，也没有模型可见面。
 
 ## 它做什么
 
@@ -17,6 +17,6 @@
 
 ## 已知限制与遗留工作
 
-- **无警长、猎人或守卫角色** —— 扩展约定可以接入它们；本包只交付 quick-7 阵容（[特性笔记范围](../../../.agents/notes/proposed/feature/2026-08-20-configurable-werewolf-mode.md)）。
+- **无警长、猎人或守卫角色** —— 扩展约定可以接入它们；本包只交付 quick-7 阵容（[特性笔记范围](../../../.agents/notes/proposed/feature/2026-08-20-configurable-werewolf-mode.zh.md)）。
 - **展示文案为英文键** —— 角色 `publicName` 与公告键是稳定字符串；本地化随视图阶段交付。
 - **死亡不翻牌** —— 死亡公告不揭示受害者身份；翻牌变体将是扩展 announce 阶段之上的新规则集配置，而非引擎改动。

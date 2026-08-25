@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-21-werewolf-deterministic-core.md
 2026-08-21-werewolf-deterministic-core.md: 7e3b7f4aefc22d3ac9110bc7323b328248d3512d
-2026-08-21-werewolf-deterministic-core.zh.md: 4bfaeb03f6e33f3dda8f6671bcf6617c4724569f
+2026-08-21-werewolf-deterministic-core.zh.md: 56eaf41d7c979cba7f3d5d0782b92daf0e685ba2

@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write docs/subsystems/werewolf.md
-werewolf.md: 90d0949d015faad7555bf932227b8c94a029a85c
-werewolf.zh.md: 37b2a049db239e45a44ac6bb7857910049915736
+werewolf.md: 353f0cfb5adb3a25b30f46258e3ed02a524a0253
+werewolf.zh.md: b6f56ee06e127bb96c6e8e7c5d1a2513627b7226

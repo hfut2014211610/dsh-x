@@ -10,7 +10,7 @@ Status: implemented
 
 ## Decision
 
-[`@deepseek-ai/dsh-documents-local`](../../../../packages/writing/documents-local/README.md) 每次操作都从 `request.sessionId` 指向的权威实时会话解析 workspace 根目录。provider 读取 `ctx.sessions.get(sessionId)?.header.cwd`，以该目录解析文档相对路径，并在访问文件系统前以同一目录执行包含检查。provider 不再提供根目录配置；Host 进程 cwd 和浏览器请求都不能选择文档 workspace。
+[`@deepseek-ai/dsh-documents-local`](../../../../packages/writing/documents-local/README.zh.md) 每次操作都从 `request.sessionId` 指向的权威实时会话解析 workspace 根目录。provider 读取 `ctx.sessions.get(sessionId)?.header.cwd`，以该目录解析文档相对路径，并在访问文件系统前以同一目录执行包含检查。provider 不再提供根目录配置；Host 进程 cwd 和浏览器请求都不能选择文档 workspace。
 
 未知会话或没有 `header.cwd` 的会话以 `DOCUMENT_IO_ERROR` 失败。目录列举、读取、大纲、搜索、新建和编辑都使用这一次会话查询，因此各操作的根目录不会分离。
 

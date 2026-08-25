@@ -20,7 +20,7 @@ fresh one-shot 子代理适合隔离单次决策，并能返回结构化结果�
 
 规则是可信注册表之上的数据配置。规则集引用已注册的角色类型、阶段类型和胜利条件类型，并提供经过校验的选项。把一个已注册角色加入牌组只需修改配置。引入带新机制的角色需要插件注册该角色以及必要的新阶段实现；注册完成后，规则集无需修改核心引擎即可使用。配置中不得出现 JavaScript、选择器、回调或表达式语言。
 
-该功能扩展现有的 Session 事件、子代理、Typert remote 和客户端 slot 机制，不修改 `agent-loop`。Session 事件是持久事实，Web Client 独占游戏交互界面，fresh `spawn` 子代理提供 persona、工具过滤、深度限制和结构化输出；参见[架构图](../../../../docs/architecture.md)、[子代理约定](../../../../docs/subsystems/subagent.md)和 [Web Client 架构](../../../../packages/client/README.md)。
+该功能扩展现有的 Session 事件、子代理、Typert remote 和客户端 slot 机制，不修改 `agent-loop`。Session 事件是持久事实，Web Client 独占游戏交互界面，fresh `spawn` 子代理提供 persona、工具过滤、深度限制和结构化输出；参见[架构图](../../../../docs/architecture.zh.md)、[子代理约定](../../../../docs/subsystems/subagent.zh.md)和 [Web Client 架构](../../../../packages/client/README.zh.md)。
 
 ## 范围与非目标
 
@@ -63,7 +63,9 @@ flowchart LR
 
 Cordis 插件配置携带一个或多个 JSON 兼容的 `WerewolfRuleSetInputV1` 记录。输入层不解析默认值。只有 `resolveRuleSet()` 可以应用显式默认值、解析注册表引用、校验跨字段不变量，并返回不可变的 `CompiledWerewolfRuleSetV1`。
 
-```ts ignore-check
+```ts
+import type { JsonValue } from '@deepseek-ai/dsh-session/types'
+
 interface WerewolfRuleSetInputV1 {
   schemaVersion: 1
   id: string
@@ -303,7 +305,13 @@ interface WerewolfSessionEventMap {
 
 上下文只保存行为一致性所需的精简状态。它明确排除隐藏思维链、不受限制的推理记录、完整对话副本和任意键值记忆。
 
-```ts ignore-check
+```ts
+import type {
+  WerewolfDecisionId as DecisionId,
+  WerewolfGameId as GameId,
+  WerewolfPlayerId as PlayerId,
+} from '@deepseek-ai/dsh-werewolf'
+
 interface BotContinuityContextV1 {
   version: 1
   gameId: GameId
@@ -641,7 +649,9 @@ UI 使用克制的夜间桌游风格，而不是普通聊天卡片：深色中�
 
 部署时可能变化的限制必须保留为 Cordis 插件配置，不能成为实现中的隐藏常量。
 
-```ts ignore-check
+```ts
+import type { WerewolfRuleSetInputV1 } from '@deepseek-ai/dsh-werewolf'
+
 interface Config {
   subagentProvider: string
   botAgent?: {
@@ -700,7 +710,7 @@ Bot 连续性上下文属于私有策略数据，UI 不得渲染。它可以包�
 
 ## 交付阶段
 
-阶段 1–4 已落地（[确定性核心](../../implemented/feature/2026-08-21-werewolf-deterministic-core.md)、[Bot 运行器](../../implemented/feature/2026-08-21-werewolf-bot-runner.md)、[Session Host](../../implemented/feature/2026-08-21-werewolf-session-host.md)、[游戏界面](../../implemented/feature/2026-08-21-werewolf-conversation-view.md)）；阶段 5 仍为 proposed。
+阶段 1–4 已落地（[确定性核心](../../implemented/feature/2026-08-21-werewolf-deterministic-core.zh.md)、[Bot 运行器](../../implemented/feature/2026-08-21-werewolf-bot-runner.zh.md)、[Session Host](../../implemented/feature/2026-08-21-werewolf-session-host.zh.md)、[游戏界面](../../implemented/feature/2026-08-21-werewolf-conversation-view.zh.md)）；阶段 5 仍为 proposed。
 
 1. 增加 `game/` 包组、狼人杀核心类型、注册表、规则编译器、经典定义、reducer、不变量和纯测试。验证确定性规则和配置扩展不需要模型或 UI 路径。
 2. 增加 Bot 连续性状态、观察投影、one-shot Bot runner、脚本化 provider 集成、重试/兜底、取消和回放测试。证明上下文修订 `N` 会传入决策 `N + 1`，且其他 Bot 的上下文不变。

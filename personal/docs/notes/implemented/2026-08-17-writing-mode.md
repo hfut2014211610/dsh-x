@@ -40,7 +40,9 @@ Status: implemented
 
 **版本语义：** 版本字符串是 `ctx.fs` 返回的不透明 `FsVersion`；客户端不得解读。documents 层只把它用于过期守卫和事件传播。当前本地后端从高分辨率文件元数据（`dev:ino:size:mtimeNs:ctimeNs`）派生该 token，并用文件级锁串行化修改；如果后续需要内容哈希语义，`documents-local` 必须在委托 `ctx.fs` 之前增加内容派生版本，或扩展 fs provider。`ctx.fs` 的锁粒度是**文件级**：`apply` 在单个目标文件上持锁，读-校验-写为一个原子区间。两个写入者都持有合法的同一 `baseVersion` 时，先进入锁的胜出，后者在锁内校验发现 `baseVersion` 已不等于当前版本，返回 `DOCUMENT_STALE_VERSION`。
 
-```ts ignore-check
+```ts
+import type { SessionId } from '@deepseek-ai/dsh-session'
+
 type DocumentFormat = 'text' | 'markdown' | 'code' | 'docx' | 'xlsx'
 
 type DocumentLocator =
@@ -120,7 +122,13 @@ type DocumentPatch =
 
 **`preferredView` 扩展点接口：** 该扩展点在 `ui-conversation` 的会话视图注册表上新增一个公开方法：
 
-```ts ignore-check
+```ts
+import type { SessionId } from '@deepseek-ai/dsh-session'
+
+interface ConversationViewEntry {
+  id: string
+}
+
 interface ConversationViewRegistry {
   /** Existing: register a conversation.view entry */
   register(entry: ConversationViewEntry): void

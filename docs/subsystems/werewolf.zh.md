@@ -14,7 +14,7 @@
 
 ## 持久游戏事件
 
-父会话日志是权威游戏记录；每个狼人杀事件都是 log-only，绝不进入模型面或派生历史。九个事件类型覆盖完整生命周期——`game-started`、`phase-opened`、`human-action`、`bot-attempt-failed`（不改变修订）、`bot-decision`、`phase-resolved`、`game-paused`、`game-resumed` 与终止性的 `game-ended`。每个载荷以 `{ version, gameId, gameRevision }` 开头；会改变状态的修订连续且逐次加一。`werewolf/phase-resolved` 携带完整声明式结算（淘汰、保护、资源与角色状态替换、私密通知、公告、投票），因此 reducer 回放时只应用已记录效果，绝不重新运行角色或阶段插件。完整载荷声明位于 [`events.ts`](../../packages/game/werewolf/src/events.ts) 与[持久化事件目录](../persistence-catalog.md)。
+父会话日志是权威游戏记录；每个狼人杀事件都是 log-only，绝不进入模型面或派生历史。九个事件类型覆盖完整生命周期——`game-started`、`phase-opened`、`human-action`、`bot-attempt-failed`（不改变修订）、`bot-decision`、`phase-resolved`、`game-paused`、`game-resumed` 与终止性的 `game-ended`。每个载荷以 `{ version, gameId, gameRevision }` 开头；会改变状态的修订连续且逐次加一。`werewolf/phase-resolved` 携带完整声明式结算（淘汰、保护、资源与角色状态替换、私密通知、公告、投票），因此 reducer 回放时只应用已记录效果，绝不重新运行角色或阶段插件。完整载荷声明位于 [`events.ts`](../../packages/game/werewolf/src/events.ts) 与[持久化事件目录](../persistence-catalog.zh.md)。
 
 ## 引擎与生命周期
 
@@ -46,7 +46,7 @@
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxgames--gameservice-abstract-seam"></a>
 
@@ -120,9 +120,9 @@ abstract abortGame<TView>(request: { gameId: GameId principalId: PrincipalId req
 abstract getHostSession(gameId: GameId): Session | undefined
 ```
 
-Types: [Session](session.md)
+Types: [Session](session.zh.md)
 
-Source: [`packages/game/game/src/service.ts:25`](../../packages/game/game/src/service.ts)
+Source: [`packages/game/game/src/service.ts`](../../packages/game/game/src/service.ts)
 
 <a id="ctxwerewolf--werewolfruntime"></a>
 
@@ -187,7 +187,7 @@ resolveRuleSet(input: JsonValue): WerewolfCompiledRuleSetV1
 listRuleSets(): ReadonlyMap<string, WerewolfRuleSetInputV1>
 ```
 
-Source: [`packages/game/werewolf/src/runtime.ts:63`](../../packages/game/werewolf/src/runtime.ts)
+Source: [`packages/game/werewolf/src/runtime.ts`](../../packages/game/werewolf/src/runtime.ts)
 
 <a id="ctxwerewolfgame--werewolfgamegateway"></a>
 
@@ -245,7 +245,7 @@ Registers the Werewolf module and exposes the UI-facing typed methods.
 @Remote('abortGame') async abortGame(request: WerewolfHostMutationRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>
 ```
 
-Source: [`packages/game/werewolf/src/host.ts:25`](../../packages/game/werewolf/src/host.ts)
+Source: [`packages/game/werewolf/src/host.ts`](../../packages/game/werewolf/src/host.ts)
 
 <a id="game-events"></a>
 
@@ -268,5 +268,5 @@ Announce that authorized readers must re-read one game projection. The event del
 'game/projection-invalidated'(gameId: GameId, gameRevision: number): void
 ```
 
-Source: [`packages/game/game/src/types.ts:15`](../../packages/game/game/src/types.ts)
+Source: [`packages/game/game/src/types.ts`](../../packages/game/game/src/types.ts)
 <!-- END GENERATED cordis-surface -->

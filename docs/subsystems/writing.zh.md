@@ -72,7 +72,7 @@ type DocumentChange = {
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.zh.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxdocuments--documents-abstract-seam"></a>
 
@@ -124,9 +124,9 @@ Document service (`ctx.documents`) shared by host providers and consumers.
 @Remote('apply') apply(request: { sessionId: SessionId path: string baseVersion: string edit: DocumentEdit }): Promise<{ version: string }>
 ```
 
-Types: [SessionId](core.md)
+Types: [SessionId](core.zh.md)
 
-Source: [`packages/writing/documents/src/index.ts:29`](../../packages/writing/documents/src/index.ts)
+Source: [`packages/writing/documents/src/index.ts`](../../packages/writing/documents/src/index.ts)
 
 <a id="documents-events"></a>
 
@@ -147,7 +147,7 @@ A document mutation committed through the documents service.
 'documents/changed'(change: DocumentChange): void
 ```
 
-Source: [`packages/writing/documents/src/types.ts:107`](../../packages/writing/documents/src/types.ts)
+Source: [`packages/writing/documents/src/types.ts`](../../packages/writing/documents/src/types.ts)
 <!-- END GENERATED cordis-surface -->
 
 ## 模型面

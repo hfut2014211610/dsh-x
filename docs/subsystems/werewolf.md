@@ -46,7 +46,7 @@ Every seat owns one durable subjective `WerewolfBotContextV1` inside the game's 
 
 ## Cordis API
 
-Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — this section is byte-identical in both language sides of the page. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
+Generated from source by `scripts/gen-cordis-catalog.ts` (verified fresh by `pnpm run verify-cordis-catalog` in doc-sync; regenerate with `pnpm run gen-cordis-catalog`) — the language sides differ only in locale-specific paired document paths. Signature blocks use a `ts cordis-catalog` fence and keep the original source JSDoc; dispatch modes are defined in the [primer](../cordis-primer.md#dispatch-modes), and the framework-inherited `ctx` API lives in [cordis-api/inherited.md](../cordis-api/inherited.md).
 
 <a id="ctxgames--gameservice-abstract-seam"></a>
 
@@ -122,7 +122,7 @@ abstract getHostSession(gameId: GameId): Session | undefined
 
 Types: [Session](session.md)
 
-Source: [`packages/game/game/src/service.ts:25`](../../packages/game/game/src/service.ts)
+Source: [`packages/game/game/src/service.ts`](../../packages/game/game/src/service.ts)
 
 <a id="ctxwerewolf--werewolfruntime"></a>
 
@@ -187,7 +187,7 @@ resolveRuleSet(input: JsonValue): WerewolfCompiledRuleSetV1
 listRuleSets(): ReadonlyMap<string, WerewolfRuleSetInputV1>
 ```
 
-Source: [`packages/game/werewolf/src/runtime.ts:63`](../../packages/game/werewolf/src/runtime.ts)
+Source: [`packages/game/werewolf/src/runtime.ts`](../../packages/game/werewolf/src/runtime.ts)
 
 <a id="ctxwerewolfgame--werewolfgamegateway"></a>
 
@@ -245,7 +245,7 @@ Registers the Werewolf module and exposes the UI-facing typed methods.
 @Remote('abortGame') async abortGame(request: WerewolfHostMutationRequestV1): Promise<GameProjection<WerewolfHumanViewV1>>
 ```
 
-Source: [`packages/game/werewolf/src/host.ts:25`](../../packages/game/werewolf/src/host.ts)
+Source: [`packages/game/werewolf/src/host.ts`](../../packages/game/werewolf/src/host.ts)
 
 <a id="game-events"></a>
 
@@ -268,5 +268,5 @@ Announce that authorized readers must re-read one game projection. The event del
 'game/projection-invalidated'(gameId: GameId, gameRevision: number): void
 ```
 
-Source: [`packages/game/game/src/types.ts:15`](../../packages/game/game/src/types.ts)
+Source: [`packages/game/game/src/types.ts`](../../packages/game/game/src/types.ts)
 <!-- END GENERATED cordis-surface -->

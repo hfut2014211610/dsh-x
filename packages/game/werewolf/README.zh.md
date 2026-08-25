@@ -8,7 +8,7 @@
 
 - **注册表** —— `ctx.werewolf` 持有规则集、角色、阶段、胜利条件四个注册表，以准确 `{ id, version }`（规则集为 `{ id, revision }`）为键。注册是调用方 fiber 上的 effect；返回的 disposer（或 fiber 处置）只移除该注册。同一版本下的重复标识符在注册时失败。
 - **规则编译** —— `resolveWerewolfRuleSet(input, registry)` 是从 JSON 规则集输入到不可变 `WerewolfCompiledRuleSetV1` 的唯一路径：严格解析（未知键、不安全整数、空牌组、封闭联合都会大声失败）、按准确版本解析注册表、定义自有的选项解析、跨字段不变量，以及规范 JSON 的 SHA-256 摘要。`parseWerewolfRuleSetInput` 在任何游戏事件产生之前就拒绝非法记录。
-- **事件** —— 九个 log-only 会话事件（`werewolf/game-started` … `werewolf/game-ended`）构成权威游戏记录；见 [docs/subsystems/werewolf.md](../../../docs/subsystems/werewolf.md) 与[持久化目录](../../../docs/persistence-catalog.md)。会改变状态的修订连续；`werewolf/bot-attempt-failed` 不改变修订。
+- **事件** —— 九个 log-only 会话事件（`werewolf/game-started` … `werewolf/game-ended`）构成权威游戏记录；见 [docs/subsystems/werewolf.md](../../../docs/subsystems/werewolf.zh.md) 与[持久化目录](../../../docs/persistence-catalog.zh.md)。会改变状态的修订连续；`werewolf/bot-attempt-failed` 不改变修订。
 - **Reducer 与引擎** —— `reduceWerewolfGame`/`applyWerewolfEvent` 把事件折叠为 `WerewolfGameStateV1`；纯引擎步骤（`startWerewolfGame`、`openNextWerewolfPhase`、`submitWerewolfHumanAction`、`commitWerewolfBotDecisions`、`resolveOpenWerewolfPhase`、`driveWerewolfGame`、`abortWerewolfGame`）计算下一批事件并用同一 reducer 折叠，因此实况对局与回放共用一条路径。动作按封闭规格词汇（`player-target`、`choice`、`text`、`compound`）校验。
 - **Bot 连续性上下文** —— 每个 Bot 座位在配置限制下拥有一份主观 `WerewolfBotContextV1`；`validateWerewolfBotContextDelta` 与 `applyWerewolfBotContextDelta` 让每个被接受的决策成为独立检查点（`contextAfter`），增量则解释允许发生的变化。档案来自确定性的 `BOT_PROFILE_CATALOG` 分配。
 - **观察投影** —— `projectWerewolfBotObservation` 在构造单次决策的授权视图前，拒绝过期的游戏、阶段、规则摘要、动作计划或 Bot 上下文。私有知识来自行动者角色投影器（仅当编译角色有权时才包含队友）；公开状态包含玩家 id、名册事实与有限近期时间线；合法动作与连续性上下文取自当前折叠状态，而非调用方携带的副本。任何路径都不会读取或序列化其他角色的私有状态。

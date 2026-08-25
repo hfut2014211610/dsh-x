@@ -47,6 +47,12 @@ interface UsageStatsState {
   contextWindow: number | null
 }
 
+declare module '@deepseek-ai/dsh-session-projection/types' {
+  interface SessionProjectionStateMap {
+    usageStats: UsageStatsState
+  }
+}
+
 const tokenUsageSchema = z.object({
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
@@ -58,18 +64,33 @@ const tokenUsageSchema = z.object({
 // Cast for the optional usage buckets: under exactOptionalPropertyTypes zod
 // infers `number | undefined` where TokenUsage declares absent-or-number
 // fields (the same cast token-meter's pressure schema carries).
+const usageRequestSchema = z.object({
+  turn: z.number().int().nonnegative(),
+  step: z.number().int().positive(),
+  time: z.number(),
+  provider: z.string().nullable(),
+  model: z.string().nullable(),
+  usage: tokenUsageSchema.nullable(),
+  llmMs: z.number().nonnegative().nullable(),
+}).strict()
+
 const usageStatsSchema = z.object({
-  requests: z.array(z.object({
-    turn: z.number().int().nonnegative(),
-    step: z.number().int().positive(),
-    time: z.number(),
-    provider: z.string().nullable(),
-    model: z.string().nullable(),
-    usage: tokenUsageSchema.nullable(),
-    llmMs: z.number().nonnegative().nullable(),
-  }).strict()),
+  requests: z.array(usageRequestSchema),
   contextWindow: z.number().int().positive().nullable(),
 }).strict() as unknown as z.ZodType<UsageStatsProjection>
+
+/** Persisted fold state, including request-routing and open-step boundaries omitted from the wire view. */
+const usageStatsStateSchema = z.object({
+  requests: z.array(usageRequestSchema),
+  openStep: z.object({
+    turn: z.number().int().nonnegative(),
+    step: z.number().int().positive(),
+    startTime: z.number(),
+  }).strict().nullable(),
+  provider: z.string().nullable(),
+  model: z.string().nullable(),
+  contextWindow: z.number().int().positive().nullable(),
+}).strict() as unknown as z.ZodType<UsageStatsState>
 
 /**
  * Create or settle the last record for one step's usage report.
@@ -113,10 +134,11 @@ function upsertRecord(
 }
 
 /** The `usageStats` unit registered on `ctx.sessionProjections` (exported for the unit spec). */
-export const usageStatsProjectionDefinition: ProjectionDefinition<'usageStats', UsageStatsState> = {
+export const usageStatsProjectionDefinition = {
   key: 'usageStats',
-  schema: usageStatsSchema,
-  init: () => ({ requests: [], openStep: null, provider: null, model: null, contextWindow: null }),
+  stateVersion: 1,
+  stateSchema: usageStatsStateSchema,
+  init: (): UsageStatsState => ({ requests: [], openStep: null, provider: null, model: null, contextWindow: null }),
   apply: (state, event) => {
     // Every uninteresting event returns the same reference (Object.is gates the change feed).
     switch (event.type) {
@@ -158,9 +180,11 @@ export const usageStatsProjectionDefinition: ProjectionDefinition<'usageStats', 
         return state
     }
   },
-  view: state => ({
-    requests: state.requests.map((record): UsageRequestRecord => ({ ...record })),
-    contextWindow: state.contextWindow,
-  }),
-  stateVersion: 1,
-}
+  wire: {
+    viewSchema: usageStatsSchema,
+    view: state => ({
+      requests: state.requests.map((record): UsageRequestRecord => ({ ...record })),
+      contextWindow: state.contextWindow,
+    }),
+  },
+} satisfies ProjectionDefinition<'usageStats', UsageStatsState>

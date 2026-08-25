@@ -18,7 +18,7 @@ export const API_REMOTE_FORWARDED_EVENTS = [
   'agent-preset/selected',
   'game/projection-invalidated',
   'commands/change',
-  'credentials/updated',
+  'credentials/reference-updated',
   'documents/changed',
   'cordis/request-run',
   'cordis/request-run-resolved',

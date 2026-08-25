@@ -14,7 +14,7 @@ That last point is the visible difference. The Plugins section renders nothing f
 
 A second channel ships as its own package and needs no edit to this one:
 
-```ts
+```js
 ctx.slots.inject('settings.connector.item', () => ctx.slots.register({
   name: 'settings.connector.item',
   id: 'dingtalk',

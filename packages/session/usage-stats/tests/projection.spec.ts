@@ -104,7 +104,7 @@ function fold(events: readonly SessionEvent[]): UsageStatsProjection {
     (folded, event) => usageStatsProjectionDefinition.apply(folded, event),
     usageStatsProjectionDefinition.init(),
   )
-  return usageStatsProjectionDefinition.view(state)
+  return usageStatsProjectionDefinition.wire.view(state)
 }
 
 describe('usageStats fold (controlled timestamps)', () => {
@@ -159,7 +159,7 @@ describe('usageStats fold (controlled timestamps)', () => {
     const first = usageStatsProjectionDefinition.apply(init, at(1, 'request/context', { provider: 'p', model: 'm' }))
     // Same route and window fold to the same reference (Object.is gates the change feed).
     expect(usageStatsProjectionDefinition.apply(first, at(2, 'request/context', { provider: 'p', model: 'm' }))).toBe(first)
-    expect(usageStatsProjectionDefinition.view(first).contextWindow).toBeNull()
+    expect(usageStatsProjectionDefinition.wire.view(first).contextWindow).toBeNull()
   })
 
   it('clears the window when a later request/context omits it', () => {
@@ -169,7 +169,7 @@ describe('usageStats fold (controlled timestamps)', () => {
       at(1, 'request/context', { provider: 'p', model: 'm', contextWindow: 1_000 }),
     )
     const cleared = usageStatsProjectionDefinition.apply(withWindow, at(2, 'request/context', { provider: 'p', model: 'm' }))
-    expect(usageStatsProjectionDefinition.view(cleared).contextWindow).toBeNull()
+    expect(usageStatsProjectionDefinition.wire.view(cleared).contextWindow).toBeNull()
   })
 
   it('ignores non-usage chunks and clamps negative clock skew to zero', () => {

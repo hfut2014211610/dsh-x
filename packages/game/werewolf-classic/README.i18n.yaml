@@ -3,4 +3,4 @@
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/game/werewolf-classic/README.md
 README.md: 5933f321acc363987d059c1728ab849e4c642c59
-README.zh.md: 519618f97f4997021aeaab9b50d9d9b32cb2f606
+README.zh.md: 906865ec04527d544d075fff59aed873f989859e

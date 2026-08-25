@@ -14,7 +14,7 @@
 
 第二个渠道自己一个包，不用改这个包：
 
-```ts
+```js
 ctx.slots.inject('settings.connector.item', () => ctx.slots.register({
   name: 'settings.connector.item',
   id: 'dingtalk',

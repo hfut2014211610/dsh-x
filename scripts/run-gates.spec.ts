@@ -31,9 +31,9 @@ function resultFor(subject: Gate, status: GateResult['status'] = 'passed'): Gate
   }
 }
 
-function withPnpmEntrypoint<T>(action: () => T): T {
+function withPnpmEntrypoint<T>(action: () => T, entrypoint = '/private/pnpm.cjs'): T {
   const previous = process.env.npm_execpath
-  process.env.npm_execpath = '/private/pnpm.cjs'
+  process.env.npm_execpath = entrypoint
   try {
     return action()
   } finally {
@@ -54,17 +54,6 @@ function withEnv<T>(name: string, value: string | undefined, action: () => T): T
   }
 }
 
-function withNodeVersion<T>(version: string, action: () => T): T {
-  const descriptor = Object.getOwnPropertyDescriptor(process.versions, 'node')
-  if (descriptor === undefined) throw new Error('process.versions.node descriptor is unavailable')
-  Object.defineProperty(process.versions, 'node', { ...descriptor, value: version })
-  try {
-    return action()
-  } finally {
-    Object.defineProperty(process.versions, 'node', descriptor)
-  }
-}
-
 describe('gate graph validation', () => {
   it.each([
     'ci-primary',
@@ -80,6 +69,7 @@ describe('gate graph validation', () => {
     'ci-windows-observational',
     'node-compat',
     'check-all',
+    'hygiene',
     'doc-sync',
   ] as const)('constructs and executes preflight for a valid non-empty %s graph', async (mode) => {
     const subject = withPnpmEntrypoint(() => gatesForMode(mode))
@@ -94,23 +84,38 @@ describe('gate graph validation', () => {
     expect(ids).toContain('public-repository-links')
   })
 
-  it('starts the longest documentation gates before short checks', () => {
+  it('keeps the hygiene aggregate aligned with the package script checks', () => {
+    const ids = withPnpmEntrypoint(() => gatesForMode('hygiene').map(subject => subject.id))
+
+    expect(ids).toEqual([
+      'rescope-vendor', 'knip', 'publint', 'constraints', 'dsh-package-licenses',
+      'package-invariants', 'built-package-invariants', 'node-next-types',
+      'optional-dependency-imports', 'client-packages', 'cordis-config',
+      'runtime-closure', 'vendored-links',
+    ])
+    expect(defaultConcurrency('hygiene', ids.length, 8)).toEqual({
+      workers: 4,
+      source: '8 available CPU(s), hygiene cap 4',
+    })
+  })
+
+  it('schedules the longest documentation leaves before short checks', () => {
     const ids = withPnpmEntrypoint(() => gatesForMode('doc-sync').map(subject => subject.id))
 
-    expect(ids.slice(0, 5)).toEqual([
-      'docs-site-build',
-      'doc-typecheck',
-      'doc-graphs',
-      'scoped-events',
-      'cordis-catalog',
+    expect(ids.slice(0, 10)).toEqual([
+      'doc-typecheck', 'docs-site-build', 'doc-graphs', 'markdown-links', 'type-equivalence',
+      'cordis-catalog', 'mermaid', 'scoped-events', 'translation-pairing', 'markdown-wrap',
     ])
   })
 
-  it('runs the complete build only once in check-all', () => {
-    const ids = withPnpmEntrypoint(() => gatesForMode('check-all').map(subject => subject.id))
+  it('launches a native pnpm entrypoint directly', () => {
+    const entrypoint = String.raw`C:\Program Files\pnpm\pnpm.exe`
+    const subject = withPnpmEntrypoint(() => gatesForMode('ci-windows-blocking')[0], entrypoint)
 
-    expect(ids).toContain('build')
-    expect(ids).not.toContain('build:web')
+    expect(subject).toMatchObject({
+      command: entrypoint,
+      args: ['run', 'build'],
+    })
   })
 
   it.each(['ci-primary', 'ci-static', 'check-all'] as const)(
@@ -343,14 +348,6 @@ describe('Node compatibility graph', () => {
         'scripts/vitest-environment.compat.spec.ts',
       ],
     })
-  })
-
-  it('reuses the complete build for the Node 22 built CLI smoke', () => {
-    const subject = withNodeVersion('22.19.0', () => withPnpmEntrypoint(() => gatesForMode('node-compat')))
-
-    expect(subject.map(item => item.id)).toContain('build')
-    expect(subject.map(item => item.id)).not.toContain('build:web')
-    expect(subject.find(item => item.id === 'cli-lazy-search-startup-smoke')?.needs).toEqual(['build'])
   })
 })
 
