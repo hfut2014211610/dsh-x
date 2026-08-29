@@ -127,6 +127,51 @@
   margin-inline: auto;
 }
 
+.launcherButton {
+  display: inline-flex;
+  align-items: center;
+  justify-content: center;
+  gap: 10px;
+  width: 36px;
+  min-height: 36px;
+  padding: 0;
+  border: 1px solid transparent;
+  border-radius: 9px;
+  color: var(--dsw-alias-label-secondary);
+  background: transparent;
+  font: inherit;
+  font-size: 0.8125rem;
+  cursor: pointer;
+}
+
+.launcherWide {
+  justify-content: flex-start;
+  width: 100%;
+  padding: 0 10px;
+}
+
+.launcherButton:hover {
+  color: var(--dsw-alias-label-primary);
+  border-color: var(--dsw-alias-border-l2);
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.launcherButton:focus-visible {
+  outline: 2px solid var(--dsw-alias-state-business-primary);
+  outline-offset: 2px;
+}
+
+.launcherMark {
+  display: grid;
+  place-items: center;
+  width: 20px;
+  height: 20px;
+  flex: none;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 56%, var(--dsw-alias-border-l2));
+  border-radius: 50%;
+  color: var(--dsw-alias-state-business-primary);
+}
+
 .lobby {
   padding: 24px;
   max-width: 720px;
@@ -154,6 +199,64 @@
 
 .ruleName {
   font-weight: 600;
+}
+
+.activeGames {
+  margin: 20px 0 26px;
+  padding: 16px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 42%, var(--dsw-alias-border-l2));
+  border-radius: 14px;
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 7%, var(--dsw-alias-bg-layer-2));
+}
+
+.activeGames h3 {
+  margin: 0 0 12px;
+}
+
+.activeGames ul {
+  display: grid;
+  gap: 10px;
+  margin: 0;
+  padding: 0;
+  list-style: none;
+}
+
+.activeGames li,
+.activeGames li > div {
+  display: flex;
+  align-items: center;
+}
+
+.activeGames li {
+  justify-content: space-between;
+  gap: 16px;
+  padding: 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 10px;
+  background: var(--dsw-alias-bg-layer-2);
+}
+
+.activeGames li > div {
+  align-items: flex-start;
+  flex-direction: column;
+  gap: 3px;
+}
+
+.activeGames li span {
+  color: var(--dsw-alias-label-tertiary);
+  font-size: 0.75rem;
+}
+
+.activeGames button,
+.ruleCard button {
+  min-height: 36px;
+  padding: 7px 12px;
+  border: 1px solid var(--dsw-alias-border-l2);
+  border-radius: 9px;
+  color: var(--dsw-alias-label-primary);
+  background: var(--dsw-alias-bg-layer-3);
+  font: inherit;
+  cursor: pointer;
 }
 
 .reveal {
@@ -472,6 +575,29 @@
 
 .known .sigil {
   border-color: var(--werewolf-accent);
+}
+
+.teammate {
+  z-index: 2;
+}
+
+.teammate .sigil {
+  border-color: var(--dsw-alias-state-business-primary);
+  box-shadow: 0 0 0 3px color-mix(in srgb, var(--dsw-alias-state-business-primary) 22%, transparent);
+}
+
+.teammateBadge {
+  display: inline-flex;
+  align-items: center;
+  gap: 4px;
+  min-height: 22px;
+  padding: 2px 7px;
+  border: 1px solid color-mix(in srgb, var(--dsw-alias-state-business-primary) 56%, var(--werewolf-border));
+  border-radius: 999px;
+  color: var(--werewolf-text);
+  background: color-mix(in srgb, var(--dsw-alias-state-business-primary) 12%, var(--werewolf-surface-strong));
+  font-size: 0.6875rem;
+  font-weight: 650;
 }
 
 .findingCurrent {

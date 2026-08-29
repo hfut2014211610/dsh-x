@@ -217,6 +217,23 @@ describe('projectWerewolfBotObservation', () => {
     const timeline = (prompt.publicState as { timeline: Array<{ data?: { text?: string } }> }).timeline
     expect(timeline.map(entry => entry.data?.text)).toEqual(['line 9', 'line 10', 'line 11'])
   })
+
+  it('projects only public entries added after a fixed Bot session\'s prior decision', () => {
+    const { rules, state, request } = botState()
+    const firstPlayer = state.players[0]
+    const secondPlayer = state.players[1]
+    if (firstPlayer === undefined || secondPlayer === undefined) throw new Error('missing player fixture')
+    const timeline = [
+      { id: '2:0', day: 1, phaseId: 'day.talk', kind: 'speech' as const, actorId: firstPlayer.playerId, key: 'speech', data: { text: 'old' } },
+      { id: '5:0', day: 1, phaseId: 'day.talk', kind: 'speech' as const, actorId: secondPlayer.playerId, key: 'speech', data: { text: 'new' } },
+    ]
+    const prompt = projectWerewolfBotObservation({ ...state, timeline }, rules, request, {
+      publicTimelineEntries: 5,
+      afterGameRevision: 2,
+    })
+    expect((prompt.publicState as { timeline: Array<{ data?: { text?: string } }> }).timeline)
+      .toEqual([expect.objectContaining({ data: { text: 'new' } })])
+  })
 })
 
 describe('bot observation information isolation', () => {

@@ -483,6 +483,11 @@ describe('web e2e: agent-preset selection', () => {
     // Static chrome, not a control: the header can only report a composition
     // the host would refuse to change.
     expect(snapshot).not.toContain('button "Minimal mode"')
+    // Writing and Design are session presets, not late view switches. A
+    // resumed session can still switch ordinary views, but these entries must
+    // never reappear as tabs after its composition has been fixed.
+    expect(await page.getByRole('tab', { name: 'Writing', exact: true }).count()).toBe(0)
+    expect(await page.getByRole('tab', { name: 'Design', exact: true }).count()).toBe(0)
   })
 
   it('drove every surface without a page error or a stream warning', () => {

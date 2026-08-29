@@ -8,6 +8,10 @@ dsh 浏览器表层组合包。[`cordis.patch.yml`](cordis.patch.yml) 叠加在 
 
 Web 使用共享的有界 normal 默认值，在首次请求后最多再重试五次符合条件的失败。`deepseek-official` 与由 settings 新增的 pi-ai 路由在省略 `retryPolicy` 时使用该默认值；显式提供方策略仍然优先。Web 不再增加重试专用的组合覆盖，因此非 Web profile 的省略行为与之相同。
 
+## 狼人杀 Bot 默认值
+
+专用狼人杀应用在游戏初始化时把每个固定 Bot Agent 的推理强度设为 `high`。该设置既保留明确的推理过程，也避免每次游戏发言与投票都使用 `max`；选定的准确模型必须提供 `high`，否则 Bot 请求会在网络 I/O 前失败。
+
 ## 模型体验
 
 ### Harness 源码与 Web 表层上下文

@@ -67,7 +67,11 @@ function tableFixture(): WerewolfHumanViewV1 {
 
 const face: WerewolfViewInjected = {
   openGame: () => {},
-  getLobby: async () => ({ version: 1, availableRuleSets: [{ id: 'quick-7', revision: 1, displayName: 'Quick 7-player game', playerCount: 7 }] }),
+  getLobby: async () => ({
+    version: 1,
+    availableRuleSets: [{ id: 'quick-7', revision: 1, displayName: 'Quick 7-player game', playerCount: 7 }],
+    activeGames: [],
+  }),
   start: async () => tableFixture(),
   getView: async () => tableFixture(),
   submitAction: async () => tableFixture(),

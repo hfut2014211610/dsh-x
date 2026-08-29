@@ -76,6 +76,8 @@
 
     - id: werewolf
       name: '@deepseek-ai/dsh-werewolf'
+      config:
+        botReasoningEffort: high
 
     - id: werewolf-classic
       name: '@deepseek-ai/dsh-werewolf-classic'

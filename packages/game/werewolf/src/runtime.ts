@@ -11,6 +11,7 @@ import { Service } from '@deepseek-ai/cordis'
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
 import type { AgentOptions } from '@deepseek-ai/dsh-agent'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { JsonValue } from '@deepseek-ai/dsh-session'
 import { resolveWerewolfRuleSet } from './rules.ts'
 import { WerewolfRegistry } from './registry.ts'
@@ -29,12 +30,17 @@ declare module '@deepseek-ai/cordis' {
   }
 }
 
+/** Reasoning levels a hosted Bot may pin, mirroring the canonical set in `dsh-model-hub`/`dsh-model-tuning`. */
+export const BOT_REASONING_EFFORTS = ['off', 'minimal', 'low', 'medium', 'high', 'xhigh', 'max'] as const
+
 /** Deployment-varying bot runner input; `botRunnerConfig()` resolves defaults. */
 export interface WerewolfRuntimeConfig {
   /** Standalone runner fallback provider; hosted games use fixed game-owned Bot Agents. */
   subagentProvider: string
   /** Per-child model route; omission inherits the parent agent's route. */
   botAgent?: AgentOptions
+  /** Hosted fixed-Bot reasoning effort; omission preserves the exact-model adapter default. */
+  botReasoningEffort?: (typeof BOT_REASONING_EFFORTS)[number]
   /** Failed attempts per decision before the fallback applies. */
   botRetryLimit?: number
   /** Wall-clock budget per child attempt. */
@@ -69,6 +75,7 @@ export class WerewolfRuntime extends Service {
       model: z.string(),
       maxTokens: z.number().step(1).min(1),
     }),
+    botReasoningEffort: z.union(BOT_REASONING_EFFORTS),
     botRetryLimit: z.number().step(1).min(0),
     botDecisionTimeoutMs: z.number().step(1).min(1),
     botFailurePolicy: z.union([z.const('auto-action'), z.const('pause-game')]),
@@ -114,6 +121,9 @@ export class WerewolfRuntime extends Service {
     return {
       provider: config.subagentProvider,
       ...(botAgent === undefined ? {} : { botAgent }),
+      ...(config.botReasoningEffort === undefined
+        ? {}
+        : { reasoningEffort: ReasoningEffortId(config.botReasoningEffort) }),
       retryLimit: config.botRetryLimit ?? 2,
       decisionTimeoutMs: config.botDecisionTimeoutMs ?? 60000,
       failurePolicy: config.botFailurePolicy ?? 'auto-action',

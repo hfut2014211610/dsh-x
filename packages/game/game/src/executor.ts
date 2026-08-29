@@ -1,6 +1,7 @@
 /** Host-side execution contracts that name Agent and subagent types. @module @deepseek-ai/dsh-game/executor */
 
 import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
+import type { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { SubagentResult, SubagentRun, SubagentStartRequest } from '@deepseek-ai/dsh-subagent'
 import type { JsonValue, SessionEvent, SessionId } from '@deepseek-ai/dsh-session'
 import type {
@@ -25,6 +26,8 @@ export interface GameBotProvisionRequest {
   readonly label: string
   /** Per-Bot model route; omission inherits the Host route. */
   readonly agentOptions?: AgentOptions
+  /** Reasoning effort pinned to every model request from this Bot. */
+  readonly reasoningEffort?: ReasoningEffortId
   /** Absolute delegation-depth cap for the Bot agent. */
   readonly maxDepth?: number
   /** Fixed per-game persona containing this seat's immutable identity. */
@@ -76,6 +79,8 @@ export interface GameModule<
 > {
   readonly id: string
   readonly version: number
+  /** Whether automatic steps complete inside the command or publish asynchronously one step at a time. */
+  readonly automaticScheduling?: 'foreground' | 'background'
   /** Validate all start dependencies without creating a Host or appending. */
   prepareStart(
     input: TStart,
@@ -93,6 +98,8 @@ export interface GameModule<
   status(state: TState): 'running' | 'paused' | 'ended'
   /** Apply one human mutation without appending it. */
   mutate(state: TState, request: GameMutationRequest<TMutation>): Promise<GameTransition<TState>>
+  /** Create every fixed game-owned Agent before automatic scheduling begins. */
+  initializeAgents?(state: TState, executor: GameAiExecutor): Promise<void>
   /** Advance bots and phase resolution by one atomic publication unit. */
   advance(state: TState, history: readonly SessionEvent[], executor: GameAiExecutor): Promise<GameAdvance<TState>>
   /** Build the only view one bound participant may receive. */

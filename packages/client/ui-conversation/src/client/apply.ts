@@ -150,11 +150,15 @@ export function apply(ctx: Context): void {
   // persisted: a fresh page load keeps the open-jump-to-bottom default.
   const chatScrollPositions = new Map<SessionId, ChatScrollPosition>()
 
-  const preferredViewResolvers = new Set<(sessionId: SessionId) => string | null>()
+  const preferredViewResolvers = new Set<{
+    viewId: string
+    matches: (sessionId: SessionId) => boolean
+  }>()
   const preferredViews = {
-    declare: (resolver: (sessionId: SessionId) => string | null): () => void => {
-      preferredViewResolvers.add(resolver)
-      return () => { preferredViewResolvers.delete(resolver) }
+    declare: (viewId: string, matches: (sessionId: SessionId) => boolean): () => void => {
+      const declaration = { viewId, matches }
+      preferredViewResolvers.add(declaration)
+      return () => { preferredViewResolvers.delete(declaration) }
     },
   }
   const companionViewResolvers = new Set<(
@@ -182,10 +186,15 @@ export function apply(ctx: Context): void {
     list: viewTabs,
     subscribe: (fn: () => void) => slots.subscribe('conversation.view', fn),
     version: () => slots.getVersion('conversation.view'),
+    isSessionOwned: (viewId: string): boolean => {
+      for (const declaration of preferredViewResolvers) {
+        if (declaration.viewId === viewId) return true
+      }
+      return false
+    },
     preferred: (sessionId: SessionId): string | null => {
-      for (const resolver of preferredViewResolvers) {
-        const id = resolver(sessionId)
-        if (id !== null) return id
+      for (const { viewId, matches } of preferredViewResolvers) {
+        if (matches(sessionId)) return viewId
       }
       return null
     },

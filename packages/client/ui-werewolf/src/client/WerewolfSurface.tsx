@@ -1,6 +1,5 @@
 /** Whole-application Werewolf shell with its sole route back to normal app chrome. */
 
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
 import type { PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import type { WerewolfViewInjected } from './WerewolfView.tsx'
 import { WerewolfView } from './WerewolfView.tsx'
@@ -9,7 +8,7 @@ import styles from './WerewolfView.module.css'
 
 /** Successful selection returned by the whole-frame routing chain. */
 export interface WerewolfSurfaceMatch {
-  agentPreset: 'werewolf'
+  mode: 'werewolf-window'
 }
 
 /** Values supplied by the Werewolf plugin after the shell chain elects it. */
@@ -28,7 +27,6 @@ export type WerewolfSurfaceProps =
 
 /** Render the game as an application mode rather than conversation content. */
 export function WerewolfSurface({ sessionId, view, exitMode }: WerewolfSurfaceProps): React.JSX.Element | null {
-  if (sessionId === undefined) return null
   const t = (key: WerewolfKey): string => view.translate(key)
   return (
     <main
@@ -54,7 +52,7 @@ export function WerewolfSurface({ sessionId, view, exitMode }: WerewolfSurfacePr
         </div>
       </header>
       <div className={styles.exclusiveContent}>
-        <WerewolfView sessionId={sessionId as SessionId} {...view} />
+        <WerewolfView sessionId={sessionId} {...view} />
       </div>
     </main>
   )

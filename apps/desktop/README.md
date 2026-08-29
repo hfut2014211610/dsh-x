@@ -18,7 +18,7 @@ Every step of that chain runs asynchronously, which matters more than it sounds:
 
 ## Window and process lifecycle
 
-The renderer runs with `nodeIntegration` off and `contextIsolation` plus the Chromium sandbox on; new windows and cross-origin navigation go to the system browser. Closing the window hides it to the tray while the runtime keeps serving agent work; quitting kills the spawned process tree (Windows `taskkill /T`, POSIX process-group signal) and leaves no orphans. One instance runs per user (single-instance lock).
+The renderer runs with `nodeIntegration` off and `contextIsolation` plus the Chromium sandbox on. A same-origin URL carrying `dshMode=werewolf` may open one hardened game window with the same security settings; other new windows and cross-origin navigation go to the system browser. Closing the primary window hides it to the tray while the runtime keeps serving agent work; quitting kills the spawned process tree (Windows `taskkill /T`, POSIX process-group signal) and leaves no orphans. One instance runs per user (single-instance lock).
 
 Two faults are treated as one, because they mean the same thing to whoever is using the app: the runtime exited, and the runtime stopped answering. The second needs asking about — a wedged event loop or a hung write leaves a process that is alive, a socket that accepts, and a UI whose every request hangs — so a connected runtime is probed with the same `host.describe` handshake that admitted it, and a run of consecutive misses reports a fault the way an exit does. One miss never does; a laptop resuming from sleep drops one.
 

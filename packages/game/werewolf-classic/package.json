@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-werewolf-classic",
   "description": "Classic Werewolf definitions — villager, wolf, seer, and witch roles, the standard night and day phases, faction victory conditions, and the quick-7 rule set",
-  "version": "0.1.0-rc.8",
+  "version": "0.1.1-rc.2",
   "publishConfig": {
     "access": "public"
   },

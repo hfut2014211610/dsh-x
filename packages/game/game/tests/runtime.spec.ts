@@ -139,4 +139,15 @@ describe('SessionGameService', () => {
     expect(await ctx.games.getView(started.gameId, principalId)).toMatchObject({ gameRevision: 2, view: { value: 10 } })
     await expect(ctx.games.getView(started.gameId, PrincipalId('other'))).rejects.toMatchObject({ code: 'GAME_FORBIDDEN' })
   })
+
+  it('lists only module games bound to the requesting principal', async () => {
+    const { ctx } = await setup()
+    const started = await ctx.games.start<{ value: number; status: string }>({
+      moduleId: 'test', requestId: GameRequestId('start-1'), expectedGameRevision: 0, input: null,
+    })
+    await expect(ctx.games.listViews('test', ctx.games.resolvePrincipal().id)).resolves.toEqual([started])
+    await expect(ctx.games.listViews('test', PrincipalId('other'))).resolves.toEqual([])
+    await expect(ctx.games.listViews('missing', ctx.games.resolvePrincipal().id))
+      .rejects.toMatchObject({ code: 'GAME_MODULE_UNAVAILABLE' })
+  })
 })

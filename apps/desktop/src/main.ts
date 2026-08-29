@@ -40,6 +40,28 @@ const LOADING_PAGE = join(HERE, '..', 'loading.html')
 const PRELOAD_SCRIPT = join(HERE, '..', 'preload.cjs')
 const TRAY_ICON = join(HERE, '..', 'assets', 'tray.png')
 
+/** Shared window geometry; the game window matches the primary one. */
+const WINDOW_GEOMETRY = {
+  width: 1440,
+  height: 900,
+  minWidth: 980,
+  minHeight: 640,
+}
+
+/** Hardened renderer settings every app window shares. */
+const sharedWebPreferences = () => ({
+  preload: PRELOAD_SCRIPT,
+  nodeIntegration: false,
+  contextIsolation: true,
+  sandbox: true,
+})
+
+/** App icon resolved at window-creation time. */
+const appIcon = () => nativeImage.createFromPath(join(HERE, '..', 'build', 'icon.png'))
+
+/** Base paint color matching loading.html's two palettes. */
+const backgroundPaint = () => (nativeTheme.shouldUseDarkColors ? '#101319' : '#ffffff')
+
 /** IPC channel carrying shell snapshots to the loading screen. */
 const STATE_CHANNEL = 'dsh-desktop-shell:state'
 /** IPC channel carrying retry requests from the loading screen. */
@@ -79,6 +101,17 @@ let pendingInstaller: string | undefined
 let servedOrigin: string | undefined
 /** The loading screen's own file URL, the one file navigation the window allows. */
 let loadingPageUrl: string | undefined
+
+/** Whether a renderer requested the isolated Werewolf application window. */
+function isWerewolfWindowUrl(value: string): boolean {
+  if (servedOrigin === undefined) return false
+  try {
+    const url = new URL(value)
+    return url.origin === servedOrigin && url.searchParams.get('dshMode') === 'werewolf'
+  } catch {
+    return false
+  }
+}
 
 const state = createShellState(pushState)
 
@@ -544,22 +577,14 @@ async function checkUpdates(announce: boolean): Promise<void> {
 
 function createWindow(): void {
   const window = new BrowserWindow({
-    width: 1440,
-    height: 900,
-    minWidth: 980,
-    minHeight: 640,
+    ...WINDOW_GEOMETRY,
     show: false,
     // Painted before any document loads, so the frame does not flash white on
-    // its way to a dark loading screen. Matches loading.html's two palettes.
-    backgroundColor: nativeTheme.shouldUseDarkColors ? '#101319' : '#ffffff',
+    // its way to the themed base color.
+    backgroundColor: backgroundPaint(),
     title: 'DeepSeek Harness',
-    icon: nativeImage.createFromPath(join(HERE, '..', 'build', 'icon.png')),
-    webPreferences: {
-      preload: PRELOAD_SCRIPT,
-      nodeIntegration: false,
-      contextIsolation: true,
-      sandbox: true,
-    },
+    icon: appIcon(),
+    webPreferences: sharedWebPreferences(),
   })
   mainWindow = window
   window.once('ready-to-show', () => { window.show() })
@@ -678,6 +703,19 @@ function quit(): void {
 
 app.on('web-contents-created', (_event, contents) => {
   contents.setWindowOpenHandler(({ url }) => {
+    if (isWerewolfWindowUrl(url)) {
+      return {
+        action: 'allow',
+        overrideBrowserWindowOptions: {
+          ...WINDOW_GEOMETRY,
+          autoHideMenuBar: true,
+          backgroundColor: backgroundPaint(),
+          title: 'Werewolf · DeepSeek Harness',
+          icon: appIcon(),
+          webPreferences: sharedWebPreferences(),
+        },
+      }
+    }
     if (/^https?:/.test(url)) void shell.openExternal(url)
     return { action: 'deny' }
   })

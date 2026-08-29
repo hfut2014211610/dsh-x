@@ -47,11 +47,11 @@ async function bench(readAttachment?: SessionFace['readAttachment']) {
 describe('ConversationController', () => {
   it('publishes preferred and companion view declarations through its service face', async () => {
     const b = await bench()
-    const preferred = () => 'writing'
+    const preferred = () => true
     const companion = () => ({ id: 'chat', label: 'Assistant' })
-    const disposePreferred = b.root.declarePreferredView(preferred)
+    const disposePreferred = b.root.declarePreferredView('writing', preferred)
     const disposeCompanion = b.root.declareCompanionView(companion)
-    expect(b.declarePreferred).toHaveBeenCalledWith(preferred)
+    expect(b.declarePreferred).toHaveBeenCalledWith('writing', preferred)
     expect(b.declareCompanion).toHaveBeenCalledWith(companion)
     disposePreferred()
     disposeCompanion()

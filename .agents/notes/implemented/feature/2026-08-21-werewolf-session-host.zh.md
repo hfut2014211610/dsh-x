@@ -10,7 +10,7 @@ Status: implemented
 
 ## 决策
 
-阶段3新增一个完整的 `@deepseek-ai/dsh-game` capability 包。`GameService` 是 Service Definition，`SessionGameService` 是默认 provider，`GameModule` 是 Consumer 约定。provider 为每局创建一个空闲 Host Agent 和 Session，记录本地主体到参与者的绑定，串行化每局变更，拥有 `GameAiExecutor`，发布 `game/projection-invalidated`，并在重启后读取已知 id 时冷恢复确定性的 `game-<GameId>` Host。Host 模型绝不运行。
+阶段3新增一个完整的 `@deepseek-ai/dsh-game` capability 包。`GameService` 是 Service Definition，`SessionGameService` 是默认 provider，`GameModule` 是 Consumer 约定。provider 为每局创建一个空闲 Host Agent 和 Session，记录本地主体到参与者的绑定，串行化每局变更，拥有 `GameAiExecutor`，发布 `game/projection-invalidated`，并在重启后读取已知 id 时冷恢复确定性的 `game-<GameId>` Host。`GameModule.initializeAgents()` 会在开始投影返回前创建固定的游戏 Agent。模块默认使用前台自动调度，也可以选择后台调度：命令转换提交后立即返回，后续自动步骤再经同一局队列分别发布。Host 模型绝不运行。
 
 每个变更请求携带调用方 `requestId`；开始后的请求还携带 `expectedGameRevision`。`game/command-receipt` 记录游戏与模块版本、方法、request id、规范 payload SHA-256 摘要、已提交修订、主体和参与者。相同重复请求即使经过自动推进也返回当前授权投影，同一键下另一 payload 会冲突，新请求携带过期修订则拒绝。回执与领域转换进入同一次 `Session.appendBatch()`。
 
@@ -20,7 +20,7 @@ Status: implemented
 
 ## 后果
 
-- 真实 Loader 组合通过 fresh 隔离子代理、有限并行、持久 Bot 上下文推进完成 `quick-7`；Host 模型调用为零，并产生终局授权回放与稳定 Host 事件序列快照。
+- 真实 Loader 组合通过固定的逐座位 Bot Session、有限并行、持久 Bot 上下文推进和增量自动发布完成 `quick-7`；Host 模型调用为零，并产生终局授权回放与稳定 Host 事件序列快照。
 - capability 拒绝发生在 `werewolf/game-started` 之前；即使 provider 支持结构化输出、persona、工具过滤和深度限制，只要继承父历史仍属非法。
 - 通用回执新增一个 required Session 事件类型，因此生成的持久化词汇与目录包含它。
 - 阶段4仍负责专用 Web 视图。阶段3不注册命令、斜杠命令或 Chat composer 变更路径。

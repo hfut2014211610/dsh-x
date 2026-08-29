@@ -32,6 +32,7 @@ function lobbyFixture(): WerewolfLobbyViewV1 {
     availableRuleSets: [
       { id: 'quick-7', revision: 1, displayName: 'Quick 7-player game', playerCount: 7 },
     ],
+    activeGames: [],
   }
 }
 
@@ -179,6 +180,23 @@ describe('WerewolfView states', () => {
     expect(view.queryByRole('alert')).toBeNull()
   })
 
+  it('continues an active game from the durable lobby list', async () => {
+    const face = injected({
+      getLobby: async () => ({
+        ...lobbyFixture(),
+        activeGames: [{
+          gameId: 'g1', gameRevision: 4, status: 'running', day: 1,
+          ruleSet: { id: 'quick-7', revision: 1, displayName: 'Quick 7-player game', playerCount: 7 },
+        }],
+      }),
+    })
+    const view = render(<TestView sessionId="s1" {...face} />)
+    fireEvent.click(await waitFor(() => view.getByRole('button', { name: zh['lobby.continue'] })))
+    await waitFor(() => { expect(face.getView).toHaveBeenCalledWith('g1') })
+    expect(face.openGame).toHaveBeenCalledWith('g1')
+    expect(view.getByTestId('werewolf-reveal')).toBeDefined()
+  })
+
   it('restores an existing game directly from its Host Session', async () => {
     const face = injected({ initialGameId: 'g1' })
     const view = render(<TestView sessionId="game-g1" {...face} />)
@@ -195,7 +213,7 @@ describe('WerewolfView states', () => {
   })
 
   it('reports an empty lobby without a start action', async () => {
-    const view = render(<TestView sessionId="s1" {...injected({ getLobby: async () => ({ version: 1, availableRuleSets: [] }) })} />)
+    const view = render(<TestView sessionId="s1" {...injected({ getLobby: async () => ({ version: 1, availableRuleSets: [], activeGames: [] }) })} />)
     await waitFor(() =>{  expect(view.getByText(zh['lobby.unavailable'])).toBeDefined() })
   })
 
@@ -222,6 +240,20 @@ describe('WerewolfView states', () => {
     expect(table.querySelector('[data-sigil="sigil-02.png"]')).not.toBeNull()
     const heading = table.querySelector('h2')
     expect(heading?.getAttribute('tabindex')).toBe('-1')
+  })
+
+  it('marks every teammate revealed by the authorized self projection', async () => {
+    const teammateView = viewFixture({
+      self: {
+        ...viewFixture().self,
+        role: { id: 'wolf', name: 'Werewolf', faction: 'wolf' },
+        teammates: [{ playerId: 'p2', seat: 2, alive: true }],
+      },
+    })
+    const view = render(<TestView sessionId="s1" {...injected({ start: async () => teammateView })} />)
+    await arriveAtTable(view)
+    expect(view.getAllByLabelText(zh['table.teammate'])).toHaveLength(1)
+    expect(view.getByText(zh['table.teammate']).closest('li')?.textContent).toContain('Seat 2')
   })
 
   it('shows ordered speaking progress and readable statements before voting', async () => {

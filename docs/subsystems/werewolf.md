@@ -22,19 +22,19 @@ The phase engine is pure: each step computes the next events and folds them thro
 
 ## Fixed Bot Agents and observation projection
 
-`projectWerewolfBotObservation` first proves that the request still matches the folded game's id and revision, open phase and action plan, compiled rule digest, pending actor, and exact current continuity context. It then builds the actor's authorized view: role and private knowledge via the registered role projector (teammates only when the role declares `seesFactionTeammates`), public roster ids and facts plus a configured trailing timeline slice, and legal action and prior context derived from authoritative state. At game start, `WerewolfGameModule` asks the Session Host's `GameAiExecutor` to provision one deterministic, tool-free Bot Agent Session for every non-human seat. The immutable persona fixes the seat, role, faction, and personality for the game; every later decision is a FIFO turn on that same Agent Session, so its earlier requests and responses remain in model context. These game-owned Sessions carry the Host parent id but no generic subagent origin descriptor, so the normal subagent catalog and popup do not expose them. Structured results remain untrusted and are validated action-first, then context-delta-second. Failed attempts retain exact categories and retry on the same Bot Session; retry exhaustion takes a deterministic trustee action or pauses the game. `GameAiExecutor` supplies the operation signal, enforces `maxConcurrentBots`, preserves result order, and never invokes the Host model.
+`projectWerewolfBotObservation` first proves that the request still matches the folded game's id and revision, open phase and action plan, compiled rule digest, pending actor, and exact current continuity context. It then builds the actor's authorized view: role and private knowledge via the registered role projector (teammates only when the role declares `seesFactionTeammates`), public roster ids and facts, legal action, and prior context derived from authoritative state. The first decision carries a configured trailing timeline slice; later decisions on a fixed Session carry only public entries added since that Bot's preceding committed decision. `WerewolfGameModule.initializeAgents()` provisions one deterministic, tool-free Bot Agent Session for every non-human seat before `start` returns. The immutable persona fixes the seat, role, faction, and personality for the game; optional `botReasoningEffort` is pinned on the Agent at provisioning and applies to every later model request. Every decision is a FIFO turn on that same Agent Session, so its earlier requests and responses remain in model context. These game-owned Sessions carry the Host parent id but no generic subagent origin descriptor, so the normal subagent catalog and popup do not expose them. Structured results remain untrusted and are validated action-first, then context-delta-second. Every prompt permits exactly the `action` and `contextDelta` root keys, states the current phase's exact action object, maps a text action's `value` to the public statement, and limits the delta to changed subjective fields. An explicit legal `publicSpeech` string recovers an otherwise malformed text action by becoming its canonical `value`; the ordinary action and speech validators still enforce phase and length rules. Failed attempts retain exact categories and retry on the same Bot Session; a retry adds its rejection diagnostic and repeats that compact output contract without resending the observation. Retry exhaustion takes a deterministic trustee action or pauses the game. `GameAiExecutor` supplies the operation signal, enforces `maxConcurrentBots`, preserves result order, and never invokes the Host model.
 
 ## Session Host, commands, and human projection
 
-`WerewolfGameModule` is the thin domain adapter registered on `ctx.games`. `start` validates the exact rule-set revision before a Host exists. The common provider creates `game-<GameId>`, atomically commits `game/command-receipt` with `werewolf/game-started`, provisions the fixed Bot Agents, and drives phases until a human form, pause, or result. A `seat-order-public` phase settles exactly the first remaining living seat; the next seat cannot act until that statement is recorded, and the vote phase cannot open until every planned statement has settled. `submitAction`, `resume`, and `abortGame` carry a caller request id and expected revision. Equal duplicate payloads return the current view after automatic advancement; another payload under the same key conflicts, and a new stale request rejects. All mutations are serialized per game.
+`WerewolfGameModule` is the thin domain adapter registered on `ctx.games`. `start` validates the exact rule-set revision before a Host exists. The common provider creates `game-<GameId>`, atomically commits `game/command-receipt` with `werewolf/game-started`, provisions the fixed Bot Agents, and returns the initialized projection. Werewolf's background automatic scheduling then publishes one phase or Bot decision unit at a time through the same serialized game queue, and each unit invalidates the human projection. A `seat-order-public` phase settles exactly the first remaining living seat; the next seat cannot act until that statement is recorded, accepted text in `action.value` becomes the visible public statement, and the vote phase cannot open until every planned statement has settled. `submitAction`, `resume`, and `abortGame` carry a caller request id and expected revision. Equal duplicate payloads return the current view; another payload under the same key conflicts, and a new stale request rejects.
 
 `Session.appendBatch()` validates JSON, the complete surface transition, and synchronous registered invariants against shadow prefixes before changing the live log. Rejection leaves events, surface, observers, and revision unchanged. Success makes the complete batch visible before publishing its events in order. Common receipts and Werewolf events are log-only.
 
-`WerewolfGameGateway` exposes typed `start`, `getView`, `getReplay`, `submitAction`, `resume`, and `abortGame`. It resolves the version-1 local principal internally; requests cannot select a Session, participant, player, or seat. `WerewolfHumanViewV1` projects public facts plus only the bound human's role, entitled teammates, resources, notices, and current form. Final views reveal roles after the result. `getReplay` rejects active games and returns authorized checkpoints instead of raw events, bot contexts, or child prompts.
+`WerewolfGameGateway` exposes typed `getLobby`, `start`, `getView`, `getReplay`, `submitAction`, `resume`, and `abortGame`. The Host Agent inherits the deployment's current `agentDefaultModel` route, so fixed Bot Agents can inherit a complete provider/model pair when no per-game override is configured. `getLobby` uses `ctx.games.listViews()` to return the local principal's running and paused games newest first. The gateway resolves the version-1 local principal internally; requests cannot select a Session, participant, player, or seat. `WerewolfHumanViewV1` projects public facts plus only the bound human's role, entitled teammates, resources, notices, and current form. Final views reveal roles after the result. `getReplay` rejects active games and returns authorized checkpoints instead of raw events, bot contexts, or child prompts.
 
-## Dedicated conversation view
+## Isolated application window
 
-`@deepseek-ai/dsh-client-ui-werewolf` injects the `conversation.view` entry `werewolf` and declares it preferred for `agentPreset: werewolf` sessions. The inject face wraps the generated `ctx.remote.werewolfGame` namespace — `getLobby` (the additive pre-game rule-set listing), `start`, `getView`, `submitAction`, `resume`, `abortGame`, `getReplay` — and subscribes to the forwarded `game/projection-invalidated` event, ignoring other games and re-reading through `getView`. During daytime discussion, the view names the current speaker, shows completed and total speaker counts, renders each completed statement or explicit pass in public order, and explains that voting opens only after the last seat settles. Forms render only the closed spec vocabulary (`player-target`, `choice`, `text`, `compound`); the browser never receives Bot contexts, Agent prompts, or raw secret events. No slash command exists and the ordinary Chat composer is suppressed for the Werewolf Host, so only the game action form can mutate game state while higher-priority system questions and approvals remain answerable.
+`@deepseek-ai/dsh-client-ui-werewolf` registers a `sidebar.footer.action` launcher that opens a named window with `dshMode=werewolf`. Only that URL elects the plugin's `shell.surface` entry, so the primary window keeps its current conversation while the game window mounts no preset switcher, Session sidebar, conversation, details, or generic overlay. The selected `gameId` stays in the window URL, and the lobby lists running and paused games from the Host when no game is selected. Game Host Sessions are excluded from ordinary workspace navigation. The inject face wraps the generated `ctx.remote.werewolfGame` namespace — `getLobby`, `start`, `getView`, `submitAction`, `resume`, `abortGame`, `getReplay` — and subscribes to the forwarded `game/projection-invalidated` event, ignoring other games and re-reading through `getView`. During daytime discussion, the view names the current speaker, shows completed and total speaker counts, renders each completed statement or explicit pass in public order, and explains that voting opens only after the last seat settles. Entitled teammates receive an explicit icon-and-text badge without revealing their role. Forms render only the closed spec vocabulary (`player-target`, `choice`, `text`, `compound`); the browser never receives Bot contexts, Agent prompts, or raw secret events. No slash command or Werewolf agent preset exists, and only typed game actions can mutate game state.
 
 ## Bot continuity context
 
@@ -69,14 +69,24 @@ abstract registerModule(module: GameModule): () => void
 abstract resolvePrincipal(): LocalGamePrincipalV1
 
 /**
- * Create a dedicated Host, commit start atomically, and auto-advance.
+ * Create a dedicated Host, commit start atomically, initialize fixed Agents, and schedule automatic advancement.
  * @param request - module, idempotency key, initial revision, and module input.
- * @returns current authorized projection after automatic advancement.
+ * @returns projection after foreground advancement, or after initialization when the module schedules in the background.
  */
 abstract start<TView>(request: { moduleId: string requestId: GameRequestId expectedGameRevision: 0 input: JsonValue }): Promise<GameProjection<TView>>
 
 /**
- * Return the current authorized view.
+ * List every game of one module authorized for the principal, newest first.
+ * @param moduleId - exact registered module id.
+ * @param principalId - authenticated caller.
+ * @returns authorized projections ordered by Host creation time.
+ */
+abstract listViews<TView>(moduleId: string, principalId: PrincipalId): Promise<GameProjection<TView>[]>
+
+/**
+ * Return the current authorized view. Reading is a side-effectful kick for a
+ * background-scheduling module: uninitialized fixed Agents plus a running
+ * game schedule one automatic advancement.
  * @param gameId - game to read.
  * @param principalId - authenticated caller.
  * @returns current authorized projection.
@@ -92,16 +102,16 @@ abstract getView<TView>(gameId: GameId, principalId: PrincipalId): Promise<GameP
 abstract getReplay<TReplay>(gameId: GameId, principalId: PrincipalId): Promise<TReplay>
 
 /**
- * Commit one human action and auto-advance.
+ * Commit one human action and schedule automatic advancement.
  * @param request - authorized compare-and-set action.
- * @returns current authorized projection after automatic advancement.
+ * @returns projection after foreground advancement, or after the action when the module schedules in the background.
  */
 abstract submitAction<TView>(request: { gameId: GameId principalId: PrincipalId requestId: GameRequestId expectedGameRevision: number action: JsonValue }): Promise<GameProjection<TView>>
 
 /**
- * Resume one paused game and auto-advance.
+ * Resume one paused game and schedule automatic advancement.
  * @param request - authorized compare-and-set resume request.
- * @returns current authorized projection after automatic advancement.
+ * @returns projection after foreground advancement, or after resume when the module schedules in the background.
  */
 abstract resume<TView>(request: { gameId: GameId principalId: PrincipalId requestId: GameRequestId expectedGameRevision: number }): Promise<GameProjection<TView>>
 
@@ -197,10 +207,10 @@ Registers the Werewolf module and exposes the UI-facing typed methods.
 
 ```ts cordis-catalog
 /**
- * List the registered rule sets for the lobby, before any game exists.
- * @returns rule-set options sorted by id then revision.
+ * List registered rule sets and resumable games for the local lobby.
+ * @returns rule-set options plus authorized running and paused games.
  */
-@Remote('getLobby') getLobby(): WerewolfLobbyViewV1
+@Remote('getLobby') async getLobby(): Promise<WerewolfLobbyViewV1>
 
 /**
  * Start one local single-player game.

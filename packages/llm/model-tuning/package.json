@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-model-tuning",
   "description": "Per-model sampling defaults: temperature, maxTokens, stop, and reasoning effort applied per provider/model",
-  "version": "0.1.0-rc.8",
+  "version": "0.1.1-rc.2",
   "publishConfig": {
     "access": "public"
   },

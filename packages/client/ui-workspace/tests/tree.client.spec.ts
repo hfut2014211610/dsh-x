@@ -108,7 +108,7 @@ describe('deriveGroups', () => {
     expect(search.items[0]?.completed).toBe(true)
   })
 
-  it('hides subagent-origin sessions without hiding ordinary forks', () => {
+  it('hides subagent and Werewolf Host sessions without hiding ordinary forks', () => {
     const parent = summary('parent', 1)
     const subagent = {
       ...summary('subagent', 3), parentId: parent.id, origin: 'subagent' as const, running: true,
@@ -120,10 +120,11 @@ describe('deriveGroups', () => {
     const forkChild = {
       ...summary('fork-child', 5), parentId: fork.id, origin: 'subagent' as const, running: true,
     }
-    const sessions = { ...list(parent, fork, subagent, grandchild, forkChild), current: subagent.id }
+    const game = { ...summary('game-g1', 6), agentPreset: 'werewolf' }
+    const sessions = { ...list(parent, fork, subagent, grandchild, forkChild, game), current: subagent.id }
     const groups = deriveGroups(
       sessions,
-      [workspace('first', ['parent', 'fork', 'subagent', 'grandchild', 'fork-child'])],
+      [workspace('first', ['parent', 'fork', 'subagent', 'grandchild', 'fork-child', 'game-g1'])],
       noArchive,
       view(['first']),
     )
@@ -215,12 +216,13 @@ describe('deriveFlat', () => {
     expect(rows.map(row => row.id)).toEqual([sid('child'), sid('tie-a'), sid('tie-b'), sid('parent')])
   })
 
-  it('hides subagent-origin rows but keeps ordinary forks', () => {
+  it('hides subagent and Werewolf Host rows but keeps ordinary forks', () => {
     const parent = summary('parent', 1)
     const fork = { ...summary('fork', 2), parentId: parent.id }
     const subagent = { ...summary('subagent', 3), parentId: parent.id, origin: 'subagent' as const }
+    const game = { ...summary('game-g1', 4), agentPreset: 'werewolf' }
     const rows = deriveFlat(
-      { ...list(parent, fork, subagent), current: subagent.id },
+      { ...list(parent, fork, subagent, game), current: subagent.id },
       noArchive,
     )
     expect(rows.map(row => row.id)).toEqual([fork.id, parent.id])

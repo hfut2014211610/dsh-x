@@ -3,6 +3,7 @@ import { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentHandle, AgentOptions } from '@deepseek-ai/dsh-agent'
 import AgentLoop from '@deepseek-ai/dsh-agent-loop'
 import { mountAgentLoopTestDependencies } from '@deepseek-ai/dsh-agent-loop-testkit'
+import { ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type { JsonValue, Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import { SessionId } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -40,8 +41,10 @@ const stateEvent = (state: EdgeState) => ({ type: 'game-edge/state', data: state
 class EdgeModule implements GameModule<EdgeState> {
   readonly id: string
   readonly version: number
+  automaticScheduling?: 'foreground' | 'background'
   hostAgentOptions?: AgentOptions
   hostAgentPreset?: string
+  initializeHook?: (state: EdgeState, executor: GameAiExecutor) => Promise<void>
   gameIdValue = 'edge'
   preparedStatus: EdgeState['status'] = 'running'
   preparedEvents: ReadonlyArray<{ type: string; data: JsonValue }> | undefined
@@ -78,6 +81,10 @@ class EdgeModule implements GameModule<EdgeState> {
   revision(state: EdgeState) { return state.revision }
   status(state: EdgeState) { return state.status }
 
+  async initializeAgents(state: EdgeState, executor: GameAiExecutor): Promise<void> {
+    await this.initializeHook?.(state, executor)
+  }
+
   async mutate(state: EdgeState, request: { method: 'submitAction' | 'resume' | 'abortGame'; payload: JsonValue }) {
     if (this.mutationMode === 'empty') return { state, events: [] }
     const next: EdgeState = {
@@ -104,11 +111,13 @@ interface IndexedHost {
   session: Session
   handle?: AgentHandle
   botHandles: Map<SessionId, AgentHandle>
+  agentsInitialized: boolean
 }
 
 interface GameInternals {
   modules: Map<string, GameModule>
   hosts: Map<ReturnType<typeof GameId>, IndexedHost>
+  automaticAdvances: Map<ReturnType<typeof GameId>, Promise<void>>
   startReceipts: Map<string, ReturnType<typeof GameId>>
   recoveries: Map<ReturnType<typeof GameId>, Promise<IndexedHost>>
   executor(record: IndexedHost, host: Agent, signal: AbortSignal): GameAiExecutor
@@ -277,6 +286,55 @@ describe('game Host utility and service edges', () => {
     expect((await start(third.ctx)).view.status).toBe('ended')
   })
 
+  it('initializes fixed Agents before returning and publishes background steps incrementally', async () => {
+    const module = new EdgeModule()
+    module.automaticScheduling = 'background'
+    let initialized = 0
+    let entered = false
+    let release: (() => void) | undefined
+    const gate = new Promise<void>((resolve) => { release = resolve })
+    module.initializeHook = async () => { initialized += 1 }
+    module.advanceHook = async (state) => {
+      entered = true
+      await gate
+      const next = { ...state, revision: state.revision + 1 }
+      return { state: next, events: [stateEvent(next)], stop: true }
+    }
+    const { ctx } = await setup(module)
+    const started = await start(ctx)
+    expect(started.gameRevision).toBe(1)
+    expect(initialized).toBe(1)
+    await vi.waitFor(() => { expect(entered).toBe(true) })
+    release?.()
+    await vi.waitFor(async () => {
+      expect((await ctx.games.getView(started.gameId, ctx.games.resolvePrincipal().id)).gameRevision).toBe(2)
+    })
+    expect(initialized).toBe(1)
+  })
+
+  it('restarts background scheduling when a recovered active view is reopened', async () => {
+    const module = new EdgeModule()
+    module.automaticScheduling = 'background'
+    let advances = 0
+    module.advanceHook = async (state) => {
+      advances += 1
+      const next = { ...state, revision: state.revision + 1 }
+      return { state: next, events: [stateEvent(next)], stop: true }
+    }
+    const { ctx } = await setup(module)
+    const started = await start(ctx)
+    await vi.waitFor(() => { expect(advances).toBe(1) })
+    const service = internals(ctx.games)
+    await vi.waitFor(() => { expect(service.automaticAdvances.has(started.gameId)).toBe(false) })
+    const record = service.hosts.get(started.gameId)
+    if (record === undefined) throw new Error('missing Host record fixture')
+    record.agentsInitialized = false
+
+    await ctx.games.getView(started.gameId, ctx.games.resolvePrincipal().id)
+
+    await vi.waitFor(() => { expect(advances).toBe(2) })
+  })
+
   it('owns child parenting and bounded ordered mapping', async () => {
     const { ctx } = await setup()
     const started = await start(ctx)
@@ -317,7 +375,13 @@ describe('game Host utility and service edges', () => {
 
   it('reuses one hidden Bot session for consecutive game decisions', async () => {
     const { ctx } = await setup()
-    const adapter = new MockAdapter([textResponse('{"turn":1}'), textResponse('{"turn":2}')])
+    const adapter = new MockAdapter(
+      [textResponse('{"turn":1}'), textResponse('{"turn":2}')],
+      {
+        efforts: [{ id: ReasoningEffortId('high'), name: 'High' }],
+        defaultEffort: ReasoningEffortId('high'),
+      },
+    )
     ctx.llm.registerAdapter(['mock'], adapter)
     const started = await start(ctx)
     const host = ctx.agents.get(SessionId(`game-${started.gameId}`))
@@ -329,6 +393,7 @@ describe('game Host utility and service edges', () => {
       childId,
       label: 'Seat 1',
       agentOptions: { provider: 'mock', model: 'mock' },
+      reasoningEffort: ReasoningEffortId('high'),
       persona: 'You are fixed Seat 1 for this game.',
       toolFilter: { allow: [] },
     }
@@ -343,6 +408,10 @@ describe('game Host utility and service edges', () => {
     const second = await executor.turnBot(childId, [{ type: 'text', text: 'decision 2' }], 1_000)
     expect(first).toMatchObject({ childId, output: [{ type: 'text', text: '{"turn":1}' }], stopReason: 'completed' })
     expect(second).toMatchObject({ childId, output: [{ type: 'text', text: '{"turn":2}' }], stopReason: 'completed' })
+    expect(adapter.requests.map(request => request.reasoningEffort)).toEqual([
+      ReasoningEffortId('high'),
+      ReasoningEffortId('high'),
+    ])
     expect(child?.session.events.filter(event => event.type === 'turn/start')).toHaveLength(2)
     expect(adapter.requests[1]?.messages.some(message => (
       message.role === 'assistant'

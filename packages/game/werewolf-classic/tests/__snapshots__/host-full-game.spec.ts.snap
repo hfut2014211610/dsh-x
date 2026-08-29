@@ -1,6 +1,6 @@
 // Vitest Snapshot v1, https://vitest.dev/guide/snapshot.html
 
-exports[`quick-7 Session Host > plays a complete keyless game through fresh isolated children without a Host model call 1`] = `
+exports[`quick-7 Session Host > plays a complete keyless game through fixed per-game Bot sessions without a Host model call 1`] = `
 {
   "botDecisions": 17,
   "contextRevisionRange": [
@@ -8,6 +8,7 @@ exports[`quick-7 Session Host > plays a complete keyless game through fresh isol
     3,
   ],
   "finalRevision": 31,
+  "fixedBotContextRetained": true,
   "hostEventTypes": [
     "game/command-receipt",
     "werewolf/game-started",
@@ -44,7 +45,10 @@ exports[`quick-7 Session Host > plays a complete keyless game through fresh isol
     "werewolf/game-ended",
   ],
   "humanActions": 1,
-  "maxConcurrentChildren": 2,
+  "maxConcurrentChildren": 0,
+  "reasoningEfforts": [
+    "high",
+  ],
   "replayCheckpoints": 31,
   "result": {
     "factionId": "wolf",

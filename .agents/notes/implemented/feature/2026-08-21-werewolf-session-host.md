@@ -10,7 +10,7 @@ The deterministic core and one-shot runner produced detached transitions but did
 
 ## Decision
 
-Stage 3 adds one complete `@deepseek-ai/dsh-game` capability package. `GameService` is the Service Definition, `SessionGameService` is the default provider, and `GameModule` is the Consumer contract. The provider creates one idle Host Agent and Session per game, records a local principal-to-participant binding, serializes each game's mutations, owns `GameAiExecutor`, publishes `game/projection-invalidated`, and cold-resumes the deterministic `game-<GameId>` Host when a known id is read after restart. The Host model is never driven.
+Stage 3 adds one complete `@deepseek-ai/dsh-game` capability package. `GameService` is the Service Definition, `SessionGameService` is the default provider, and `GameModule` is the Consumer contract. The provider creates one idle Host Agent and Session per game, records a local principal-to-participant binding, serializes each game's mutations, owns `GameAiExecutor`, publishes `game/projection-invalidated`, and cold-resumes the deterministic `game-<GameId>` Host when a known id is read after restart. `GameModule.initializeAgents()` creates fixed game-owned Agents before a start projection returns. Modules use foreground automatic scheduling by default and may select background scheduling, which returns after the command transition and publishes later automatic steps independently through the same game queue. The Host model is never driven.
 
 Every mutating request carries a caller `requestId`; requests after start also carry `expectedGameRevision`. `game/command-receipt` records the game and module version, method, request id, canonical payload SHA-256 digest, committed revision, principal, and participant. An equal duplicate returns the current authorized projection even after automatic advancement, another payload under the same key conflicts, and a new stale request rejects. The receipt and domain transition enter one `Session.appendBatch()` call.
 
@@ -20,7 +20,7 @@ Every mutating request carries a caller `requestId`; requests after start also c
 
 ## Consequences
 
-- A real Loader composition completes `quick-7` with fresh isolated children, bounded parallelism, durable bot-context progression, no Host model call, a terminal authorized replay, and a stable snapshot of the Host event sequence.
+- A real Loader composition completes `quick-7` with fixed per-seat Bot Sessions, bounded parallelism, durable bot-context progression, incremental automatic publications, no Host model call, a terminal authorized replay, and a stable snapshot of the Host event sequence.
 - Capability rejection happens before `werewolf/game-started`; providers that inherit parent history are invalid even if they support structured output, persona, tool filtering, and depth limits.
 - The common receipt adds one required Session event type, so the generated persistence vocabulary and catalog include it.
 - Stage 4 remains responsible for the dedicated Web view. Stage 3 registers no command, slash command, or Chat-composer mutation path.

@@ -42,9 +42,9 @@ export abstract class GameService extends Service {
    */
   abstract resolvePrincipal(): LocalGamePrincipalV1
   /**
-   * Create a dedicated Host, commit start atomically, and auto-advance.
+   * Create a dedicated Host, commit start atomically, initialize fixed Agents, and schedule automatic advancement.
    * @param request - module, idempotency key, initial revision, and module input.
-   * @returns current authorized projection after automatic advancement.
+   * @returns projection after foreground advancement, or after initialization when the module schedules in the background.
    */
   abstract start<TView>(request: {
     moduleId: string
@@ -53,7 +53,16 @@ export abstract class GameService extends Service {
     input: JsonValue
   }): Promise<GameProjection<TView>>
   /**
-   * Return the current authorized view.
+   * List every game of one module authorized for the principal, newest first.
+   * @param moduleId - exact registered module id.
+   * @param principalId - authenticated caller.
+   * @returns authorized projections ordered by Host creation time.
+   */
+  abstract listViews<TView>(moduleId: string, principalId: PrincipalId): Promise<GameProjection<TView>[]>
+  /**
+   * Return the current authorized view. Reading is a side-effectful kick for a
+   * background-scheduling module: uninitialized fixed Agents plus a running
+   * game schedule one automatic advancement.
    * @param gameId - game to read.
    * @param principalId - authenticated caller.
    * @returns current authorized projection.
@@ -67,9 +76,9 @@ export abstract class GameService extends Service {
    */
   abstract getReplay<TReplay>(gameId: GameId, principalId: PrincipalId): Promise<TReplay>
   /**
-   * Commit one human action and auto-advance.
+   * Commit one human action and schedule automatic advancement.
    * @param request - authorized compare-and-set action.
-   * @returns current authorized projection after automatic advancement.
+   * @returns projection after foreground advancement, or after the action when the module schedules in the background.
    */
   abstract submitAction<TView>(request: {
     gameId: GameId
@@ -79,9 +88,9 @@ export abstract class GameService extends Service {
     action: JsonValue
   }): Promise<GameProjection<TView>>
   /**
-   * Resume one paused game and auto-advance.
+   * Resume one paused game and schedule automatic advancement.
    * @param request - authorized compare-and-set resume request.
-   * @returns current authorized projection after automatic advancement.
+   * @returns projection after foreground advancement, or after resume when the module schedules in the background.
    */
   abstract resume<TView>(request: {
     gameId: GameId

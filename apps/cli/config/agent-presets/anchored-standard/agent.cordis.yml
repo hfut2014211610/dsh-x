@@ -265,10 +265,10 @@
 
 # Windows-only `bash` tool (see custom-bash.mjs): registers the SAME tool name
 # as the persistent shell with a Minimal-compatible description, but executes
-# through the ordinary cross-platform subprocess seam (`bash -c`, resolved from
-# PATH — point `bashPath` at Git Bash explicitly when the WSL shim would
-# otherwise be picked up). No OS sandbox confinement on Windows; the tool
-# description says so.
+# through the ordinary cross-platform subprocess seam. Mounting first validates
+# an explicit `bashPath`, or finds Git Bash from the PATH-resolved `git` and
+# standard installation roots before trying a bare `bash`. No OS sandbox
+# confinement on Windows; the tool description says so.
 - id: custom-bash
   name: ./custom-bash.mjs
   disabled: !!js process.platform !== 'win32'

@@ -10,15 +10,27 @@
  * cold-start resolution closure for the pwsh rows' bare plugin names.
  */
 
-import { afterEach, describe, expect, it } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
 import { mkdtempSync, rmSync, readFileSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join, resolve } from 'node:path'
-import { fileURLToPath } from 'node:url'
+import { join, resolve, win32 } from 'node:path'
+import { fileURLToPath, pathToFileURL } from 'node:url'
 import yaml from 'js-yaml'
 import { entryListSchema } from '@deepseek-ai/cordis-plugin-include'
 import { evaluate } from '@deepseek-ai/cordis-plugin-loader'
 import { composeEntries, initProfile, loadProfile, PROFILES_DIR } from '@deepseek-ai/dsh-app-boot'
+
+interface CustomBashModule {
+  apply(ctx: unknown, config: unknown): Promise<void>
+}
+
+interface RegisteredBashTool {
+  execute(args: { command: string }, exec?: { signal?: AbortSignal }): Promise<{ text: string }>
+}
+
+async function customBashModule(presetRoot: string, preset: string): Promise<CustomBashModule> {
+  return await import(pathToFileURL(join(presetRoot, preset, 'custom-bash.mjs')).href) as CustomBashModule
+}
 
 /**
  * The effective disabled state of one row on one platform: a `!!js` expression
@@ -154,5 +166,65 @@ describe('shipped agent presets gate both shell tools by platform', () => {
       expect(disabledOn(byId.get(id)!, 'linux'), `${id} on linux`).toBe(true)
     }
     expect(byId.get('terminal-pwsh')?.config).toMatchObject({ shellDialect: 'pwsh' })
+  })
+
+  it.each(['minimal', 'anchored-standard'])('%s resolves and caches Git Bash while the preset mounts', async (preset) => {
+    const git = win32.join('D:\\Tools\\Git', 'cmd', 'git.exe')
+    const bash = win32.join('D:\\Tools\\Git', 'bin', 'bash.exe')
+    const resolveExecutable = vi.fn(async (command: string): Promise<string> => {
+      if (command === 'git') return git
+      if (command === bash) return bash
+      throw new Error(`unexpected executable ${command}`)
+    })
+    const spawn = vi.fn(() => ({
+      done: Promise.resolve({ exitCode: 0 }),
+      collected: {
+        stdout: { readFrom: () => ({ text: 'ok' }) },
+        stderr: { readFrom: () => ({ text: '' }) },
+      },
+    }))
+    let tool: RegisteredBashTool | undefined
+    const register = vi.fn((value: RegisteredBashTool) => { tool = value })
+    const stopSetupCancellation = vi.fn()
+    const fiber = { uid: 1 }
+    const plugin = await customBashModule(presetRoot, preset)
+
+    await plugin.apply({
+      subprocess: { resolveExecutable, spawn },
+      tools: { register },
+      fiber,
+      on: vi.fn(() => stopSetupCancellation),
+    }, {})
+
+    expect(resolveExecutable.mock.calls.map(call => call[0])).toEqual(['git', bash])
+    expect(register).toHaveBeenCalledOnce()
+    expect(stopSetupCancellation).toHaveBeenCalledOnce()
+    const resolvedTool = tool
+    if (resolvedTool === undefined) throw new Error('custom-bash did not register its tool')
+    await resolvedTool.execute({ command: 'printf ok' })
+    expect(resolveExecutable.mock.calls.map(call => call[0])).toEqual(['git', bash])
+    expect(spawn).toHaveBeenCalledWith(expect.objectContaining({ argv: [bash, '-c', 'printf ok'] }))
+  })
+
+  it.each(['minimal', 'anchored-standard'])('%s rejects the mount before publishing an unusable bash tool', async (preset) => {
+    const resolveExecutable = vi.fn(async (command: string): Promise<string> => {
+      throw new Error(`${command} missing`)
+    })
+    const register = vi.fn()
+    const stopSetupCancellation = vi.fn()
+    const fiber = { uid: 1 }
+    const plugin = await customBashModule(presetRoot, preset)
+
+    await expect(plugin.apply({
+      subprocess: { resolveExecutable },
+      tools: { register },
+      fiber,
+      on: vi.fn(() => stopSetupCancellation),
+    }, {})).rejects.toThrow('Git Bash is unavailable')
+
+    expect(resolveExecutable.mock.calls[0]?.[0]).toBe('git')
+    expect(resolveExecutable.mock.calls.at(-1)?.[0]).toBe('bash')
+    expect(register).not.toHaveBeenCalled()
+    expect(stopSetupCancellation).toHaveBeenCalledOnce()
   })
 })

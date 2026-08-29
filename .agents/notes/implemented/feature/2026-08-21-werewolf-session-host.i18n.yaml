@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-21-werewolf-session-host.md
-2026-08-21-werewolf-session-host.md: 62c607eddc74a8670915baa619ab821045157a07
-2026-08-21-werewolf-session-host.zh.md: da27cdcb312e6bfa9b924faae48f27141195b2b5
+2026-08-21-werewolf-session-host.md: 758e2ff86dfac04199eca7f44657e2c7719df402
+2026-08-21-werewolf-session-host.zh.md: e2396231596f33f51c0bae48518352f44fae9bdc

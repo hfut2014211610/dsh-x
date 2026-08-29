@@ -22,6 +22,7 @@ import {
   type WerewolfBotActionRequest,
 } from '../src/engine.ts'
 import { WerewolfPlayerId } from '../src/brand.ts'
+import { BOT_REASONING_EFFORTS } from '../src/runtime.ts'
 import { counterIds, EMPTY_DELTA, miniRuleSet, testLimits } from './fixtures.ts'
 import { MockAdapter } from '../../../core/agent-loop/tests/mock-adapter.ts'
 
@@ -37,7 +38,8 @@ type ScriptStep =
 /** The first legal value of the request's serialized action spec. */
 function firstLegalValue(request: ResolvedSubagentStartRequest): string | null {
   const text = request.prompt[0]?.type === 'text' ? request.prompt[0].text : ''
-  const prompt = JSON.parse(text.slice(text.indexOf('{'))) as {
+  const observationStart = text.lastIndexOf('\n\n{')
+  const prompt = JSON.parse(text.slice(observationStart + 2)) as {
     legalAction: { spec: { kind: string; targets?: string[]; options?: string[] } }
   }
   const spec = prompt.legalAction.spec
@@ -478,6 +480,86 @@ describe('runWerewolfBotDecision', () => {
     expect(whitespace.kind).toBe('accepted')
     if (whitespace.kind !== 'accepted') return
     expect(whitespace.submission.envelope.publicSpeech).toBeUndefined()
+
+    const actionSpeechWorld = await setupWorld([
+      { kind: 'structured', value: envelope({ value: '  action value is visible  ' }) },
+    ])
+    const actionSpeech = await runWerewolfBotDecision({
+      ctx: actionSpeechWorld.ctx,
+      config: config(),
+      state: kill.state,
+      rules,
+      request: talkRequest,
+      agent: actionSpeechWorld.agent,
+    })
+    expect(actionSpeech.kind).toBe('accepted')
+    if (actionSpeech.kind !== 'accepted') return
+    expect(actionSpeech.submission.envelope.publicSpeech).toBe('action value is visible')
+
+    const wrappedSpeech = await runWerewolfBotDecision({
+      ctx: actionSpeechWorld.ctx,
+      config: config(),
+      state: kill.state,
+      rules,
+      request: talkRequest,
+      agent: actionSpeechWorld.agent,
+      executor: {
+        turnBot: async childId => ({
+          childId,
+          output: [{
+            type: 'text',
+            text: JSON.stringify({
+              action: { value: { skip: false, text: 'wrapped speech is visible' } },
+              contextDelta: { memorySummary: 'I spoke during day one.' },
+              publicSpeech: 'wrapped speech is visible',
+            }),
+          }],
+          stopReason: 'completed',
+          timedOut: false,
+        }),
+      },
+    })
+    expect(wrappedSpeech.kind).toBe('accepted')
+    if (wrappedSpeech.kind !== 'accepted') return
+    expect(wrappedSpeech.attempts).toEqual([])
+    expect(wrappedSpeech.submission.envelope.action).toEqual({ value: 'wrapped speech is visible' })
+    expect(wrappedSpeech.submission.envelope.publicSpeech).toBe('wrapped speech is visible')
+
+    const fixedPrompts: string[] = []
+    const fixedOutputs = [
+      '{"legalAction":{"value":"bad"},"contextDelta":{}}',
+      '{"action":{"kind":"speak","text":"still invalid"},"contextDelta":{"beliefs":[]}}',
+      '{"action":{"value":"corrected"},"contextDelta":{}}',
+    ]
+    const fixed = await runWerewolfBotDecision({
+      ctx: actionSpeechWorld.ctx,
+      config: config({ retryLimit: 2 }),
+      state: kill.state,
+      rules,
+      request: talkRequest,
+      agent: actionSpeechWorld.agent,
+      executor: {
+        turnBot: async (childId, blocks) => {
+          fixedPrompts.push(blocks[0]?.type === 'text' ? blocks[0].text : '')
+          return {
+            childId,
+            output: [{ type: 'text', text: fixedOutputs[fixedPrompts.length - 1] ?? '' }],
+            stopReason: 'completed',
+            timedOut: false,
+          }
+        },
+      },
+    })
+    expect(fixed.kind).toBe('accepted')
+    if (fixed.kind !== 'accepted') return
+    expect(fixed.submission.envelope.publicSpeech).toBe('corrected')
+    expect(fixedPrompts[0]).toContain('"legalAction"')
+    expect(fixedPrompts[0]).toContain('action must be exactly {"value": VALUE}')
+    expect(fixedPrompts[1]).not.toContain('"decisionId"')
+    expect(fixedPrompts[1]).toContain('invalid-output')
+    expect(fixedPrompts[1]).toContain('action must be exactly {"value": VALUE}')
+    expect(fixedPrompts[2]).not.toContain('"decisionId"')
+    expect(fixedPrompts[2]).toContain('illegal-action')
   })
 
   it('rejects public speech outside text phases and above the active policy limit', async () => {
@@ -604,6 +686,7 @@ describe('runtime bot configuration', () => {
     expect(resolved.maxConcurrentBots).toBe(4)
     expect(resolved.publicTimelineEntries).toBe(24)
     expect(resolved.botAgent).toBeUndefined()
+    expect(resolved.reasoningEffort).toBeUndefined()
     expect(resolved.limits.maxCommitments).toBe(8)
   })
 
@@ -620,6 +703,14 @@ describe('runtime bot configuration', () => {
     expect(emptyAgent.werewolf.botRunnerConfig().botAgent).toBeUndefined()
   })
 
+  it.each(['', ' high', 'high ', 'hight'])('rejects an out-of-vocabulary Bot reasoning effort %j', async (value) => {
+    const ctx = new Context()
+    await expect(ctx.plugin(WerewolfRuntime, {
+      subagentProvider: 'scripted',
+      botReasoningEffort: value as (typeof BOT_REASONING_EFFORTS)[number],
+    })).rejects.toThrow()
+  })
+
   it('keeps defaults over a config-free load out of the documented surface', async () => {
     const ctx = new Context()
     const fiber = await ctx.plugin(WerewolfRuntime, {
@@ -627,6 +718,7 @@ describe('runtime bot configuration', () => {
       botRetryLimit: 0,
       botFailurePolicy: 'pause-game',
       botAgent: { provider: 'mock', model: 'bot' },
+      botReasoningEffort: 'high',
       maxConcurrentBots: 2,
       contextLimits: {
         memorySummaryChars: 10, beliefBasisChars: 10, commitmentChars: 10, strategyChars: 10, maxCommitments: 2,
@@ -638,6 +730,7 @@ describe('runtime bot configuration', () => {
     expect(resolved.failurePolicy).toBe('pause-game')
     expect(resolved.maxConcurrentBots).toBe(2)
     expect(resolved.botAgent).toEqual({ provider: 'mock', model: 'bot' })
+    expect(resolved.reasoningEffort).toBe('high')
     expect(resolved.limits.memorySummaryChars).toBe(10)
     expect(resolved.publicTimelineEntries).toBe(4)
     void fiber

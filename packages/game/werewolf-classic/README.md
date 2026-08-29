@@ -17,6 +17,6 @@ The plugin is a function plugin (`name`, `inject: ['werewolf']`, `apply`) that r
 
 ## Known Limitations and Deferred Work
 
-- **No sheriff, hunter, or guard roles** — the extension contracts admit them; this package ships only the quick-7 roster ([feature note scope](../../../.agents/notes/proposed/feature/2026-08-20-configurable-werewolf-mode.md)).
+- **No sheriff, hunter, or guard roles** — the extension contracts admit them; this package ships only the quick-7 roster.
 - **Display copy is keyed English** — role `publicName`s and announcement keys are stable strings; localization arrives with the view stage.
 - **No death-side role reveal** — deaths announce without revealing the victim's role; a reveal variant would be a new rule-set configuration over an extended announce phase, not an engine change.

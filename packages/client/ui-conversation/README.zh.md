@@ -14,7 +14,7 @@
 
 功能插件可以调用 `ctx.conversation.declareCompanionView`，把一个已注册视图放在指定活跃视图旁边。resolver 提供伴随视图 id 与本地化面板标题。会话主体通过自身拥有的同一 `conversation.view` render share 渲染两个条目，隐藏互斥 tab 栏，为伴随视图提供独立滚动区，并把常驻 composer 放在该栏。两栏之间有一条分隔条让伴随视图这一栏可调宽：初始宽度取自内置 CSS 宽度在当前视口下解析出的值，在面板完成布局后量一次；另有一个百分比上限，保证在宽窗口下拖宽的栏不会在窗口变窄后吃掉主视图。缺失、指向自身或尚未注册的伴随视图会被忽略；没有伴随视图的会话继续使用普通视图环。
 
-`ctx.conversation.declarePreferredView` 是可逆的会话视图覆盖。有效的优先 id 会临时先于持久化 tab 生效，但不会写入它；resolver 恢复为 null 后，之前的 tab 会重新活跃。已注册的优先视图还会让空白会话立即离开 Hero，移除后则恢复 Hero。根组件、页头与主体都会订阅该偏好所依赖的会话列表投影，因此 agent preset 切换一经确认，组装布局便会在同一轮渲染中更新。composer selector 接收同一份由 Host 确认的 `agentPreset`，因此专用产品视图无需根据客户端路由或标题猜测，就能替换普通消息输入。
+`ctx.conversation.declarePreferredView(viewId, matches)` 声明的是会话自有视图，而不是另一个可切换 tab。该视图不会出现在 tab 栏中，只有 matcher 接纳当前会话时才能活跃；匹配期间它优先于持久化的普通 tab，但不会写入该状态，后续不再匹配时会恢复原 tab。匹配到已注册视图还会让空白会话立即离开 Hero。根组件、页头与主体都会订阅该偏好所依赖的会话列表投影，因此 agent preset 切换一经确认，组装布局便会在同一轮渲染中更新。composer selector 接收同一份由 Host 确认的 `agentPreset`，因此专用产品视图无需根据客户端路由或标题猜测，就能替换普通消息输入。
 
 Chat 业务行是彼此独立的注册表贡献，不是封闭的内建联合。Client 插件通过 declaration merging 增加类型化 `ChatNodeDataMap` key，在 `ctx.conversationEvents` 上注册 `ConversationNodeDefinition`，再向 `conversation.chat.node` 注册匹配的 keyed renderer；它无须修改会话 fold 或中央 renderer switch。稳定事件 id、append/prepend 回放、Location data 与 renderer 约束见 [Conversation Node 实操手册](../../../docs/cookbook/adding-a-conversation-node.zh.md)。
 

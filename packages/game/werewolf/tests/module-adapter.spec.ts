@@ -14,7 +14,7 @@ import {
 import { projectWerewolfHumanView } from '../src/human-projection.ts'
 import type { WerewolfEvent } from '../src/events.ts'
 import { WerewolfGameModule } from '../src/module-adapter.ts'
-import WerewolfRuntime from '../src/runtime.ts'
+import WerewolfRuntime, { BOT_REASONING_EFFORTS } from '../src/runtime.ts'
 import type { WerewolfGameStateV1, WerewolfRuleSetInputV1 } from '../src/types.ts'
 import {
   counterIds,
@@ -36,7 +36,11 @@ const CAPABLE: SubagentProvider['capabilities'] = {
   persona: true,
 }
 
-async function setup(options: { failurePolicy?: 'auto-action' | 'pause-game'; inheritsParentContext?: boolean } = {}) {
+async function setup(options: {
+  failurePolicy?: 'auto-action' | 'pause-game'
+  inheritsParentContext?: boolean
+  botReasoningEffort?: (typeof BOT_REASONING_EFFORTS)[number]
+} = {}) {
   const ctx = new Context()
   await ctx.plugin(SubagentRuntime)
   await ctx.plugin(WerewolfRuntime, {
@@ -44,6 +48,7 @@ async function setup(options: { failurePolicy?: 'auto-action' | 'pause-game'; in
     botRetryLimit: 0,
     botFailurePolicy: options.failurePolicy ?? 'auto-action',
     maxConcurrentBots: 2,
+    ...(options.botReasoningEffort === undefined ? {} : { botReasoningEffort: options.botReasoningEffort }),
   })
   ctx.subagents.registerProvider({
     name: 'module-test',
@@ -203,6 +208,18 @@ describe('WerewolfGameModule input and mutation boundaries', () => {
 })
 
 describe('WerewolfGameModule advancement, projection, and replay', () => {
+  it('provisions every non-human seat once during game initialization', async () => {
+    const { module } = await setup({ botReasoningEffort: 'high' })
+    const start = await prepared(module)
+    const provisioned: Array<Parameters<GameAiExecutor['provisionBot']>[0]> = []
+    const executor = idleExecutor()
+    executor.provisionBot = async (request) => { provisioned.push(request) }
+    await module.initializeAgents(start.state, executor)
+    expect(provisioned).toHaveLength(start.state.players.filter(player => !player.human).length)
+    expect(new Set(provisioned.map(request => request.childId)).size).toBe(provisioned.length)
+    expect(provisioned.every(request => request.reasoningEffort === 'high')).toBe(true)
+  })
+
   it('opens a phase and stops when the human actor is pending', async () => {
     const { module, rules } = await setup()
     const start = await prepared(module)

@@ -23,7 +23,7 @@ declare module '@deepseek-ai/cordis' {
 
 /** Registers the Werewolf module and exposes the UI-facing typed methods. */
 export class WerewolfGameGateway extends TypertRemoteService {
-  static inject = ['games', 'werewolf', 'subagents']
+  static inject = ['agentDefaultModel', 'games', 'werewolf', 'subagents']
 
   constructor(ctx: Context) {
     super(ctx, 'werewolfGame')
@@ -31,12 +31,21 @@ export class WerewolfGameGateway extends TypertRemoteService {
   }
 
   /**
-   * List the registered rule sets for the lobby, before any game exists.
-   * @returns rule-set options sorted by id then revision.
+   * List registered rule sets and resumable games for the local lobby.
+   * @returns rule-set options plus authorized running and paused games.
    */
   @Remote('getLobby')
-  getLobby(): WerewolfLobbyViewV1 {
-    return { version: 1, availableRuleSets: listWerewolfRuleSetOptions(this.ctx.werewolf) }
+  async getLobby(): Promise<WerewolfLobbyViewV1> {
+    const principal = this.ctx.games.resolvePrincipal()
+    const games = await this.ctx.games.listViews<WerewolfHumanViewV1>('werewolf', principal.id)
+    return {
+      version: 1,
+      availableRuleSets: listWerewolfRuleSetOptions(this.ctx.werewolf),
+      activeGames: games
+        .map(game => game.view)
+        .filter((game): game is WerewolfHumanViewV1 & { status: 'running' | 'paused' } => game.status !== 'ended')
+        .map(({ gameId, gameRevision, status, day, ruleSet }) => ({ gameId, gameRevision, status, day, ruleSet })),
+    }
   }
 
   /**

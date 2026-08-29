@@ -39,6 +39,8 @@ interface HostRecord {
   session: Session
   handle?: AgentHandle
   botHandles: Map<SessionId, AgentHandle>
+  agentsInitialized: boolean
+  agentInitialization?: Promise<void>
 }
 
 function botStopReason(reason: TurnEndReason): SubagentStopReason {
@@ -126,6 +128,7 @@ export class SessionGameService extends GameService {
   private readonly startReceipts = new Map<string, GameId>()
   private readonly tails = new Map<string, Promise<unknown>>()
   private readonly recoveries = new Map<GameId, Promise<HostRecord>>()
+  private readonly automaticAdvances = new Map<GameId, Promise<void>>()
 
   constructor(ctx: Context) {
     super(ctx)
@@ -195,6 +198,7 @@ export class SessionGameService extends GameService {
         session: handle.agent.session,
         handle,
         botHandles: new Map(),
+        agentsInitialized: false,
       }
       try {
         const receipt: GameCommandReceiptV1 = {
@@ -213,9 +217,14 @@ export class SessionGameService extends GameService {
         this.startReceipts.set(`${principal.id}\u0000${request.requestId}`, record.gameId)
         this.invalidate(record.gameId, module.revision(prepared.state))
         await handle.agent.runMaintenance(async (signal) => {
-          await this.advance(record, module, prepared.state, handle.agent, signal)
+          await this.initializeAgents(record, module, prepared.state, handle.agent, signal)
+          if (module.automaticScheduling !== 'background') {
+            await this.advance(record, module, prepared.state, handle.agent, signal)
+          }
         })
-        return this.project<TView>(record)
+        const projection = this.project<TView>(record)
+        if (module.automaticScheduling === 'background') this.scheduleAdvance(record.gameId)
+        return projection
       } catch (error) {
         if (!this.hosts.has(record.gameId)) await handle.dispose()
         throw error
@@ -226,7 +235,27 @@ export class SessionGameService extends GameService {
   /** @inheritdoc */
   async getView<TView>(gameId: GameId, principalId: PrincipalId): Promise<GameProjection<TView>> {
     const record = await this.authorize(gameId, principalId)
-    return this.project<TView>(record)
+    const module = this.moduleFor(record)
+    const state = this.restore(module, record)
+    const projection = this.project<TView>(record, state)
+    if (
+      !record.agentsInitialized
+      && module.automaticScheduling === 'background'
+      && module.status(state) === 'running'
+    ) {
+      this.scheduleAdvance(record.gameId)
+    }
+    return projection
+  }
+
+  /** @inheritdoc */
+  // oxlint-disable-next-line typescript/require-await -- async keeps a missing-module rejection a rejection, not a synchronous throw
+  async listViews<TView>(moduleId: string, principalId: PrincipalId): Promise<GameProjection<TView>[]> {
+    this.requireModule(moduleId)
+    return [...this.hosts.values()]
+      .filter(record => record.moduleId === moduleId && record.principalId === principalId)
+      .sort((left, right) => right.session.header.createdAt - left.session.header.createdAt)
+      .map(record => this.project<TView>(record))
   }
 
   /** @inheritdoc */
@@ -315,31 +344,129 @@ export class SessionGameService extends GameService {
       await agent.runMaintenance(async (signal) => {
         this.append(record.session, [receiptEvent(receipt), ...transition.events])
         this.invalidate(record.gameId, module.revision(transition.state))
-        if (autoAdvance) await this.advance(record, module, transition.state, agent, signal)
+        if (autoAdvance) {
+          await this.initializeAgents(record, module, transition.state, agent, signal)
+          if (module.automaticScheduling !== 'background') {
+            await this.advance(record, module, transition.state, agent, signal)
+          }
+        }
       })
       if (module.status(transition.state) === 'ended') await this.releaseBots(record)
-      return this.project<TView>(record)
+      const projection = this.project<TView>(record)
+      if (autoAdvance && module.automaticScheduling === 'background') this.scheduleAdvance(record.gameId)
+      return projection
     })
   }
 
-  private async advance(record: HostRecord, module: GameModule, initial: unknown, agent: Agent, signal: AbortSignal): Promise<void> {
+  private async advance(
+    record: HostRecord,
+    module: GameModule,
+    initial: unknown,
+    agent: Agent,
+    signal: AbortSignal,
+  ): Promise<void> {
     let state = initial
     while (module.status(state) === 'running') {
-      const executor = this.executor(record, agent, signal)
-      const step = await module.advance(state, record.session.events, executor)
-      if (step.events.length === 0) {
-        if (!step.stop) throw new GameHostError('GAME_INVALID_TRANSITION', `game module ${module.id} returned an empty non-stopping advance`)
+      const result = await this.advanceStep(record, module, state, agent, signal)
+      state = result.state
+      if (result.stopped) {
+        if (module.status(state) === 'ended') await this.releaseBots(record)
         return
       }
-      this.requireProgress(module, state, step.state, step.events)
-      this.append(record.session, step.events)
-      const previousRevision = module.revision(state)
-      state = step.state
-      /* v8 ignore else -- requireProgress immediately above proves the revision changed */
-      if (module.revision(state) !== previousRevision) this.invalidate(record.gameId, module.revision(state))
-      if (step.stop) return
     }
     await this.releaseBots(record)
+  }
+
+  /**
+   * Publish one atomic advance unit: call the module, validate progress, and append its events.
+   * @returns the post-step state plus whether the module told the Host to stop advancing.
+   */
+  private async advanceStep(
+    record: HostRecord,
+    module: GameModule,
+    state: unknown,
+    agent: Agent,
+    signal: AbortSignal,
+  ): Promise<{ state: unknown; stopped: boolean }> {
+    const step = await module.advance(state, record.session.events, this.executor(record, agent, signal))
+    if (step.events.length === 0) {
+      if (!step.stop) throw new GameHostError('GAME_INVALID_TRANSITION', `game module ${module.id} returned an empty non-stopping advance`)
+      return { state, stopped: true }
+    }
+    this.requireProgress(module, state, step.state, step.events)
+    this.append(record.session, step.events)
+    this.invalidate(record.gameId, module.revision(step.state))
+    return { state: step.state, stopped: step.stop }
+  }
+
+  private async initializeAgents(
+    record: HostRecord,
+    module: GameModule,
+    state: unknown,
+    agent: Agent,
+    signal: AbortSignal,
+  ): Promise<void> {
+    if (record.agentsInitialized) return
+    const pending = record.agentInitialization
+    if (pending !== undefined) {
+      await pending
+      return
+    }
+    const initialization = (async () => {
+      await module.initializeAgents?.(state, this.executor(record, agent, signal))
+      record.agentsInitialized = true
+    })()
+    record.agentInitialization = initialization
+    try {
+      await initialization
+    } finally {
+      if (record.agentInitialization === initialization) delete record.agentInitialization
+    }
+  }
+
+  private scheduleAdvance(gameId: GameId): void {
+    if (this.automaticAdvances.has(gameId)) return
+    let continueAutomatically = false
+    const task = Promise.resolve().then(async () => {
+      try {
+        continueAutomatically = await this.enqueue(String(gameId), async () => {
+          const record = await this.recoverHost(gameId)
+          const module = this.moduleFor(record)
+          const state = this.restore(module, record)
+          if (module.status(state) !== 'running') return false
+          const agent = this.requireAgent(record)
+          return await agent.runMaintenance(async (signal) => {
+            await this.initializeAgents(record, module, state, agent, signal)
+            return await this.advanceOnce(record, module, state, agent, signal)
+          })
+        })
+      } catch (error) {
+        this.ctx.logger.error(`game ${gameId} automatic advance failed: ${error instanceof Error ? error.message : String(error)}`)
+      } finally {
+        if (this.automaticAdvances.get(gameId) === task) this.automaticAdvances.delete(gameId)
+        if (continueAutomatically) this.scheduleAdvance(gameId)
+      }
+    })
+    this.automaticAdvances.set(gameId, task)
+  }
+
+  /**
+   * Publish one background-scheduling step.
+   * @returns whether another scheduled step should follow this one.
+   */
+  private async advanceOnce(
+    record: HostRecord,
+    module: GameModule,
+    state: unknown,
+    agent: Agent,
+    signal: AbortSignal,
+  ): Promise<boolean> {
+    const result = await this.advanceStep(record, module, state, agent, signal)
+    if (module.status(result.state) === 'ended') {
+      await this.releaseBots(record)
+      return false
+    }
+    return !result.stopped
   }
 
   private executor(record: HostRecord, host: Agent, signal: AbortSignal): GameAiExecutor {
@@ -354,24 +481,44 @@ export class SessionGameService extends GameService {
         }
         const childDepth = resolveChildDepth(host, request.maxDepth)
         const policies = captureDelegatedPolicyOverrides(host)
-        const handle = await this.ctx.agents.create({
-          sessionId: request.childId,
-          meta: {
-            ...(host.session.header.cwd === undefined ? {} : { cwd: host.session.header.cwd }),
-            parentSession: host.id,
-            delegationDepth: childDepth,
-          },
-          agentOptions: resolveChildAgentOptions(host, request.agentOptions, childDepth),
-          signal,
-          setup: (childCtx) => {
-            applyChildComposition(childCtx, host, {
-              persona: request.persona,
-              ...(request.toolFilter === undefined ? {} : { toolFilter: request.toolFilter }),
-            })
-          },
-        })
+        const agentOptions = resolveChildAgentOptions(host, request.agentOptions, childDepth)
+        const setup = (childCtx: Context) => {
+          applyChildComposition(childCtx, host, {
+            persona: request.persona,
+            ...(request.toolFilter === undefined ? {} : { toolFilter: request.toolFilter }),
+          })
+          const reasoningEffort = request.reasoningEffort
+          if (reasoningEffort !== undefined) {
+            childCtx.on('agent/request', async (_payload, next) => ({
+              ...await next(),
+              reasoningEffort,
+            }))
+          }
+        }
+        const persisted = this.ctx.sessions.get(request.childId)
+        if (persisted !== undefined && persisted.header.parentSession !== host.id) {
+          throw new Error(`game Bot session ${request.childId} belongs to another parent`)
+        }
+        const handle = persisted === undefined
+          ? await this.ctx.agents.create({
+            sessionId: request.childId,
+            meta: {
+              ...(host.session.header.cwd === undefined ? {} : { cwd: host.session.header.cwd }),
+              parentSession: host.id,
+              delegationDepth: childDepth,
+            },
+            agentOptions,
+            signal,
+            setup,
+          })
+          : await this.ctx.agents.resume({
+            resumeSessionId: request.childId,
+            agentOptions,
+            signal,
+            setup,
+          })
         try {
-          appendDelegatedPolicyOverrides(handle.agent.session, policies)
+          if (persisted === undefined) appendDelegatedPolicyOverrides(handle.agent.session, policies)
           record.botHandles.set(request.childId, handle)
         } catch (error) {
           await handle.dispose()
@@ -435,9 +582,13 @@ export class SessionGameService extends GameService {
     session.appendBatch(events.map(event => ({ type: event.type, data: event.data })) as SessionAppendEntry[])
   }
 
-  private project<TView>(record: HostRecord): GameProjection<TView> {
+  /**
+   * Project the authorized view for one bound participant.
+   * @param restored - precomputed module state; omission replays the Host log.
+   */
+  private project<TView>(record: HostRecord, restored?: unknown): GameProjection<TView> {
     const module = this.moduleFor(record)
-    const state = this.restore(module, record)
+    const state = restored ?? this.restore(module, record)
     return {
       gameId: record.gameId,
       gameRevision: module.revision(state),
@@ -543,6 +694,7 @@ export class SessionGameService extends GameService {
       participantId: receipt.participantId,
       session,
       botHandles: new Map(),
+      agentsInitialized: false,
     }
     this.hosts.set(record.gameId, record)
     this.startReceipts.set(`${record.principalId}\u0000${receipt.requestId}`, record.gameId)

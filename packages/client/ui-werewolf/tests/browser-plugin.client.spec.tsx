@@ -2,7 +2,7 @@
 /**
  * ui-werewolf browser half on a real cordis Context with a fake sessions face
  * and a Service-based Remote double whose `werewolfGame` namespace answers per
- * script: the plugin claims the whole-frame shell for Werewolf sessions, and
+ * script: the plugin claims the whole-frame shell only for its window URL, and
  * the inject face unwraps
  * each Remote verb's ok/error strip (a not-ok answer throws the error
  * message), forwards start/getView/submitAction/resume/abortGame/getReplay
@@ -25,7 +25,11 @@ import type {
 } from '@deepseek-ai/dsh-werewolf/types'
 import { apply as hostApply } from '../src/index.ts'
 
-afterEach(cleanup)
+afterEach(() => {
+  cleanup()
+  vi.restoreAllMocks()
+  window.history.replaceState(null, '', '/')
+})
 
 const sid = (k: string): SessionId => k as SessionId
 
@@ -67,6 +71,7 @@ function lobbyFixture(): WerewolfLobbyViewV1 {
     availableRuleSets: [
       { id: 'quick-7', revision: 1, displayName: 'Quick 7-player game', playerCount: 7 },
     ],
+    activeGames: [],
   }
 }
 
@@ -108,7 +113,11 @@ function viewFixture(): WerewolfHumanViewV1 {
 const REPLAY = { version: 1 as const, gameId: 'g1', finalRevision: 2, checkpoints: [] }
 
 /** Boot the plugin over fake faces; the werewolfGame namespace answers per script. */
-async function bench(options: { failWith?: string; hostInitiallyVisible?: boolean } = {}) {
+async function bench(options: { failWith?: string; dedicated?: boolean; gameId?: string; current?: string } = {}) {
+  const dedicated = options.dedicated ?? true
+  window.history.replaceState(null, '', dedicated
+    ? `/?dshMode=werewolf${options.gameId === undefined ? '' : `&gameId=${options.gameId}`}`
+    : '/')
   const ctx = new Context()
   const remote = new RemoteDouble(ctx)
   const answer = <T,>(value: T) => async () =>
@@ -129,6 +138,7 @@ async function bench(options: { failWith?: string; hostInitiallyVisible?: boolea
   ctx.slots.register({
     name: 'root', children: {
       'shell.surface': { kind: 'chain', scope: 'session-maybe' },
+      'sidebar.footer.action': { kind: 'list', scope: 'root' },
     },
   } as never, (() => null) as never)
   ctx.provide('locale', new LocaleRuntime(ctx))
@@ -138,11 +148,11 @@ async function bench(options: { failWith?: string; hostInitiallyVisible?: boolea
   const byId: Record<string, { agentPreset: string }> = {
     s1: { agentPreset: 'werewolf' },
     s2: { agentPreset: 'coding' },
-    ...(options.hostInitiallyVisible === false ? {} : { 'game-g1': { agentPreset: 'werewolf' } }),
+    'game-g1': { agentPreset: 'werewolf' },
   }
   ctx.provide('sessions', {
     list: {
-      getSnapshot: () => ({ byId }),
+      getSnapshot: () => ({ byId, current: options.current === undefined ? undefined : sid(options.current) }),
       subscribe: (listener: () => void) => {
         sessionListeners.add(listener)
         return () => { sessionListeners.delete(listener) }
@@ -153,6 +163,7 @@ async function bench(options: { failWith?: string; hostInitiallyVisible?: boolea
   })
   const fiber = ctx.plugin({ inject: [...inject], apply: clientApply })
   const surfaceEntry = () => ctx.slots.entries('shell.surface')[0]
+  const launcherEntry = () => ctx.slots.entries('sidebar.footer.action')[0]
   const surfaceInjected = (sessionId: SessionId): WerewolfSurfaceInjected =>
     (surfaceEntry()?.inject as unknown as ((id: SessionId | undefined) => WerewolfSurfaceInjected))(sessionId)
   return {
@@ -163,45 +174,52 @@ async function bench(options: { failWith?: string; hostInitiallyVisible?: boolea
     open,
     clear,
     surfaceEntry,
+    launcherEntry,
     verbs: () => surfaceInjected(sid('s1')).view,
     hostVerbs: () => surfaceInjected(sid('game-g1')).view,
-    publishHost: () => {
-      byId['game-g1'] = { agentPreset: 'werewolf' }
-      for (const listener of [...sessionListeners]) listener()
-    },
   }
 }
 
 describe('ui-werewolf browser plugin', () => {
-  it('claims the whole frame only for Werewolf sessions and exits through the dedicated action', async () => {
+  it('claims the whole frame only in the dedicated window and closes that window on exit', async () => {
+    const close = vi.spyOn(window, 'close').mockImplementation(() => {})
     const b = await bench()
     await b.fiber.await()
     const entry = b.surfaceEntry()
     const select = entry?.select as ((owner: ShellSurfaceOwnerProps) => unknown) | undefined
-    expect(select?.({ agentPreset: 'werewolf' })).toEqual({ agentPreset: 'werewolf' })
-    expect(select?.({ agentPreset: 'coding' })).toBeNull()
+    expect(select?.({ agentPreset: 'werewolf' })).toEqual({ mode: 'werewolf-window' })
+    expect(select?.({ agentPreset: 'coding' })).toEqual({ mode: 'werewolf-window' })
+    window.history.replaceState(null, '', '/')
     expect(select?.({})).toBeNull()
     const injected = (entry?.inject as unknown as ((sessionId: SessionId | undefined) => WerewolfSurfaceInjected) | undefined)?.(sid('s1'))
     injected?.exitMode()
-    expect(b.clear).toHaveBeenCalledOnce()
+    expect(close).toHaveBeenCalledOnce()
   })
 
-  it('binds Host Sessions to their game and opens the dedicated Host after start', async () => {
-    const b = await bench()
+  it('restores the game id from the dedicated URL and updates that route after start', async () => {
+    const b = await bench({ gameId: 'g1' })
     await b.fiber.await()
     expect(b.hostVerbs().initialGameId).toBe('g1')
-    expect(b.verbs().initialGameId).toBeUndefined()
-    b.verbs().openGame('g1')
-    expect(b.open).toHaveBeenCalledWith(sid('game-g1'))
+    b.verbs().openGame('g2')
+    expect(new URL(window.location.href).searchParams.get('gameId')).toBe('g2')
+    expect(b.open).not.toHaveBeenCalled()
   })
 
-  it('waits for a newly published Host before navigating to it', async () => {
-    const b = await bench({ hostInitiallyVisible: false })
+  it('opens the game launcher in a named isolated window', async () => {
+    const openWindow = vi.spyOn(window, 'open').mockImplementation(() => null)
+    const b = await bench({ dedicated: false, current: 's2' })
     await b.fiber.await()
-    b.verbs().openGame('g1')
-    expect(b.open).not.toHaveBeenCalled()
-    b.publishHost()
-    expect(b.open).toHaveBeenCalledWith(sid('game-g1'))
+    const injected = (b.launcherEntry()?.inject as unknown as () => { launch: () => void })()
+    injected.launch()
+    const [url, target] = openWindow.mock.calls[0] ?? []
+    expect(new URL(String(url)).searchParams.get('dshMode')).toBe('werewolf')
+    expect(target).toBe('dsh-werewolf')
+  })
+
+  it('clears a persisted legacy game session from the primary window', async () => {
+    const b = await bench({ dedicated: false, current: 's1' })
+    await b.fiber.await()
+    expect(b.clear).toHaveBeenCalledOnce()
   })
 
   it('unwraps each Remote verb and forwards requests verbatim', async () => {

@@ -117,6 +117,7 @@ function byRecency(a: SessionSummary, b: SessionSummary): number {
  */
 function sessionVisible(session: SessionSummary, current: SessionId | undefined, archived: ReadonlySet<SessionId>): boolean {
   return session.origin !== 'subagent'
+    && session.agentPreset !== 'werewolf'
     && !archived.has(session.id)
     && (!session.blank || session.id === current)
 }

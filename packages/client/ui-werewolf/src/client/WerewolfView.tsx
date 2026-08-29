@@ -49,8 +49,8 @@ interface FieldChoice {
 export interface WerewolfViewInjected {
   /** Game bound to the rendered Host Session, when this is not a launcher. */
   initialGameId?: string
-  /** Navigate from a launcher session to the dedicated game Host Session. */
-  openGame: (gameId: string) => void
+  /** Persist the selected game in the dedicated window URL, or clear it for the lobby. */
+  openGame: (gameId?: string) => void
   /** Lobby listing available before any game exists. */
   getLobby: () => Promise<WerewolfLobbyViewV1>
   /** Start one game on the exact rule-set pair with a fresh seed. */
@@ -94,9 +94,9 @@ function fill(template: string, params?: Record<string, string | number>): strin
 }
 
 /** The main view component; see the module doc for the interaction states. */
-export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected): React.JSX.Element {
+export function WerewolfView(props: { sessionId?: string | undefined } & WerewolfViewInjected): React.JSX.Element {
   const {
-    sessionId, translate, initialGameId, getLobby, getView, subscribeInvalidated, openGame,
+    translate, initialGameId, getLobby, getView, subscribeInvalidated, openGame,
   } = props
   const t = useCallback((key: WerewolfKey, params?: Record<string, string | number>) => fill(translate(key), params), [translate])
   const [lobby, setLobby] = useState<WerewolfLobbyViewV1 | null>(null)
@@ -186,7 +186,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
     if (initialGameId === undefined) loadLobby()
     else loadGame(initialGameId)
     return stop
-  }, [sessionId, initialGameId, subscribeInvalidated, getView, applyResult, fail, loadLobby, loadGame])
+  }, [initialGameId, subscribeInvalidated, getView, applyResult, fail, loadLobby, loadGame])
 
   const phaseInstanceId = view?.phase?.phaseInstanceId
   useEffect(() => {
@@ -244,6 +244,31 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
       <section className={styles.lobby} aria-label={t('lobby.title')} data-testid="werewolf-lobby">
         <h2>{t('lobby.title')}</h2>
         <p>{t('lobby.subtitle')}</p>
+        {(lobby?.activeGames ?? []).length > 0 && (
+          <section className={styles.activeGames} aria-label={t('lobby.activeTitle')}>
+            <h3>{t('lobby.activeTitle')}</h3>
+            <ul>
+              {(lobby?.activeGames ?? []).map(game => (
+                <li key={game.gameId}>
+                  <div>
+                    <strong>{game.ruleSet.displayName}</strong>
+                    <span>{t('lobby.activeMeta', { day: game.day, status: t(`status.${game.status}`) })}</span>
+                  </div>
+                  <button
+                    type="button"
+                    disabled={busy}
+                    onClick={() => {
+                      openGame(game.gameId)
+                      loadGame(game.gameId)
+                    }}
+                  >
+                    {t('lobby.continue')}
+                  </button>
+                </li>
+              ))}
+            </ul>
+          </section>
+        )}
         {(lobby?.availableRuleSets ?? []).length === 0
           ? <p role="status">{t('lobby.unavailable')}</p>
           : (
@@ -313,6 +338,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
               setReady(false)
               setReplay(null)
               setFinding(null)
+              openGame()
               loadLobby()
             }}
           >
@@ -378,6 +404,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
   }
 
   const night = view.phase !== null && view.phase.segment === 'night'
+  const teammateIds = new Set(view.self.teammates.map(teammate => teammate.playerId))
   const speechFlow = view.phase?.speech ?? null
   const humanSeat = view.players.find(player => player.human)
   const selfAlive = humanSeat?.alive ?? true
@@ -510,6 +537,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
               const angle = count > 0 ? (index / count) * 360 - 90 : 0
               const findingIndex = latestNoticeIndexForTarget(view.self.notices, player.playerId)
               const known = findingIndex >= 0
+              const teammate = teammateIds.has(player.playerId)
               return (
                 <li
                   key={player.playerId}
@@ -519,6 +547,7 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
                     player.alive ? '' : styles.dead,
                     player.human ? styles.self : '',
                     known ? styles.known : '',
+                    teammate ? styles.teammate : '',
                     selectedTargetOf(selected) === player.playerId ? styles.selected : '',
                   ].filter(Boolean).join(' ')}
                   style={{ '--seat-angle': `${angle}deg` } as React.CSSProperties}
@@ -535,6 +564,12 @@ export function WerewolfView(props: { sessionId: string } & WerewolfViewInjected
                     {player.displayName}
                     {player.human ? ` (${t('table.you')})` : ''}
                   </span>
+                  {teammate && (
+                    <span className={styles.teammateBadge} aria-label={t('table.teammate')}>
+                      <span aria-hidden="true">◆</span>
+                      {t('table.teammate')}
+                    </span>
+                  )}
                   {player.alive
                     ? player.human
                       ? <span>{view.self.role.name}</span>

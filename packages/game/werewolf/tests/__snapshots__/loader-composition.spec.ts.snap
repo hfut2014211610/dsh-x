@@ -3,7 +3,7 @@
 exports[`Werewolf real Loader composition > boots the YAML surface and snapshots an illegal-action retry into a fresh child > authorized bot prompt and retry contract 1`] = `
 [
   {
-    "instructionPrefix": "Return exactly one JSON object matching the requested output schema: the legal action, your context delta, and public speech only when the schema permits it. The legalAction.spec field enumerates every legal value; anything else is rejected and retried. The context delta updates only your own subjective beliefs, commitments, strategy, and memory summary.",
+    "instructionPrefix": "Return exactly one JSON object with the two root keys action and contextDelta; do not add any other root key. Never put kind, text, target, option, legalAction, beliefs, or commitments beside those root keys. contextDelta contains only changed subjective state and may use only beliefUpdates, addCommitments, settleCommitments, strategy, and memorySummary; use {} when nothing changes and never copy the full prior context. For this phase, action must be exactly {"value": VALUE}. VALUE must satisfy legalAction.spec; null is not allowed.",
     "label": "werewolf night.kill seat 3 attempt 1",
     "maxDepth": 1,
     "outputSchema": {
@@ -169,7 +169,7 @@ exports[`Werewolf real Loader composition > boots the YAML surface and snapshots
     },
   },
   {
-    "instructionPrefix": "Return exactly one JSON object matching the requested output schema: the legal action, your context delta, and public speech only when the schema permits it. The legalAction.spec field enumerates every legal value; anything else is rejected and retried. The context delta updates only your own subjective beliefs, commitments, strategy, and memory summary.
+    "instructionPrefix": "Return exactly one JSON object with the two root keys action and contextDelta; do not add any other root key. Never put kind, text, target, option, legalAction, beliefs, or commitments beside those root keys. contextDelta contains only changed subjective state and may use only beliefUpdates, addCommitments, settleCommitments, strategy, and memorySummary; use {} when nothing changes and never copy the full prior context. For this phase, action must be exactly {"value": VALUE}. VALUE must satisfy legalAction.spec; null is not allowed.
 
 Previous attempt rejected: illegal-action: target is not among the legal targets",
     "label": "werewolf night.kill seat 3 attempt 2",

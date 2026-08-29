@@ -27,6 +27,8 @@ import type { WerewolfBotActionRequest } from './types.ts'
 export interface WerewolfProjectionLimitsV1 {
   /** How many trailing public timeline entries the prompt carries. */
   publicTimelineEntries: number
+  /** Exclude public entries already delivered to this fixed Bot session. */
+  afterGameRevision?: number
 }
 
 export type { WerewolfActionSpecJsonV1, WerewolfSingleActionSpecJsonV1 } from './types.ts'
@@ -141,7 +143,10 @@ export function projectWerewolfBotObservation(
     teammates,
     day: state.day,
   })
+  // Timeline entry ids are `<gameRevision>:<ordinal>` (reducer.ts); parse the numeric prefix.
   const timeline = state.timeline
+    .filter(entry => limits.afterGameRevision === undefined
+      || Number(entry.id.split(':', 1)[0]) > limits.afterGameRevision)
     .slice(-Math.max(1, limits.publicTimelineEntries))
     .map(entry => ({
       day: entry.day,

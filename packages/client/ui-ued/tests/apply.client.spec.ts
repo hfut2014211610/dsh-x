@@ -13,7 +13,7 @@ import { apply, inject } from '../src/client/index.ts'
 import type { UedViewInjected } from '../src/client/UedView.tsx'
 
 
-type PreferredView = (sessionId: string) => string | null
+type PreferredView = (sessionId: string) => boolean
 type CompanionView = (sessionId: string, activeViewId: string) => { id: string; label: string } | null
 
 async function bench(sessions: Record<string, { agentPreset?: string }> = {}) {
@@ -37,9 +37,14 @@ async function bench(sessions: Record<string, { agentPreset?: string }> = {}) {
   documentsHost.documents = documents
   ctx.provide('remote.documents', documents as never)
   let preferred: PreferredView | undefined
+  let preferredViewId: string | undefined
   let companion: CompanionView | undefined
   ctx.provide('conversation', {
-    declarePreferredView: (fn: PreferredView) => { preferred = fn; return () => { preferred = undefined } },
+    declarePreferredView: (viewId: string, fn: PreferredView) => {
+      preferredViewId = viewId
+      preferred = fn
+      return () => { preferredViewId = undefined; preferred = undefined }
+    },
     declareCompanionView: (fn: CompanionView) => { companion = fn; return () => { companion = undefined } },
   } as never)
   return {
@@ -49,6 +54,7 @@ async function bench(sessions: Record<string, { agentPreset?: string }> = {}) {
     read,
     slots: ctx.get('slots') as SlotRegistry,
     preferred: () => preferred,
+    preferredViewId: () => preferredViewId,
     companion: () => companion,
   }
 }
@@ -77,18 +83,19 @@ describe('ui-ued apply', () => {
   })
 
   it('claims the view only for design sessions, and offers the assistant back beside it', async () => {
-    const { ctx, slots, preferred, companion } = await bench({
+    const { ctx, slots, preferred, preferredViewId, companion } = await bench({
       design: { agentPreset: 'ued' },
       writing: { agentPreset: 'writing' },
     })
     declareRoot(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
 
-    expect(preferred()?.('design')).toBe('ued')
+    expect(preferredViewId()).toBe('ued')
+    expect(preferred()?.('design')).toBe(true)
     // The gate is the preset: a session on another preset, and one this client
     // has never seen, both keep whatever view they had.
-    expect(preferred()?.('writing')).toBeNull()
-    expect(preferred()?.('unknown')).toBeNull()
+    expect(preferred()?.('writing')).toBe(false)
+    expect(preferred()?.('unknown')).toBe(false)
 
     expect(companion()?.('design', 'ued')).toEqual({ id: 'chat', label: '助手' })
     // Already on the chat tab: nothing to offer back.

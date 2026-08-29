@@ -161,6 +161,10 @@ const packageFileExtras: Readonly<Record<string, readonly string[]>> = {
   // sandbox-local resolves it through the package's ./runner export. tsdown
   // also shares its generated FFI code through a hashed runtime chunk.
   '@deepseek-ai/dsh-sandbox-windows-acl': ['lib/runner.js', 'lib/types-*.js'],
+  // Multiple public entry bundles share these game runtime implementations
+  // through tsdown's hashed chunks.
+  '@deepseek-ai/dsh-game': ['lib/events-*.js'],
+  '@deepseek-ai/dsh-werewolf': ['lib/engine-*.js'],
   // SQLite loads every statement from immutable package resources at runtime.
   '@deepseek-ai/dsh-session-persistence-sqlite': ['resources/sql/**/*.sql'],
   '@deepseek-ai/dsh-skill-badge': ['assets'],

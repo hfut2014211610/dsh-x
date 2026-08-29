@@ -12,8 +12,8 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent, AgentOptions } from '@deepseek-ai/dsh-agent'
-import type { ContentBlock } from '@deepseek-ai/dsh-llm'
-import { SessionId, type JsonValue } from '@deepseek-ai/dsh-session'
+import type { ContentBlock, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
+import { SessionId, type JsonValue, type SessionEvent } from '@deepseek-ai/dsh-session'
 import type { JsonSchemaNode, ObjectJsonSchema } from '@deepseek-ai/dsh-tools'
 import type { SubagentResult, SubagentRun, SubagentRuntime } from '@deepseek-ai/dsh-subagent'
 import { delegationDepthOf } from '@deepseek-ai/dsh-subagent'
@@ -30,7 +30,7 @@ import type {
   WerewolfContextLimitsV1,
   WerewolfGameStateV1,
 } from './types.ts'
-import type { WerewolfEvent } from './events.ts'
+import { isWerewolfEvent, type WerewolfEvent } from './events.ts'
 
 /** Deployment-resolved runner settings; the runtime Config owns the values. */
 export interface WerewolfBotRunnerConfigV1 {
@@ -38,6 +38,8 @@ export interface WerewolfBotRunnerConfigV1 {
   provider: string
   /** Per-child model route; omission inherits the parent agent's route. */
   botAgent?: AgentOptions
+  /** Reasoning effort pinned when the Host provisions each fixed Bot Agent. */
+  reasoningEffort?: ReasoningEffortId
   /** Failed attempts per decision before the fallback applies. */
   retryLimit: number
   /** Wall-clock budget per child attempt. */
@@ -69,9 +71,9 @@ export const WEREWOLF_BOT_PERSONA = [
 
 /** The fixed instruction block appended to every bot prompt. */
 export const WEREWOLF_BOT_INSTRUCTIONS = [
-  'Return exactly one JSON object matching the requested output schema: the legal action, your context delta, and public speech only when the schema permits it.',
-  'The legalAction.spec field enumerates every legal value; anything else is rejected and retried.',
-  'The context delta updates only your own subjective beliefs, commitments, strategy, and memory summary.',
+  'Return exactly one JSON object with the two root keys action and contextDelta; do not add any other root key.',
+  'Never put kind, text, target, option, legalAction, beliefs, or commitments beside those root keys.',
+  'contextDelta contains only changed subjective state and may use only beliefUpdates, addCommitments, settleCommitments, strategy, and memorySummary; use {} when nothing changes and never copy the full prior context.',
 ].join(' ')
 
 /**
@@ -249,11 +251,55 @@ function attemptEvent(
   }
 }
 
-function promptBlocks(promptText: string, diagnostic: string | undefined): ContentBlock[] {
+function actionOutputContract(spec: WerewolfActionSpecV1): string {
+  if (spec.kind === 'compound') {
+    const fields = spec.fields.map(field => JSON.stringify(field.id)).join(', ')
+    return `For this phase, action must contain exactly these keys: ${fields}. Each value must satisfy that field's spec under legalAction.spec; do not wrap the fields in a value key.`
+  }
+  const skip = spec.allowSkip
+    ? 'null is allowed only to skip.'
+    : 'null is not allowed.'
+  const speech = spec.kind === 'text'
+    ? ' For a non-null value, this string is the public statement shown in the game UI.'
+    : ''
+  return `For this phase, action must be exactly {"value": VALUE}. VALUE must satisfy legalAction.spec; ${skip}${speech}`
+}
+
+function promptBlocks(
+  promptText: string,
+  diagnostic: string | undefined,
+  retryFixedSession: boolean,
+  spec: WerewolfActionSpecV1,
+): ContentBlock[] {
+  const outputContract = `${WEREWOLF_BOT_INSTRUCTIONS} ${actionOutputContract(spec)}`
   const text = diagnostic === undefined
-    ? `${WEREWOLF_BOT_INSTRUCTIONS}\n\n${promptText}`
-    : `${WEREWOLF_BOT_INSTRUCTIONS}\n\nPrevious attempt rejected: ${diagnostic}\n\n${promptText}`
+    ? `${outputContract}\n\n${promptText}`
+    : retryFixedSession
+      ? `${outputContract}\n\nYour immediately preceding response for the same decision was rejected: ${diagnostic}\nReturn one corrected JSON object now; the preceding decision prompt remains current.`
+      : `${outputContract}\n\nPrevious attempt rejected: ${diagnostic}\n\n${promptText}`
   return [{ type: 'text', text }]
+}
+
+function latestBotDecisionRevision(history: readonly SessionEvent[], playerId: string): number | undefined {
+  for (let index = history.length - 1; index >= 0; index -= 1) {
+    const event = history[index]
+    if (event !== undefined && isWerewolfEvent(event) && event.type === 'werewolf/bot-decision'
+      && event.data.entries.some(entry => entry.playerId === playerId)) {
+      return event.data.gameRevision
+    }
+  }
+  return undefined
+}
+
+function publicSpeechCandidate(
+  spec: WerewolfActionSpecV1,
+  envelope: WerewolfBotEnvelopeResult,
+): string | undefined {
+  if (spec.kind === 'text' && envelope.action !== null && typeof envelope.action === 'object'
+    && !Array.isArray(envelope.action) && typeof envelope.action.value === 'string') {
+    return envelope.action.value
+  }
+  return envelope.publicSpeech
 }
 
 type AttemptWait<T> =
@@ -361,16 +407,22 @@ export async function runWerewolfBotDecision(input: {
   agent: Agent
   /** Host-owned fixed Bot executor; omission preserves the isolated runner test face. */
   executor?: Pick<GameAiExecutor, 'turnBot'>
+  /** Host log used to send only public entries added since this fixed Bot's prior decision. */
+  history?: readonly SessionEvent[]
   signal?: AbortSignal
 }): Promise<WerewolfBotRunOutcome> {
-  const { ctx, config, state, rules, request, agent, executor, signal } = input
+  const { ctx, config, state, rules, request, agent, executor, history = [], signal } = input
   const openPhase = state.openPhase
   const actor = openPhase?.plan.actors.find(entry => entry.playerId === request.playerId)
   if (openPhase === null || actor === undefined) {
     throw new WerewolfError('WEREWOLF_ILLEGAL_ACTION', `player ${request.playerId} is not an actor of the open phase`)
   }
+  const lastDecisionRevision = executor === undefined
+    ? undefined
+    : latestBotDecisionRevision(history, request.playerId)
   const prompt = projectWerewolfBotObservation(state, rules, request, {
     publicTimelineEntries: config.publicTimelineEntries,
+    ...(lastDecisionRevision === undefined ? {} : { afterGameRevision: lastDecisionRevision }),
   })
   const roster = state.players.map(player => player.playerId)
   const attempts: WerewolfEvent<'werewolf/bot-attempt-failed'>[] = []
@@ -387,7 +439,12 @@ export async function runWerewolfBotDecision(input: {
     let oneShotRun: SubagentRun | undefined
     let oneShotResult: AttemptWait<SubagentResult | ResultFault> | undefined
     try {
-      const blocks = promptBlocks(JSON.stringify(prompt), attempt > 1 ? diagnostic : undefined)
+      const blocks = promptBlocks(
+        JSON.stringify(prompt),
+        attempt > 1 ? diagnostic : undefined,
+        executor !== undefined && attempt > 1,
+        actor.spec,
+      )
       if (executor !== undefined) {
         settled = { kind: 'result', value: await executor.turnBot(stableChildId, blocks, config.decisionTimeoutMs) }
       } else {
@@ -463,7 +520,15 @@ export async function runWerewolfBotDecision(input: {
       envelope = { action: null, contextDelta: {} }
     }
     if (failure === undefined) {
-      const actionError = validateWerewolfAction(actor, envelope.action)
+      let actionError = validateWerewolfAction(actor, envelope.action)
+      if (actionError !== undefined && actor.spec.kind === 'text' && typeof envelope.publicSpeech === 'string') {
+        const recoveredAction: JsonValue = { value: envelope.publicSpeech }
+        const recoveredError = validateWerewolfAction(actor, recoveredAction)
+        if (recoveredError === undefined) {
+          envelope = { ...envelope, action: recoveredAction }
+          actionError = undefined
+        }
+      }
       if (actionError !== undefined) {
         failure = { category: 'illegal-action', diagnostic: `illegal-action: ${actionError}` }
       }
@@ -472,7 +537,7 @@ export async function runWerewolfBotDecision(input: {
       try {
         publicSpeech = normalizeWerewolfPublicSpeech(
           actor.spec,
-          envelope.publicSpeech,
+          publicSpeechCandidate(actor.spec, envelope),
           state.ruleSet.policies.speechMaxChars,
         )
       } catch (error) {

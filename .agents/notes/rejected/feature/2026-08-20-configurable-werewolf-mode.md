@@ -1,6 +1,6 @@
 # Agent Note: Configurable single-player Werewolf mode
 
-Status: proposed
+Status: rejected — fixed per-game Bot Sessions replaced the proposed fresh one-shot continuity model
 
 English | [中文](2026-08-20-configurable-werewolf-mode.zh.md)
 
@@ -63,9 +63,7 @@ The optional composition bundle mounts `ctx.games`, the concrete `spawn` provide
 
 The Cordis plugin config carries one or more JSON-compatible `WerewolfRuleSetInputV1` records. The input keeps defaults unresolved. `resolveRuleSet()` is the only operation that applies explicit defaults, resolves registry references, validates cross-field invariants, and returns an immutable `CompiledWerewolfRuleSetV1`.
 
-```ts
-import type { JsonValue } from '@deepseek-ai/dsh-session/types'
-
+```ts ignore-check
 interface WerewolfRuleSetInputV1 {
   schemaVersion: 1
   id: string
@@ -305,13 +303,7 @@ Each bot owns one `BotContinuityContextV1` inside the parent game's event stream
 
 The context stores concise state needed for behavioral consistency. It explicitly excludes hidden chain-of-thought, unrestricted reasoning transcripts, complete conversation copies, and arbitrary key-value memory.
 
-```ts
-import type {
-  WerewolfDecisionId as DecisionId,
-  WerewolfGameId as GameId,
-  WerewolfPlayerId as PlayerId,
-} from '@deepseek-ai/dsh-werewolf'
-
+```ts ignore-check
 interface BotContinuityContextV1 {
   version: 1
   gameId: GameId
@@ -649,9 +641,7 @@ Package READMEs document configuration, lifecycle semantics, failure behavior, e
 
 Deployment-varying limits remain Cordis plugin configuration rather than constants hidden in the implementation.
 
-```ts
-import type { WerewolfRuleSetInputV1 } from '@deepseek-ai/dsh-werewolf'
-
+```ts ignore-check
 interface Config {
   subagentProvider: string
   botAgent?: {

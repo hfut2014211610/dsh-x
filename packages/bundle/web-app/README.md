@@ -8,6 +8,10 @@ The dsh browser-surface bundle. [`cordis.patch.yml`](cordis.patch.yml) rides ove
 
 Web uses the shared bounded normal default of five eligible retries after the initial request. The `deepseek-official` route and settings-added pi-ai routes use that default when they omit `retryPolicy`; explicit provider policies still win. Web adds no retry-specific composition override, so the same omission behavior applies to non-Web profiles.
 
+## Werewolf Bot defaults
+
+The dedicated Werewolf application pins each fixed Bot Agent to reasoning effort `high` when the game initializes. This preserves deliberate reasoning without applying `max` to every game statement and vote; the selected exact model must expose `high`, or game Bot requests fail before network I/O.
+
 ## Model Experience
 
 ### Harness-source and Web-surface context

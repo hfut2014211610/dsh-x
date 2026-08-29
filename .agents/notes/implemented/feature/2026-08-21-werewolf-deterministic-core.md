@@ -6,7 +6,7 @@ English | [中文](2026-08-21-werewolf-deterministic-core.zh.md)
 
 ## Problem
 
-The [configurable Werewolf mode proposal](../../proposed/feature/2026-08-20-configurable-werewolf-mode.md) stages delivery so that no playable surface ships before the deterministic foundation is provable without a model. Stage 1 had to answer three questions in code: how rule-set configuration selects registered mechanics without admitting executable code, how one session log can be the single authoritative record for a whole game (replay, resume, fork), and where bot subjectivity may live so it can never masquerade as game truth. The full interaction design (bot runner, projections, dedicated view) is deliberately out of this stage.
+The [configurable Werewolf mode proposal](../../rejected/feature/2026-08-20-configurable-werewolf-mode.md) stages delivery so that no playable surface ships before the deterministic foundation is provable without a model. Stage 1 had to answer three questions in code: how rule-set configuration selects registered mechanics without admitting executable code, how one session log can be the single authoritative record for a whole game (replay, resume, fork), and where bot subjectivity may live so it can never masquerade as game truth. The full interaction design (bot runner, projections, dedicated view) is deliberately out of this stage.
 
 ## Decision
 

@@ -471,12 +471,14 @@ export type ChatStore = ReturnType<typeof createChatStore>
 
 /** Live conversation-view registry shared by the root, header, and session body. */
 export interface ConversationViews {
-  /** Registered conversation-view tabs in presentation order. */
+  /** Registered conversation views in presentation order. */
   list: () => readonly ViewTab[]
   /** Subscribe to conversation-view registration changes. */
   subscribe: (fn: () => void) => () => void
   /** Current conversation-view registration version. */
   version: () => number
+  /** Whether a view belongs to a session preset and is therefore not a switchable tab. */
+  isSessionOwned: (viewId: string) => boolean
   /** Resolve a temporary session-preferred view, or null. */
   preferred: (sessionId: SessionId) => string | null
   /** Resolve the secondary view for one active view, or null. */

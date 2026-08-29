@@ -5,16 +5,17 @@ export const NS = 'ui-werewolf'
 
 /** The Werewolf dictionary key set. */
 export type WerewolfKey =
-  | 'view.werewolf'
+  | 'view.werewolf' | 'launcher.label' | 'launcher.hint'
   | 'shell.eyebrow' | 'shell.title' | 'shell.mode' | 'shell.exit' | 'shell.exitHint'
   | 'lobby.title' | 'lobby.subtitle' | 'lobby.players' | 'lobby.roles' | 'lobby.start' | 'lobby.starting'
-  | 'lobby.unavailable'
+  | 'lobby.unavailable' | 'lobby.activeTitle' | 'lobby.activeMeta' | 'lobby.continue'
+  | 'status.running' | 'status.paused'
   | 'reveal.title' | 'reveal.covered' | 'reveal.action' | 'reveal.ready' | 'reveal.faction' | 'reveal.teammates'
   | 'reveal.resources' | 'reveal.none'
   | 'table.title' | 'table.signalTitle' | 'table.solo' | 'table.day' | 'table.night' | 'table.phase' | 'table.seat' | 'table.you'
   | 'table.alive' | 'table.dead' | 'table.deadOn' | 'table.unknownRole' | 'table.role'
   | 'table.timeline' | 'table.notices' | 'table.noNotices' | 'table.empty'
-  | 'table.track' | 'table.known' | 'table.knownNone' | 'table.openFinding'
+  | 'table.track' | 'table.known' | 'table.knownNone' | 'table.openFinding' | 'table.teammate'
   | 'finding.title' | 'finding.seer' | 'finding.wolfKill' | 'finding.scope'
   | 'finding.type' | 'finding.target' | 'finding.victim' | 'finding.noVictim' | 'finding.faction' | 'finding.factionWolf' | 'finding.factionVillage'
   | 'finding.when' | 'finding.day' | 'finding.back'
@@ -34,6 +35,8 @@ export type WerewolfKey =
 /** English copy. */
 export const en: Record<WerewolfKey, string> = {
   'view.werewolf': 'Werewolf',
+  'launcher.label': 'Werewolf',
+  'launcher.hint': 'Open Werewolf in a separate window',
   'shell.eyebrow': 'SIGNAL CIRCLE',
   'shell.title': 'Werewolf',
   'shell.mode': 'Solo game',
@@ -46,6 +49,11 @@ export const en: Record<WerewolfKey, string> = {
   'lobby.start': 'Start game',
   'lobby.starting': 'Starting…',
   'lobby.unavailable': 'No rule set is available yet.',
+  'lobby.activeTitle': 'Continue a game',
+  'lobby.activeMeta': 'Day {day} · {status}',
+  'lobby.continue': 'Continue',
+  'status.running': 'In progress',
+  'status.paused': 'Paused',
   'reveal.title': 'Your seat has been assigned',
   'reveal.covered': 'Your role card is face down.',
   'reveal.action': 'Reveal role',
@@ -75,6 +83,7 @@ export const en: Record<WerewolfKey, string> = {
   'table.known': 'Known',
   'table.knownNone': 'Unknown',
   'table.openFinding': 'View finding',
+  'table.teammate': 'Known teammate',
   'finding.title': 'Findings',
   'finding.seer': 'Inspect',
   'finding.wolfKill': 'Wolf attack',
@@ -143,6 +152,8 @@ export const en: Record<WerewolfKey, string> = {
 /** Chinese copy. */
 export const zh: Record<WerewolfKey, string> = {
   'view.werewolf': '狼人杀',
+  'launcher.label': '狼人杀',
+  'launcher.hint': '在独立窗口中打开狼人杀',
   'shell.eyebrow': 'SIGNAL CIRCLE',
   'shell.title': '狼人杀',
   'shell.mode': '单机对局',
@@ -155,6 +166,11 @@ export const zh: Record<WerewolfKey, string> = {
   'lobby.start': '开始游戏',
   'lobby.starting': '正在开局…',
   'lobby.unavailable': '暂无可用的规则集。',
+  'lobby.activeTitle': '继续已有对局',
+  'lobby.activeMeta': '第 {day} 天 · {status}',
+  'lobby.continue': '继续游戏',
+  'status.running': '进行中',
+  'status.paused': '已暂停',
   'reveal.title': '座位已分配',
   'reveal.covered': '你的身份牌背面朝上。',
   'reveal.action': '揭示身份',
@@ -184,6 +200,7 @@ export const zh: Record<WerewolfKey, string> = {
   'table.known': '已知',
   'table.knownNone': '未知',
   'table.openFinding': '查看发现',
+  'table.teammate': '已知队友',
   'finding.title': '发现档案',
   'finding.seer': '查验',
   'finding.wolfKill': '狼人袭击',

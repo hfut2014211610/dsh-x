@@ -105,7 +105,8 @@ describe('Werewolf real Loader composition', () => {
         requests.push(request)
         attempt += 1
         const promptText = request.prompt[0]?.type === 'text' ? request.prompt[0].text : ''
-        const prompt = JSON.parse(promptText.slice(promptText.indexOf('{'))) as {
+        const observationStart = promptText.lastIndexOf('\n\n{')
+        const prompt = JSON.parse(promptText.slice(observationStart + 2)) as {
           legalAction: { spec: { targets: string[] } }
         }
         const target = attempt === 1 ? 'not-a-player' : prompt.legalAction.spec.targets[0]
@@ -146,7 +147,7 @@ describe('Werewolf real Loader composition', () => {
     expect(retryText?.type === 'text' && retryText.text.includes('Previous attempt rejected: illegal-action:')).toBe(true)
     expect(requests.map((entry) => {
       const text = entry.prompt[0]?.type === 'text' ? entry.prompt[0].text : ''
-      const jsonStart = text.indexOf('{')
+      const jsonStart = text.lastIndexOf('\n\n{') + 2
       return {
         label: entry.label,
         persona: entry.persona,

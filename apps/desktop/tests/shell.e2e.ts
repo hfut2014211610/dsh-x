@@ -1,5 +1,5 @@
 // Desktop shell smoke: launch the real Electron main, watch the window swap
-// from the loading screen to the official web UI, then quit and prove the
+// from the loading screen to the deployment-branded web UI, then quit and prove the
 // lifecycle contract. Keyless — reaching the web boot surface needs no model
 // credential.
 //
@@ -85,8 +85,17 @@ describe.skipIf(!hasShell || !hasBuiltRuntime)('desktop shell smoke', () => {
         const window = await electron.firstWindow()
         await window.waitForURL(/^http:\/\/127\.0\.0\.1:\d+\//, { timeout: 120_000 })
         expect(window.url()).toMatch(/^http:\/\/127\.0\.0\.1:\d+\//)
-        await expect.poll(() => window.title(), { timeout: 30_000 }).toBe('DeepSeek Harness')
+        await expect.poll(() => window.title(), { timeout: 30_000 }).toBe('DSH Local Build')
         const url = window.url()
+
+        const popupPromise = electron.waitForEvent('window')
+        const launcher = window.getByTestId('werewolf-window-launcher')
+        await launcher.waitFor({ state: 'visible' })
+        await launcher.click()
+        const gameWindow = await popupPromise
+        await gameWindow.waitForLoadState('domcontentloaded')
+        expect(new URL(gameWindow.url()).searchParams.get('dshMode')).toBe('werewolf')
+        await gameWindow.close()
 
         await electron.close()
         if (attached !== undefined) {

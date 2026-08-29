@@ -6,13 +6,13 @@
 
 ## 生命周期
 
-`start()` 在创建 Host 前完成模块校验。第一条 `game/command-receipt` 与模块开始事件通过 `Session.appendBatch()` 进入 Session。后续 `submitAction`、`resume`、`abortGame` 使用 `{ method, requestId }` 回执、payload SHA-256 摘要和 `expectedGameRevision`：相同重复请求返回当前投影，修改 payload 会发生冲突，新请求携带过期修订则拒绝。每局只有一个串行操作队列。已知 `GameId` 可经 Agent 持久化路径冷恢复其确定性的 `game-<GameId>` Host。模块可通过 `hostAgentPreset` 标记该 Host，使客户端在不改变游戏权威的前提下选择模块专用视图。
+`start()` 在创建 Host 前完成模块校验。第一条 `game/command-receipt` 与模块开始事件通过 `Session.appendBatch()` 进入 Session，随后 `initializeAgents()` 会在开始投影返回前完成。后续 `submitAction`、`resume`、`abortGame` 使用 `{ method, requestId }` 回执、payload SHA-256 摘要和 `expectedGameRevision`：相同重复请求返回当前投影，修改 payload 会发生冲突，新请求携带过期修订则拒绝。每局只有一个串行操作队列。模块可以选择后台自动调度，使命令在自身转换提交后返回，后续每个自动步骤分别发布投影失效通知。已知 `GameId` 可经 Agent 持久化路径冷恢复其确定性的 `game-<GameId>` Host。模块可通过 `hostAgentPreset` 标记该 Host，使客户端在不改变游戏权威的前提下选择模块专用视图。
 
 ## 模块约定
 
-`GameModule` 拥有领域规则、事件折叠、修订与状态、变更、自动推进、授权投影和回放。Host 拥有 Agent/Session 生命周期、主体绑定、幂等、原子发布、取消、有限并发和子代理启动权限。模块事件只进入日志，绝不进入 Host 模型 surface。
+`GameModule` 拥有领域规则、事件折叠、修订与状态、变更、固定 Agent 初始化、自动推进及调度模式、授权投影和回放。Host 拥有 Agent/Session 生命周期、主体绑定、幂等、原子发布、取消、有限并发和子代理启动权限。模块事件只进入日志，绝不进入 Host 模型 surface。
 
-`GameAiExecutor.map()` 在指定并发上限下保持输入顺序。`provisionBot()` 在准确 Host 下创建稳定的 Bot 身份，并对同一局保持幂等；`turnBot()` 把后续决策依次发送到同一个 Agent Session。游戏 Bot Session 记录 `parentSession`，但不写 `origin: subagent`，因此通用子代理目录不能枚举或打开其私密推理。`start()` 仍保留给需要 one-shot 的其他游戏模块。
+`GameAiExecutor.map()` 在指定并发上限下保持输入顺序。`provisionBot()` 在准确 Host 下创建稳定的 Bot 身份，可选择为该 Agent 的请求固定由适配器定义的推理强度，并对同一局保持幂等；`turnBot()` 把后续决策依次发送到同一个 Agent Session。准确模型解析会在网络 I/O 前拒绝不受支持的固定强度。游戏 Bot Session 记录 `parentSession`，但不写 `origin: subagent`，因此通用子代理目录不能枚举或打开其私密推理。`start()` 仍保留给需要 one-shot 的其他游戏模块。
 
 ## 导出形态
 

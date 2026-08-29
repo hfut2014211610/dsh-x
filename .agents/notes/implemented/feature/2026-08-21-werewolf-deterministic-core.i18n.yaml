@@ -2,5 +2,5 @@
 # side as of the last confirmed-consistent state. Both languages carry equal authority;
 # after editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-21-werewolf-deterministic-core.md
-2026-08-21-werewolf-deterministic-core.md: 7e3b7f4aefc22d3ac9110bc7323b328248d3512d
-2026-08-21-werewolf-deterministic-core.zh.md: 56eaf41d7c979cba7f3d5d0782b92daf0e685ba2
+2026-08-21-werewolf-deterministic-core.md: 608da65c36ad90dc599857582dcbb912213abe7a
+2026-08-21-werewolf-deterministic-core.zh.md: 6b3a376b78ac9c77dfe496c4ff006ac508363f22

@@ -101,10 +101,13 @@ export function ConversationSessionHeader({
 }: ConversationSessionHeaderProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
+  const switchableTabs = tabs.filter(tab => !views.isSessionOwned(tab.id))
   const selectedId = useStore(s => s.view)
   const preferredId = useSessions(() => views.preferred(sessionId))
   const activePreferredId = tabs.some(tab => tab.id === preferredId) ? preferredId : null
-  const active = resolveActiveView(tabs, selectedId, activePreferredId)
+  const active = activePreferredId === null
+    ? resolveActiveView(switchableTabs, selectedId, null)
+    : resolveActiveView(tabs, selectedId, activePreferredId)
   const companion = active === undefined ? null : views.companion(sessionId, active.id)
   const hasCompanion = companion !== null
     && companion.id !== active?.id
@@ -180,9 +183,9 @@ export function ConversationSessionHeader({
               {renderSlot('conversation.session.header.utilities', {})}
             </div>
           </div>
-          {tabs.length > 1 && !hasCompanion && (
+          {switchableTabs.length > 1 && activePreferredId === null && !hasCompanion && (
             <div className={css.tabs} role="tablist">
-              {tabs.map(viewTab => (
+              {switchableTabs.map(viewTab => (
                 <button
                   key={viewTab.id}
                   type="button"
@@ -214,10 +217,13 @@ export function ConversationSession({
 }: ConversationSessionProps) {
   useSyncExternalStore(views.subscribe, views.version)
   const tabs = views.list()
+  const switchableTabs = tabs.filter(tab => !views.isSessionOwned(tab.id))
   const selectedId = useStore(s => s.view)
   const preferredId = useSessions(() => views.preferred(sessionId))
   const activePreferredId = tabs.some(tab => tab.id === preferredId) ? preferredId : null
-  const active = resolveActiveView(tabs, selectedId, activePreferredId)
+  const active = activePreferredId === null
+    ? resolveActiveView(switchableTabs, selectedId, null)
+    : resolveActiveView(tabs, selectedId, activePreferredId)
   const declaredCompanion = active === undefined ? null : views.companion(sessionId, active.id)
   const companion = declaredCompanion !== null
     && declaredCompanion.id !== active?.id

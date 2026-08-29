@@ -22,19 +22,19 @@
 
 ## 固定 Bot Agent 与观察投影
 
-`projectWerewolfBotObservation` 首先证明请求仍匹配折叠状态中的游戏标识与修订、已开启阶段与动作计划、编译规则摘要、待决策行动者及其准确的当前连续性上下文，再构造授权视图：经注册角色投影器得到行动者角色与私有知识（仅当角色声明 `seesFactionTeammates` 时包含队友），公开状态包含玩家 id、名册事实与配置数量的尾部时间线，合法动作与先前上下文均取自权威状态。游戏开始时，`WerewolfGameModule` 通过 Session Host 的 `GameAiExecutor` 为每个非真人座位创建一个确定性、禁用工具的 Bot Agent Session。不可变 persona 在整局内固定座位、角色、阵营与性格；后续每次决策都按 FIFO 送入同一个 Agent Session，因此先前请求与回答持续留在模型上下文中。这些游戏自有 Session 记录 Host 父标识，但不带通用子代理 origin descriptor，所以不会出现在普通子代理目录或弹窗中。结构化结果仍是不可信输入，依次校验动作与上下文增量；失败尝试保留准确类别并在同一 Bot Session 上重试。重试耗尽后执行确定性托管动作或暂停游戏。`GameAiExecutor` 补入操作 signal，执行 `maxConcurrentBots`，保持结果顺序，且绝不调用 Host 模型。
+`projectWerewolfBotObservation` 首先证明请求仍匹配折叠状态中的游戏标识与修订、已开启阶段与动作计划、编译规则摘要、待决策行动者及其准确的当前连续性上下文，再构造授权视图：经注册角色投影器得到行动者角色与私有知识（仅当角色声明 `seesFactionTeammates` 时包含队友），公开状态包含玩家 id 与名册事实，合法动作与先前上下文均取自权威状态。第一次决策携带配置数量的尾部时间线；固定 Session 的后续决策只携带该 Bot 上一次已提交决策后新增的公开记录。`WerewolfGameModule.initializeAgents()` 会在 `start` 返回前为每个非真人座位创建一个确定性、禁用工具的 Bot Agent Session。不可变 persona 在整局内固定座位、角色、阵营与性格；可选 `botReasoningEffort` 会在创建 Agent 时固定，并应用于其后每次模型请求。后续每次决策都按 FIFO 送入同一个 Agent Session，因此先前请求与回答持续留在模型上下文中。这些游戏自有 Session 记录 Host 父标识，但不带通用子代理 origin descriptor，所以不会出现在普通子代理目录或弹窗中。结构化结果仍是不可信输入，依次校验动作与上下文增量。每条 prompt 只允许 `action` 与 `contextDelta` 两个根键，明确当前阶段准确的动作对象，把文本动作的 `value` 映射为公开发言，并把增量限制为发生变化的主观字段。显式且合法的 `publicSpeech` 字符串可以恢复格式错误的文本动作，并成为它的规范 `value`；常规动作与发言校验仍会执行阶段和长度限制。失败尝试保留准确类别并在同一 Bot Session 上重试，重试会追加拒绝诊断并重复这份精简输出约定，而不重新发送观察。重试耗尽后执行确定性托管动作或暂停游戏。`GameAiExecutor` 补入操作 signal，执行 `maxConcurrentBots`，保持结果顺序，且绝不调用 Host 模型。
 
 ## Session Host、命令与真人投影
 
-`WerewolfGameModule` 是注册到 `ctx.games` 的薄领域适配器。`start` 在 Host 存在前校验准确规则集修订。通用 provider 创建 `game-<GameId>`，原子提交 `game/command-receipt` 与 `werewolf/game-started`，创建固定 Bot Agent，并推进阶段直到真人表单、暂停或结果。`seat-order-public` 阶段每次只结算尚未发言的首个存活座位；该发言记录前下一座位不能行动，全部计划发言完成前投票阶段不能开启。`submitAction`、`resume`、`abortGame` 携带调用方 request id 与 expected revision。相同 payload 的重复请求在自动推进后返回当前视图；同一键配另一 payload 会冲突，新请求携带过期修订则拒绝。全部变更按局串行。
+`WerewolfGameModule` 是注册到 `ctx.games` 的薄领域适配器。`start` 在 Host 存在前校验准确规则集修订。通用 provider 创建 `game-<GameId>`，原子提交 `game/command-receipt` 与 `werewolf/game-started`，创建固定 Bot Agent，并返回已初始化投影。随后狼人杀的后台自动调度经同一局串行队列逐个发布阶段或 Bot 决策单元，每个单元都会使真人投影失效。`seat-order-public` 阶段每次只结算尚未发言的首个存活座位；该发言记录前下一座位不能行动，已接受文本的 `action.value` 会成为可见公开发言，全部计划发言完成前投票阶段不能开启。`submitAction`、`resume`、`abortGame` 携带调用方 request id 与 expected revision。相同 payload 的重复请求返回当前视图；同一键配另一 payload 会冲突，新请求携带过期修订则拒绝。
 
 `Session.appendBatch()` 在改变实时日志前，针对影子前缀校验 JSON、完整 surface 转换和同步注册不变量。拒绝时事件、surface、观察者与修订均不改变。成功时完整批次先变得可见，再按顺序发布事件。通用回执与狼人杀事件均为 log-only。
 
-`WerewolfGameGateway` 暴露类型化 `start`、`getView`、`getReplay`、`submitAction`、`resume`、`abortGame`。它在内部解析版本1本地主体；请求不能选择 Session、participant、player 或座位。`WerewolfHumanViewV1` 投影公开事实，以及仅属于绑定真人的角色、获授权队友、资源、通知与当前表单。最终视图在结果产生后揭示角色。`getReplay` 拒绝活跃游戏，并返回授权检查点而非原始事件、Bot 上下文或子代理 prompt。
+`WerewolfGameGateway` 暴露类型化 `getLobby`、`start`、`getView`、`getReplay`、`submitAction`、`resume`、`abortGame`。Host Agent 继承部署当前的 `agentDefaultModel` 路由，因此未配置逐局覆盖时，固定 Bot Agent 也能继承完整的 provider/model。`getLobby` 通过 `ctx.games.listViews()` 按新到旧返回本地主体的运行中与已暂停对局。Gateway 在内部解析版本1本地主体；请求不能选择 Session、participant、player 或座位。`WerewolfHumanViewV1` 投影公开事实，以及仅属于绑定真人的角色、获授权队友、资源、通知与当前表单。最终视图在结果产生后揭示角色。`getReplay` 拒绝活跃游戏，并返回授权检查点而非原始事件、Bot 上下文或子代理 prompt。
 
-## 专用会话视图
+## 独立应用窗口
 
-`@deepseek-ai/dsh-client-ui-werewolf` 注入 `conversation.view` 条目 `werewolf`，并对 `agentPreset: werewolf` 的会话声明首选视图。注入面包装生成的 `ctx.remote.werewolfGame` 命名空间——`getLobby`（附加的局前规则集列表）、`start`、`getView`、`submitAction`、`resume`、`abortGame`、`getReplay`——并订阅转发的 `game/projection-invalidated` 事件，忽略其他游戏并通过 `getView` 重读。白天讨论时，视图会显示当前发言人、已完成/总发言数，以及按公开顺序记录的每条发言或明确过麦，并说明最后一席完成后才进入投票。表单只渲染封闭规格词汇（`player-target`、`choice`、`text`、`compound`）；浏览器不会收到 Bot 上下文、Agent prompt 或原始秘密事件。不存在斜杠命令，狼人杀 Host 会隐藏普通 Chat 输入框，因此只有游戏动作表单能改变游戏状态；更高优先级的系统提问与审批仍可回答。
+`@deepseek-ai/dsh-client-ui-werewolf` 注册 `sidebar.footer.action` 入口，打开带 `dshMode=werewolf` 的具名窗口。只有该 URL 会选择插件的 `shell.surface` 条目，因此主窗口保留当前会话，而游戏窗口不挂载 preset 切换器、Session 侧边栏、会话区、详情区或通用覆盖层。所选 `gameId` 保留在窗口 URL 中；未选择对局时，大厅会从 Host 列出运行中与已暂停对局。游戏 Host Session 不进入普通工作区导航。注入面包装生成的 `ctx.remote.werewolfGame` 命名空间——`getLobby`、`start`、`getView`、`submitAction`、`resume`、`abortGame`、`getReplay`——并订阅转发的 `game/projection-invalidated` 事件，忽略其他游戏并通过 `getView` 重读。白天讨论时，视图会显示当前发言人、已完成/总发言数，以及按公开顺序记录的每条发言或明确过麦，并说明最后一席完成后才进入投票。获授权可见的队友会得到图标和文字标识，但不会揭示其角色。表单只渲染封闭规格词汇（`player-target`、`choice`、`text`、`compound`）；浏览器不会收到 Bot 上下文、Agent prompt 或原始秘密事件。不存在斜杠命令或狼人杀 agent preset，只有类型化游戏动作能改变游戏状态。
 
 ## Bot 连续性上下文
 
@@ -69,14 +69,24 @@ abstract registerModule(module: GameModule): () => void
 abstract resolvePrincipal(): LocalGamePrincipalV1
 
 /**
- * Create a dedicated Host, commit start atomically, and auto-advance.
+ * Create a dedicated Host, commit start atomically, initialize fixed Agents, and schedule automatic advancement.
  * @param request - module, idempotency key, initial revision, and module input.
- * @returns current authorized projection after automatic advancement.
+ * @returns projection after foreground advancement, or after initialization when the module schedules in the background.
  */
 abstract start<TView>(request: { moduleId: string requestId: GameRequestId expectedGameRevision: 0 input: JsonValue }): Promise<GameProjection<TView>>
 
 /**
- * Return the current authorized view.
+ * List every game of one module authorized for the principal, newest first.
+ * @param moduleId - exact registered module id.
+ * @param principalId - authenticated caller.
+ * @returns authorized projections ordered by Host creation time.
+ */
+abstract listViews<TView>(moduleId: string, principalId: PrincipalId): Promise<GameProjection<TView>[]>
+
+/**
+ * Return the current authorized view. Reading is a side-effectful kick for a
+ * background-scheduling module: uninitialized fixed Agents plus a running
+ * game schedule one automatic advancement.
  * @param gameId - game to read.
  * @param principalId - authenticated caller.
  * @returns current authorized projection.
@@ -92,16 +102,16 @@ abstract getView<TView>(gameId: GameId, principalId: PrincipalId): Promise<GameP
 abstract getReplay<TReplay>(gameId: GameId, principalId: PrincipalId): Promise<TReplay>
 
 /**
- * Commit one human action and auto-advance.
+ * Commit one human action and schedule automatic advancement.
  * @param request - authorized compare-and-set action.
- * @returns current authorized projection after automatic advancement.
+ * @returns projection after foreground advancement, or after the action when the module schedules in the background.
  */
 abstract submitAction<TView>(request: { gameId: GameId principalId: PrincipalId requestId: GameRequestId expectedGameRevision: number action: JsonValue }): Promise<GameProjection<TView>>
 
 /**
- * Resume one paused game and auto-advance.
+ * Resume one paused game and schedule automatic advancement.
  * @param request - authorized compare-and-set resume request.
- * @returns current authorized projection after automatic advancement.
+ * @returns projection after foreground advancement, or after resume when the module schedules in the background.
  */
 abstract resume<TView>(request: { gameId: GameId principalId: PrincipalId requestId: GameRequestId expectedGameRevision: number }): Promise<GameProjection<TView>>
 
@@ -197,10 +207,10 @@ Registers the Werewolf module and exposes the UI-facing typed methods.
 
 ```ts cordis-catalog
 /**
- * List the registered rule sets for the lobby, before any game exists.
- * @returns rule-set options sorted by id then revision.
+ * List registered rule sets and resumable games for the local lobby.
+ * @returns rule-set options plus authorized running and paused games.
  */
-@Remote('getLobby') getLobby(): WerewolfLobbyViewV1
+@Remote('getLobby') async getLobby(): Promise<WerewolfLobbyViewV1>
 
 /**
  * Start one local single-player game.
