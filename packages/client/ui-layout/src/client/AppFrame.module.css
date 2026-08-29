@@ -10,14 +10,6 @@
   transition: grid-template-columns var(--ds-transition-duration-slow) var(--ds-ease-in-out);
 }
 
-/* A shell.surface chain occupant spans every standard column. Its own
-   component owns internal scrolling and the only way back to normal chrome. */
-.frame > [data-shell-exclusive] {
-  grid-column: 1 / -1;
-  min-width: 0;
-  min-height: 0;
-}
-
 /* Dragging writes widths at pointer cadence; easing them would detach the
    column from the handle. */
 .frame[data-dragging] {

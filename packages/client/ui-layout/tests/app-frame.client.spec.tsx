@@ -2,7 +2,7 @@
 /**
  * AppFrame interaction spec under the four-share props form: real layout
  * store instance (createLayoutStore().create() — the test-sanctioned engine
- * path), recording slot stubs, and a render-prop SessionProvider stub
+ * path), a recording renderSlot stub, and a render-prop SessionProvider stub
  * (the real one is framework-wired to the renderer host; its own behavior is
  * ui-renderer's spec territory). Drag sequences (pointer capture + rAF flush),
  * concession response to viewport change, and details staying mounted at
@@ -13,7 +13,6 @@
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, render } from '@testing-library/react'
 import { useSyncExternalStore } from 'react'
-import type { ReactNode } from 'react'
 import { AppFrame } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import type { AppFrameProps } from '@deepseek-ai/dsh-client-ui-layout/src/client/AppFrame.tsx'
 import { SIDEBAR_COLLAPSED } from '@deepseek-ai/dsh-client-ui-layout/src/client/columns.ts'
@@ -25,7 +24,6 @@ import type {
 // Session selection controls for the SessionProvider and useSessions stubs.
 const selectedSession = { current: 's-test' as SessionId | undefined }
 const selectedSessionBlank = { current: false }
-const selectedAgentPreset = { current: 'coding' as string | undefined }
 const baselinesReady = { current: true }
 
 // Render-prop contract stub fed through the standard seat prop (the renderer
@@ -66,26 +64,13 @@ function mountFrame() {
     if (key === 'conversation.empty') return <div data-testid="empty-content" />
     return <div data-testid="other-content" />
   }) as AppFrameProps['renderSlot']
-  const renderSlotChain = ((key: string, owner: object, opts?: { fallback?: ReactNode }) => {
-    slotCalls.push({ key, props: owner })
-    return (owner as { agentPreset?: string }).agentPreset === 'werewolf'
-      ? <main data-shell-exclusive="" data-testid="exclusive-content" />
-      : opts?.fallback ?? null
-  }) as AppFrameProps['renderSlotChain']
   const useSessions = ((sel: (s: SessionListState) => unknown) => {
     const current = selectedSession.current
     const sessionState = {
       ids: current === undefined ? [] : [current],
       byId: current === undefined
         ? {}
-        : { [current]: {
-          id: current,
-          displayTitle: 'Test',
-          running: false,
-          blank: selectedSessionBlank.current,
-          updatedAt: 1,
-          ...(selectedAgentPreset.current === undefined ? {} : { agentPreset: selectedAgentPreset.current }),
-        } },
+        : { [current]: { id: current, displayTitle: 'Test', running: false, blank: selectedSessionBlank.current, updatedAt: 1 } },
       current,
       phase: 'ready',
     } as SessionListState
@@ -100,7 +85,6 @@ function mountFrame() {
       useStore={hookOf(instance)}
       actions={instance.actions}
       renderSlot={renderSlot}
-      renderSlotChain={renderSlotChain}
       useSessions={useSessions}
       useWorkspaces={((sel: (s: WorkspaceListState) => unknown) => sel(workspaceState)) as never}
       SessionProvider={SessionProviderStub}
@@ -130,7 +114,6 @@ beforeEach(() => {
   frameWidth = 1920
   selectedSession.current = 's-test' as SessionId
   selectedSessionBlank.current = false
-  selectedAgentPreset.current = 'coding'
   baselinesReady.current = true
   vi.useFakeTimers()
   vi.stubGlobal('ResizeObserver', ResizeObserverStub)
@@ -178,15 +161,6 @@ describe('AppFrame', () => {
     const { slotCalls, getByTestId } = mountFrame()
     expect(getByTestId('center-content')).toBeTruthy()
     expect(slotCalls.map(c => c.key)).toContain('conversation')
-  })
-
-  it('lets a selected whole-frame mode replace sidebar, conversation, details, and overlays together', () => {
-    selectedAgentPreset.current = 'werewolf'
-    const { getByTestId, queryByTestId } = mountFrame()
-    expect(getByTestId('exclusive-content')).toBeTruthy()
-    expect(queryByTestId('sidebar-content')).toBeNull()
-    expect(queryByTestId('center-content')).toBeNull()
-    expect(queryByTestId('details-content')).toBeNull()
   })
 
   it('renders both column occupants before baselines settle (no loading gate)', () => {

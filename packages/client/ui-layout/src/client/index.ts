@@ -1,7 +1,7 @@
 /**
  * Layout plugin, browser half: one register() call contributes AppFrame into
  * the runtime's built-in 'root' slot and, in the same breath, declares the
- * five child slots (declaration = exclusive render authority), seats the
+ * four child slots (declaration = exclusive render authority), seats the
  * layout store (panel geometry), and wires the panel-action service face.
  * ctx.layout is the cross-plugin panel-action contract; navigation state lives
  * with the runtime sessions service. A second effect seats the theme
@@ -33,17 +33,9 @@ declare module '@deepseek-ai/cordis' {
 declare module '@deepseek-ai/dsh-client-ui-slots' {
   interface SlotMap {
     // The 'root' entry itself is the runtime's built-in slot (declared
-    // there); these five are the frame's children, declared by the same
+    // there); these four are the frame's children, declared by the same
     // register() call that contributes AppFrame. Session owners never pass
     // sessionId: the framework injects it as a standard prop.
-    /**
-     * Optional whole-frame takeover. Chain entries receive the current
-     * Session's confirmed Agent preset and may replace the complete standard
-     * shell. A declining chain falls back to sidebar, conversation, details,
-     * and overlays together, so a selected mode cannot leak ordinary app
-     * navigation or controls around its own exit path.
-     */
-    'shell.surface': { kind: 'chain'; scope: 'session-maybe'; owner: ShellSurfaceOwnerProps }
     /**
      * The whole left column. OCCUPIED by ui-sidebar's SidebarRoot, which
      * declares the workspace and settings seats inside it — registering here
@@ -106,12 +98,6 @@ export interface SidebarOwnerProps {
   width: number
 }
 
-/** Whole-frame routing facts supplied by AppFrame. */
-export interface ShellSurfaceOwnerProps {
-  /** Host-confirmed Agent preset for the current Session. */
-  agentPreset?: string
-}
-
 /** Conversation owner share: business state and actions belong to the registrant. */
 export interface ConvOwnerProps {}
 
@@ -123,7 +109,7 @@ export const inject = ['slots', 'theme']
 
 /**
  * Client plugin body: provide ctx.layout, then one register() call — AppFrame
- * into 'root' with the five child-slot declarations, the layout store seat,
+ * into 'root' with the four child-slot declarations, the layout store seat,
  * and the inject hook that hands the store's bound actions to the service.
  * @param ctx - client root context.
  */
@@ -134,7 +120,6 @@ export function apply(ctx: ClientContext): void {
     const disposeRegistration = ctx.slots.register({
       name: 'root',
       children: {
-        'shell.surface': { kind: 'chain', scope: 'session-maybe' },
         'sidebar': { kind: 'single', scope: 'root' },
         'conversation': { kind: 'single', scope: 'session-maybe' },
         'details': { kind: 'single', scope: 'session' },

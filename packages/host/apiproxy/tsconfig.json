@@ -51,9 +51,6 @@
       "path": "../../core/tools"
     },
     {
-      "path": "../../game/game"
-    },
-    {
       "path": "../../session/session-persistence"
     },
     {

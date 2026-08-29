@@ -4,16 +4,11 @@ import { afterEach, describe, expect, it } from 'vitest'
 import { cleanup, fireEvent, render, waitFor } from '@testing-library/react'
 import type { ReactElement } from 'react'
 import { WerewolfView, type WerewolfViewInjected } from '../src/client/WerewolfView.tsx'
-import { WerewolfSurface } from '../src/client/WerewolfSurface.tsx'
 import { zh } from '../src/client/locales.ts'
 import type { WerewolfHumanViewV1 } from '@deepseek-ai/dsh-werewolf/types'
 
 const TestView = WerewolfView as unknown as (
   props: { sessionId: string } & WerewolfViewInjected,
-) => ReactElement
-
-const TestSurface = WerewolfSurface as unknown as (
-  props: { sessionId: string; view: WerewolfViewInjected; exitMode: () => void },
 ) => ReactElement
 
 function tableFixture(): WerewolfHumanViewV1 {
@@ -92,12 +87,6 @@ afterEach(() => {
 })
 
 describe('WerewolfView responsive snapshots', () => {
-  it('pins the dedicated whole-app chrome and exit route', async () => {
-    const view = render(<TestSurface sessionId="s1" view={face} exitMode={() => {}} />)
-    await waitFor(() => { expect(view.getByRole('button', { name: zh['lobby.start'] })).toBeDefined() })
-    expect(view.getByTestId('werewolf-exclusive-surface')).toMatchSnapshot()
-  })
-
   it('matches the desktop layout snapshot at 1280px', async () => {
     window.innerWidth = 1280
     window.innerHeight = 800

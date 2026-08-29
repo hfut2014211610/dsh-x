@@ -39,12 +39,6 @@
       "path": "../../feedback/message-feedback"
     },
     {
-      "path": "../../game/game"
-    },
-    {
-      "path": "../../game/werewolf"
-    },
-    {
       "path": "../../host/plugin-inventory"
     },
     {

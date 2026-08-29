@@ -41,9 +41,6 @@
       "path": "../../extensions/cordis-host-runner"
     },
     {
-      "path": "../../game/game"
-    },
-    {
       "path": "../../settings/settings"
     },
     {
