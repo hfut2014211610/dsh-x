@@ -1,9 +1,0 @@
-- text: Writing /
-- strong: outline-navigation.md
-- img
-- text: Saved
-- button "Reload":
-  - img
-- button "Open in new window":
-  - img
-- button "Save" [disabled]

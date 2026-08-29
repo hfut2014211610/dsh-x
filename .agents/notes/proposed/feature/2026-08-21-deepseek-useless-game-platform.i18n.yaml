@@ -1,0 +1,6 @@
+# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
+# side as of the last confirmed-consistent state. Both languages carry equal authority;
+# after editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write .agents/notes/proposed/feature/2026-08-21-deepseek-useless-game-platform.md
+2026-08-21-deepseek-useless-game-platform.md: 69e5e0565acff0bc54906d194b76b5403be61bf8
+2026-08-21-deepseek-useless-game-platform.zh.md: ca5712f4f49063fa1a28cfced3157d7760957b41
