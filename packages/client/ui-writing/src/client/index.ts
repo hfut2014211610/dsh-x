@@ -36,9 +36,9 @@ export function apply(ctx: ClientContext): void {
     if (listeners === undefined) return
     for (const listener of [...listeners]) listener(change)
   })
-  ctx.effect(() => ctx.conversation.declarePreferredView((sessionId: SessionId) => {
+  ctx.effect(() => ctx.conversation.declarePreferredView('writing', (sessionId: SessionId) => {
     const summary = ctx.sessions.list.getSnapshot().byId[sessionId]
-    return summary?.agentPreset === 'writing' ? 'writing' : null
+    return summary?.agentPreset === 'writing'
   }), 'ui-writing: preferred view')
   ctx.effect(() => ctx.conversation.declareCompanionView((sessionId, activeViewId) => {
     const summary = ctx.sessions.list.getSnapshot().byId[sessionId]

@@ -105,6 +105,8 @@ function mount(
     composerBlock?: { reason: string }
     /** Mutable view ledger used by registration-order regressions. */
     viewTabs?: ViewTab[]
+    /** View ids owned by a session preset rather than exposed as tabs. */
+    sessionOwnedViewIds?: readonly string[]
     /** Optional secondary view declaration for an active view. */
     companion?: (sessionId: SessionId, activeViewId: string) => { id: string; label: string } | null
   } = {},
@@ -155,6 +157,7 @@ function mount(
     list: () => viewTabs,
     subscribe: () => () => {},
     version: () => 1,
+    isSessionOwned: (viewId: string) => options.sessionOwnedViewIds?.includes(viewId) ?? false,
     preferred: (sessionId: SessionId) =>
       sessions.getSnapshot().byId[sessionId]?.agentPreset === 'writing' ? 'writing' : null,
     companion: options.companion ?? (() => null),
@@ -521,6 +524,8 @@ describe('ConversationRoot resident composer', () => {
     expect(b.view.getByTestId('view-writing')).toBeTruthy()
     expect(b.view.getByTestId('view-chat')).toBeTruthy()
     expect(b.view.getByRole('complementary', { name: 'Assistant' })).toBeTruthy()
+    // Mode views are not tabs: the mode owns the session from creation, so
+    // the header must not offer switching into or out of it.
     expect(b.view.queryByRole('tab')).toBeNull()
     expect(b.view.container.querySelector('[data-conversation-companion-layout]')).toBeTruthy()
     expect(b.view.container.querySelector('[data-composer-seat]')).toBeTruthy()
@@ -663,6 +668,47 @@ describe('ConversationRoot resident composer', () => {
     act(() => { b.setAgentPreset('standard') })
     expect(b.view.getByTestId('view-trajectory')).toBeTruthy()
     expect(b.view.getByRole('tab', { name: 'Trajectory' }).getAttribute('aria-selected')).toBe('true')
+  })
+
+  it('hides mode-owned tabs from ordinary sessions while keeping ordinary tabs clickable', () => {
+    const viewTabs: ViewTab[] = [
+      { id: 'chat', label: 'Chat' },
+      { id: 'trajectory', label: 'Trajectory' },
+      { id: 'writing', label: '写作模式' },
+      { id: 'ued', label: '设计' },
+    ]
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      summaryAgentPreset: 'standard',
+      viewTabs,
+      sessionOwnedViewIds: ['writing', 'ued'],
+      companion: () => null,
+    })
+    expect(b.view.getByTestId('view-chat')).toBeTruthy()
+    expect(b.view.getByRole('tab', { name: 'Chat' })).toBeTruthy()
+    expect(b.view.getByRole('tab', { name: 'Trajectory' })).toBeTruthy()
+    expect(b.view.queryByRole('tab', { name: '写作模式' })).toBeNull()
+    expect(b.view.queryByRole('tab', { name: '设计' })).toBeNull()
+
+    // Ordinary tabs still switch the rendered view.
+    fireEvent.click(b.view.getByRole('tab', { name: 'Trajectory' }))
+    expect(b.chat.store.getSnapshot().view).toBe('trajectory')
+    expect(b.view.getByTestId('view-trajectory')).toBeTruthy()
+  })
+
+  it('ignores a persisted mode view outside its owning session preset', () => {
+    const viewTabs: ViewTab[] = [
+      { id: 'chat', label: 'Chat' },
+      { id: 'trajectory', label: 'Trajectory' },
+      { id: 'writing', label: 'Writing' },
+    ]
+    const b = mount(conversationSnapshot(), undefined, undefined, {
+      summaryAgentPreset: 'standard',
+      viewTabs,
+      sessionOwnedViewIds: ['writing'],
+    })
+    act(() => { b.chat.actions.setView('writing') })
+    expect(b.view.queryByTestId('view-writing')).toBeNull()
+    expect(b.view.getByTestId('view-chat')).toBeTruthy()
   })
 
   it('keeps the Chat fallback selected by id when a view is inserted before it', () => {

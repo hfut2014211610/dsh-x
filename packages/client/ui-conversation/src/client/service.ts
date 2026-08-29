@@ -59,14 +59,16 @@ export interface IConversation {
    */
   loadOlder(): Promise<void>
   /**
-   * Declare a temporary preferred conversation view. While a resolver returns
-   * an id, that view takes precedence without replacing the user's persisted
-   * tab selection; when it returns null, the prior tab becomes active again.
-   * Resolvers run in registration order; the first non-null result wins.
-   * @param resolver - returns a conversation.view entry id or null.
-   * @returns disposer that removes this resolver.
+   * Declare a session-owned preferred conversation view. The declared view is
+   * omitted from the switchable tab strip. While its matcher returns true,
+   * that view takes precedence without replacing the user's persisted tab
+   * selection; when it returns false, the prior switchable tab becomes active.
+   * Declarations run in registration order; the first matching view wins.
+   * @param viewId - registered conversation.view id owned by a session preset.
+   * @param matches - whether the session belongs to this view.
+   * @returns disposer that removes this declaration.
    */
-  declarePreferredView(resolver: (sessionId: SessionId) => string | null): () => void
+  declarePreferredView(viewId: string, matches: (sessionId: SessionId) => boolean): () => void
   /**
    * Declare a secondary conversation view rendered beside an active view.
    * Resolvers run in registration order; the first non-null result wins.
@@ -126,7 +128,10 @@ export class ConversationController extends Service implements IConversation {
    * constructed by the plugin apply (the same instances the slot inject
    * factories close over).
    */
-  private readonly declarePreferredViewImpl: (resolver: (sessionId: SessionId) => string | null) => () => void
+  private readonly declarePreferredViewImpl: (
+    viewId: string,
+    matches: (sessionId: SessionId) => boolean,
+  ) => () => void
   private readonly declareCompanionViewImpl: (
     resolver: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null,
   ) => () => void
@@ -134,7 +139,9 @@ export class ConversationController extends Service implements IConversation {
   constructor(ctx: Context, config: {
     input: SessionInputResolver
     blocks: ComposerBlocks
-    preferredViews: { declare: (resolver: (sessionId: SessionId) => string | null) => () => void }
+    preferredViews: {
+      declare: (viewId: string, matches: (sessionId: SessionId) => boolean) => () => void
+    }
     companionViews: {
       declare: (
         resolver: (sessionId: SessionId, activeViewId: string) => ViewCompanion | null,
@@ -156,8 +163,11 @@ export class ConversationController extends Service implements IConversation {
     }, 'conversation attachment URL cache')
   }
 
-  declarePreferredView(resolver: (sessionId: SessionId) => string | null): () => void {
-    return this.declarePreferredViewImpl(resolver)
+  declarePreferredView(
+    viewId: string,
+    matches: (sessionId: SessionId) => boolean,
+  ): () => void {
+    return this.declarePreferredViewImpl(viewId, matches)
   }
 
   declareCompanionView(

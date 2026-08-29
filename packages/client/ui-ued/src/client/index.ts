@@ -44,7 +44,8 @@ export function apply(ctx: ClientContext): void {
     ctx.sessions.list.getSnapshot().byId[sessionId]?.agentPreset === PRESET
 
   ctx.effect(() => ctx.conversation.declarePreferredView(
-    (sessionId: SessionId) => isDesignSession(sessionId) ? PRESET : null,
+    PRESET,
+    (sessionId: SessionId) => isDesignSession(sessionId),
   ), 'ui-ued: preferred view')
 
   ctx.effect(() => ctx.conversation.declareCompanionView(

@@ -223,6 +223,7 @@ function mount(slots: SlotRegistry, nodes: ConversationSnapshot['nodes'] = NODES
     list: () => tabsOf(slots),
     subscribe: (fn: () => void) => slots.subscribe('conversation.view', fn),
     version: () => slots.getVersion('conversation.view'),
+    isSessionOwned: () => false,
     preferred: () => null,
     companion: () => null,
   }

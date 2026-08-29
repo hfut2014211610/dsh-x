@@ -2,9 +2,9 @@
 
 English | [中文](README.zh.md)
 
-Browser design-mode plugin. It registers one `conversation.view` tab (`ued`) holding a prototype list and a sandboxed preview frame, declares itself the preferred view for sessions whose `agentPreset` is `ued`, and offers `chat` back as the companion view. Nothing runs on the host: the prototypes come from the existing `documents` Remote surface, and a `documents/changed` frame repaints the preview.
+Browser design-mode plugin. It registers the session-owned `ued` `conversation.view` holding a prototype list and a sandboxed preview frame, activates it only for sessions whose `agentPreset` is `ued`, and offers `chat` back as the companion view. Nothing runs on the host: the prototypes come from the existing `documents` Remote surface, and a `documents/changed` frame repaints the preview.
 
-The gate is the preset, not the file type: it decides which sessions *open* on this view, so nothing renders a model-written page unless the session was started to design one. Be precise about what that gate is not — `conversation.view` has no per-session filter, so the tab itself is registered for every session, exactly as `ui-writing`'s is. A person in an ordinary chat session can still click Design and render HTML from that workspace. What the preset removes is the automatic path.
+The gate is the preset, not the file type: it decides which sessions activate this view, so nothing renders a model-written page unless the session was started to design one. The registered entry is omitted from the ordinary tab strip and cannot be selected after a session starts.
 
 ## The preview frame
 
@@ -50,4 +50,3 @@ None; this package neither assembles nor sends a provider request.
 - **No in-view editing** — the view reads prototypes; changing one goes through the model, as the design policy requires.
 - **A pick carries markup, not pixels** — the model gets the element’s selector and its own markup. What the element *looks like* is not in the annotation, and the sandbox gives the host no way to capture it; a screenshot would have to be drawn inside the frame.
 - **The outline is an element in the prototype’s tree** — it hangs off `documentElement` rather than `body` to stay clear of the page’s own selectors, and it is removed on disarm, but a rule written against `html > *` would still see it.
-- **The tab cannot be hidden per session** — `conversation.view` registrations are global, so Design appears beside Chat everywhere. Hiding it where it does not apply needs an availability resolver on `ctx.conversation`, beside the preferred- and companion-view ones.
