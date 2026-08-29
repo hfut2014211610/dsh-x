@@ -73,8 +73,9 @@
 
 # Windows-only `bash` (see custom-bash.mjs): the same tool name and a
 # Minimal-compatible description, executed through the ordinary cross-platform
-# subprocess seam (`bash -c`, resolved from PATH — point `bashPath` at Git Bash
-# explicitly when the WSL shim would otherwise be picked up).
+# subprocess seam. Mounting first validates an explicit `bashPath`, or finds
+# Git Bash from the PATH-resolved `git` and standard installation roots before
+# trying a bare `bash`.
 - id: custom-bash
   name: ./custom-bash.mjs
   disabled: !!js process.platform !== 'win32'
