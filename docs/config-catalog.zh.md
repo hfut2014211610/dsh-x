@@ -727,6 +727,7 @@ export type Density = 'compact' | 'standard' | 'detailed'
 ```
 
 来源：[`packages/channel/feishu/src/index.ts:75`](../packages/channel/feishu/src/index.ts)
+
 <a id="deepseek-aidsh-file-reference-local"></a>
 
 ## `@deepseek-ai/dsh-file-reference-local`
