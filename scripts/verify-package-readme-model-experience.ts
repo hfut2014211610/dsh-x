@@ -34,7 +34,6 @@ const NO_MODEL_EXPERIENCE_SECTION: Readonly<Record<string, string>> = {
   'packages/util/brand': 'The package is a type-only primitive erased at compile time.',
   'packages/util/home-paths': 'The package only resolves harness-owned host paths; model-facing consumers own any rendered use.',
   'packages/util/launch-environment': 'The package only resolves host environment values; model-facing consumers own any rendered use.',
-  'packages/game/werewolf-classic': 'The definitions plugin only registers game rules on ctx.werewolf; it contributes no model-visible surface.',
 }
 
 /**
@@ -88,7 +87,6 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-plan': { kind: 'indirect', reason: 'The chip dispatches /plan off; dsh-plan-mode owns the model-visible policy, exit tool, and logged state.' },
   'packages/client/ui-user-questions': { kind: 'indirect', reason: 'The package mounts dsh-tool-ask-user; that tool owns the model-visible schema and answer rendering.' },
   'packages/client/ui-trajectory': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
-  'packages/client/ui-werewolf': { kind: 'none', reason: 'Browser-side game view; view actions create no parent model request (bot children are owned by dsh-werewolf).' },
   'packages/client/ui-writing': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-ued': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/channel/feishu': { kind: 'indirect', reason: 'The channel carries a Lark message into an ordinary session; the session preset owns every tool and prompt section.' },

@@ -320,9 +320,6 @@
     { "path": "./packages/lsp/lsp" },
     { "path": "./packages/lsp/lsp-stdio" },
     { "path": "./packages/lsp/tool-lsp" },
-    { "path": "./packages/game/game" },
-    { "path": "./packages/game/werewolf" },
-    { "path": "./packages/game/werewolf-classic" },
     { "path": "./apps/cli" },
     { "path": "./apps/desktop" }
   ]

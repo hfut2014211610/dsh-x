@@ -88,7 +88,6 @@
     { "path": "./packages/client/ui-user-questions" },
     { "path": "./packages/client/ui-trajectory" },
     { "path": "./packages/client/ui-writing" },
-    { "path": "./packages/client/ui-werewolf" },
     { "path": "./packages/client/ui-ued" },
     { "path": "./packages/client/ui-settings-connectors" },
     { "path": "./packages/session-query/session-log-export" },

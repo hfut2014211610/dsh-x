@@ -14,7 +14,6 @@ Groups hold `packages/<group>/<pkg>/`; names stay `@deepseek-ai/dsh-<pkg>`. **Gr
 | [`api/`](api/README.md) | Remote BFF assembly and Typert RPC gateway | Product — stable API |
 | [`typert/`](typert/README.md) | Type graph generation, artifact loading, and runtime registry | Product — stable API |
 | [`goal/`](goal/README.md) | Same-session goal persistence and lifecycle | Product — stable API |
-| [`game/`](game/README.md) | Werewolf core and classic definitions | Product — stable API |
 | [`schedule/`](schedule/README.md) | Session-local scheduled follow-ups | Product — stable API |
 | [`feedback/`](feedback/README.md) | Human feedback | Product — stable API |
 | [`identity/`](identity/README.md) | Shared anonymous identity | Product — stable API |

@@ -22,7 +22,6 @@ export function ConversationRoot({
   const session = useSession(s => s)
   const inputState = useInput(s => s)
   const cwd = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.cwd)
-  const agentPreset = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.agentPreset)
   const summaryBlank = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.blank)
   const workspaces = useWorkspaces(s => s)
   // A plugin this package cannot import (ui-model-selection) says this session cannot
@@ -177,7 +176,7 @@ export function ConversationRoot({
   const phase = settling ? 'settling' : hero ? 'hero' : 'active'
   const composer = renderSlotChain(
     'conversation.composer',
-    { interactions: pending, session, agentPreset },
+    { interactions: pending, session },
     { fallback: composerBar, overlay: true },
   )
 
