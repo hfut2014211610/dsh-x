@@ -76,6 +76,20 @@ describe('RepositoryCleaner', () => {
     expect(existsSync(join(root, 'native/landlock-run/tsconfig.tsbuildinfo'))).toBe(false)
   })
 
+  it('removes the desktop application direct lib output', async () => {
+    const root = fixture()
+    const desktop = 'apps/desktop'
+    addProject(root, desktop, 'lib')
+    write(join(root, desktop, 'lib/main.js'))
+    write(join(root, desktop, 'tsconfig.tsbuildinfo'))
+
+    await new RepositoryCleaner(root).clean()
+
+    expect(existsSync(join(root, desktop, 'lib'))).toBe(false)
+    expect(existsSync(join(root, desktop, 'tsconfig.tsbuildinfo'))).toBe(false)
+    expect(existsSync(join(root, desktop, 'src/index.ts'))).toBe(true)
+  })
+
   it('refuses project outputs reached through a symlink outside the repository', async () => {
     const root = fixture()
     const externalProject = fixture()

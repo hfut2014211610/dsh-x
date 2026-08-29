@@ -79,6 +79,11 @@ export class RepositoryCleaner {
       join(this.root, 'native/landlock-run/tsconfig.tsbuildinfo'),
       canonicalRoot,
     )
+    await this.addIfPresent(
+      targets,
+      join(this.root, 'apps/desktop/tsconfig.tsbuildinfo'),
+      canonicalRoot,
+    )
 
     // The root project-reference graph is the source of truth for live build targets.
     // Each emitting project declares lib/types as outDir; its parent lib also owns
@@ -122,6 +127,7 @@ export class RepositoryCleaner {
     const pending = [join(this.root, 'tsconfig.json')]
     const visited = new Set<string>()
     const nativeEntryOutput = join(this.root, 'native/landlock-run/packages/entry/lib')
+    const desktopOutput = join(this.root, 'apps/desktop/lib')
 
     while (pending.length > 0) {
       const nextConfigPath = pending.pop()
@@ -135,7 +141,7 @@ export class RepositoryCleaner {
         const typesDirectory = resolve(parsed.options.outDir)
         const outputDirectory = basename(typesDirectory) === 'types'
           ? dirname(typesDirectory)
-          : typesDirectory === nativeEntryOutput
+          : typesDirectory === nativeEntryOutput || typesDirectory === desktopOutput
             ? typesDirectory
             : undefined
         if (outputDirectory === undefined) {
