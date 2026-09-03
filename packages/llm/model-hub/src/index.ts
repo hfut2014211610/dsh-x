@@ -302,8 +302,8 @@ export function prepareProviderEntry(
 
 /**
  * RPC gateway for the model-hub settings page. The HTTP `settings.*` surface
- * allowlists namespaces (`WEB_SETTINGS_NAMESPACES` in dsh-host-apiproxy) and
- * refuses this plugin's namespace, so the page talks to this service instead:
+ * allowlists namespaces and refuses this plugin's namespace, so the page talks
+ * to this service instead:
  * the gateway's SRC-mode claims are discovered by the Typert gateway from the
  * live service, no generated artifacts needed. Every write still goes through
  * the settings seam, keeping schema validation, persistence, hot reload, and
