@@ -116,7 +116,7 @@ export function run(command: string, args: readonly string[], options: RunOption
 
 export function runConcurrent(command: string, args: readonly string[], options: RunOptions = {}): Promise<void> {
   return new Promise((resolveRun, rejectRun) => {
-    const child = spawn(command, [...args], { cwd: options.cwd, env: options.env, stdio: 'inherit' })
+    const child = spawn(command, [...args], { cwd: options.cwd, env: options.env, stdio: 'inherit', ...WINDOWS_SHELL })
     child.once('error', rejectRun)
     child.once('close', (status, signal) => {
       if (status === 0) resolveRun()

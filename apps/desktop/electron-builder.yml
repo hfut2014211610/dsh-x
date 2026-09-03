@@ -18,7 +18,7 @@ productName: DeepSeek Harness
 # packaged manifest, so it is what `app.getVersion()` reports, what the
 # installer filenames carry, and what the update check compares.
 extraMetadata:
-  version: 0.1.1-rc.2-x.0.8
+  version: 0.1.2-alpha.5-x.0.9
 # Where the in-app update check looks. Without this electron-builder infers the
 # target from the package manifest's `repository`, which is UPSTREAM — every
 # installed app would then check releases that never carry this fork's builds.
