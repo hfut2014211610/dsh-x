@@ -7,9 +7,8 @@
  * @module @deepseek-ai/dsh-client-ui-model-hub/client
  */
 
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: the shell's SlotMap merge (the 'settings.section' entry) and the
 // locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
@@ -48,9 +47,8 @@ export function apply(ctx: ClientContext): void {
   const connection = ctx.get('connection') as ConnectionHandle
   const rpc = (connection as unknown as { rpc: HubRpc }).rpc
   const controller = new ModelHubStore(rpc)
-  const useSnapshot = bindSnapshotSelector(controller.store)
   const t = ctx.locale.bind(NS) as ModelHubInjected['t']
-  const injected = (): ModelHubInjected => ({ controller, useSnapshot, t })
+  const injected = (): ModelHubInjected => ({ controller, hooks: { snapshot: controller.store }, t })
 
   ctx.effect(() => {
     const refresh = (): void => {

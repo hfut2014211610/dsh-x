@@ -11,8 +11,8 @@
  * for unit tests.
  */
 
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { CredentialState, DefaultModelSelection, HubModel, HubProvider, ImportOutcome, ProbeResult, ProviderPreset } from './types.ts'
 
 /** The namespace this page edits. */

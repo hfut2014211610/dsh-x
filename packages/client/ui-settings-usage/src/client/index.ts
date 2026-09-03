@@ -5,9 +5,8 @@
  * session.list wire join; the page only reads.
  * Export discipline: packages/client/AGENTS.md.
  */
-import type { ClientContext } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
 import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
-import { bindSnapshotSelector } from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the shell's SlotMap merge (the 'settings.section' entry).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
@@ -60,11 +59,10 @@ export function apply(ctx: ClientContext): void {
 
   const connection = ctx.get('connection') as ConnectionHandle
   const controller = new UsageSettingsStore(connection.api)
-  const useSnapshot = bindSnapshotSelector(controller.store)
   // Registration-time text (the nav label thunk) and the inject face share
   // one bound translate; copy freshness rides the locale revision.
   const t: UsageSectionInjectedBound = ctx.locale.bind(NS)
-  const injected = (): UsageSectionInjected => ({ controller, useSnapshot, t })
+  const injected = (): UsageSectionInjected => ({ controller, hooks: { snapshot: controller.store }, t })
 
   ctx.effect(() => ctx.on('connection/reset', () => { refreshIfLoaded(controller) }),
     'ui-settings-usage: connection reset refresh')

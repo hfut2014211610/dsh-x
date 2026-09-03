@@ -12,8 +12,8 @@ import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
 import { Button, IconRefreshOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
-import type { UsageSettingsState, UsageSettingsStore } from './store.ts'
+import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
+import type { UsageSettingsStore } from './store.ts'
 import type { DayUsage, ModelUsageRow, UsageRange } from './view-model.ts'
 import {
   USAGE_RANGES, formatDuration, formatTokens, heatmapDaysOf, intensityOf,
@@ -25,14 +25,19 @@ import styles from './UsageSection.module.css'
 export interface UsageSectionInjected {
   /** The page store (loaded on mount, refreshed on demand). */
   controller: UsageSettingsStore
-  /** uSES subscription hook bound to the store. */
-  useSnapshot: SnapshotSelectorHook<UsageSettingsState>
+  hooks: {
+    /** Panel snapshot bound by the UI renderer as useSnapshot. */
+    snapshot: UsageSettingsStore['store']
+  }
   /** Section copy. */
   t: (key: UsageKey) => string
 }
 
 /** Props delivered by the slot outlet: the inject face spread flat. */
-export type UsageSectionProps = Partial<UsageSectionInjected>
+export type UsageSectionProps = Partial<InjectFace<UsageSectionInjected>>
+
+/** Component-side view of the inject face (hooks bound as useSnapshot). */
+type UsageSectionFace = InjectFace<UsageSectionInjected>
 
 /** Copy key of each statistics-window choice, in display order. */
 const RANGE_LABELS: Record<UsageRange, UsageKey> = {
@@ -109,7 +114,7 @@ export function UsageSection(props: UsageSectionProps): ReactNode {
   return <UsageLoaded injected={{ controller, useSnapshot, t }} />
 }
 
-function UsageLoaded({ injected }: { injected: UsageSectionInjected }): ReactNode {
+function UsageLoaded({ injected }: { injected: UsageSectionFace }): ReactNode {
   const { controller, t } = injected
   const state = injected.useSnapshot(snapshot => snapshot)
   useEffect(() => {

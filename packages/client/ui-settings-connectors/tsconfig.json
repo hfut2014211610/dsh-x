@@ -8,7 +8,7 @@
   "references": [
     { "path": "../../../vendor/cordis" },
     { "path": "../locale" },
-    { "path": "../runtime" },
+    { "path": "../store" },
     { "path": "../ui-primitives" },
     { "path": "../ui-settings" },
     { "path": "../ui-slots" },

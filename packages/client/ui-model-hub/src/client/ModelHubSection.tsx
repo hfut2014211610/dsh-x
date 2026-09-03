@@ -11,10 +11,10 @@
 
 import { useEffect, useState } from 'react'
 import { Button, IconPlusOutline16, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SnapshotSelectorHook } from '@deepseek-ai/dsh-client-ui-slots'
+import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import type { en } from './locales.ts'
 import { routeNameFor } from './store.ts'
-import type { ModelHubState, ModelHubStore } from './store.ts'
+import type { ModelHubStore } from './store.ts'
 import type { HubModel, HubProvider, ImportNote, ImportOutcome } from './types.ts'
 import { ProviderEditor } from './ProviderEditor.tsx'
 import { ModelEditor } from './ModelEditor.tsx'
@@ -24,8 +24,10 @@ import styles from './ModelHubSection.module.css'
 export interface ModelHubInjected {
   /** The page store (loaded on mount, refreshed after writes). */
   controller: ModelHubStore
-  /** uSES subscription hook bound to the store. */
-  useSnapshot: SnapshotSelectorHook<ModelHubState>
+  hooks: {
+    /** Page snapshot bound by the UI renderer as useSnapshot. */
+    snapshot: ModelHubStore['store']
+  }
   /** Section copy. */
   t: (key: keyof typeof en) => string
 }
@@ -34,7 +36,7 @@ export interface ModelHubInjected {
  * Props delivered by the slot outlet: the inject face spread flat (the
  * renderer erases the share boundary at the render call).
  */
-export type ModelHubSectionProps = Partial<ModelHubInjected>
+export type ModelHubSectionProps = Partial<InjectFace<ModelHubInjected>>
 
 /** Which editor modal is open: nothing, a new entry, or the key being edited. */
 type EditorState = { kind: 'none' } | { kind: 'provider'; key: string | null } | { kind: 'model'; id: string | null }

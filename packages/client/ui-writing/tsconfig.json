@@ -7,10 +7,16 @@
   "include": ["src"],
   "references": [
     { "path": "../../../vendor/cordis" },
+    { "path": "../../api/remotes/tsconfig.client.json" },
+    { "path": "../../api/session-controller/tsconfig.client.json" },
+    { "path": "../../core/session" },
     { "path": "../locale" },
-    { "path": "../runtime" },
+    { "path": "../ui-chat" },
     { "path": "../ui-conversation" },
+    { "path": "../ui-input-trigger" },
     { "path": "../ui-primitives" },
+    { "path": "../ui-renderer" },
+    { "path": "../ui-session" },
     { "path": "../ui-slots" },
     { "path": "../../writing/documents" },
     { "path": "../../runtime-diagnostics/invariants" }

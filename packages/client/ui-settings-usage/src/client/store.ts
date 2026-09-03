@@ -7,8 +7,8 @@
 
 import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import type { ResponseValue } from '@deepseek-ai/dsh-host-apiproxy/api'
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
-import { createSnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 // Type-only: pulls the sessionTitle and usageStats projection-key merges
 // into the wire rows' `values` face.
 import type {} from '@deepseek-ai/dsh-session-title/client'

@@ -1,7 +1,7 @@
 /** The staged form behind a connector card: what it shows, and what a save writes. */
 
 import { describe, expect, it, vi } from 'vitest'
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   ConnectorForm, choiceField, durationField, listField, textField, toggleField,
 } from '../src/client/connector-form.ts'

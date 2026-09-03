@@ -7,11 +7,12 @@
  */
 
 import { useEffect } from 'react'
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import { IconAgentPresetOutline16 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: pulls the ui-conversation SlotMap merge (the header actions).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
+import type {} from '@deepseek-ai/dsh-agent-presets/types'
 import type { AgentPresetSettingsState } from './settings-store.ts'
 import type { AgentPresetSeatState } from './seat-store.ts'
 import { AgentPresetPicker } from './AgentPresetSeat.tsx'
@@ -24,16 +25,16 @@ export interface AgentPresetLabelInjected {
     /** Roster snapshot bound by the renderer as useAgentPresets. */
     agentPresets: SnapshotStore<AgentPresetSettingsState>
     /** Shared new-session picker state, used while this session remains blank. */
-    agentPresetSeat: SnapshotStore<AgentPresetSeatState>
+    agentPresetSeat?: SnapshotStore<AgentPresetSeatState>
   }
   /** Read the roster, so the label can show a name rather than an id. */
   load: () => Promise<void>
   /** Read the selectable roster for the blank-session picker. */
-  loadSeat: () => Promise<void>
+  loadSeat?: () => Promise<void>
   /** Select another composition while the session is still blank. */
-  select: (id: string) => Promise<void>
+  select?: (id: string) => Promise<void>
   /** Clear the picker's one-shot introduction cue. */
-  introduced: () => void
+  introduced?: () => void
 }
 
 /** Full component props. */
@@ -51,9 +52,25 @@ export function AgentPresetLabel({
   sessionId, useSessions, useAgentPresets, useAgentPresetSeat,
   load, loadSeat, select, introduced, t,
 }: AgentPresetLabelProps) {
-  const summary = useSessions(state => state.byId[sessionId])
-  if (summary?.agentPreset === undefined) return null
-  if (summary.blank) {
+  const summary = useSessions(state => state.byId[sessionId] as
+    | { blank?: boolean; agentPreset?: unknown; projectionValues?: { agentPreset?: unknown } }
+    | undefined)
+  const projectionValue = summary?.projectionValues?.agentPreset
+  const topLevelValue = (summary as { agentPreset?: unknown } | undefined)?.agentPreset
+  const preset = typeof projectionValue === 'string'
+    ? projectionValue
+    : typeof topLevelValue === 'string' ? topLevelValue : undefined
+  const blank = summary?.blank ?? false
+
+  useEffect(() => {
+    // Deployments that compose no presets never label anything, so the roster
+    // is only worth a request once a session reports one.
+    if (preset !== undefined) void load()
+  }, [preset, load])
+
+  if (preset === undefined) return null
+  if (blank && useAgentPresetSeat !== undefined && loadSeat !== undefined
+    && select !== undefined && introduced !== undefined) {
     return (
       <AgentPresetPicker
         load={loadSeat}
@@ -64,7 +81,7 @@ export function AgentPresetLabel({
       />
     )
   }
-  return <RunningPresetLabel preset={summary.agentPreset} useAgentPresets={useAgentPresets} load={load} t={t} />
+  return <RunningPresetLabel preset={preset} useAgentPresets={useAgentPresets} load={load} t={t} />
 }
 
 type RunningPresetLabelProps = Pick<

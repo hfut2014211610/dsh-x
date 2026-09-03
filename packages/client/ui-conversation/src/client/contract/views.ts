@@ -1,9 +1,9 @@
-/** Shared conversation view, selection, and store-state contracts. */
+/** Conversation view and session-local presentation state. */
 
-/** Tool call identity as carried on the wire (branded upstream in connection). */
+/** Tool call identity as carried on the wire. */
 export type CallId = string
 
-/** Selection target for the details linkage channel (toolcall is the step special case). */
+/** Selection target for the details linkage channel. */
 export interface SelectionTarget { turnSeq: number; stepSeq?: number; callId?: CallId; toolName?: string }
 
 /**
@@ -27,12 +27,28 @@ export interface ChatStoreState {
   selection: SelectionTarget | null
   /** Composer draft (persisted; survives session switches and reloads). */
   draft: string
-  /** Active conversation view id ('conversation.view' entry id); null falls back to Chat. */
+  /** Active conversation view id; null falls back to Chat. */
   view: string | null
-  /**
-   * One-shot inspect handoff: chat writes the call to reveal, the trajectory
-   * view consumes it and acknowledges by clearing. Read with `?? null` —
-   * persisted snapshots from before this field rehydrate without it.
-   */
-  inspect: { callId: CallId } | null
+  /** One-shot inspect handoff consumed and cleared by the trajectory view. */
+  inspect?: { callId: CallId } | null
+  /** Focus request consumed and acknowledged by the addressed View. */
+  viewRequest?: ConversationViewRequest | null
+}
+
+/** One-shot focus request addressed to a Conversation View. */
+export interface ConversationViewRequest {
+  /** Target `conversation.view` entry id. */
+  readonly view: string
+  /** Target-owned opaque focus identity. */
+  readonly focus: string
+}
+
+/** Per-session state owned by the target-neutral Conversation shell. */
+export interface ConversationStoreState {
+  /** Composer draft (persisted; survives session switches and reloads). */
+  draft: string
+  /** Preferred `conversation.view` entry id; null resolves to Chat when registered. */
+  view: string | null
+  /** Focus request consumed and acknowledged by the addressed View. */
+  viewRequest: ConversationViewRequest | null
 }

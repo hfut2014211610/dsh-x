@@ -2,7 +2,7 @@
 import { Context } from '@deepseek-ai/cordis'
 import { describe, expect, it } from 'vitest'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
-import { SlotRegistry } from '@deepseek-ai/dsh-client-runtime/client'
+import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { apply, inject, refreshIfLoaded } from '@deepseek-ai/dsh-client-ui-settings-usage/client'
 import { UsageSection } from '../src/client/UsageSection.tsx'
@@ -51,7 +51,7 @@ describe('ui-settings-usage apply', () => {
     expect(injected.t('nav')).toBe('用量')
     expect(injected.t('title')).toBe('模型用量')
     expect(typeof injected.controller.load).toBe('function')
-    expect(typeof injected.useSnapshot).toBe('function')
+    expect(injected.hooks.snapshot).toBe(injected.controller.store)
     // The locale thunk follows the active locale without re-registration.
     b.locale.setLocale('en')
     expect(resolveSlotLabel(entry.options.label)).toBe('Usage')

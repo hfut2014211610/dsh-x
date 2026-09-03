@@ -8,7 +8,7 @@
  * is where the difference lives, so that is what this reads.
  */
 
-import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { PluginInventorySnapshot } from '@deepseek-ai/dsh-api-remotes/client'
 
 /** Loader-tree identity of one entry, as the inventory spells it. */

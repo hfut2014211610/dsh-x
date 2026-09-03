@@ -3,7 +3,7 @@
 import { afterEach, describe, expect, it, vi } from 'vitest'
 import { act, cleanup, fireEvent, render, waitFor, within } from '@testing-library/react'
 import type { ReactElement } from 'react'
-import type { SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { DocumentChange, DocumentOutlineEntry, DocumentReadResult } from '@deepseek-ai/dsh-documents/types'
 import { WritingView, type WritingViewInjected } from '../src/client/WritingView.tsx'
 import { zh } from '../src/client/locales.ts'

@@ -10,6 +10,7 @@ describe('preset display copy', () => {
     ['standard', 'presetStandardName', 'presetStandardDescription'],
     ['anchored-standard', 'presetAnchoredName', 'presetAnchoredDescription'],
     ['code', 'presetCodeName', 'presetCodeDescription'],
+    ['ptc', 'presetPtcName', 'presetPtcDescription'],
     ['minimal', 'presetMinimalName', 'presetMinimalDescription'],
     ['cordis', 'presetCordisName', 'presetCordisDescription'],
     ['writing', 'presetWritingName', 'presetWritingDescription'],

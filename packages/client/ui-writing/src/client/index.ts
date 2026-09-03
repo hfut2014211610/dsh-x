@@ -3,13 +3,19 @@
  * @module @deepseek-ai/dsh-client-ui-writing/client
  */
 
-import type { ClientContext, SessionId } from '@deepseek-ai/dsh-client-runtime/client'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: the 'conversation.view' SlotMap row and ctx.conversation face.
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
 // Type-only: pulls the generated Remote API and ctx.remote merge.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+// Type-only: pulls the sessions service face (ctx.sessions).
+import type {} from '@deepseek-ai/dsh-api-session-controller/client'
+// Type-only: pulls the slot registry face (ctx.slots).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
+import type {} from '@deepseek-ai/dsh-client-ui-session/client'
 import type { ClientSessionContext, InputTriggerServiceContract, InputTriggerSource } from '@deepseek-ai/dsh-client-ui-input-trigger/client'
 import type { DocumentChange } from '@deepseek-ai/dsh-documents/types'
 import { WritingView, type WritingViewInjected } from './WritingView.tsx'

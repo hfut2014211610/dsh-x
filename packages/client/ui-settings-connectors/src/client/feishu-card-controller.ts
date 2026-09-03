@@ -7,7 +7,8 @@
  * knobs folded away, and the two actions that undo it.
  */
 
-import type { SettingsScope, SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   ConnectorForm, choiceField, durationField, listField, textField, toggleField,
   type ConnectorActions, type ConnectorFieldState, type ConnectorFormState,

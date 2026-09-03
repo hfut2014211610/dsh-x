@@ -36,6 +36,9 @@ interface Koffi {
  * externally-backed ArrayBuffer, which the V8 memory sandbox — on in the
  * Electron runtime the packaged desktop app runs — rejects with a fatal
  * napi error; plain node accepts it, so the dialog only crashed packaged.
+ * The `uint16` zero check terminates only on two zero bytes: a single zero
+ * low byte is a valid BMP code unit (U+XX00, e.g. 开 = U+5F00) and must not
+ * terminate the scan.
  */
 function readUtf16(koffi: Koffi, address: unknown): string {
   let out = ''

@@ -6,7 +6,7 @@
  * 上的合同的一份复述，不是从那边导入的。
  */
 
-import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-runtime/client'
+import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 
 /** 一次裸 RPC 的结果。 */
 export type AuthRpcResult = { ok: true; value: unknown } | { ok: false; error: { message: string } }

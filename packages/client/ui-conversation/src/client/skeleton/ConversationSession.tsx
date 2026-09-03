@@ -3,11 +3,14 @@
 import { useCallback, useEffect, useRef, useState, useSyncExternalStore } from 'react'
 import clsx from 'clsx'
 import { ResizeHandle } from '@deepseek-ai/dsh-client-ui-primitives'
-import type { SessionId, SessionListState, SessionSummary } from '@deepseek-ai/dsh-client-runtime/client'
+import type { SessionListState, SessionSummary } from '@deepseek-ai/dsh-api-session-controller/client'
+import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type {
   ConversationSessionHeaderSlotProps, ConversationSessionSlotProps,
 } from '../contract/slots.ts'
 import type { ViewTab } from '../contract/views.ts'
+import { conversationPhase } from '../contract/snapshot.ts'
+import { resolveActiveView } from '../view-selection.ts'
 import css from './ConversationRoot.module.css'
 
 /** Full props composed from the strict session body contract. */
@@ -52,7 +55,7 @@ function clampCompanion(px: number): number {
 }
 
 /** Resolve by id; a live preferred view temporarily overrides the persisted tab. */
-function resolveActiveView(
+function resolveActiveViewWithPreferred(
   tabs: readonly ViewTab[],
   selectedId: string | null,
   preferredId: string | null,
@@ -96,26 +99,32 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
  * @returns the hidden blank-session header or visible title and tabs.
  */
 export function ConversationSessionHeader({
-  sessionId, useSession, useSessions, useStore, actions,
-  renderSlot, views, open, t,
+  sessionId, useSession, useSessions, useConversation, useConversationViews, useStore,
+  renderSlot, open, selectView, views, t,
 }: ConversationSessionHeaderProps) {
-  useSyncExternalStore(views.subscribe, views.version)
-  const tabs = views.list()
-  const switchableTabs = tabs.filter(tab => !views.isSessionOwned(tab.id))
+  const fallbackTabs: readonly ViewTab[] = []
+  const viewsSubscribe = views?.subscribe ?? (() => () => {})
+  const viewsVersion = views?.version ?? (() => 0)
+  useSyncExternalStore(viewsSubscribe, viewsVersion)
+  const hookTabs = useConversationViews?.(value => value) ?? views?.list() ?? fallbackTabs
+  const tabs = hookTabs
+  const switchableTabs = views === undefined ? [...tabs] : tabs.filter(tab => !views.isSessionOwned(tab.id))
   const selectedId = useStore(s => s.view)
-  const preferredId = useSessions(() => views.preferred(sessionId))
-  const activePreferredId = tabs.some(tab => tab.id === preferredId) ? preferredId : null
+  const preferredId = useSessions(() => views?.preferred(sessionId) ?? null)
+  const activePreferredId = preferredId !== null && tabs.some(tab => tab.id === preferredId) ? preferredId : null
   const active = activePreferredId === null
-    ? resolveActiveView(switchableTabs, selectedId, null)
-    : resolveActiveView(tabs, selectedId, activePreferredId)
-  const companion = active === undefined ? null : views.companion(sessionId, active.id)
+    ? resolveActiveView([...switchableTabs], selectedId)
+    : resolveActiveViewWithPreferred([...tabs], selectedId, activePreferredId)
+  const companion = active === undefined || views === undefined ? null : views.companion(sessionId, active.id)
   const hasCompanion = companion !== null
     && companion.id !== active?.id
     && tabs.some(tab => tab.id === companion.id)
   const ancestry = useSessions(s => deriveAncestry(s, sessionId), equalBreadcrumbs)
-  const composerPhase = useSession(s => s.composerPhase)
-  const blank = useSession(s => s.blank)
-  const hideChrome = blank && composerPhase === 'blank' && activePreferredId === null
+  const session = useSession(s => s)
+  const conversation = useConversation(s => s)
+  const blank = session.blank
+  const phase = conversationPhase(session, conversation)
+  const hideChrome = blank && phase === 'blank' && activePreferredId === null
 
   return (
     <header
@@ -192,7 +201,7 @@ export function ConversationSessionHeader({
                   role="tab"
                   aria-selected={viewTab.id === active?.id}
                   className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-                  onClick={() => { actions.setView(viewTab.id) }}
+                  onClick={() => { selectView(viewTab.id) }}
                 >
                   {viewTab.label}
                 </button>
@@ -212,30 +221,38 @@ export function ConversationSessionHeader({
  * @returns the active view area, or null while the Session remains blank.
  */
 export function ConversationSession({
-  sessionId, useSession, useSessions, useInput, inputActions, useStore, actions,
-  renderSlot, views, bindDraftMirror, releaseSessionImages, t,
+  sessionId, useSession, useSessions, useConversation, useConversationViews,
+  useInput, inputActions, useStore, actions,
+  renderSlot, views, bindDraftMirror, releaseSessionImages, openView, t,
 }: ConversationSessionProps) {
-  useSyncExternalStore(views.subscribe, views.version)
-  const tabs = views.list()
-  const switchableTabs = tabs.filter(tab => !views.isSessionOwned(tab.id))
+  const viewsSubscribe = views?.subscribe ?? (() => () => {})
+  const viewsVersion = views?.version ?? (() => 0)
+  useSyncExternalStore(viewsSubscribe, viewsVersion)
+  const hookTabs = useConversationViews?.(value => value)
+  const listedTabs = views?.list() ?? hookTabs ?? []
+  const tabs = listedTabs
+  const switchableTabs = views === undefined ? [...tabs] : tabs.filter(tab => !views.isSessionOwned(tab.id))
   const selectedId = useStore(s => s.view)
-  const preferredId = useSessions(() => views.preferred(sessionId))
-  const activePreferredId = tabs.some(tab => tab.id === preferredId) ? preferredId : null
+  const preferredId = useSessions?.(() => views?.preferred(sessionId) ?? null) ?? null
+  const activePreferredId = preferredId !== null && tabs.some(tab => tab.id === preferredId) ? preferredId : null
   const active = activePreferredId === null
-    ? resolveActiveView(switchableTabs, selectedId, null)
-    : resolveActiveView(tabs, selectedId, activePreferredId)
-  const declaredCompanion = active === undefined ? null : views.companion(sessionId, active.id)
+    ? resolveActiveView([...switchableTabs], selectedId)
+    : resolveActiveViewWithPreferred([...tabs], selectedId, activePreferredId)
+  const declaredCompanion = active === undefined || views === undefined ? null : views.companion(sessionId, active.id)
   const companion = declaredCompanion !== null
     && declaredCompanion.id !== active?.id
     && tabs.some(tab => tab.id === declaredCompanion.id)
     ? declaredCompanion
     : null
-  const composerPhase = useSession(s => s.composerPhase)
-  const blank = useSession(s => s.blank)
+  const session = useSession(s => s)
+  const conversation = useConversation(s => s)
+  const blank = session.blank
+  const phase = conversationPhase(session, conversation)
   const inputState = useInput(s => s)
   const storedDraft = useStore(s => s.draft)
-  // `?? null`: persisted snapshots from before the inspect field rehydrate without it.
-  const inspect = useStore(s => s.inspect ?? null)
+  // `?? null`: persisted snapshots from before the inspect/viewRequest fields rehydrate without it.
+  const inspect = useStore(s => (s as { inspect?: { callId: string } | null }).inspect ?? null)
+  const viewRequest = useStore(s => (s as { viewRequest?: { view: string; focus: string } | null }).viewRequest ?? null)
   // null until the panel has been laid out once: the CSS default is a viewport
   // expression, so the first drag has to start from what it actually resolved
   // to rather than from a number this component picked.
@@ -252,7 +269,7 @@ export function ConversationSession({
   // moment the companion layout stops rendering, not only when this slot
   // unmounts, or a session that once showed a dragged assistant column keeps
   // imposing that width on every later layout.
-  const showsCompanion = companion !== null && !(blank && composerPhase === 'blank' && activePreferredId === null)
+  const showsCompanion = companion !== null && !(blank && phase === 'blank' && activePreferredId === null)
 
   // Written to the DOM rather than rendered as a style prop: the element that
   // declares this property is above this slot, so a style prop here could not
@@ -273,13 +290,25 @@ export function ConversationSession({
   }, [inputActions])
 
   useEffect(() => () => {
-    releaseSessionImages(sessionId)
+    releaseSessionImages?.(sessionId)
   }, [releaseSessionImages, sessionId])
 
-  if (blank && composerPhase === 'blank' && activePreferredId === null) return null
+  if (blank && phase === 'blank' && activePreferredId === null) return null
   const owner = {
     inspect,
-    onInspectDone: () => { actions.setInspect(null) },
+    onInspectDone: () => { (actions as unknown as { setInspect?: (value: null) => void }).setInspect?.(null) },
+    viewRequest,
+    openView: openView ?? ((view: string, focus: string) => {
+      const extended = actions as unknown as {
+        openView?: (view: string, focus: string) => void
+        setView?: (view: string) => void
+      }
+      if (extended.openView !== undefined) extended.openView(view, focus)
+      else extended.setView?.(view)
+    }),
+    completeViewRequest: () => {
+      (actions as unknown as { completeViewRequest?: () => void }).completeViewRequest?.()
+    },
   }
   if (companion === null) {
     return (
