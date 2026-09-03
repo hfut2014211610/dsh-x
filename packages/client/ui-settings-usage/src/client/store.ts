@@ -5,8 +5,10 @@
  * on connection reset, and on demand.
  */
 
-import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
-import type { ResponseValue } from '@deepseek-ai/dsh-host-apiproxy/api'
+import type { Context as ClientContext } from '@deepseek-ai/cordis'
+// Type-only: pulls the ctx.remote merge and the session namespace face,
+// plus the wire session-list row type.
+import type { SessionSummary } from '@deepseek-ai/dsh-api-remotes/client'
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 // Type-only: pulls the sessionTitle and usageStats projection-key merges
@@ -28,15 +30,15 @@ export interface UsageSettingsState {
   overview: UsageOverview
 }
 
-/** The session-list wire item narrowed to the fields the panel reads. */
-type SessionListWireItem = ResponseValue<'session.list'>['items'][number]
+/** The session-list row narrowed to the fields the panel reads. */
+type SessionListWireItem = SessionSummary
 
 const emptyOverview = (range: UsageRange): UsageOverview =>
   usageOverviewOf([], Date.now(), range)
 
 /**
  * Narrow one wire row to the panel's input: the title rides the row's
- * `sessionTitle` projection value, and the usage value comes from the row's
+ * `title` projection value, and the usage value comes from the row's
  * usage projection block (absent carries as null).
  * @param item - one `session.list` row.
  * @returns the aggregation input.
@@ -64,9 +66,10 @@ export class UsageSettingsStore {
   private inputs: readonly UsageSessionInput[] = []
 
   /**
-   * @param api - the wire face (session-list domain).
+   * @param ctx - the page plugin's context, whose `remote.session` namespace
+   * carries the session-list read.
    */
-  constructor(private readonly api: Pick<IApiClient, 'sessions'>) {}
+  constructor(private readonly ctx: ClientContext) {}
 
   /**
    * Refresh the whole panel snapshot from one session-list page. A failure
@@ -77,9 +80,9 @@ export class UsageSettingsStore {
     const generation = ++this.generation
     this.store.update((s) => { s.status = 'loading'; s.error = null })
     try {
-      const response = await this.api.sessions.list({})
-      if (!response.result.ok) throw new Error(response.result.error.message)
-      this.inputs = response.result.value.items.map(usageInputOf)
+      const response = await this.ctx.remote.session.list({})
+      if (!response.ok) throw new Error(response.error.message)
+      this.inputs = response.value.items.map(usageInputOf)
       if (generation !== this.generation) return
       this.store.update((s) => {
         s.status = 'ready'

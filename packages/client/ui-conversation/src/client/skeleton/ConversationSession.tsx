@@ -99,15 +99,16 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
  * @returns the hidden blank-session header or visible title and tabs.
  */
 export function ConversationSessionHeader({
-  sessionId, useSession, useSessions, useConversation, useConversationViews, useStore,
+  sessionId, useSession, useSessions, useConversation, useStore,
   renderSlot, open, selectView, views, t,
 }: ConversationSessionHeaderProps) {
-  const fallbackTabs: readonly ViewTab[] = []
+  // Fork-owned preferred/companion registry, read through the same
+  // ConversationViews face the root uses; upstream callers may omit it, in
+  // which case every session resolves its persisted tab without overrides.
   const viewsSubscribe = views?.subscribe ?? (() => () => {})
   const viewsVersion = views?.version ?? (() => 0)
   useSyncExternalStore(viewsSubscribe, viewsVersion)
-  const hookTabs = useConversationViews?.(value => value) ?? views?.list() ?? fallbackTabs
-  const tabs = hookTabs
+  const tabs: readonly ViewTab[] = views?.list() ?? []
   const switchableTabs = views === undefined ? [...tabs] : tabs.filter(tab => !views.isSessionOwned(tab.id))
   const selectedId = useStore(s => s.view)
   const preferredId = useSessions(() => views?.preferred(sessionId) ?? null)
@@ -221,16 +222,15 @@ export function ConversationSessionHeader({
  * @returns the active view area, or null while the Session remains blank.
  */
 export function ConversationSession({
-  sessionId, useSession, useSessions, useConversation, useConversationViews,
+  sessionId, useSession, useSessions, useConversation,
   useInput, inputActions, useStore, actions,
   renderSlot, views, bindDraftMirror, releaseSessionImages, openView, t,
 }: ConversationSessionProps) {
+  // Same roster source as the header above; see its comment.
   const viewsSubscribe = views?.subscribe ?? (() => () => {})
   const viewsVersion = views?.version ?? (() => 0)
   useSyncExternalStore(viewsSubscribe, viewsVersion)
-  const hookTabs = useConversationViews?.(value => value)
-  const listedTabs = views?.list() ?? hookTabs ?? []
-  const tabs = listedTabs
+  const tabs: readonly ViewTab[] = views?.list() ?? []
   const switchableTabs = views === undefined ? [...tabs] : tabs.filter(tab => !views.isSessionOwned(tab.id))
   const selectedId = useStore(s => s.view)
   const preferredId = useSessions?.(() => views?.preferred(sessionId) ?? null) ?? null

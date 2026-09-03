@@ -45,7 +45,6 @@ import type { Agent } from '@deepseek-ai/dsh-agent'
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmFailure, StreamChunk } from '@deepseek-ai/dsh-llm'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { SettingsPathOp, SettingsProvider } from '@deepseek-ai/dsh-settings'
 import type { PiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
@@ -69,9 +68,9 @@ export type * from './types.ts'
 
 export const name = 'dsh-x-model-hub'
 
-const NS = settingsNamespace('dsh-x-model-hub')
-const PI_AI_NS = settingsNamespace('llm-pi-ai')
-const AGENT_DEFAULT_NS = settingsNamespace('agent-default-model')
+const NS = 'dsh-x-model-hub'
+const PI_AI_NS = 'llm-pi-ai'
+const AGENT_DEFAULT_NS = 'agent-default-model'
 
 /**
  * Compute the settings edits that bring the stock adapter's user layer in
@@ -549,15 +548,17 @@ export function apply(ctx: Context, config: Config): void {
     }
   }
 
-  installSettingsSection(ctx, NS, Config, config, {
-    validate: assertUsable,
-    setSource: (source) => {
-      current = source
-    },
-    onChange: () => {
-      if (settings === undefined) return
-      void reconcile('keeping the previously generated routes after a refused update')
-    },
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, NS, Config, config, {
+      validate: assertUsable,
+      setSource: (source: () => Config) => {
+        current = source
+      },
+      onChange: () => {
+        if (settings === undefined) return
+        void reconcile('keeping the previously generated routes after a refused update')
+      },
+    })
   })
 
   ctx.plugin(ModelHubGateway)

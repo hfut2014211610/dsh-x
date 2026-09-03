@@ -10,10 +10,6 @@ export type {
 } from './contract/views.ts'
 export type { ConversationKey } from './locales.ts'
 export type {
-  AssistantChatData, ChatNode, ChatNodeDataMap, ChatNodeKind, ManualCompactionChatData,
-  RetryChatData, ToolChatData, TurnTailChatData,
-} from '@deepseek-ai/dsh-client-ui-chat/client'
-export type {
   ConversationContextReader, ConversationLocation,
   ConversationLocationData, ConversationLocationDataScope, ConversationLocationDataSource,
   ConversationLocationDataStore,
@@ -66,12 +62,6 @@ export type {
   MessageImageLoader, MessageImageSource, MessageImagesOwnerProps, RenderMessageImages,
   UseConversation, UseConversationViews,
 } from './contract/slots.ts'
-export type {
-  ChatFileMentions, ChatNodeOwnerProps, ChatNodeViewProps,
-  ChatStore, ChatStoreState, ChatViewInjected, ChatViewSlotProps, CommandRowOwnerProps, CommandRowProps,
-  DetailsInjected, DetailsSlotProps, DetailsToolOwnerProps, MessageImagesProps,
-  TurnTailOwnerProps, UseChatNodeTurnData,
-} from '@deepseek-ai/dsh-client-ui-chat/client'
 export type {
   ArbitrateKey, ArbitrateOutcome, BeginCommandRequest, CommandClaim, ConsumeTokenRequest,
   DraftAttachmentId, InputActions, InputState, InsertReferenceRequest, InsertTextRequest,

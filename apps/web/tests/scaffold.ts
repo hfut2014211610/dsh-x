@@ -67,6 +67,7 @@ import {
   packChunkRuns,
   SESSION_FORMAT_VERSION,
   SessionId,
+  SessionLogOffset,
   type Session,
   type SessionEvent,
   type SessionHeader,
@@ -1079,6 +1080,7 @@ export async function seedSession(
     const prepared = scaffold.ctx.sessions.prepare(meta.id, {
       seed: events,
       meta,
+      inheritedEventCount: SessionLogOffset(0),
       seedSource: 'persistence',
     })
     await scaffold.ctx.sessionProjectionCache.write(prepared)

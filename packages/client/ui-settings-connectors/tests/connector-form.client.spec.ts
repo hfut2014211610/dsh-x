@@ -70,6 +70,9 @@ function fakeScope(options: {
       }
       return Promise.resolve()
     },
+    // The form under test only calls set/unset; mutate stays a stub to
+    // satisfy the scope face.
+    mutate: () => Promise.resolve(),
     publish: (patch) => {
       snapshot = { ...snapshot, ...patch }
       notify()

@@ -288,6 +288,7 @@ export function apply(ctx: Context): void {
     store: conversationStore,
     inject: (sessionId: SessionId, actions: BoundActions<typeof conversationStore>): ConversationSessionInjected => ({
       hooks: { conversationViews },
+      views,
       bindDraftMirror: write => inputHub.shell(sessionId).bindMirror(write),
       openView: (view, focus) => {
         activateView(sessionId, view)
@@ -307,6 +308,7 @@ export function apply(ctx: Context): void {
     store: conversationStore,
     inject: (sessionId: SessionId, actions: BoundActions<typeof conversationStore>): ConversationSessionHeaderInjected => ({
       hooks: { conversationViews },
+      views,
       open: (id) => { sessions.open(id) },
       selectView: (view) => {
         activateView(sessionId, view)

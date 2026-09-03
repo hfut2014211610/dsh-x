@@ -6,7 +6,6 @@ import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
-import type { IApiClient } from '@deepseek-ai/dsh-api-remotes/client'
 import { SettingsSchemaService } from '@deepseek-ai/dsh-client-ui-settings/src/client/schema.ts'
 import { SettingsScopeBinder } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-scope.ts'
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
@@ -23,24 +22,28 @@ async function bench() {
   const locale = new LocaleRuntime(ctx)
   locale.setLocale('zh')
   ctx.provide('locale', locale)
-  const describeSettings = vi.fn(() => Promise.resolve({ rpcId: 's', result: { ok: false, error: {} } }))
+  // No namespace is served until a Host plugin registers one; the rejection
+  // keeps the mirror without a view, so the card stays in its loading shape.
+  const describeSettings = vi.fn(() => Promise.resolve({
+    ok: false as const,
+    error: { code: 'settings/rejected', message: 'denied' },
+  }))
   // The card binds its scope through the Settings surface's service, and
-  // forwarded host events reach it through the same `$dispatch` handoff the
-  // connection sink makes.
-  new TestRemote(ctx)
+  // forwarded host events reach it through the test double's explicit emit
+  // driver.
+  const remote = new TestRemote(ctx, { settings: { describe: describeSettings } })
+  remote.$host = { home: undefined, isLoopback: true }
   // 卡片的扫码那一段走连接上的裸 RPC 通道，所以 bench 里要有一条。
   const rpcCall = vi.fn(() => Promise.resolve({ ok: true, value: {} }))
   ctx.provide('connection', {
-    isLoopback: true,
-    api: { settings: { describe: describeSettings } },
     rpc: { call: rpcCall },
   } as never)
   // The Settings surface constructs its scope service in its own fiber; the
   // same construction here gives the card the `settingsScope` service.
-  const connection = ctx.get('connection') as { api: Pick<IApiClient, 'settings'>; isLoopback: boolean }
   new SettingsScopeBinder(ctx, {
-    mirror: new SettingsDescribeMirror(connection.api, connection.isLoopback ? 'host' : 'memory'),
+    mirror: new SettingsDescribeMirror(ctx as never, 'host'),
     schema: new SettingsSchemaService(ctx),
+    persistence: 'host',
   })
   // The card's switch reads the plugin tree and writes it; both namespaces are
   // separate services, so a fiber that declares them waits for both.

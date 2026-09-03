@@ -4,6 +4,7 @@ import { describe, expect, it } from 'vitest'
 import { resolveSlotLabel } from '@deepseek-ai/dsh-client-ui-slots'
 import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
+import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { apply, inject, refreshIfLoaded } from '@deepseek-ai/dsh-client-ui-settings-usage/client'
 import { UsageSection } from '../src/client/UsageSection.tsx'
 
@@ -16,9 +17,11 @@ async function bench(): Promise<{ ctx: Context; slots: SlotRegistry; locale: Loc
   // comes from FALLBACK_LOCALE (en): state the asserted locale explicitly.
   locale.setLocale('zh')
   ctx.provide('locale', locale)
-  // The apply path only captures the wire face; no call leaves this fake
+  // The apply path only captures the context; no call leaves this fake
   // until the section actually loads.
-  ctx.provide('connection', { api: {} } as never)
+  new TestRemote(ctx, {
+    session: { list: () => Promise.resolve({ ok: true, value: { items: [] } }) },
+  })
   return { ctx, slots: ctx.get('slots') as SlotRegistry, locale }
 }
 
@@ -36,7 +39,7 @@ function declare(slots: SlotRegistry): () => void {
 
 describe('ui-settings-usage apply', () => {
   it('declares the services it uses', () => {
-    expect(inject).toEqual(['slots', 'locale', 'connection'])
+    expect(inject).toEqual(['slots', 'locale', 'remote', 'remote.session'])
   })
 
   it('registers the usage nav entry with a locale-following label and the section inject face', async () => {

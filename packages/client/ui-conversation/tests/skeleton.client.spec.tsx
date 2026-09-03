@@ -127,6 +127,8 @@ function mount(
     sessionOwnedViewIds?: readonly string[]
     /** Optional secondary view declaration for an active view. */
     companion?: (sessionId: SessionId, activeViewId: string) => { id: string; label: string } | null
+    /** Seed one pending takeover interaction for the session (takeover-accessibility regression). */
+    pendingTakeover?: boolean
   } = {},
 ) {
   const root = sid('root')
@@ -160,8 +162,13 @@ function mount(
   const useSession = bindSnapshotSelector(session)
   const conversation = createSnapshotStore<ConversationSnapshot>(EMPTY_CONVERSATION_SNAPSHOT)
   const useConversation = bindSnapshotSelector(conversation)
+  // New-world split: the unified fork-era Conversation snapshot is gone, so a
+  // pending takeover interaction is seeded as its own session-scoped map entry.
+  const pendingSeed: SessionPendingInteractionSnapshot = options.pendingTakeover === true
+    ? new Map([[SID, {} as never]])
+    : new Map()
   const useSessionPendingInteraction = bindSnapshotSelector(
-    createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()),
+    createSnapshotStore<SessionPendingInteractionSnapshot>(pendingSeed),
   )
   const store = createConversationStore().create()
   store.actions.setDraft('ordinary draft')
@@ -185,7 +192,6 @@ function mount(
       (sessions.getSnapshot().byId[sessionId] as { agentPreset?: string } | undefined)?.agentPreset === 'writing' ? 'writing' : null,
     companion: options.companion ?? (() => null),
   }
-  const useConversationViews: SessionSlotProps['useConversationViews'] = selector => selector(viewTabs)
   /** Owner share handed to the two composer tool-row seats, per render. */
   const seatOwners: { key: string; owner: unknown }[] = []
   let pickerOwner: unknown
@@ -206,7 +212,6 @@ function mount(
           SessionProvider={({ children }) => children}
           useSession={useSession}
           useConversation={useConversation}
-          useConversationViews={useConversationViews}
           useChat={useChat}
           useTrajectory={useTrajectory}
           useSessions={props.useSessions}
@@ -232,7 +237,6 @@ function mount(
           SessionProvider={({ children }) => children}
           useSession={useSession}
           useConversation={useConversation}
-          useConversationViews={useConversationViews}
           useChat={useChat}
           useTrajectory={useTrajectory}
           useSessions={props.useSessions}
@@ -578,14 +582,14 @@ describe('ConversationRoot resident composer', () => {
   })
 
   it('keeps pending takeover interaction accessible outside the Chat view', () => {
-    const b = mount(conversationSnapshot({ pending: [{} as never] }))
+    const b = mount(sessionSnapshotOf(), undefined, undefined, { pendingTakeover: true })
     act(() => { b.chat.actions.setView('trajectory') })
     expect(b.view.getByTestId('view-trajectory')).toBeTruthy()
     expect(b.view.getByRole('textbox')).toBeTruthy()
   })
 
   it('renders a declared companion beside the active view and removes the tab switch', () => {
-    const b = mount(conversationSnapshot(), undefined, undefined, {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, {
       viewTabs: [
         { id: 'chat', label: 'Chat' },
         { id: 'writing', label: 'Writing' },
@@ -612,7 +616,7 @@ describe('ConversationRoot resident composer', () => {
   // out, so that measurement floors at the drag minimum); from there the
   // separator owns it, and dragging toward the primary view widens it.
   it('lets the companion column be resized from the separator between the two', () => {
-    const b = mount(conversationSnapshot(), undefined, undefined, {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, {
       viewTabs: [
         { id: 'chat', label: 'Chat' },
         { id: 'writing', label: 'Writing' },
@@ -642,7 +646,7 @@ describe('ConversationRoot resident composer', () => {
   // the panel alone leaves the input box at its old width beside a resized
   // column, which is what the first attempt at this did.
   it('sizes the companion column through the property the composer also reads', () => {
-    const b = mount(conversationSnapshot(), undefined, undefined, {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, {
       viewTabs: [
         { id: 'chat', label: 'Chat' },
         { id: 'writing', label: 'Writing' },
@@ -668,7 +672,7 @@ describe('ConversationRoot resident composer', () => {
   // Leaving the companion layout has to hand the width back to the stylesheet,
   // or a session that once had a dragged assistant column keeps imposing it.
   it('releases the width when the session leaves the companion layout', () => {
-    const b = mount(conversationSnapshot(), undefined, undefined, {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, {
       viewTabs: [
         { id: 'chat', label: 'Chat' },
         { id: 'writing', label: 'Writing' },
@@ -689,7 +693,7 @@ describe('ConversationRoot resident composer', () => {
 
   it('opens a blank writing session directly and restores the Hero after leaving the preset', () => {
     const b = mount(
-      conversationSnapshot({ blank: true, composerPhase: 'blank' }),
+      sessionSnapshotOf({ blank: true }),
       undefined,
       undefined,
       {
@@ -722,7 +726,7 @@ describe('ConversationRoot resident composer', () => {
   })
 
   it('restores the prior tab after a preferred writing view releases an active session', () => {
-    const b = mount(conversationSnapshot(), undefined, undefined, {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, {
       summaryAgentPreset: 'standard',
       viewTabs: [
         { id: 'chat', label: 'Chat' },
@@ -752,7 +756,7 @@ describe('ConversationRoot resident composer', () => {
       { id: 'writing', label: '写作模式' },
       { id: 'ued', label: '设计' },
     ]
-    const b = mount(conversationSnapshot(), undefined, undefined, {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, {
       summaryAgentPreset: 'standard',
       viewTabs,
       sessionOwnedViewIds: ['writing', 'ued'],
@@ -776,7 +780,7 @@ describe('ConversationRoot resident composer', () => {
       { id: 'trajectory', label: 'Trajectory' },
       { id: 'writing', label: 'Writing' },
     ]
-    const b = mount(conversationSnapshot(), undefined, undefined, {
+    const b = mount(sessionSnapshotOf(), undefined, undefined, {
       summaryAgentPreset: 'standard',
       viewTabs,
       sessionOwnedViewIds: ['writing'],

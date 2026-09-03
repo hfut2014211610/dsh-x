@@ -1,18 +1,16 @@
 import { describe, expect, it } from 'vitest'
-import type { SettingsNamespace, SettingsPathOp } from '@deepseek-ai/dsh-settings'
+import type { SettingsPathOp, SettingsProvider } from '@deepseek-ai/dsh-settings'
 import { diffRouteOps, reconcileRoutes } from '../src/index.ts'
 
 const settingsCapture = (failWith?: Error) => {
-  const calls: { ns: SettingsNamespace; ops: SettingsPathOp[] }[] = []
-  return {
-    calls,
-    settings: {
-      mutate: async (ns: SettingsNamespace, ops: readonly SettingsPathOp[]) => {
-        if (failWith !== undefined) throw failWith
-        calls.push({ ns, ops: [...ops] })
-      },
+  const calls: { ns: string; ops: SettingsPathOp[] }[] = []
+  const settings: Pick<SettingsProvider, 'mutate'> = {
+    mutate: async (ns, ops) => {
+      if (failWith !== undefined) throw failWith
+      calls.push({ ns, ops: [...ops] })
     },
   }
+  return { calls, settings }
 }
 
 describe('diffRouteOps', () => {

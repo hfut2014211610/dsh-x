@@ -14,6 +14,8 @@ import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+// Type-only: pulls the slot registry face (ctx.slots).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { ModelHubSection } from './ModelHubSection.tsx'
 import type { ModelHubInjected } from './ModelHubSection.tsx'
 import { ModelHubStore } from './store.ts'

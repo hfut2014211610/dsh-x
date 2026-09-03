@@ -31,7 +31,9 @@ export const inject = ['sessions', 'slots', 'locale']
 
 /** Claim the composer for one-shot history or an unavailable continuation owner. */
 function selectReadOnlySubagent(owner: ComposerChainProps): SubagentReadOnlyMatch | null {
-  const subagent = owner.session?.subagent
+  const session = owner.session
+  if (session === undefined || !('subagent' in session)) return null
+  const subagent = session.subagent
   if (subagent === undefined || subagent === null) return null
   if (subagent.address.mode === 'one-shot') return { reason: 'one-shot' }
   // The parent catalog is fetched ahead of the selected Session. Until it
@@ -41,7 +43,7 @@ function selectReadOnlySubagent(owner: ComposerChainProps): SubagentReadOnlyMatc
   // A RUNNING parent-offline continuable child keeps the default composer:
   // its input is disabled there, but the same primary Stop stays available so
   // the child can be interrupted. Once it stops, this takeover returns.
-  return owner.session?.running === true ? null : { reason: 'parent-unavailable' }
+  return session.running === true ? null : { reason: 'parent-unavailable' }
 }
 
 /**

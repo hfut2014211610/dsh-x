@@ -36,7 +36,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
+import type {} from '@deepseek-ai/dsh-settings'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-agent'
 import type {} from '@deepseek-ai/dsh-agent-default-model'
@@ -66,7 +66,7 @@ export const name = 'dsh-x-feishu'
  * 段按 key 覆盖在它上面——连接器页那张卡片改的就是后者。没有这一句注册，那张
  * 卡片的五个字段就绑在一个不存在的命名空间上，页面只能显示"没有可改的东西"。
  */
-const NS = settingsNamespace('dsh-x-feishu')
+const NS = 'dsh-x-feishu'
 
 /** 依赖。`agentPresets` 是可选的——没有预设组合的部署照样能跑。 */
 export const inject = ['agents', 'agentDefaultModel', 'sessions', 'storageDomain']
@@ -247,13 +247,15 @@ export function apply(ctx: Context, config: Config): void {
     })
   }
 
-  installSettingsSection(ctx, NS, Config, config, {
-    setSource: (current) => { source = current },
-    // 端点是唯一一个"拨号那一刻定死"的值，所以只有它需要被通知。
-    onChange: () => {
-      if (client?.redialIfMoved() === true) logger.info('桥接端点改了，正在改连 %s', endpoint())
-      publish()
-    },
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, NS, Config, config, {
+      setSource: (current: () => Config) => { source = current },
+      // 端点是唯一一个"拨号那一刻定死"的值，所以只有它需要被通知。
+      onChange: () => {
+        if (client?.redialIfMoved() === true) logger.info('桥接端点改了，正在改连 %s', endpoint())
+        publish()
+      },
+    })
   })
 
   // 路由表要异步打开，所以整段装配放进 inject 纤维里。注意纤维里的错误会被

@@ -372,7 +372,7 @@ describe('web e2e: agent-preset selection', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-writing'))
     await page.getByRole('button', { name: 'Standard mode' }).click()
     await page.getByRole('menuitem', { name: /Writing mode/ }).click()
-    await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('writing')
+    await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('writing')
 
     // The view lands with its tool rail collapsed, so the tree is a click away
     // rather than the first thing the workspace shows. The pointer leaves the
@@ -487,7 +487,7 @@ describe('web e2e: agent-preset selection', () => {
     // preferred workspace never strands the user without a way back.
     await page.getByRole('button', { name: 'Writing mode' }).click()
     await page.getByRole('menuitem', { name: /^Standard mode/ }).first().click()
-    await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('standard')
+    await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('standard')
     await page.getByText('Into the Unknown').waitFor({ timeout: 15_000 })
     expect(await page.locator('[data-writing-view]').count()).toBe(0)
     expect(await page.locator('[data-phase="hero"]').count()).toBe(1)
@@ -497,7 +497,7 @@ describe('web e2e: agent-preset selection', () => {
     onTestFailed(() => saveFailureShot(page, 'web-e2e-agent-preset-ued'))
     await page.getByRole('button', { name: 'Standard mode' }).click()
     await page.getByRole('menuitem', { name: /Design mode/ }).click()
-    await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('ued')
+    await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('ued')
 
     await page.getByRole('complementary', { name: 'Prototypes' }).waitFor({ timeout: 15_000 })
     await page.getByRole('button', { name: PROTOTYPE_DOCUMENT, exact: true }).click()
@@ -519,7 +519,7 @@ describe('web e2e: agent-preset selection', () => {
 
     await page.getByRole('button', { name: 'Design mode' }).click()
     await page.getByRole('menuitem', { name: /^Standard mode/ }).first().click()
-    await expect.poll(() => livePreset(scaffold.baseUrl), { timeout: 15_000 }).toBe('standard')
+    await expect.poll(() => livePreset(scaffold), { timeout: 15_000 }).toBe('standard')
   }, 90_000)
 
   it('labels a resumed session with the preset it was created under', async () => {

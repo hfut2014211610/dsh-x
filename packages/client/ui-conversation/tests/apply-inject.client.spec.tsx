@@ -84,7 +84,7 @@ async function bench() {
     return { state: input.state, actions: input }
   }
   const viewSource = (id: SessionId): ObservableSnapshot<readonly ViewTab[]> =>
-    conversationApi(id).injected.hooks.conversationViews
+    conversationApi(id).injected.hooks!.conversationViews
   return {
     runtime, feature, slots: runtime.slots, entryOf, conversationApi, headerApi, residentApi, composerApi,
     inputApi, viewSource, sessionFake, connectWorkspace,
@@ -96,7 +96,7 @@ describe('Conversation inject API', () => {
     const b = await bench()
     const { injected } = b.conversationApi(ROOT)
     expect(b.sessionFake.loadOlder).not.toHaveBeenCalled()
-    expect(Object.keys(injected)).toEqual(['hooks', 'bindDraftMirror', 'openView'])
+    expect(Object.keys(injected)).toEqual(['hooks', 'views', 'bindDraftMirror', 'openView'])
     expect(b.viewSource(ROOT).getSnapshot()).toEqual([])
     await b.runtime.dispose()
   })

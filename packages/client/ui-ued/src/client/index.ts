@@ -47,7 +47,7 @@ export function apply(ctx: ClientContext): void {
   // acquire a render entry for any HTML in its workspace, widening this
   // boundary from design sessions to all of them.
   const isDesignSession = (sessionId: SessionId): boolean =>
-    ctx.sessions.list.getSnapshot().byId[sessionId]?.agentPreset === PRESET
+    ctx.sessions.list.getSnapshot().byId[sessionId]?.projectionValues?.agentPreset === PRESET
 
   ctx.effect(() => ctx.conversation.declarePreferredView(
     PRESET,

@@ -44,11 +44,11 @@ export function apply(ctx: ClientContext): void {
   })
   ctx.effect(() => ctx.conversation.declarePreferredView('writing', (sessionId: SessionId) => {
     const summary = ctx.sessions.list.getSnapshot().byId[sessionId]
-    return summary?.agentPreset === 'writing'
+    return summary?.projectionValues?.agentPreset === 'writing'
   }), 'ui-writing: preferred view')
   ctx.effect(() => ctx.conversation.declareCompanionView((sessionId, activeViewId) => {
     const summary = ctx.sessions.list.getSnapshot().byId[sessionId]
-    return summary?.agentPreset === 'writing' && activeViewId === 'writing'
+    return summary?.projectionValues?.agentPreset === 'writing' && activeViewId === 'writing'
       ? { id: 'chat', label: t('assistant.title') }
       : null
   }), 'ui-writing: assistant companion')

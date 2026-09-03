@@ -33,7 +33,6 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
-import { installSettingsSection, settingsNamespace } from '@deepseek-ai/dsh-settings'
 import type { SettingsProvider } from '@deepseek-ai/dsh-settings'
 import type { LlmCallConfig, ReasoningEffortId } from '@deepseek-ai/dsh-llm'
 import type {} from '@deepseek-ai/dsh-agent'
@@ -77,7 +76,7 @@ export const Config: z<Config> = z.object({
 
 export const name = 'dsh-x-model-tuning'
 
-const NS = settingsNamespace('dsh-x-model-tuning')
+const NS = 'dsh-x-model-tuning'
 
 /**
  * Reject profile keys that cannot split into a non-empty provider and model.
@@ -255,14 +254,16 @@ export async function runModelTuningCommand(
  */
 export function apply(ctx: Context, config: Config): void {
   let current: () => Config = () => config
-  installSettingsSection(ctx, NS, Config, config, {
-    validate: assertWellFormedKeys,
-    setSource: (source) => {
-      current = source
-    },
-    // Nothing registration-level derives from the value: the listener reads
-    // the source per request, so a committed change needs no re-judgment here.
-    onChange: () => undefined,
+  ctx.inject(['settings'], (settingsCtx) => {
+    settingsCtx.settings.installSection(ctx, NS, Config, config, {
+      validate: assertWellFormedKeys,
+      setSource: (source: () => Config) => {
+        current = source
+      },
+      // Nothing registration-level derives from the value: the listener reads
+      // the source per request, so a committed change needs no re-judgment here.
+      onChange: () => undefined,
+    })
   })
   const getProfiles = (): Readonly<Record<string, ModelTuning>> => current().profiles ?? {}
   ctx.on('agent/request', createRequestListener(getProfiles))

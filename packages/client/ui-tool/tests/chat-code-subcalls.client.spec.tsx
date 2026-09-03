@@ -11,8 +11,9 @@ import { SlotTestRuntime, TestRemote, stubSettingsScope } from '@deepseek-ai/dsh
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { PropsRenderSlots } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  ConversationEventRegistry, ConversationViewRegistry, type ConvViewOwnerProps,
+  ConversationEventRegistry, type ConvViewOwnerProps,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { ConversationViewRegistry } from '@deepseek-ai/dsh-client-ui-conversation/src/client/conversation/view-registry.ts'
 import { en as conversationEn, NS as CONVERSATION_NS, zh as conversationZh } from '@deepseek-ai/dsh-client-ui-conversation/src/client/locales.ts'
 import { apply as applyChat, inject as injectChat } from '@deepseek-ai/dsh-client-ui-chat/client'
 import { apply as applyTool, inject as injectTool } from '../src/client/apply.ts'

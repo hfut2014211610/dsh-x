@@ -6,9 +6,12 @@
  * Export discipline: packages/client/AGENTS.md.
  */
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
-import type { ConnectionHandle } from '@deepseek-ai/dsh-api-remotes/client'
+// Type-only: pulls the ctx.remote merge and the session namespace face.
+import type {} from '@deepseek-ai/dsh-api-remotes/client'
 // Type-only: pulls the shell's SlotMap merge (the 'settings.section' entry).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
+// Type-only: pulls the slot registry face (ctx.slots).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 import { UsageSection } from './UsageSection.tsx'
@@ -46,7 +49,7 @@ export function refreshIfLoaded(controller: UsageSettingsStore): void {
  * ui-settings' apply, whose activation order relative to this one is NOT
  * constrained; registration depends on each slot through `slots.inject()`.
  */
-export const inject = ['slots', 'locale', 'connection']
+export const inject = ['slots', 'locale', 'remote', 'remote.session']
 
 /**
  * Register the usage section once the `settings.section` declaration is on
@@ -57,8 +60,7 @@ export const inject = ['slots', 'locale', 'connection']
 export function apply(ctx: ClientContext): void {
   ctx.effect(() => ctx.locale.register(NS, { zh, en }), 'ui-settings-usage: copy dictionaries')
 
-  const connection = ctx.get('connection') as ConnectionHandle
-  const controller = new UsageSettingsStore(connection.api)
+  const controller = new UsageSettingsStore(ctx)
   // Registration-time text (the nav label thunk) and the inject face share
   // one bound translate; copy freshness rides the locale revision.
   const t: UsageSectionInjectedBound = ctx.locale.bind(NS)

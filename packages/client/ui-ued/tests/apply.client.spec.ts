@@ -16,7 +16,7 @@ import type { UedViewInjected } from '../src/client/UedView.tsx'
 type PreferredView = (sessionId: string) => boolean
 type CompanionView = (sessionId: string, activeViewId: string) => { id: string; label: string } | null
 
-async function bench(sessions: Record<string, { agentPreset?: string }> = {}) {
+async function bench(sessions: Record<string, { projectionValues?: { agentPreset?: string | null } }> = {}) {
   const ctx = new Context()
   await ctx.plugin(SlotRegistry).await()
   // These specs assert the shipped Chinese copy. There is no jsdom `window`
@@ -84,8 +84,8 @@ describe('ui-ued apply', () => {
 
   it('claims the view only for design sessions, and offers the assistant back beside it', async () => {
     const { ctx, slots, preferred, preferredViewId, companion } = await bench({
-      design: { agentPreset: 'ued' },
-      writing: { agentPreset: 'writing' },
+      design: { projectionValues: { agentPreset: 'ued' } },
+      writing: { projectionValues: { agentPreset: 'writing' } },
     })
     declareRoot(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
@@ -104,7 +104,7 @@ describe('ui-ued apply', () => {
   })
 
   it('reads listings and prototypes through the documents Remote', async () => {
-    const { ctx, slots, list, read } = await bench({ design: { agentPreset: 'ued' } })
+    const { ctx, slots, list, read } = await bench({ design: { projectionValues: { agentPreset: 'ued' } } })
     declareRoot(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
     const entry = slots.entries('conversation.view')[0]!
@@ -121,7 +121,7 @@ describe('ui-ued apply', () => {
   })
 
   it('hands the failure message the host gave to the view, not a generic one', async () => {
-    const { ctx, slots, list, read } = await bench({ design: { agentPreset: 'ued' } })
+    const { ctx, slots, list, read } = await bench({ design: { projectionValues: { agentPreset: 'ued' } } })
     declareRoot(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
     const entry = slots.entries('conversation.view')[0]!
@@ -134,7 +134,7 @@ describe('ui-ued apply', () => {
   })
 
   it('delivers a document change only to the session that owns it', async () => {
-    const { ctx, slots } = await bench({ design: { agentPreset: 'ued' }, other: { agentPreset: 'ued' } })
+    const { ctx, slots, remote } = await bench({ design: { projectionValues: { agentPreset: 'ued' } }, other: { projectionValues: { agentPreset: 'ued' } } })
     declareRoot(slots)
     await ctx.plugin({ inject: [...inject], apply }).await()
     const entry = slots.entries('conversation.view')[0]!
@@ -149,9 +149,9 @@ describe('ui-ued apply', () => {
     const stopSecond = faceFor('design').subscribeChanged(alsoMine)
     faceFor('other').subscribeChanged(theirs)
 
-    ctx.remote.$dispatch('documents/changed', [{ sessionId: 'design', path: 'home.html' }])
+    remote.emit('documents/changed', [{ sessionId: 'design', path: 'home.html' }])
     // A session nobody is watching must not throw its way out of the fan-out.
-    ctx.remote.$dispatch('documents/changed', [{ sessionId: 'ghost', path: 'x.html' }])
+    remote.emit('documents/changed', [{ sessionId: 'ghost', path: 'x.html' }])
 
     expect(mine).toHaveBeenCalledTimes(1)
     expect(alsoMine).toHaveBeenCalledTimes(1)
@@ -159,7 +159,7 @@ describe('ui-ued apply', () => {
 
     stop()
     stopSecond()
-    ctx.remote.$dispatch('documents/changed', [{ sessionId: 'design', path: 'home.html' }])
+    remote.emit('documents/changed', [{ sessionId: 'design', path: 'home.html' }])
     expect(mine).toHaveBeenCalledTimes(1)
     expect(alsoMine).toHaveBeenCalledTimes(1)
   })

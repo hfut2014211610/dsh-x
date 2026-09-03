@@ -19,7 +19,6 @@ export type {
   ScopedStandardSourceBinding, SlotRendererHost, SlotScopeAdapter,
   StandardSourceBinding, StoreInstanceLike,
 } from '@deepseek-ai/dsh-client-ui-slots'
-export type { SessionProviderProps } from './session-provider.tsx'
 // The one hook constructor in the client stack, exposed so settings sections
 // that own a store can bind it without duplicating the uSES bridge.
 export { bindSnapshotSelector } from './bind.ts'

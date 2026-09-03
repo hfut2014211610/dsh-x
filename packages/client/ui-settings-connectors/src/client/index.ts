@@ -21,6 +21,8 @@ import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 import type {} from '@deepseek-ai/dsh-client-locale/client'
 // Type-only: the ctx.remote Context merge the settings scope subscribes on.
 import type {} from '@deepseek-ai/dsh-api-remotes/client'
+// Type-only: pulls the slot registry face (ctx.slots).
+import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { ConnectorsSection } from './ConnectorsSection.tsx'
 import type { ConnectorsSectionInjected } from './ConnectorsSection.tsx'
 import { FeishuCard } from './FeishuCard.tsx'

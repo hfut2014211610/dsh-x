@@ -31,8 +31,8 @@ export interface AgentPresetLabelInjected {
   load: () => Promise<void>
   /** Read the selectable roster for the blank-session picker. */
   loadSeat?: () => Promise<void>
-  /** Select another composition while the session is still blank. */
-  select?: (id: string) => Promise<void>
+  /** Stage one preset for the next session; resolves to a refusal, or undefined. */
+  select?: (id: string) => Promise<string | undefined>
   /** Clear the picker's one-shot introduction cue. */
   introduced?: () => void
 }

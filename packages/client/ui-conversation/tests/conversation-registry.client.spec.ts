@@ -10,8 +10,9 @@ import type {
   ISessions, SessionBinding, SessionFace, SessionListState, SessionSnapshot,
 } from '@deepseek-ai/dsh-api-session-controller/client'
 import {
-  ConversationEventRegistry, ConversationNodeAssembler, ConversationViewRegistry, UiConversation,
+  ConversationEventRegistry, ConversationNodeAssembler, UiConversation,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
+import { ConversationViewRegistry } from '../src/client/conversation/view-registry.ts'
 import type {
   ConversationNodeDefinition, ConversationViewDefinition, ConversationViewNode,
 } from '@deepseek-ai/dsh-client-ui-conversation/client'
