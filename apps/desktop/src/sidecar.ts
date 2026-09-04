@@ -47,11 +47,17 @@ export interface SidecarOptions {
 
 /** One connected runtime. */
 export interface SidecarHandle {
-  /** The connected URL (`http://127.0.0.1:<port>/`). */
+  /** The connected URL: the launch-token URL for token runtimes, origin `/` otherwise. */
   url: string
   /** Whether the shell owns (and therefore kills) the runtime process. */
   owned: boolean
   pid: number | undefined
+  /**
+   * Browser-session cookie minted from the launch token, held so the health
+   * watch can keep probing an authenticated runtime. Undefined for legacy
+   * tokenless runtimes and attached instances.
+   */
+  cookie?: string
   /** Forwarded exit signal for owned runtimes; attached instances never emit. */
   onExit: (listener: (code: number | null) => void) => void
   kill: () => void
@@ -63,8 +69,9 @@ export interface SidecarHandle {
  * @returns the loopback URL, or undefined when the line is not the URL line.
  */
 export function parseWebUrlLine(line: string): string | undefined {
-  const match = /^dsh web: (http:\/\/127\.0\.0\.1:\d+)\b/.exec(line)
-  return match?.[1]
+  const match = /^dsh web: (http:\/\/127\.0\.0\.1:\d+)(\/\?token=\S+)?(?=$| )/.exec(line)
+  if (match === null) return undefined
+  return match[1] + (match[2] ?? '')
 }
 
 /** Await a condition with a deadline, sleeping between attempts. */
@@ -85,6 +92,63 @@ async function waitUntil(
 async function servesIndex(url: string, deps: SidecarDeps): Promise<boolean> {
   try {
     const response = await deps.fetchImpl(url, { signal: AbortSignal.timeout(2_000), redirect: 'follow' })
+    return response.ok
+  } catch {
+    return false
+  }
+}
+
+/**
+ * Exchange the printed launch token for the browser-session cookie.
+ *
+ * Since the web authenticated its browser API, the readiness URL carries a
+ * single-use launch token: `GET`ting it mints the signed cookie (303 to `/`)
+ * that authenticates every later request, including the readiness probe and
+ * the spawn handshake below. Runtimes that print a bare URL predate
+ * the exchange and keep the legacy tokenless probe.
+ * @param tokenUrl - readiness URL as printed by `dsh web`, token included.
+ * @param fetchImpl - fetch implementation (injectable for tests).
+ * @returns The `name=value` cookie pair, or undefined when the exchange fails.
+ */
+async function exchangeBrowserCookie(tokenUrl: string, fetchImpl: typeof fetch): Promise<string | undefined> {
+  let response: Response
+  try {
+    response = await fetchImpl(tokenUrl, { redirect: 'manual', signal: AbortSignal.timeout(2_000) })
+  } catch {
+    return undefined
+  }
+  if (response.status !== 303 && response.status !== 302) return undefined
+  const setCookie = response.headers.get('set-cookie')
+  if (setCookie === null) return undefined
+  const pair = setCookie.split(';', 1)[0]?.trim()
+  if (pair === undefined || pair === '' || !pair.includes('=')) return undefined
+  return pair
+}
+
+/**
+ * Whether one origin serves this app's index to a held browser-session cookie.
+ *
+ * The readiness poll, the spawn handshake, and the health watch share it: the
+ * spawned runtime prints a launch token (not credentials), the exchange mints
+ * the cookie, and every later check presents it. Runtimes that print a bare
+ * URL predate the web's browser authentication and keep the legacy tokenless
+ * probe.
+ * @param origin - served origin without credentials.
+ * @param cookie - browser-session `name=value` pair, or undefined for legacy hosts.
+ * @param fetchImpl - fetch implementation (injectable for tests).
+ * @returns True on HTTP 200.
+ */
+export async function servesAuthenticatedIndex(
+  origin: string,
+  cookie: string | undefined,
+  fetchImpl: typeof fetch,
+): Promise<boolean> {
+  try {
+    const response = await fetchImpl(`${origin}/`, {
+      ...(cookie === undefined ? {} : { headers: { cookie } }),
+      signal: AbortSignal.timeout(2_000),
+      redirect: 'follow',
+    })
     return response.ok
   } catch {
     return false
@@ -152,21 +216,36 @@ export async function startSidecar(
     throw new SidecarError('dsh did not print its serving URL in time', lines.slice(-20))
   }
 
-  const indexUrl = `${url}/`
-  const ready = await waitUntil(deps.now() + options.readyTimeoutMs, deps, options.pollIntervalMs, async () => servesIndex(indexUrl, deps))
+  const webUrl: string = url
+  const hasToken = webUrl.includes('?token=')
+  const origin = new URL(webUrl).origin
+  let cookie: string | undefined
+  const ready = await waitUntil(deps.now() + options.readyTimeoutMs, deps, options.pollIntervalMs, async () => {
+    if (!hasToken) return servesIndex(`${webUrl}/`, deps)
+    if (cookie === undefined) cookie = await exchangeBrowserCookie(webUrl, deps.fetchImpl)
+    const sessionCookie: string | undefined = cookie
+    return sessionCookie !== undefined && servesAuthenticatedIndex(origin, sessionCookie, deps.fetchImpl)
+  })
   if (!ready) {
     child.killTree()
-    throw new SidecarError(`dsh did not answer on ${url} in time`, lines.slice(-20))
+    throw new SidecarError(`dsh did not answer on ${webUrl} in time`, lines.slice(-20))
   }
-  const handshake = await describeOrigin(url, deps.fetchImpl, deps.randomUuid, 2_000)
-  if (handshake === undefined) {
+  // The readiness poll already holds a fresh cookie-authenticated 200; confirm
+  // it once more (not the retired `host.describe` endpoint) before showing the
+  // window. The runtime version was validated at discovery.
+  const handshakeCookie: string | undefined = cookie
+  const handshake = hasToken
+    ? handshakeCookie !== undefined && await servesAuthenticatedIndex(origin, handshakeCookie, deps.fetchImpl)
+    : await describeOrigin(origin, deps.fetchImpl, deps.randomUuid, 2_000) !== undefined
+  if (!handshake) {
     child.killTree()
-    throw new SidecarError(`host.describe handshake failed against ${url}`, lines.slice(-20))
+    throw new SidecarError(`authenticated handshake failed against ${webUrl}`, lines.slice(-20))
   }
   return {
-    url: indexUrl,
+    url: hasToken ? webUrl : `${webUrl}/`,
     owned: true,
     pid: child.pid,
+    ...(cookie === undefined ? {} : { cookie }),
     onExit: (listener) => { child.onExit(listener) },
     kill: () => { child.killTree() },
   }

@@ -59,6 +59,10 @@ describe('parseWebUrlLine', () => {
     expect(parseWebUrlLine('dsh web: http://127.0.0.1:4312 (LAN: http://192.168.1.4:4312)'))
       .toBe('http://127.0.0.1:4312')
   })
+  it('keeps the launch token on the readiness URL', () => {
+    expect(parseWebUrlLine('dsh web: http://127.0.0.1:4312/?token=abcDEF123'))
+      .toBe('http://127.0.0.1:4312/?token=abcDEF123')
+  })
   it('ignores every other line', () => {
     expect(parseWebUrlLine('profile web loaded')).toBeUndefined()
     expect(parseWebUrlLine('dsh web: http://0.0.0.0:4312')).toBeUndefined()
@@ -100,6 +104,40 @@ describe('startSidecar', () => {
     const handle = await startSidecar({ source: 'path', spawn: { command: 'dsh', args: [] }, version: '1.0.0' }, deps, options)
     expect(spawnedSpecs).toEqual([{ command: 'dsh', args: [] }])
     expect(handle).toMatchObject({ url: 'http://127.0.0.1:7777/', owned: true, pid: 4321 })
+    expect(runtime.killed).toBe(false)
+  })
+
+  it('exchanges the launch token before probing the index and the handshake', async () => {
+    const runtime = fakeRuntime()
+    const seen: string[] = []
+    const deps = makeDeps(() => {
+      queueMicrotask(() => {
+        runtime.lines('dsh web: http://127.0.0.1:7778/?token=launch-1')
+      })
+      return runtime.process
+    }, (async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = requestUrl(input)
+      seen.push(`${init?.method ?? 'GET'} ${url}`)
+      if (url === 'http://127.0.0.1:7778/?token=launch-1') {
+        return new Response(null, {
+          status: 303,
+          headers: { 'set-cookie': 'dsh-auth-x=y; Max-Age=1; Path=/; HttpOnly; SameSite=Strict' },
+        })
+      }
+      if (url === 'http://127.0.0.1:7778/') {
+        const cookie = (init?.headers as Record<string, string> | undefined)?.cookie
+        return new Response('ok', { status: cookie === 'dsh-auth-x=y' ? 200 : 401 })
+      }
+      if (url === 'http://127.0.0.1:7778/api/host.describe') {
+        const cookie = (init?.headers as Record<string, string> | undefined)?.cookie
+        if (cookie !== 'dsh-auth-x=y') return new Response('no', { status: 401 })
+        return describeOk()
+      }
+      throw new Error(`unexpected fetch ${url}`)
+    }))
+    const handle = await startSidecar({ source: 'path', spawn: { command: 'dsh', args: [] }, version: '1.0.0' }, deps, options)
+    expect(handle).toMatchObject({ url: 'http://127.0.0.1:7778/?token=launch-1', owned: true, pid: 4321 })
+    expect(seen).toContain('GET http://127.0.0.1:7778/?token=launch-1')
     expect(runtime.killed).toBe(false)
   })
 

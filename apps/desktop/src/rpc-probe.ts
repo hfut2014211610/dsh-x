@@ -16,8 +16,9 @@ export interface HostDescription {
  * Validation is the rpcId discipline of the wire protocol: a dsh host answers
  * with the caller's rpcId and an `ok` result. Anything else on the port — or
  * any non-dsh HTTP server — fails the probe, which callers treat as "not a
- * serving dsh instance". The browser trust fence admits this probe because it
- * targets loopback with no Origin header.
+ * serving dsh instance". It targets runtimes that predate the web's browser
+ * authentication; authenticated runtimes answer only to a held session cookie
+ * (see the sidecar's exchange), so discovery falls through to a spawnable one.
  * @param origin - served origin, for example `http://127.0.0.1:3080`.
  * @param fetchImpl - fetch implementation (injectable for tests).
  * @param randomUuid - UUID v4 source for the rpcId.
@@ -35,7 +36,9 @@ export async function describeOrigin(
   try {
     response = await fetchImpl(`${origin}/api/host.describe`, {
       method: 'POST',
-      headers: { 'content-type': 'application/json' },
+      headers: {
+        'content-type': 'application/json',
+      },
       body: JSON.stringify({ type: 'client-request', rpcId, method: 'host.describe', payload: {} }),
       signal: AbortSignal.timeout(timeoutMs),
     })

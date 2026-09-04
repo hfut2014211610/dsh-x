@@ -14,7 +14,7 @@ import { mkdir, readFile, readdir, rm, writeFile } from 'node:fs/promises'
 import { homedir } from 'node:os'
 import { dirname, join } from 'node:path'
 import { fileURLToPath } from 'node:url'
-import { createHash } from 'node:crypto'
+import { createHash, randomUUID } from 'node:crypto'
 import { Readable } from 'node:stream'
 import { pipeline } from 'node:stream/promises'
 import { createReadStream, createWriteStream } from 'node:fs'
@@ -28,7 +28,7 @@ import { reapOwnedRuntime, type OwnedRuntimeRecord } from './owned-runtime.ts'
 import { killProcessTree, spawnRuntimeProcess } from './process-tree.ts'
 import { createRestartPolicy } from './restart-policy.ts'
 import { describeOrigin } from './rpc-probe.ts'
-import { startSidecar, type SidecarHandle } from './sidecar.ts'
+import { servesAuthenticatedIndex, startSidecar, type SidecarHandle } from './sidecar.ts'
 import { createShellState, type ShellSnapshot } from './shell-state.ts'
 import { checkForUpdate, downloadUpdate, type UpdaterDeps, type UpdateFeed } from './updater.ts'
 
@@ -141,7 +141,7 @@ async function reapPreviousRuntime(): Promise<void> {
       }
     },
     clearRecord: clearOwnedRuntime,
-    describes: async origin => await describeOrigin(origin, fetch, () => crypto.randomUUID(), 2_000) !== undefined,
+    describes: async origin => await describeOrigin(origin, fetch, () => randomUUID(), 2_000) !== undefined,
     alive: (pid) => {
       try {
         // Signal 0 delivers nothing and throws ESRCH for a pid nobody owns.
@@ -308,7 +308,7 @@ async function connect(): Promise<void> {
     // how the packaged smoke forces the spawn path and how a developer points
     // the shell at a specific instance.
     probeOrigin: process.env.DSH_DESKTOP_PROBE_ORIGIN ?? (app.isPackaged ? '' : DEFAULT_PROBE_ORIGIN),
-    randomUuid: () => crypto.randomUUID(),
+    randomUuid: () => randomUUID(),
   })
   for (const line of outcome.trail) log(line)
   if (outcome.candidate === undefined) {
@@ -324,7 +324,7 @@ async function connect(): Promise<void> {
     handle = await startSidecar(outcome.candidate, {
       spawn: spawnRuntimeProcess,
       fetchImpl: fetch,
-      randomUuid: () => crypto.randomUUID(),
+      randomUuid: () => randomUUID(),
       sleep: ms => new Promise((resolve) => { setTimeout(resolve, ms) }),
       now: () => Date.now(),
     }, { urlTimeoutMs: URL_TIMEOUT_MS, readyTimeoutMs: READY_TIMEOUT_MS, pollIntervalMs: POLL_INTERVAL_MS })
@@ -357,9 +357,13 @@ async function connect(): Promise<void> {
   // Attached instances are excluded: this shell neither owns nor restarts one.
   if (handle.owned) {
     const origin = servedOrigin
+    const cookie = handle.cookie
     stopHealthWatch = startHealthWatch(
       {
-        probe: async () => await describeOrigin(origin, fetch, () => crypto.randomUUID(), 2_000) !== undefined,
+        // The health probe presents the exchanged browser-session cookie, so
+        // an authenticated runtime keeps answering it; legacy tokenless
+        // runtimes answer the bare index as before.
+        probe: async () => servesAuthenticatedIndex(origin, cookie, fetch),
         setTimer: (fn, ms) => setTimeout(fn, ms),
         clearTimer: (timer) => { clearTimeout(timer as NodeJS.Timeout) },
       },
