@@ -10,17 +10,18 @@ The fork stood on upstream 0.1.2-alpha.5 while upstream shipped 0.1.5-rc.1: 171 
 
 ## Decision
 
-Merge `upstream/master` (0.1.5-rc.1) into the fork and cut `0.1.5-rc.1-x.0.10`:
+Merge `upstream/master` (0.1.5-rc.1) into the fork and cut `0.1.5-rc.1-x.0.10`, then switch the desktop product to the upstream Electron shell (see below), releasing `0.1.5-rc.1-x.0.11` from it:
 
-- Keep the fork's Electron sidecar shell and drop upstream's desktop tree; keep upstream's self-contained `apps/desktop-host`. The fork's `desktop-release.yml` flow is unchanged except the native paths, now `native/system`.
-- Fork manifests keep carrying the upstream version verbatim (`0.1.5-rc.1`); the fork serial lives only in `apps/desktop/electron-builder.yml` (`0.1.5-rc.1-x.0.10`).
+- Adopt `apps/desktop` and `apps/desktop-host` wholesale; the fork's Stage A sidecar shell is deleted. The fork's `desktop-release.yml` flow is rewritten around the upstream `package-target.ts` pipeline (packed family closure, so fork packages ride the runtime).
+- The update channel is this repository's GitHub Releases instead of the upstream Tencent COS deployment (the fork holds no COS credentials); code signing stays an unsigned-but-valid fallback, engaging only when its environments exist.
+- Fork manifests keep carrying the upstream version verbatim (`0.1.5-rc.1`); the fork serial rides the packaged manifest through `extraMetadata` (`DSH_DESKTOP_VERSION`), never the source tree.
 - Re-port the two-writer overlap recovery onto the restore pipeline: the scanner retains fed rows and, on a restarting seq, rebuilds the restore over the spared prefix so the later numbering still wins. `overlaps`/`overlapFloor` semantics are unchanged.
 - Port `usage-stats` and the Feishu renderer off `assistant/chunk`: usage travels on `assistant/message`, attempts without messages leave no record, and the card renders whole messages.
-- Union the web-app/CLI compositions (upstream `open-in-app`, `file-uploads`, frontend-static rows plus the fork's Feishu/writing/model-hub rows) and resolve `tsdown.config.ts` back off the fork desktop.
+- Union the web-app/CLI compositions (upstream `open-in-app`, `file-uploads`, frontend-static rows plus the fork's Feishu/writing/model-hub rows).
 
 ## Alternatives considered
 
-Keeping upstream's desktop and re-porting the fork shell onto it was rejected: it replaces the fork's shipped release flow and product identity for no runtime gain. Rebasing the fork instead of merging was rejected: 171 commits of review history are worth more than a linear log. Downgrading the overlap tests to assert refusal was rejected and then unneeded: the restore-aware re-port keeps the recovery the desktop-plus-CLI sharing scenario relies on.
+Keeping the fork's sidecar shell was the merge's first resolution and was then reversed: carrying a parallel shell permanently re-pays this merge's desktop conflict on every upstream sync, while the sidecar's real assets (the automated release flow and the GitHub update channel) port onto the upstream shell. Rebasing the fork instead of merging was rejected: 171 commits of review history are worth more than a linear log. Downgrading the overlap tests to assert refusal was rejected and then unneeded: the restore-aware re-port keeps the recovery the desktop-plus-CLI sharing scenario relies on.
 
 ## Verification
 

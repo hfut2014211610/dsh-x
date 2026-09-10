@@ -1,50 +1,46 @@
 name: Desktop release
 
-# Pack and publish the desktop shell installers (Stage A sidecar shape). By
-# default every artifact embeds the bundled dsh runtime from the npm release of
-# the given version, so the workflow runs after the dsh family publish. The
-# `packed` runtime source instead packs the dsh and vendor families from THIS
-# commit and installs the stage from those tarballs, for a release whose
-# version is not (or not yet) on the npm registry. Windows ships first; macOS
-# and Linux follow on the same workflow. Code signing rides
-# CSC_LINK/CSC_KEY_PASSWORD when the secrets exist and stays a valid unsigned
-# fallback when they do not.
+# Package the upstream Electron shell (apps/desktop) per target from THIS
+# commit's packed dsh family closure, so fork packages ride the runtime, then
+# upload the installers to a GitHub Release.
+#
+# Differences from the upstream scripts this flow drives: the update channel
+# is this repository's GitHub Releases instead of the Tencent COS deployment
+# (the fork holds no COS credentials; see electron-builder.config.mjs), the
+# packaged app version carries the fork serial through DSH_DESKTOP_VERSION,
+# and code signing is an unsigned-but-valid fallback when the secrets below
+# are absent. macOS notarization and Windows token signing engage only when
+# their environments are configured.
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Published @deepseek-ai/dsh version to bundle (npm source only; defaults to latest)'
+        description: 'Fork version stamped into the installers (e.g. 0.1.5-rc.1-x.0.11); empty uses the dsh manifest version'
         required: false
         default: ''
-      runtime:
-        description: 'Runtime source: npm installs the published version; packed builds it from this commit'
-        required: false
-        default: 'npm'
-        type: choice
-        options: ['npm', 'packed']
       release-tag:
-        description: 'Existing release tag to upload the installers to (e.g. dsh-v0.2.0); empty skips the upload'
+        description: 'Existing release tag to upload the installers to (e.g. dsh-v0.1.5-rc.1-x.0.11); empty skips the upload'
         required: false
         default: ''
-  push:
-    tags:
-      - 'desktop-v*'
 
 permissions:
   contents: write
 
 env:
   DSH_TELEMETRY_DISABLED: '1'
+  DSH_DESKTOP_APP_ID: com.deepseek.harness
+  # writeReleaseRecord resolves the COS update config for its bookkeeping
+  # file; the fork never uploads to COS, so a bare origin suffices.
+  DOWNLOAD_TEST_ORIGIN: https://github.com
+  FORK_VERSION: ${{ github.event.inputs.version }}
+  RELEASE_TAG: ${{ github.event.inputs.release-tag }}
 
 jobs:
   windows:
     runs-on: windows-latest
-    name: windows x64 / nsis + portable
-    timeout-minutes: 40
-    env:
-      BUNDLED_VERSION: ${{ github.event.inputs.version || github.ref_name }}
-      RUNTIME_SOURCE: ${{ github.event.inputs.runtime || 'npm' }}
+    name: windows x64 / nsis
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -62,89 +58,46 @@ jobs:
         shell: pwsh
         run: pnpm install --frozen-lockfile
 
-      - name: Build the shell and its runtime inputs
+      - name: Download the Electron binary
         shell: pwsh
-        run: |
-          pnpm run desktop:prepare
-          # The official-profile complete build, not build:lib+build:web: the
-          # packed runtime's release verify requires the .dsh-build client
-          # build record only this build writes, with the official profile.
-          pnpm run build:official
-          npx tsc -b apps/desktop/tsconfig.json
+        # The workspace denies install scripts; the binary the packager needs
+        # comes from the Electron package's own installer on demand.
+        run: node apps/desktop/node_modules/electron/install.js
 
-      - name: Assemble the bundled dsh runtime archive
+      - name: Build the desktop shell
         shell: pwsh
-        run: |
-          $stage = Join-Path $env:RUNNER_TEMP 'dsh-runtime-stage'
-          New-Item -ItemType Directory -Force $stage | Out-Null
-          if ($env:RUNTIME_SOURCE -eq 'packed') {
-            # This commit's runtime: pack both families (plus the landlock
-            # entry, a plain dependency of dsh-sandbox-local), then install
-            # the stage from those tarballs. Optional platform prebuilts
-            # (koffi, landlock) still come from the registry, matching the
-            # npm path below.
-            pnpm run release:pack --family dsh --out dist/npm-dsh
-            pnpm run release:pack --family vendor --out dist/npm-vendor
-            pnpm --dir native/system run build:ts
-            pnpm --dir native/system/packages/entry pack --pack-destination "$PWD/dist/npm-landlock" | Out-Null
-            pnpm exec tsx scripts/release/desktop-runtime.ts --from dist/npm-dsh --from dist/npm-vendor --from dist/npm-landlock --stage $stage
-            npm install --prefix $stage --no-audit --no-fund --package-lock=false --omit=dev
-            # pwsh continues past a native command's non-zero exit: prove the
-            # stage really holds a runtime before anything zips it.
-            if (-not (Test-Path (Join-Path $stage 'node_modules/@deepseek-ai/dsh/package.json'))) {
-              throw "the runtime stage did not install a dsh tree"
-            }
-          } else {
-            $version = if ($env:BUNDLED_VERSION -match '^desktop-v(.+)$') { $Matches[1] } else { $env:BUNDLED_VERSION }
-            # A dispatch on a branch yields a ref name, not a version — anything
-            # that does not start like a version resolves to latest.
-            $spec = if ($version -match '^\d') { "@deepseek-ai/dsh@$version" } else { '@deepseek-ai/dsh@latest' }
-            npm install --prefix $stage --omit=dev $spec
-          }
-          New-Item -ItemType Directory -Force apps/desktop/resources | Out-Null
-          # bsdtar writes forward-slash zip entries (Compress-Archive writes
-          # backslashes, which portable unzippers reject); the shell extracts
-          # this archive into userData on first run.
-          tar -a -cf apps/desktop/resources/dsh-runtime.zip -C $stage .
+        run: pnpm --filter @deepseek-ai/dsh-desktop run build
 
-      - name: Package installers
+      - name: Package win-x64
         shell: pwsh
         env:
-          CSC_LINK: ${{ secrets.WINDOWS_CSC_LINK }}
-          CSC_KEY_PASSWORD: ${{ secrets.WINDOWS_CSC_KEY_PASSWORD }}
-        run: pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --win nsis portable --publish never
-
-      - name: Smoke the packaged app
-        shell: pwsh
-        env:
-          DSH_DESKTOP_PACKAGED_EXE: ${{ github.workspace }}\apps\desktop\release\win-unpacked\DeepSeek Harness.exe
-        run: npx vitest run --config vitest.desktop.config.ts apps/desktop/tests/packaged.e2e.ts
+          DSH_DESKTOP_VERSION: ${{ env.FORK_VERSION }}
+        run: pnpm --filter @deepseek-ai/dsh-desktop exec tsx scripts/package-target.ts win-x64
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: desktop-windows-x64
-          path: apps/desktop/release/*.exe
+          path: |
+            apps/desktop/.desktop-build/targets/win-x64/artifacts/*.exe
+            apps/desktop/.desktop-build/targets/win-x64/artifacts/*.yml
+            apps/desktop/.desktop-build/targets/win-x64/artifacts/*.7z
+            apps/desktop/.desktop-build/targets/win-x64/artifacts/*.blockmap
           if-no-files-found: error
 
       - name: Attach installers to the release
-        if: ${{ github.event.inputs.release-tag != '' }}
+        if: ${{ env.RELEASE_TAG != '' }}
+        shell: pwsh
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.inputs.release-tag }}
-        shell: bash
-        # latest.yml rides along: it is the channel file the shell reads to
-        # verify a download's checksum, and an installer published without it
-        # updates unverified.
-        run: gh release upload "$RELEASE_TAG" apps/desktop/release/*.exe apps/desktop/release/latest.yml --clobber
+        run: |
+          $files = Get-ChildItem apps/desktop/.desktop-build/targets/win-x64/artifacts -Include *.exe, *.yml, *.7z, *.blockmap | ForEach-Object { $_.FullName }
+          gh release upload $env:RELEASE_TAG $files --clobber
 
   macos:
     runs-on: macos-latest
     name: macos arm64 + x64 / dmg
-    timeout-minutes: 40
-    env:
-      BUNDLED_VERSION: ${{ github.event.inputs.version || github.ref_name }}
-      RUNTIME_SOURCE: ${{ github.event.inputs.runtime || 'npm' }}
+    timeout-minutes: 60
     steps:
       - uses: actions/checkout@v6
         with:
@@ -161,106 +114,45 @@ jobs:
       - name: Install (immutable)
         run: pnpm install --frozen-lockfile
 
-      - name: Build the shell and its runtime inputs
-        run: |
-          pnpm run desktop:prepare
-          # The official-profile complete build, not build:lib+build:web: the
-          # packed runtime's release verify requires the .dsh-build client
-          # build record only this build writes, with the official profile.
-          pnpm run build:official
-          npx tsc -b apps/desktop/tsconfig.json
+      - name: Download the Electron binary
+        # Same opt-in install as the Windows lane.
+        run: node apps/desktop/node_modules/electron/install.js
 
-      - name: Assemble the bundled dsh runtime archive
-        run: |
-          stage="$RUNNER_TEMP/dsh-runtime-stage"
-          mkdir -p "$stage"
-          if [[ "$RUNTIME_SOURCE" == "packed" ]]; then
-            # This commit's runtime: pack both families (plus the landlock
-            # entry, a plain dependency of dsh-sandbox-local), then install
-            # the stage from those tarballs. Optional platform prebuilts
-            # (koffi, landlock) still come from the registry, matching the
-            # npm path below.
-            pnpm run release:pack --family dsh --out dist/npm-dsh
-            pnpm run release:pack --family vendor --out dist/npm-vendor
-            pnpm --dir native/system run build:ts
-            pnpm --dir native/system/packages/entry pack --pack-destination "$PWD/dist/npm-landlock" >/dev/null
-            pnpm exec tsx scripts/release/desktop-runtime.ts --from dist/npm-dsh --from dist/npm-vendor --from dist/npm-landlock --stage "$stage"
-            npm install --prefix "$stage" --no-audit --no-fund --package-lock=false --omit=dev
-            # Fail loud on a stage that silently installed nothing.
-            test -f "$stage/node_modules/@deepseek-ai/dsh/package.json"
-          else
-            version="${BUNDLED_VERSION#desktop-v}"
-            # A dispatch on a branch yields a ref name, not a version — anything
-            # that does not start like a version resolves to latest.
-            if [[ "$version" =~ ^[0-9] ]]; then spec="@deepseek-ai/dsh@$version"; else spec='@deepseek-ai/dsh@latest'; fi
-            npm install --prefix "$stage" --omit=dev "$spec"
-          fi
-          # The x64 dmg embeds this same archive, but the stage above was
-          # installed for the arm64 host: koffi and sharp carry per-arch
-          # prebuilt packages and node-pty copied its host prebuild into
-          # build/. Complete the stage for both darwin architectures.
-          pnpm exec tsx scripts/release/darwin-universal.ts --stage "$stage"
-          mkdir -p apps/desktop/resources
-          # bsdtar writes forward-slash zip entries; the shell extracts this
-          # archive into userData on first run.
-          tar -a -cf apps/desktop/resources/dsh-runtime.zip -C "$stage" .
+      - name: Build the desktop shell
+        run: pnpm --filter @deepseek-ai/dsh-desktop run build
 
-      - name: Package installers
-        # Two explicit invocations, one per arch: the config-level arch list
-        # builds only the host arch on this electron-builder build.
-        run: |
-          pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --mac dmg --arm64 --publish never
-          pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --mac dmg --x64 --publish never
+      - name: Package mac-arm64
+        env:
+          DSH_DESKTOP_VERSION: ${{ env.FORK_VERSION }}
+        run: pnpm --filter @deepseek-ai/dsh-desktop exec tsx scripts/package-target.ts mac-arm64
+
+      - name: Package mac-x64
+        env:
+          DSH_DESKTOP_VERSION: ${{ env.FORK_VERSION }}
+        run: pnpm --filter @deepseek-ai/dsh-desktop exec tsx scripts/package-target.ts mac-x64
 
       - uses: actions/upload-artifact@v4
         with:
           name: desktop-macos
-          path: apps/desktop/release/*.dmg
+          path: |
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.dmg
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.zip
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.yml
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.blockmap
+            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*.dmg
+            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*.zip
+            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*.yml
+            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*.blockmap
           if-no-files-found: error
 
       - name: Attach installers to the release
-        if: ${{ github.event.inputs.release-tag != '' }}
+        if: ${{ env.RELEASE_TAG != '' }}
         env:
           GH_TOKEN: ${{ github.token }}
-          RELEASE_TAG: ${{ github.event.inputs.release-tag }}
-        run: gh release upload "$RELEASE_TAG" apps/desktop/release/*.dmg apps/desktop/release/latest-mac.yml --clobber
-
-  linux:
-    if: false # Follows the same zip-based flow as Windows/macOS; enable when the Linux target ships.
-    runs-on: ubuntu-latest
-    name: linux x64 / AppImage + deb
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - uses: pnpm/action-setup@v4
-        with:
-          dest: ${{ runner.temp }}/setup-pnpm
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-
-      - name: Install (immutable)
-        run: pnpm install --frozen-lockfile
-
-      - name: Build and package
         run: |
-          pnpm run desktop:prepare
-          pnpm run build:official
-          npx tsc -b apps/desktop/tsconfig.json
-          stage="$RUNNER_TEMP/dsh-runtime-stage"
-          npm install --prefix "$stage" --omit=dev "@deepseek-ai/dsh@latest"
-          mkdir -p apps/desktop/resources
-          tar -a -cf apps/desktop/resources/dsh-runtime.zip -C "$stage" .
-          sudo apt-get update && sudo apt-get install -y --no-install-recommends xvfb libgtk-3-0t64 libnss3 libasound2t64
-          pnpm --filter @deepseek-ai/dsh-desktop-shell exec electron-builder --linux AppImage deb --publish never
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: desktop-linux-x64
-          path: |
-            apps/desktop/release/*.AppImage
-            apps/desktop/release/*.deb
-          if-no-files-found: error
+          shopt -s nullglob
+          files=(
+            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.{dmg,zip,yml,blockmap}
+            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*.{dmg,zip,yml,blockmap}
+          )
+          gh release upload "$RELEASE_TAG" "${files[@]}" --clobber

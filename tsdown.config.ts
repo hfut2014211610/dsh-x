@@ -18,11 +18,7 @@ export default defineConfig(({ env }) => {
   return {
     workspace: client
       ? ['vendor/*', 'packages/*/*', 'apps/cli']
-      // The fork's Electron sidecar (apps/desktop) builds through its own tsc
-      // project (`npx tsc -b apps/desktop/tsconfig.json`), not the workspace
-      // tsdown pass: it has no index/invariant/startup entry. Upstream's
-      // desktop host (apps/desktop-host) stays in the workspace pass.
-      : ['vendor/*', 'packages/*/*', 'apps/cli', 'apps/desktop-host'],
+      : ['vendor/*', 'packages/*/*', 'apps/cli', 'apps/desktop', 'apps/desktop-host'],
     entry: client ? '' : ['lib/types/{index,invariant,startup}.js'],
     outDir: 'lib',
     format: ['esm'],

@@ -1,7 +1,8 @@
-// Generates the desktop shell's icons (build/icon.png 1024px, assets/tray.png
-// 32px) from the product mark — the whale path of website/public/favicon.svg,
-// parsed and scanline-filled with supersampling, so no binary design tool is
-// needed and the visual is reviewable in code. Run from apps/desktop:
+// Generates the desktop shell's icon (build/icon.png 1024px) from the product
+// mark — the whale path of website/public/favicon.svg, parsed and
+// scanline-filled with supersampling, so no binary design tool is needed and
+// the visual is reviewable in code. (The old sidecar shell also generated a
+// tray icon here; the upstream shell has no tray.) Run from apps/desktop:
 //   node scripts/generate-icons.mjs
 import { deflateSync } from 'node:zlib'
 import { mkdirSync, readFileSync, writeFileSync } from 'node:fs'
@@ -168,7 +169,5 @@ function render(size, ss, scale, subpaths, fill) {
 const { d, fill } = markPath()
 const subpaths = parseSubpaths(d)
 mkdirSync(join(here, '..', 'build'), { recursive: true })
-mkdirSync(join(here, '..', 'assets'), { recursive: true })
 writeFileSync(join(here, '..', 'build', 'icon.png'), encodePng(1024, render(1024, 2, 0.92, subpaths, fill)))
-writeFileSync(join(here, '..', 'assets', 'tray.png'), encodePng(32, render(32, 4, 0.9, subpaths, fill)))
-console.log('icons written from the favicon mark: build/icon.png (1024), assets/tray.png (32)')
+console.log('icon written from the favicon mark: build/icon.png (1024)')
