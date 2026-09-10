@@ -12,6 +12,7 @@ import { LocalFileSystem } from '@deepseek-ai/dsh-fs-local'
 import SandboxedFileSystem from '@deepseek-ai/dsh-fs-sandbox'
 import SandboxPolicyService from '@deepseek-ai/dsh-sandbox-policy'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
+import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
 import { DocumentsLocal } from '../src/index.ts'
 import type { DocumentEdit } from '@deepseek-ai/dsh-documents'
 
@@ -30,6 +31,7 @@ beforeEach(async () => {
   // cwd, so an unresolved fixture root compares unequal to its own policy.
   dir = await realpath(await mkdtemp(join(tmpdir(), 'dsh-documents-')))
   ctx = new Context()
+  await ctx.plugin(SessionProjectionRegistry)
   policyFiber = await ctx.plugin(SandboxPolicyService, { mode: 'danger-full-access', workspaceRoot: dir })
   fsFiber = await ctx.plugin(LocalFileSystem, { cwd: dir })
   sessionFiber = await ctx.plugin(SessionStore)

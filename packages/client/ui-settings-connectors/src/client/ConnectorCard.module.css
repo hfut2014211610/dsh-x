@@ -2,7 +2,7 @@
 
 .card {
   list-style: none;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 12px;
   background: var(--dsw-alias-bg-layer-3);
   transition: border-color .16s, background .16s;
@@ -67,6 +67,7 @@
   flex: none;
   padding: 1px 8px;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--dsw-alias-bg-module-platform);
   color: var(--dsw-alias-label-tertiary);
   font-size: 11px;
@@ -101,6 +102,7 @@
   flex: none;
   padding: 1px 8px;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--dsw-alias-bg-module-platform);
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
@@ -112,7 +114,7 @@
 .body {
   margin: 0 16px;
   padding-bottom: 8px;
-  border-top: 1px solid var(--dsw-alias-border-l2);
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 /* The channel's own switch, above its settings: whether it runs at all is a
@@ -152,7 +154,7 @@
   gap: 6px;
   margin-top: 16px;
   padding-top: 14px;
-  border-top: 1px solid var(--dsw-alias-border-l2);
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 .authHeading {
@@ -217,7 +219,7 @@
   gap: 8px;
   margin-top: 12px;
   padding: 14px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 10px;
   text-align: center;
 }
@@ -270,7 +272,7 @@
   justify-content: flex-end;
   gap: 8px;
   padding: 12px 0 4px;
-  border-top: 1px solid var(--dsw-alias-border-l2);
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 .failed {
@@ -353,6 +355,7 @@
 .badge {
   padding: 1px 8px;
   border-radius: 999px;
+  corner-shape: round;
   background: var(--dsw-alias-bg-module-platform);
   color: var(--dsw-alias-label-secondary);
   font-size: 11px;
@@ -382,7 +385,7 @@
   width: 100%;
   height: 34px;
   padding: 0 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
   background: var(--dsw-alias-bg-base);
   color: var(--dsw-alias-label-primary);
@@ -425,7 +428,7 @@
   box-sizing: border-box;
   width: 100%;
   padding: 7px 10px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
   background: var(--dsw-alias-bg-base);
   color: var(--dsw-alias-label-primary);
@@ -448,7 +451,7 @@
 .group {
   margin-top: 16px;
   padding-top: 12px;
-  border-top: 1px solid var(--dsw-alias-border-l2);
+  border-top: 0.5px solid var(--dsw-alias-border-l2);
 }
 
 .groupHeading {
@@ -471,7 +474,7 @@
   align-items: flex-start;
   gap: 8px;
   padding: 10px 12px;
-  border: 1px solid var(--dsw-alias-border-l2);
+  border: 0.5px solid var(--dsw-alias-border-l2);
   border-radius: 8px;
   cursor: pointer;
 }

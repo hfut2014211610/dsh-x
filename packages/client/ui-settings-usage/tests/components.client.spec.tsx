@@ -37,8 +37,10 @@ const row = (sessionId: string, title: string | null) => ({
 /** A store seeded with one scripted list answer. */
 function storeWith(items: unknown[]): UsageSettingsStore {
   return new UsageSettingsStore({
-    sessions: {
-      list: () => Promise.resolve({ result: { ok: true, value: { items } } }),
+    remote: {
+      session: {
+        list: () => Promise.resolve({ ok: true, value: { items } }),
+      },
     },
   } as never)
 }
@@ -95,7 +97,7 @@ describe('UsageSection', () => {
     await waitFor(() => { expect(screen.getByText(en.empty)).toBeTruthy() })
 
     const failing = new UsageSettingsStore({
-      sessions: { list: () => Promise.resolve({ result: { ok: false, error: { code: 'X', message: 'denied' } } }) },
+      remote: { session: { list: () => Promise.resolve({ ok: false, error: { code: 'X', message: 'denied' } }) } },
     } as never)
     const failingHook = bindSnapshotSelector<UsageSettingsState>(failing.store)
     render(<UsageSection controller={failing} useSnapshot={failingHook} t={t} />)

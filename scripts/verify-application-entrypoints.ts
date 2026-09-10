@@ -1,7 +1,7 @@
 /**
  * Enforce dsh profiles as the only supported Node application launcher.
- * Vendor CLIs, build tools, and test tools are explicit classifications
- * rather than implicit holes.
+ * Vendor CLIs, build tools, test tools, and the Feishu channel's resident
+ * companion daemon are explicit classifications rather than implicit holes.
  */
 
 import { existsSync, globSync, readFileSync } from 'node:fs'
@@ -27,6 +27,10 @@ interface DemoPolicy {
 const MANIFEST_BIN_ALLOWLIST = new Map<string, ManifestBin>([
   ['apps/cli/package.json', { dsh: 'lib/bin.js' }],
   ['packages/experimental/webworker-packer/package.json', { 'dsh-pack-vfs-image': './bin.js' }],
+  // The Feishu bridge is a resident companion daemon: it holds the machine's
+  // single event subscription and starts dsh when it is not running, so it
+  // cannot itself run inside a dsh profile.
+  ['packages/channel/feishu/package.json', { 'dsh-feishu-bridge': 'lib/bin.js' }],
 ])
 
 /** Every JavaScript executable in an application or packaging workspace has one explicit role. */
@@ -45,6 +49,7 @@ const EXECUTABLE_SOURCE_ALLOWLIST = new Map<string, string>([
   ['packages/test-support/loader-smoke/tests/fixtures/headless-driver.ts', 'test-only subprocess driver'],
   ['packages/test-support/llm-mock-server/src/bin.ts', 'test-only model server'],
   ['python/sdk-runtime/runtime-bootstrap.mjs', 'private packaging-only runtime dispatcher'],
+  ['packages/channel/feishu/src/bin.ts', 'resident companion daemon entry (starts and supervises dsh)'],
 ])
 
 /** Root demos are application wrappers and therefore must visibly select dsh. */

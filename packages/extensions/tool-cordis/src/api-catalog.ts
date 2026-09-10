@@ -846,6 +846,31 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
     ],
   },
   {
+    key: 'directoryPickerController',
+    summary: 'Host service backing the generated `ctx.remote.directoryPicker` namespace.',
+    description: 'Host service backing the generated `ctx.remote.directoryPicker` namespace. The seam it exports is abstract and therefore never a Loader entry of its own, so this controller carries the wire verbs: one composed backend serves either the native chooser or the browse primitives, and a verb the composition cannot serve is refused rather than approximated.',
+    methods: [
+      {
+        signature: '@Remote(\'pick\') async pick(signal: AbortSignal): Promise<string | null>',
+        description: 'Open the host\'s OS chooser for a Remote caller.',
+        parameters: [{ name: 'signal', description: 'caller lifetime; abort terminates the chooser.' }],
+        returns: 'the chosen absolute path, or null when the operator cancels.',
+      },
+      {
+        signature: '@Remote(\'list\') async list(path: string | undefined, signal: AbortSignal): Promise<DirectoryListing>',
+        description: 'List one directory level for a Remote caller\'s in-app browser.',
+        parameters: [{ name: 'path', description: 'absolute directory to list; absent lists the home directory.' }, { name: 'signal', description: 'caller lifetime; abort stops the backend\'s scan instead of letting it outlive a disconnected caller.' }],
+        returns: 'the level\'s listing with its ancestry.',
+      },
+      {
+        signature: '@Remote(\'createDirectory\') async createDirectory(path: string, name: string): Promise<string>',
+        description: 'Create one child directory for a Remote caller\'s in-app browser.',
+        parameters: [{ name: 'path', description: 'absolute existing parent directory.' }, { name: 'name', description: 'single non-blank path segment.' }],
+        returns: 'the created directory\'s absolute path.',
+      },
+    ],
+  },
+  {
     key: 'documents',
     summary: 'Document service (`ctx.documents`) shared by host providers and consumers.',
     description: 'Document service (`ctx.documents`) shared by host providers and consumers.',
@@ -885,31 +910,6 @@ export const SERVICE_API: readonly ServiceApiEntry[] = [
         description: 'Apply one version-guarded document mutation and emit documents/changed.',
         parameters: [{ name: 'request', description: 'session, path, guarded base version, and the edit.' }],
         returns: 'the document\'s new version.',
-      },
-    ],
-  },
-  {
-    key: 'directoryPickerController',
-    summary: 'Host service backing the generated `ctx.remote.directoryPicker` namespace.',
-    description: 'Host service backing the generated `ctx.remote.directoryPicker` namespace. The seam it exports is abstract and therefore never a Loader entry of its own, so this controller carries the wire verbs: one composed backend serves either the native chooser or the browse primitives, and a verb the composition cannot serve is refused rather than approximated.',
-    methods: [
-      {
-        signature: '@Remote(\'pick\') async pick(signal: AbortSignal): Promise<string | null>',
-        description: 'Open the host\'s OS chooser for a Remote caller.',
-        parameters: [{ name: 'signal', description: 'caller lifetime; abort terminates the chooser.' }],
-        returns: 'the chosen absolute path, or null when the operator cancels.',
-      },
-      {
-        signature: '@Remote(\'list\') async list(path: string | undefined, signal: AbortSignal): Promise<DirectoryListing>',
-        description: 'List one directory level for a Remote caller\'s in-app browser.',
-        parameters: [{ name: 'path', description: 'absolute directory to list; absent lists the home directory.' }, { name: 'signal', description: 'caller lifetime; abort stops the backend\'s scan instead of letting it outlive a disconnected caller.' }],
-        returns: 'the level\'s listing with its ancestry.',
-      },
-      {
-        signature: '@Remote(\'createDirectory\') async createDirectory(path: string, name: string): Promise<string>',
-        description: 'Create one child directory for a Remote caller\'s in-app browser.',
-        parameters: [{ name: 'path', description: 'absolute existing parent directory.' }, { name: 'name', description: 'single non-blank path segment.' }],
-        returns: 'the created directory\'s absolute path.',
       },
     ],
   },
