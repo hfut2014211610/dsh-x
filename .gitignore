@@ -46,6 +46,7 @@ worktrees/
 # Stale local packaging residue from the retired sidecar shell (pre-0.1.5
 # releases built here); the upstream shell builds under .desktop-build/.
 apps/desktop/release/
+apps/desktop/resources/
 
 # Local release-packaging workspace (personal/scripts/build-windows.mjs).
 /dist/
