@@ -91,7 +91,9 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          $files = Get-ChildItem apps/desktop/.desktop-build/targets/win-x64/artifacts -Include *.exe, *.yml, *.7z, *.blockmap | ForEach-Object { $_.FullName }
+          # -Include needs a wildcard in -Path to take effect; top level only
+          # so the win-unpacked helper binaries never reach the release.
+          $files = Get-ChildItem -Path apps/desktop/.desktop-build/targets/win-x64/artifacts/* -Include *.exe, *.yml, *.7z, *.blockmap | ForEach-Object { $_.FullName }
           gh release upload $env:RELEASE_TAG $files --clobber
 
   macos:

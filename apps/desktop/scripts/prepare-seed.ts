@@ -163,17 +163,27 @@ async function main(): Promise<void> {
     let signedMachOFiles: number | undefined
     let macOSSigning: ReturnType<typeof resolveMacOSSigningEnvironment> | undefined
     if (targetPlatform === 'darwin') {
-      macOSSigning = resolveMacOSSigningEnvironment(process.env)
-      const signing = await signMacOSSeedStore(
-        STORE_ROOT,
-        resolveDesktopAppId(process.env),
-        macOSSigning,
-      )
-      signedMachOFiles = signing.signedFiles
-      process.stdout.write(
-        `desktop seed: signed ${signing.signedFiles} Mach-O files, updated ${signing.updatedIndexRows} pnpm index records, and pruned ${signing.prunedOrphans} native orphans\n`,
-      )
-      await verifyOfflineInstallation(release)
+      // Fork: unsigned seed when no Apple identity exists (same fallback as
+      // the unsigned app package); the archived-store verification below
+      // already skips itself without a signing identity.
+      try {
+        macOSSigning = resolveMacOSSigningEnvironment(process.env)
+      } catch {
+        macOSSigning = undefined
+        process.stdout.write('desktop seed: no macOS signing identity; leaving the seed store unsigned\n')
+      }
+      if (macOSSigning !== undefined) {
+        const signing = await signMacOSSeedStore(
+          STORE_ROOT,
+          resolveDesktopAppId(process.env),
+          macOSSigning,
+        )
+        signedMachOFiles = signing.signedFiles
+        process.stdout.write(
+          `desktop seed: signed ${signing.signedFiles} Mach-O files, updated ${signing.updatedIndexRows} pnpm index records, and pruned ${signing.prunedOrphans} native orphans\n`,
+        )
+        await verifyOfflineInstallation(release)
+      }
     }
     removePnpmProjectRegistrations(STORE_ROOT)
     archivePnpmStore(SEED_ROOT, STORE_ROOT)
