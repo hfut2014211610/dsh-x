@@ -9,9 +9,10 @@ describe('SessionDriver', () => {
     const live = { id: 'session-live' } as unknown as Agent
     const resume = vi.fn()
     const touch = vi.fn(async () => {})
+    const get = vi.fn(() => live)
     const ctx = {
       agents: {
-        get: vi.fn(() => live),
+        get,
         resume,
       },
       agentDefaultModel: {
@@ -41,7 +42,7 @@ describe('SessionDriver', () => {
     })
 
     await expect(driver.ensureAgent('chat')).resolves.toBe(live)
-    expect(ctx.agents.get).toHaveBeenCalledWith('session-live')
+    expect(get).toHaveBeenCalledWith('session-live')
     expect(resume).not.toHaveBeenCalled()
     expect(touch).toHaveBeenCalledWith('chat', 2)
   })

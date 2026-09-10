@@ -1,3 +1,8 @@
+---
+description: "Feishu (Lark) channel: a resident bridge plus a dsh plugin that turns direct messages and group mentions into card-visible agent sessions."
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-feishu
 
 English | [中文](README.zh.md)
@@ -6,6 +11,26 @@ Reach a dsh session from Feishu: say something in a direct message and it starts
 
 The design and its trade-offs are in the [channel note](../../../personal/docs/notes/proposed/2026-08-18-feishu-channel.md).
 
+## Summary
+
+This package drives dsh sessions from Feishu. A resident bridge process holds the machine's single event subscription and talks to Feishu; the dsh-side plugin creates sessions, submits messages, renders event streams onto interactive cards, and answers tool approvals inline. One local socket joins them, and the socket being connected is the liveness signal. Use it when users must work agents from direct messages or group chats. The plugin stores no Feishu credential of its own; the bridge reads the config the plugin writes.
+
+## Table of Contents
+
+- [Two parts](#two-parts)
+- [Dependencies](#dependencies)
+- [Configuration](#configuration)
+- [Running it](#running-it)
+- [Checks](#checks)
+- [Verified against real credentials](#verified-against-real-credentials)
+- [Numbers actually measured](#numbers-actually-measured)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="two-parts"></a>
 ## Two parts
 
 | Part | Where it runs | What it does |
@@ -17,11 +42,13 @@ One local socket connects them. **The socket being connected is what "dsh is ali
 
 Why two processes at all: `lark-cli` admits **exactly one consumer per event key**. Since there can only be one, the resident bridge holds it end to end and dsh is the client — which makes handover and mutual exclusion problems that never arise.
 
+<a id="dependencies"></a>
 ## Dependencies
 
 - `lark-cli` (v1.0.87 here, with the app and its credentials in the system keychain). The bridge is the only thing that talks to Feishu, and this plugin stores no Feishu credential of its own.
 - The plugin side needs only dsh's services and `zod`.
 
+<a id="configuration"></a>
 ## Configuration
 
 Everything lives under Settings → Connectors → Feishu, or the equivalent section of `$DSH_HOME/settings.yaml`. The bridge has no interface of its own: its `~/.dsh-x-feishu/config.json` is written by the plugin, read-only to it, and watched — so a settings change needs no bridge restart.
@@ -73,6 +100,7 @@ With `workspace` empty, sessions run in `$DSH_HOME/feishu`. That is not a regist
 
 Outbound still goes through lark-cli: `appId` is how the matching profile is found locally, and replies and cards are sent as that app. Whichever app an event arrived through is the one answered — a card can only be patched by the app that sent it, so a wrong identity cannot even refresh progress.
 
+<a id="running-it"></a>
 ## Running it
 
 The Web bundle mounts this package, so the only thing left to start is the bridge — a resident process holding the machine's single Feishu event subscription:
@@ -85,12 +113,14 @@ node --import tsx/esm packages/channel/feishu/src/bridge/main.ts
 dsh-feishu-bridge
 ```
 
+<a id="checks"></a>
 ## Checks
 
 ```sh
 pnpm exec vitest run packages/channel/feishu
 ```
 
+<a id="verified-against-real-credentials"></a>
 ## Verified against real credentials
 
 These raw escape hatches were driven through `lark-cli` v1.0.87 against a real group chat:
@@ -103,10 +133,12 @@ These raw escape hatches were driven through `lark-cli` v1.0.87 against a real g
 
 `event consume` runs without `--quiet`, so dropped-event warnings are not hidden; the real loss rate still needs long observation of the resident log.
 
+<a id="numbers-actually-measured"></a>
 ## Numbers actually measured
 
 Five cold `lark-cli` starts: 339 / 361 / 291 / 343 / 282 ms. **About 300ms each**, which is why the card updates in stages rather than streaming token by token — streaming wants a frame every 200–500ms, and process startup alone eats that.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the message text it hands a session: a Lark message arrives with the bot mention stripped and nothing added, and the session's own preset owns every tool and prompt section from there.
@@ -120,3 +152,12 @@ None of its own; the prefix a session assembles is the same whether the turn arr
 - **One mode at a time** — identity and event source are configured together, so an A-mode identity cannot be paired with a B-mode event feed. Splitting them means making `mode` two independent dimensions, which changes the config shape.
 - **A killed bridge leaves its consumer behind** — reaping happens on the next start, from the pid and event key it wrote down, so a bridge killed and never restarted leaves one `lark-cli` consumer running until then.
 - **Cards are patched by the app that sent them** — a reply must go out as the same application that received the message, so a deployment that rotates applications mid-conversation loses the ability to update its own cards.
+
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+The bridge owns the only event subscription: never start a second `lark-cli event consume` for the same key. Card text is append-only so CardKit typewriter updates stay a pure extension; the renderer never rewrites what it already wrote.
+
+</details>

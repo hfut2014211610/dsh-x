@@ -13,7 +13,7 @@ import { afterAll, beforeAll, describe, expect, it, vi } from 'vitest'
 import { SUBAGENT_MODEL_SELECTION_SETTINGS_NAMESPACE } from '@deepseek-ai/dsh-tool-subagent/model-selection-settings'
 import { SETTINGS_NAMESPACE, SHIPPED_PRESET_ROOT } from '@deepseek-ai/dsh-agent-presets'
 import { applyChildComposition, childSessionMeta } from '@deepseek-ai/dsh-subagent'
-import { ToolCallId, createMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
+import { ToolCallId, createAssistantMessage, createToolResultMessage } from '@deepseek-ai/dsh-llm'
 import { CompactionId } from '@deepseek-ai/dsh-compaction'
 import type {} from '@deepseek-ai/dsh-compaction-basic'
 import type {} from '@deepseek-ai/dsh-skill'
@@ -33,7 +33,7 @@ const INSTALL_ANCHOR = join(REPO_ROOT, 'apps/cli/package.json')
 const MINIMAL_PROMPT = 'You are a helpful software engineer assistant.'
 const MINIMAL_BASH_DESCRIPTION = `Run commands in a bash shell
 * When invoking this tool, the contents of the "command" parameter does NOT need to be XML-escaped.
-* You don't have access to the internet via this tool.
+* You do not have access to the internet via this tool.
 * You do have access to a mirror of common linux and python packages via apt and pip.
 * State is persistent across command calls and discussions with the user.
 * To inspect a particular line range of a file, e.g. lines 10-25, try 'sed -n 10,25p /path/to/the/file'.
@@ -100,6 +100,8 @@ async function bootWeb(
     // write into a real harness home and have them claim it from each other.
     // Pinned for the same reason the two rows above are.
     { id: 'instance-lock', config: { dshHome: dirname(settingsFile), profile: 'test' } },
+    // Fixed Session IDs must stay inside this boot's temporary profile root.
+    { id: 'session-persistence-jsonl', config: { root: join(dirname(settingsFile), 'sessions') } },
     // Host rows with side effects outside this process: a bound port, a served
     // asset tree, a telemetry exporter. `api-gateway` and `directory-picker`
     // stay ENABLED on purpose — the api-proxy is the host row that injects
@@ -119,10 +121,16 @@ async function bootWeb(
     // skills test below proves it reaches preset-composed agents.
     { id: 'skill-badge', disabled: false },
     { id: 'modules', disabled: true },
+    // The physical Connection row owns the disabled HTTP server. bootWeb
+    // supplies only its in-process registries so Host services still prove
+    // their shipped dependency graph without binding a port.
     { id: 'connection', disabled: true },
     // Export owns a Connection Fetch route, so this Host-only composition
     // disables it with the transport service above.
     { id: 'session-log-download', disabled: true },
+    // The open-in-app host routes wait for the webserver and connection
+    // rows disabled above (connection's trust fence guards every route).
+    { id: 'open-in-app', disabled: true },
     // The always-on reload chain waits for the browser roster and bound port
     // disabled above.
     { id: 'client-hmr', disabled: true },
@@ -176,6 +184,10 @@ async function bootWeb(
   const rootConfig = join(profileDir, 'cordis.yml')
   await writeFile(rootConfig, '[]\n')
   return await boot('dsh-test', rootConfig, [...bundlePatches, ...overrides], (bootCtx) => {
+    bootCtx.provide('connection', {
+      fetch: { register: () => () => {} },
+      rpc: { intercept: () => () => {} },
+    } as never)
     provideCmdline(bootCtx, { args: [], exit: () => {} })
   })
 }
@@ -216,9 +228,7 @@ describe('the shipped Web composition', () => {
   it('leaves the global tool layer empty', () => {
     // Every model-facing tool belongs to a preset, `ask_user_question`
     // included: a tool in the global layer reaches EVERY agent regardless of
-    // which preset composed it, so a two-tool benchmark surface would really
-    // present three. A regression here means an agent-plane row came back to
-    // the host composition.
+    // which preset composed it, expanding that preset's tool list.
     expect(toolNames(ctx)).toEqual([])
   })
 
@@ -272,7 +282,7 @@ describe('the shipped Web composition', () => {
       // depend on ripgrep being present on the machine.
       expect(toolNames(ctx, handle.agent).filter(name => name !== 'glob' && name !== 'grep')).toEqual([
         'ask_user_question', SHELL_TOOL, 'create_goal', 'edit', 'exit_plan_mode',
-        'get_goal', 'interrupt_agent', 'job_kill', 'job_list', 'job_output', 'list_agents', 'ralph', 'read', 'read_image', 'send_message', 'skill',
+        'get_goal', 'interrupt_agent', 'job_kill', 'job_list', 'job_output', 'list_agents', 'present', 'ralph', 'read', 'read_image', 'send_message', 'skill',
         'subagent', 'subagent_fork', 'todo_write', 'update_goal', 'web_fetch', 'web_search',
         'workflow', 'write',
       ].sort())
@@ -316,7 +326,7 @@ describe('the shipped Web composition', () => {
     }
   })
 
-  it('composes the exact RL prompt and two tools from `minimal`', async () => {
+  it('composes the exact RL prompt and persistent shell from `minimal`', async () => {
     const handle = await ctx.agents.create({
       // Unique per run: executing a tool durably writes the session log, and a
       // fixed id would collide with a log an earlier run left there.
@@ -326,7 +336,7 @@ describe('the shipped Web composition', () => {
     try {
       const assembly = await ctx.systemPrompt.assemble({ scope: handle.agent })
       expect(assembly.sections).toEqual([
-        { name: 'deployment:persona', text: MINIMAL_PROMPT },
+        { name: 'deployment:persona-prefix', text: MINIMAL_PROMPT },
       ])
       expect(assembly.tools.map(tool => tool.name).sort()).toEqual(MINIMAL_TOOLS)
       // win32 carries custom-bash's description;
@@ -335,6 +345,10 @@ describe('the shipped Web composition', () => {
       expect(JSON.stringify(assembly.tools.find(tool => tool.name === 'str_replace_editor')?.parameters))
         .toContain('Absolute path')
       expect(ctx.commands.find(handle.agent, 'goal')).toBeUndefined()
+      // serviceFor reports preset-owned providers; unisolated consumers inherit the host fs.
+      expect(ctx.agentPresets.serviceFor(handle.agent, 'fs')).toBeUndefined()
+      expect(ctx.get('fs')?.sandboxMode).toBeDefined()
+      expect(handle.agent.ctx.get('fs')?.sandboxMode).toBe(ctx.get('fs')?.sandboxMode)
       expect(ctx.agentPresets.serviceFor(handle.agent, 'compaction')).toBeUndefined()
       expect(handle.agent.ctx.get('compaction')).toBeUndefined()
 
@@ -398,11 +412,11 @@ describe('the shipped Web composition', () => {
       session.append('assistant/message', {
         turn: 1,
         step: 1,
-        message: createMessage({
-          role: 'assistant',
+        message: createAssistantMessage({
           content: [{ type: 'text', text: 'anchored reply' }],
-          source: { kind: 'model', provider: 'spec', model: 'spec' },
+          source: { provider: 'spec', model: 'spec' },
         }),
+        stream: [],
       }, { surfaceOp: 'append' })
       session.append('step/end', { turn: 1, step: 1 })
       session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
@@ -433,11 +447,11 @@ describe('the shipped Web composition', () => {
       session.append('assistant/message', {
         turn: 2,
         step: 1,
-        message: createMessage({
-          role: 'assistant',
+        message: createAssistantMessage({
           content: [{ type: 'tool-call', id: unlockCall, name: 'dev_tool_search', arguments: unlockArgs }],
-          source: { kind: 'model', provider: 'spec', model: 'spec' },
+          source: { provider: 'spec', model: 'spec' },
         }),
+        stream: [],
       }, { surfaceOp: 'append' })
       session.append('tool/call', { turn: 2, step: 1, callId: unlockCall, name: 'dev_tool_search', arguments: unlockArgs })
       session.append('tool/result', {
@@ -1116,7 +1130,7 @@ describe('the default preset as a user setting', () => {
         setup: agentCtx => ctx.agentPresets.mount(agentCtx).then(() => undefined),
       })
       try {
-        // `mount()` with no id resolves the effective default. Two tools, not
+        // `mount()` with no id resolves the effective default. One tool, not
         // `standard`'s catalog: the setting decided the composition.
         expect(toolNames(ctx, handle.agent)).toEqual(MINIMAL_TOOLS)
       } finally {
@@ -1143,7 +1157,7 @@ describe('a session keeps the preset it was created with', () => {
     try {
       // The api-proxy guard reads exactly this: the header records what the
       // session runs, so naming anything else is a caller error rather than a
-      // switch. Its history was produced under `minimal`'s two tools.
+      // switch. Its history was produced under `minimal`'s single tool.
       expect(handle.agent.session.header.agentPreset).toBe('minimal')
     } finally {
       await handle.dispose()
@@ -1205,7 +1219,7 @@ describe('a composition that configures its own preset roots', () => {
       setup: agentCtx => rootsCtx.agentPresets.mount(agentCtx, 'team-spec').then(() => undefined),
     })
     try {
-      expect(toolNames(rootsCtx, handle.agent)).toEqual(['bash', 'str_replace_editor'])
+      expect(toolNames(rootsCtx, handle.agent)).toEqual(['bash'])
     } finally {
       await handle.dispose()
     }

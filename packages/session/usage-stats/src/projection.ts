@@ -2,12 +2,11 @@
  * The `usageStats` projection unit: a pure fold of request routes, step
  * boundaries, and logged usage reports into one record per model request.
  *
- * A record exists for every step that reported usage or assembled a message.
- * `assistant/chunk` usage reports create or update the step's record early —
- * so a request that failed after streaming usage stays billed — and the
- * `assistant/message` settles the same record with the final usage and the
- * model wall time (`step/start` → message, the same boundary session-stats
- * sums as `llmMs`). The single-record-per-step upsert relies on the log
+ * A record exists for every step that assembled a message. The message carries
+ * the step's final usage (`usage` travels on `assistant/message`; there is no
+ * separate usage record), and the model wall time (`step/start` → message, the
+ * same boundary session-stats sums as `llmMs`). A message without usage keeps
+ * a null sample. The single-record-per-step upsert relies on the log
  * invariant token-meter also relies on: usage reports for one turn/step are
  * adjacent, so checking the last record decides match-vs-append. Provider and
  * model ride the latest `request/context` (logged only on route or capacity
@@ -154,10 +153,6 @@ export const usageStatsProjectionDefinition = {
         return provider === state.provider && model === state.model && contextWindow === state.contextWindow
           ? state
           : { ...state, provider, model, contextWindow }
-      }
-      case 'assistant/chunk': {
-        if (event.data.chunk.type !== 'usage') return state
-        return upsertRecord(state, event.time, event.data.turn, event.data.step, event.data.chunk.usage, null)
       }
       case 'assistant/message': {
         const open = state.openStep

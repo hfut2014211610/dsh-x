@@ -89,7 +89,7 @@ describe('makeStageUniversal', () => {
   it('refuses a stage whose koffi install is missing', () => {
     const stage = stageWith({ sharp: '0.35.3' })
     stages.push(stage)
-    expect(() => makeStageUniversal(stage, fakeOps({ packed: [], extracted: [], removed: [] })))
+    expect(() => { makeStageUniversal(stage, fakeOps({ packed: [], extracted: [], removed: [] })) })
       .toThrow(/koffi is not installed in the stage/)
   })
 })

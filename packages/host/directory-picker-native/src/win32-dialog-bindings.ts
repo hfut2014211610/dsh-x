@@ -28,26 +28,19 @@ interface Koffi {
 }
 
 /**
- * Read a NUL-terminated UTF-16 string at a native address. koffi's
- * `_Out_ void **` out-params surface a raw address, and
- * `koffi.decode(addr, 'str16')` would dereference it as a pointer — crash
- * on real Windows. Decoding one `uint16` at a time reads the memory at the
- * address itself: `koffi.view` would do it in one shot, but it hands V8 an
- * externally-backed ArrayBuffer, which the V8 memory sandbox — on in the
- * Electron runtime the packaged desktop app runs — rejects with a fatal
- * napi error; plain node accepts it, so the dialog only crashed packaged.
- * The `uint16` zero check terminates only on two zero bytes: a single zero
- * low byte is a valid BMP code unit (U+XX00, e.g. 开 = U+5F00) and must not
- * terminate the scan.
+ * Read a valid NUL-terminated UTF-16 allocation without an external buffer.
+ * Generic `koffi.decode(..., 'str16')` expects a pointer variable, so the
+ * buffer holds the string address rather than the string bytes.
+ * @param koffi - the loaded koffi binding.
+ * @param address - the string address surfaced by the `_Out_ void **` param.
+ * @param pointerSize - the process's pointer width (`koffi.sizeof('void *')`).
+ * @returns the decoded UTF-16 path.
  */
-function readUtf16(koffi: Koffi, address: unknown): string {
-  let out = ''
-  for (let offset = 0; offset < 32768; offset += 2) {
-    const code = koffi.decode(address, offset, 'uint16') as number
-    if (code === 0) break
-    out += String.fromCharCode(code)
-  }
-  return out
+function readUtf16(koffi: Koffi, address: unknown, pointerSize: number): string {
+  const pointer = Buffer.alloc(8)
+  // koffi 3 surfaces `_Out_ void **` values as BigInt native addresses.
+  pointer.writeBigUInt64LE(BigInt(address as bigint | number))
+  return koffi.decode(pointer.subarray(0, pointerSize), 'str16') as string
 }
 
 const COINIT_APARTMENTTHREADED = 0x2
@@ -62,6 +55,10 @@ const SIGDN_FILESYSPATH = 0x80058000 | 0
  */
 const DPI_AWARENESS_CONTEXTS = [-4, -3, -2]
 const WM_CLOSE = 0x10
+/** `VK_MENU`: the synthesized Alt press's virtual key. */
+const VK_MENU = 0x12
+/** `KEYEVENTF_KEYUP`: the synthesized Alt press's release flag. */
+const KEYEVENTF_KEYUP = 0x2
 
 /** IFileOpenDialog vtable slots (IUnknown 0-2, IModalWindow 3, IFileDialog 4+). */
 const SLOT_RELEASE = 2
@@ -108,6 +105,7 @@ export async function loadWin32DialogBindings(): Promise<Win32DialogBindings> {
   const coCreateInstance = ole32.func('__stdcall', 'CoCreateInstance', 'int32', ['void *', 'void *', 'uint32', 'void *', 'void *'])
   const coTaskMemFree = ole32.func('__stdcall', 'CoTaskMemFree', 'void', ['void *'])
   const getCurrentThreadId = kernel32.func('__stdcall', 'GetCurrentThreadId', 'uint32', [])
+  const keybdEvent = user32.func('__stdcall', 'keybd_event', 'void', ['uint8', 'uint8', 'uint32', 'uintptr'])
 
   const protoShow = koffi.proto('int32 __stdcall DshDialogShow(void *self, void *owner)')
   const protoSetOptions = koffi.proto('int32 __stdcall DshDialogSetOptions(void *self, uint32 options)')
@@ -147,6 +145,10 @@ export async function loadWin32DialogBindings(): Promise<Win32DialogBindings> {
       coUninitialize()
     },
     currentThreadId: () => getCurrentThreadId() as number,
+    pressAltForForeground: () => {
+      keybdEvent(VK_MENU, 0, 0, 0)
+      keybdEvent(VK_MENU, 0, KEYEVENTF_KEYUP, 0)
+    },
     createFolderDialog: (): Win32FolderDialog => {
       const out = Buffer.alloc(pointerSize)
       const created = coCreateInstance(CLSID_FILE_OPEN_DIALOG, null, CLSCTX_INPROC_SERVER, IID_IFILE_OPEN_DIALOG, out) as number
@@ -165,7 +167,7 @@ export async function loadWin32DialogBindings(): Promise<Win32DialogBindings> {
             const nameOut: unknown[] = [null]
             const gotName = method(item, SLOT_GET_DISPLAY_NAME, protoGetDisplayName)(SIGDN_FILESYSPATH, nameOut)
             if (gotName < 0) return { hr: gotName }
-            const path = readUtf16(koffi, nameOut[0])
+            const path = readUtf16(koffi, nameOut[0], pointerSize)
             coTaskMemFree(nameOut[0])
             return { hr: gotName, path }
           } finally {

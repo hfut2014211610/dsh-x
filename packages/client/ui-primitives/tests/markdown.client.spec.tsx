@@ -1,20 +1,11 @@
 // @vitest-environment jsdom
 import { cleanup, fireEvent, render, screen } from '@testing-library/react'
 import { afterEach, describe, expect, it } from 'vitest'
-import { MessageText } from '@deepseek-ai/dsh-client-ui-primitives'
 import { JsonBlock, MarkdownText } from './markdown-test-components.tsx'
 import { cjkFriendlyStrong } from '../src/markdown/cjkFriendlyStrong.ts'
 import { mathCompatibility } from '../src/markdown/mathCompatibility.ts'
 
 afterEach(cleanup)
-
-describe('MessageText', () => {
-  it('renders the text verbatim', () => {
-    const { container } = render(<MessageText text={'# line1\n`line2`'} />)
-    expect(container.textContent).toBe('# line1\n`line2`')
-    expect(container.querySelector('h1')).toBeNull()
-  })
-})
 
 describe('MarkdownText', () => {
   // A caller that owns the source and shows it in a reading view needs to get

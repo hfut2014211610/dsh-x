@@ -20,7 +20,7 @@ vi.mock('node:child_process', async (importOriginal) => {
     child.kill = () => {}
     return child
   }
-  return { ...actual, spawn: fake } as unknown as typeof actual
+  return { ...actual, spawn: fake }
 })
 
 describe('spawnSubprocess window suppression', () => {

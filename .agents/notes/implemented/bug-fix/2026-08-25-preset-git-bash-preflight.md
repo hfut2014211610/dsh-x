@@ -14,7 +14,7 @@ Both self-contained preset copies resolve and verify Bash during their asynchron
 
 The candidate order follows the community `dsh-anchored-standard` resolver. That source resolves lazily on the first tool call; this harness adaptation performs the same discovery during plugin load because the composition cannot provide its advertised bootstrap tool without a valid Bash executable.
 
-The resolved executable path is retained for every tool call in that preset mount. Disposal aborts an in-flight lookup through the subprocess resolver's signal. If every candidate fails, plugin load rejects with an aggregate diagnostic that names the installation and `bashPath` remedies; no unusable tool is published. This remains a mount-time dependency check rather than preset roster health, consistent with the [broken-preset decision](2026-08-09-broken-preset-roster-rows.md): discovery validates the composition file, while mounting resolves runtime dependencies and rolls the composition back on failure.
+The resolved executable path is retained for every tool call in that preset mount. Disposal aborts an in-flight lookup through the subprocess resolver's signal. If every candidate fails, plugin load rejects with an aggregate diagnostic that names the installation and `bashPath` remedies; no unusable tool is published. This remains a mount-time dependency check rather than preset roster health, consistent with the [broken-preset decision](../../archived/bug-fix/2026-08-09-broken-preset-roster-rows.md): discovery validates the composition file, while mounting resolves runtime dependencies and rolls the composition back on failure.
 
 ## Verification
 

@@ -19,12 +19,12 @@ import {
   collectReferenceTargets, createReferenceTargets, renderBlocks, renderFootnoteSection,
   wrapBlockChildren,
 } from './render.tsx'
-import type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels, MarkdownRenderContext, ReferenceTargets } from './render.tsx'
+import type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels, MarkdownPathImages, MarkdownRenderContext, ReferenceTargets } from './render.tsx'
 import { renderBlocksWithSource } from './source-positions.tsx'
 import 'katex/dist/katex.min.css'
 import css from './MarkdownText.module.css'
 
-export type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels } from './render.tsx'
+export type { MarkdownCodeLabels, MarkdownFileMentions, MarkdownLabels, MarkdownPathImages } from './render.tsx'
 
 /** One settled full render: parse with math, resolve references, append the footnote section. */
 function renderSettled(
@@ -32,6 +32,7 @@ function renderSettled(
   labels: MarkdownLabels,
   fileMentions: MarkdownFileMentions | undefined,
   sourcePositions: boolean,
+  pathImages: MarkdownPathImages | undefined,
 ): ReactNode[] {
   const root = parseGfmWithMath(text)
   const targets = createReferenceTargets()
@@ -40,6 +41,7 @@ function renderSettled(
     streaming: false,
     labels,
     fileMentions,
+    pathImages,
     targets,
     footnoteOrder: [],
     footnoteCounts: new Map(),
@@ -110,6 +112,7 @@ class StreamingRenderer {
         streaming: true,
         labels: this.labels,
         fileMentions: undefined,
+        pathImages: undefined,
         targets: frameTargets,
         footnoteOrder: this.frozenFootnoteOrder,
         footnoteCounts: this.frozenFootnoteCounts,
@@ -128,6 +131,7 @@ class StreamingRenderer {
       streaming: true,
       labels: this.labels,
       fileMentions: undefined,
+      pathImages: undefined,
       targets: frameTargets,
       footnoteOrder: [...this.frozenFootnoteOrder],
       footnoteCounts: new Map(this.frozenFootnoteCounts),
@@ -154,8 +158,10 @@ class StreamingRenderer {
  * `labels` forwards localized fence and footnote chrome — pass a
  * reference-stable object (memoized per locale revision), because a new
  * identity discards the streaming render cache mid-message. `fileMentions`
- * links inline-code tokens its resolver recognizes as real files; this is
- * the single streaming gate — it applies to settled renders only, because a
+ * links inline-code tokens its resolver recognizes as real files, and
+ * `pathImages` rewrites image destinations that are local file paths into
+ * displayable URLs its resolver vouches for; both vocabularies are the
+ * single streaming gate — they apply to settled renders only, because a
  * streaming message's vocabulary is not final and frozen cached elements
  * must not bake in handlers that could go stale.
  * @returns A GFM document with TeX math rendered through KaTeX; raw HTML,
@@ -163,7 +169,7 @@ class StreamingRenderer {
  * images render directly.
  */
 export const MarkdownText = memo(function MarkdownText({
-  text, streaming = false, labels, codeLabels, fileMentions, sourcePositions = false,
+  text, streaming = false, labels, codeLabels, fileMentions, sourcePositions = false, pathImages,
 }: {
   text: string
   streaming?: boolean
@@ -173,12 +179,10 @@ export const MarkdownText = memo(function MarkdownText({
   /**
    * Mark each top-level block with the source offsets it came from, for a
    * caller that owns the text and needs to read back from the rendering.
-   *
-   * Settled renders only. A streaming message's blocks freeze into cached
-   * elements whose offsets are into a document still being written, and
-   * nothing edits an assistant reply mid-stream anyway.
+   * Settled renders only.
    */
   sourcePositions?: boolean
+  pathImages?: MarkdownPathImages | undefined
 }) {
   const resolvedLabels = (labels ?? codeLabels) as MarkdownLabels
   const streamRef = useRef<StreamingRenderer | null>(null)
@@ -186,13 +190,13 @@ export const MarkdownText = memo(function MarkdownText({
   const children = useMemo(() => {
     if (!streaming) {
       streamRef.current = null
-      return renderSettled(text, resolvedLabels, fileMentions, sourcePositions)
+      return renderSettled(text, resolvedLabels, fileMentions, sourcePositions, pathImages)
     }
     if (streamRef.current === null || streamLabelsRef.current !== resolvedLabels) {
       streamRef.current = new StreamingRenderer(resolvedLabels)
       streamLabelsRef.current = resolvedLabels
     }
     return streamRef.current.render(text)
-  }, [text, streaming, resolvedLabels, codeLabels, labels, fileMentions, sourcePositions])
+  }, [text, streaming, resolvedLabels, codeLabels, labels, fileMentions, sourcePositions, pathImages])
   return <div className={css.markdown}>{children}</div>
 })

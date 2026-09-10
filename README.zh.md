@@ -74,6 +74,18 @@ pnpm dsh web
 
 未列于上述特点之外的一切随上游演进：从 `upstream` 远程合并即可吸收上游变更。
 
+## 引用
+
+```bibtex
+@misc{deepseek-harness2026,
+  title={DeepSeek Harness: Everything is a Plugin},
+  author={DeepSeek-AI},
+  year={2026},
+  publisher={GitHub},
+  howpublished={\url{https://github.com/deepseek-ai/deepseek-harness}},
+}
+```
+
 ## 许可证
 
 [MIT](LICENSE)

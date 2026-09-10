@@ -1,3 +1,8 @@
+---
+description: "用量设置页：基于 usageStats 投影值在客户端聚合的全局 token 消耗视图，按设计无视会话身份。"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings-usage
 
 [English](README.md) | 中文
@@ -6,6 +11,19 @@
 
 页面只读：打开时加载、连接重置后重取、按需刷新，没有写入面。值即投影 seam 提供的原样——挂载中的会话实时，冷会话与其最后一次持久化投影检查点一样新旧（`asOfSeq` 说明陈旧程度）——简介行说明了这一点。
 
+## 概述
+
+本包渲染"用量"设置页：基于全部会话列表行的 `usageStats` 投影值在客户端聚合的全局模型 token 消耗视图，按设计无视会话身份。统计区间选择器约束所有数字；汇总条、按天点阵图和分模型明细表离线重聚合，不产生网络请求。页面只读，从不流式跟随实时帧。适合需要展示 token 花销、又不想新增 host 端点的部署。
+
+## 目录
+
+- [Model Experience](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 无。本节渲染基于 wire 投影值的浏览器只读面板；不触碰任何模型请求。
@@ -14,6 +32,7 @@
 
 无；插件从不组装或发送供应商请求。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
 - **单页列表，未做完整分页** —— store 只读取一页 `session.list`；首页装不下全部会话的部署会少报总计，直到补上分页支持。
@@ -21,3 +40,13 @@
 - **冷会话新鲜度受检查点约束** —— 分离会话展示其最后持久化的投影检查点；面板只在简介行统一说明，不逐行标注。
 - **点阵图以天为粒度且上限 28 格** —— 天内强度坍缩为每天一个点，90 天与全部区间仍画 28 格（其总计和模型行覆盖完整区间），悬浮日期为相对表述，界面不渲染任何墙钟日期。
 - **辅助 LLM 调用未计账且未标注** —— 标题生成与搜索 LLM 的消耗游离于 `usageStats` 之外（其事件不记录 usage），面板甚至无法标出该缺口。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+缺失的桶渲染为 `—` 而非 0：缺席的计数是上报缺口，不是实测为零。面板按设计只读，按打开/重置/需求重取，不做流式跟随。
+
+</details>

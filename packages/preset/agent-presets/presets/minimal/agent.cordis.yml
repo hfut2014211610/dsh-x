@@ -1,4 +1,4 @@
-# The `minimal` agent preset: a fixed-prompt, two-tool coding-agent composition.
+# The `minimal` agent preset: a fixed-prompt, single-tool coding-agent composition.
 #
 # The persona is the complete system prompt, so global identity, Web orientation,
 # tool guidance, and later assembly listeners cannot add prompt text. Runtime
@@ -9,7 +9,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: You are a helpful software engineer assistant.
+    prefix: You are a helpful software engineer assistant.
     complete: true
     includeRuntimeContext: false
 
@@ -70,7 +70,6 @@
           * Use native Windows paths (C:\...) and $env:NAME variables; this is PowerShell, not bash.
           * Please avoid commands that may produce a very large amount of output.
           * Please run long lived commands in the background, e.g. 'Start-Job' or start a server with Start-Process.
-
 # Windows-only `bash` (see custom-bash.mjs): the same tool name and a
 # Minimal-compatible description, executed through the ordinary cross-platform
 # subprocess seam. Mounting first validates an explicit `bashPath`, or finds

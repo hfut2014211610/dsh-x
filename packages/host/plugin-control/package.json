@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-host-plugin-control",
   "description": "Remote surface that enables and disables configured Cordis Loader plugin entries",
-  "version": "0.1.2-alpha.5",
+  "version": "0.1.5-rc.1",
   "publishConfig": {
     "access": "public"
   },

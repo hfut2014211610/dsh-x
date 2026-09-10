@@ -12,8 +12,15 @@ vi.mock('node:child_process', async (importOriginal) => {
     argsOrOptions: readonly string[] | Record<string, unknown> | undefined,
     maybeOptions: Record<string, unknown> | undefined,
   ) => {
-    const options = Array.isArray(argsOrOptions) ? maybeOptions : argsOrOptions
-    spawnCalls.push({ command, options: { ...(options ?? {}) } })
+    if (Array.isArray(argsOrOptions)) {
+      spawnCalls.push({ command, options: { ...(maybeOptions ?? {}) } })
+    } else {
+      // Array.isArray does not narrow readonly arrays out of the union, but
+      // the call sites only pass an options record here; the assertion states
+      // the branch's actual input for the spread below.
+      const record = argsOrOptions as Record<string, unknown> | undefined
+      spawnCalls.push({ command, options: { ...(record ?? {}) } })
+    }
     const child = new EventEmitter() as EventEmitter & {
       pid: number
       stdout: PassThrough
@@ -26,7 +33,7 @@ vi.mock('node:child_process', async (importOriginal) => {
     child.kill = () => {}
     return child
   }
-  return { ...actual, spawn: fake } as unknown as typeof actual
+  return { ...actual, spawn: fake }
 })
 
 /** Deps recording every kill delivery. */

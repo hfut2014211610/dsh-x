@@ -1,15 +1,40 @@
+---
+description: "Per-model sampling defaults over stock llm-pi-ai: temperature, maxTokens, stop, and reasoningEffort matched by provider/model."
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-model-tuning
 
 English | [中文](README.zh.md)
 
 Per-model sampling defaults: the configuration surface the stock `llm-pi-ai` deliberately does not carry (per-model `temperature` / `maxTokens` / `stop` / `reasoningEffort`).
 
+## Summary
+
+This package adds per-model sampling defaults the stock adapter omits: the `dsh-x-model-tuning` namespace maps `provider/model` keys to `temperature`, `maxTokens`, `stop`, and `reasoningEffort`, matched on the `agent/request` waterfall so values reach the logged request header. A `/model-tuning` slash command writes through the settings seam with validation and hot reload. Omitted fields pass through untouched. Use it when models need fixed sampling that UI choices must not override.
+
+## Table of Contents
+
+- [How it works](#how-it-works)
+- [Loading](#loading)
+- [Configuration](#configuration)
+- [Commands](#commands)
+- [Tests](#tests)
+- [Boundaries](#boundaries)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="how-it-works"></a>
 ## How it works
 
 - Registers the `dsh-x-model-tuning` settings namespace. The cordis patch's `config:` block is the composition base and the `dsh-x-model-tuning:` section of `$DSH_HOME/settings.yaml` is the user layer; they merge by key and a change takes effect on the next request.
 - Matches an entry by `provider/model` on the `agent/request` waterfall — the sanctioned place to rewrite a request's configuration, the same mechanism `packages/core/agent/src/model-selection.ts` uses — and replaces the effective configuration. The values reach the logged request header, which is what keeps the model-visible ⟺ logged invariant intact.
 - The `/model-tuning` slash command writes through the settings seam, so it gets validation, persistence, and hot reload for free.
 
+<a id="loading"></a>
 ## Loading
 
 The Web bundle mounts this package by default; an empty `profiles` map is dormant and costs nothing. To mount it over another composition:
@@ -22,6 +47,7 @@ pnpm dsh web --patch ./packages/llm/model-tuning/cordis.patch.yml
 # ~/.dsh/profiles/<name>/cordis.patch.yml
 ```
 
+<a id="configuration"></a>
 ## Configuration
 
 ```yaml
@@ -36,6 +62,7 @@ dsh-x-model-tuning:
 
 A field an entry declares overrides every request to that model; a field it omits passes through untouched, so a reasoning effort chosen in the UI survives unless the entry declares its own. A malformed key — no `/`, or an empty side — is refused at write time and named. An effort the model does not offer fails the request loud with `UNSUPPORTED_REASONING_EFFORT` from the adapter.
 
+<a id="commands"></a>
 ## Commands
 
 ```
@@ -44,17 +71,20 @@ A field an entry declares overrides every request to that model; a field it omit
 /model-tuning unset <provider/model> [field]           drop one field, or the whole entry
 ```
 
+<a id="tests"></a>
 ## Tests
 
 ```sh
 pnpm exec vitest run packages/llm/model-tuning
 ```
 
+<a id="boundaries"></a>
 ## Boundaries
 
 - Only the four `LlmCallConfig` fields. Protocol, endpoint, context window, and thinking-level vocabulary belong to the stock `llm-pi-ai` section.
 - Vendor-specific body parameters (`top_p`, `enable_search`, and the like) are not in the sanctioned request vocabulary, so this package cannot inject them. Needing one means writing an `LlmAdapter`, which is a much larger undertaking.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as it only fills sampling fields on an outgoing request; it registers no tool, prompt section, or result projection.
@@ -68,3 +98,12 @@ None; sampling parameters travel beside the prompt rather than in it, so the cac
 - **Matching is by model id, not by capability** — a new model gets defaults only once someone names it, and a renamed model silently falls back to the provider's own defaults.
 - **Only fields the waterfall declares are managed** — anything else on the request passes through untouched, which is deliberate but means a provider-specific knob has no home here.
 - **No per-session override** — the tuning is per model for the whole harness; a single conversation that wants different sampling has to change the setting.
+
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+Match on the `agent/request` waterfall, the same mechanism `packages/core/agent/src/model-selection.ts` uses: values must reach the logged request header to keep the model-visible ⟺ logged invariant intact. Only the four `LlmCallConfig` fields; vendor-specific body parameters need a real `LlmAdapter`.
+
+</details>

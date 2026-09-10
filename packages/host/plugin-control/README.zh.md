@@ -1,3 +1,8 @@
+---
+description: "插件变更面：通过一个生成的 Remote 启用或停用已配置的 Loader 条目，重启后依然生效。"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-host-plugin-control
 
 [English](README.md) | 中文
@@ -10,6 +15,19 @@
 
 该服务仅供 Remote 使用，不声明同进程 Cordis `Context` merge。Client 包通过显式的 [`api-remotes`](../../api/remotes/README.zh.md) 组合消费它，而不导入 Host 实现。
 
+## 概述
+
+本包是插件面的写入一半：一个生成的 Remote `pluginControl/setEnabled`，通过一次 `ctx.loader.update` 启用或停用已配置的 Loader 条目——这次调用既翻转运行中的 fiber，又把 profile 写回去，所以改动在重启后依然生效。树上已不存在的条目返回 `found: false` 而不抛错。服务仅供 Remote 使用，无同进程 merge。适合客户端在不动整棵树的情况下启停已组合条目。
+
+## 目录
+
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## 模型体验
 
 无，因为这个仅限 Host 的控制面不注册提示词、工具、消息或提供方请求。
@@ -18,7 +36,18 @@
 
 无；本包从不组装模型输入。
 
+<a id="known-limitations-and-deferred-work"></a>
 ## 已知限制与暂缓事项
 
 - **只作用于已配置条目** —— 服务只启用或停用 profile 中已经声明的东西，既不能为 profile 从未提及的插件新增条目，也不能移除条目。
 - **不做解析检查** —— 启用一个模块无法导入的条目会报告成功，因为 Loader 接受了这次配置变更，导入失败随后体现为该条目自己的 Fiber 阶段。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+一次 `ctx.loader.update` 就是全部操作：Loader 同时持有运行中的树和读自的 profile，除此之外不要再存任何东西，否则就是第二个需要同步的真相。
+
+</details>

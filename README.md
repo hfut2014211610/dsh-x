@@ -53,6 +53,18 @@ Start with the [development guide](docs/development.md) and [architecture docume
 
 Everything not listed above tracks upstream: merge from the `upstream` remote to absorb its changes.
 
+## Citation
+
+```bibtex
+@misc{deepseek-harness2026,
+  title={DeepSeek Harness: Everything is a Plugin},
+  author={DeepSeek-AI},
+  year={2026},
+  publisher={GitHub},
+  howpublished={\url{https://github.com/deepseek-ai/deepseek-harness}},
+}
+```
+
 ## License
 
 [MIT](LICENSE)

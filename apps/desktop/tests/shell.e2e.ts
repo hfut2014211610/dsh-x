@@ -14,6 +14,7 @@
 // install would; the spawned runtime gets an isolated DSH_HOME so a
 // developer's personal profile plugins cannot break the boot.
 import { existsSync, mkdirSync, mkdtempSync, rmSync, writeFileSync, chmodSync } from 'node:fs'
+import { randomUUID } from 'node:crypto'
 import * as nodeZlib from 'node:zlib'
 import { tmpdir } from 'node:os'
 import { join } from 'node:path'
@@ -62,7 +63,7 @@ afterAll(() => {
 describe.skipIf(!hasShell || !hasBuiltRuntime)('desktop shell smoke', () => {
   test('the shell attaches to a serving runtime or spawns and reaps its own', ({ skip }) => {
     return (async () => {
-      const attached = await describeOrigin(probeOrigin, fetch, () => crypto.randomUUID(), 2_000)
+      const attached = await describeOrigin(probeOrigin, fetch, () => randomUUID(), 2_000)
       if (attached === undefined && !nodeBootsRuntime) {
         skip('no serving instance to attach to and this node predates the runtime\'s node:zlib requirement (need >= 22.19)')
       }

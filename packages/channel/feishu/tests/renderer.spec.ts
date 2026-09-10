@@ -10,11 +10,13 @@ function ev(type: string, data: unknown): SessionEvent {
   return { type, seq, time: seq, data } as unknown as SessionEvent
 }
 
-const textDelta = (text: string, turn = 1, step = 1): SessionEvent =>
-  ev('assistant/chunk', { turn, step, chunk: { type: 'text-delta', index: 0, text } })
-
-const reasoningDelta = (text: string): SessionEvent =>
-  ev('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'reasoning-delta', index: 0, text } })
+const assistantMessage = (text: string, turn = 1, step = 1): SessionEvent =>
+  ev('assistant/message', {
+    turn,
+    step,
+    message: { content: [{ type: 'text', text }] },
+    stream: [],
+  })
 
 const toolCall = (callId: string, name: string, args = '{}'): SessionEvent =>
   ev('tool/call', { turn: 1, step: 1, callId, name, arguments: args })
@@ -25,17 +27,17 @@ const toolResult = (callId: string, error?: { name: string; code: string }): Ses
 const turnEnd = (reason: unknown): SessionEvent => ev('turn/end', { turn: 1, reason })
 
 describe('TurnRenderer', () => {
-  it('文本流拼成正文', () => {
+  it('多步消息拼成正文', () => {
     const renderer = new TurnRenderer()
-    renderer.apply(textDelta('你好'))
-    renderer.apply(textDelta('，世界'))
+    renderer.apply(assistantMessage('你好', 1, 1))
+    renderer.apply(assistantMessage('，世界', 1, 2))
     expect(renderer.text).toBe('你好，世界')
   })
 
   it('输出只增不改——卡片打字机要求新文本是旧文本的延长', () => {
     const renderer = new TurnRenderer()
     const snapshots: string[] = []
-    for (const event of [textDelta('一'), toolCall('c1', 'bash'), toolResult('c1'), textDelta('二')]) {
+    for (const event of [assistantMessage('一', 1, 1), toolCall('c1', 'bash'), toolResult('c1'), assistantMessage('二', 1, 2)]) {
       renderer.apply(event)
       snapshots.push(renderer.text)
     }
@@ -46,7 +48,7 @@ describe('TurnRenderer', () => {
 
   it('apply 返回的是本次新增那段', () => {
     const renderer = new TurnRenderer()
-    expect(renderer.apply(textDelta('abc'))).toBe('abc')
+    expect(renderer.apply(assistantMessage('abc'))).toBe('abc')
     expect(renderer.apply(ev('request/header', {}))).toBe('')
   })
 
@@ -65,20 +67,21 @@ describe('TurnRenderer', () => {
 
   it('compact 密度只出正文，工具行全不要', () => {
     const renderer = new TurnRenderer({ density: 'compact', argPreview: 80 })
-    renderer.apply(textDelta('结果是 42'))
+    renderer.apply(assistantMessage('结果是 42'))
     renderer.apply(toolCall('c1', 'bash'))
     renderer.apply(toolResult('c1'))
     expect(renderer.text).toBe('结果是 42')
   })
 
-  it('推理内容只在 detailed 下出现', () => {
-    const standard = new TurnRenderer()
-    standard.apply(reasoningDelta('先看看'))
-    expect(standard.text).toBe('')
-
-    const detailed = new TurnRenderer({ density: 'detailed', argPreview: 80 })
-    detailed.apply(reasoningDelta('先看看'))
-    expect(detailed.text).toBe('先看看')
+  it('推理块不进正文，只出文本块', () => {
+    const renderer = new TurnRenderer({ density: 'detailed', argPreview: 80 })
+    renderer.apply(ev('assistant/message', {
+      turn: 1,
+      step: 1,
+      message: { content: [{ type: 'reasoning', text: '先看看' }, { type: 'text', text: '结论' }] },
+      stream: [],
+    }))
+    expect(renderer.text).toBe('结论')
   })
 
   it('工具成功缀对勾，失败缀错误码', () => {
@@ -98,35 +101,17 @@ describe('TurnRenderer', () => {
     expect(renderer.apply(toolResult('never-seen'))).toBe('')
   })
 
-  it('这一步没来过流块时，用整条消息补底', () => {
+  it('整条消息直接渲染', () => {
     const renderer = new TurnRenderer()
     renderer.apply(ev('assistant/message', {
-      turn: 1, step: 1, message: { content: [{ type: 'text', text: '非流式的回答' }] },
+      turn: 1, step: 1, message: { content: [{ type: 'text', text: '非流式的回答' }] }, stream: [],
     }))
     expect(renderer.text).toBe('非流式的回答')
   })
 
-  it('已经流过的那一步不再用整条消息补，避免重复一遍', () => {
-    const renderer = new TurnRenderer()
-    renderer.apply(textDelta('流出来的'))
-    renderer.apply(ev('assistant/message', {
-      turn: 1, step: 1, message: { content: [{ type: 'text', text: '流出来的' }] },
-    }))
-    expect(renderer.text).toBe('流出来的')
-  })
-
-  it('补底是按步算的，另一步没流过照样补', () => {
-    const renderer = new TurnRenderer()
-    renderer.apply(textDelta('第一步', 1, 1))
-    renderer.apply(ev('assistant/message', {
-      turn: 1, step: 2, message: { content: [{ type: 'text', text: '第二步' }] },
-    }))
-    expect(renderer.text).toBe('第一步第二步')
-  })
-
   it('正常结束不往正文里加东西', () => {
     const renderer = new TurnRenderer()
-    renderer.apply(textDelta('好了'))
+    renderer.apply(assistantMessage('好了'))
     renderer.apply(turnEnd({ kind: 'completed' }))
     expect(renderer.text).toBe('好了')
     expect(renderer.finished).toEqual({ kind: 'completed' })

@@ -189,6 +189,7 @@ export function AgentPresetPicker({
         }}
         align="start"
         portal
+        className={css.menuAnchor}
         anchor={(
           <button
             type="button"
@@ -200,7 +201,7 @@ export function AgentPresetPicker({
             onClick={() => { setOpen(value => !value) }}
           >
             <IconAgentPresetOutline16 className={introducing ? `${css.seatIcon} ${css.introIcon}` : css.seatIcon} />
-            {shownLabel}
+            <span className={css.seatLabel}>{shownLabel}</span>
             <IconChevronDownOutline14 className={css.chevron} />
           </button>
         )}

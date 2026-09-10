@@ -192,6 +192,9 @@ export function ConversationSessionHeader({
             <div className={css.headerUtilities}>
               {renderSlot('conversation.session.header.utilities', {})}
             </div>
+            <div className={css.headerCorner} data-conversation-header-corner="">
+              {renderSlot('conversation.session.header.corner', {})}
+            </div>
           </div>
           {switchableTabs.length > 1 && activePreferredId === null && !hasCompanion && (
             <div className={css.tabs} role="tablist">
@@ -233,7 +236,7 @@ export function ConversationSession({
   const tabs: readonly ViewTab[] = views?.list() ?? []
   const switchableTabs = views === undefined ? [...tabs] : tabs.filter(tab => !views.isSessionOwned(tab.id))
   const selectedId = useStore(s => s.view)
-  const preferredId = useSessions?.(() => views?.preferred(sessionId) ?? null) ?? null
+  const preferredId = useSessions(() => views?.preferred(sessionId) ?? null)
   const activePreferredId = preferredId !== null && tabs.some(tab => tab.id === preferredId) ? preferredId : null
   const active = activePreferredId === null
     ? resolveActiveView([...switchableTabs], selectedId)
@@ -298,14 +301,7 @@ export function ConversationSession({
     inspect,
     onInspectDone: () => { (actions as unknown as { setInspect?: (value: null) => void }).setInspect?.(null) },
     viewRequest,
-    openView: openView ?? ((view: string, focus: string) => {
-      const extended = actions as unknown as {
-        openView?: (view: string, focus: string) => void
-        setView?: (view: string) => void
-      }
-      if (extended.openView !== undefined) extended.openView(view, focus)
-      else extended.setView?.(view)
-    }),
+    openView,
     completeViewRequest: () => {
       (actions as unknown as { completeViewRequest?: () => void }).completeViewRequest?.()
     },

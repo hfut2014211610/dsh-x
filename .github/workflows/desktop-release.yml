@@ -85,8 +85,8 @@ jobs:
             # npm path below.
             pnpm run release:pack --family dsh --out dist/npm-dsh
             pnpm run release:pack --family vendor --out dist/npm-vendor
-            pnpm --dir native/landlock-run run build:ts
-            pnpm --dir native/landlock-run/packages/entry pack --pack-destination "$PWD/dist/npm-landlock" | Out-Null
+            pnpm --dir native/system run build:ts
+            pnpm --dir native/system/packages/entry pack --pack-destination "$PWD/dist/npm-landlock" | Out-Null
             pnpm exec tsx scripts/release/desktop-runtime.ts --from dist/npm-dsh --from dist/npm-vendor --from dist/npm-landlock --stage $stage
             npm install --prefix $stage --no-audit --no-fund --package-lock=false --omit=dev
             # pwsh continues past a native command's non-zero exit: prove the
@@ -182,8 +182,8 @@ jobs:
             # npm path below.
             pnpm run release:pack --family dsh --out dist/npm-dsh
             pnpm run release:pack --family vendor --out dist/npm-vendor
-            pnpm --dir native/landlock-run run build:ts
-            pnpm --dir native/landlock-run/packages/entry pack --pack-destination "$PWD/dist/npm-landlock" >/dev/null
+            pnpm --dir native/system run build:ts
+            pnpm --dir native/system/packages/entry pack --pack-destination "$PWD/dist/npm-landlock" >/dev/null
             pnpm exec tsx scripts/release/desktop-runtime.ts --from dist/npm-dsh --from dist/npm-vendor --from dist/npm-landlock --stage "$stage"
             npm install --prefix "$stage" --no-audit --no-fund --package-lock=false --omit=dev
             # Fail loud on a stage that silently installed nothing.

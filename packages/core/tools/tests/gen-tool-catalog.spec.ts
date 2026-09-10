@@ -31,7 +31,7 @@ describe('gen-tool-catalog collectToolCatalog', () => {
       'cordis_undefine', 'create_goal', 'document_create', 'document_edit', 'document_outline',
       'document_read', 'document_search', 'edit', 'exit_plan_mode', 'followup_task', 'get_goal', 'glob', 'grep',
       'interrupt_agent', 'interrupt_agent', 'job_kill', 'job_list', 'job_output',
-      'list_agents', 'list_agents', 'list_subagent_models', 'lsp', 'pwsh', 'pwsh', 'ralph',
+      'list_agents', 'list_agents', 'list_subagent_models', 'lsp', 'present', 'pwsh', 'pwsh', 'ralph',
       'read', 'read_image', 'run_code', 'schedule_create', 'schedule_delete',
       'schedule_list', 'send_message', 'send_message', 'session_event_read', 'session_event_search',
       'session_event_trace', 'session_search', 'session_trace', 'skill', 'spawn_teammate',

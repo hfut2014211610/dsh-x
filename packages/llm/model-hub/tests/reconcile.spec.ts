@@ -41,9 +41,9 @@ describe('reconcileRoutes', () => {
     })
     expect(result.changed).toBe(true)
     expect(calls).toHaveLength(2)
-    expect(String(calls[0]!.ns)).toBe('llm-pi-ai')
+    expect(calls[0]!.ns).toBe('llm-pi-ai')
     expect(calls[0]!.ops).toEqual([{ op: 'set', path: ['providers', 'gw'], value: profile }])
-    expect(String(calls[1]!.ns)).toBe('dsh-x-model-hub')
+    expect(calls[1]!.ns).toBe('dsh-x-model-hub')
     expect(calls[1]!.ops).toEqual([{ op: 'set', path: ['_routes'], value: ['gw'] }])
   })
 

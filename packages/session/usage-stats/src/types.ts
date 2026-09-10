@@ -17,7 +17,7 @@ export {}
 /**
  * Provider-reported consumption of one model request, folded from the step's
  * logged usage reports. `usage` is null when no report landed (an adapter
- * that reports none, or a request that failed before any usage chunk);
+ * that reports none, or a step that assembled no message);
  * request-granularity fields (`llmMs`, `time`) then still describe the
  * attempt when their boundary events exist.
  */
@@ -40,9 +40,8 @@ export interface UsageRequestRecord {
 
 /**
  * Per-request model consumption for the whole session log. Requests appear in
- * log order; one record exists per step that reported usage or assembled a
- * message, so failed attempts that still streamed a usage chunk stay billed
- * while purely local steps (none today) stay absent.
+ * log order; one record exists per step that assembled a message, so steps
+ * with no message stay absent.
  */
 export interface UsageStatsProjection {
   /** One record per usage-reporting or message-assembling step, in log order. */

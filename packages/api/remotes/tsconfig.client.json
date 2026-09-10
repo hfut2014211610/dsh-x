@@ -21,6 +21,9 @@
       "path": "../../client/connection/tsconfig.client.json"
     },
     {
+      "path": "../../client/file-upload/tsconfig.client.json"
+    },
+    {
       "path": "../../credentials/credentials"
     },
     {
@@ -66,6 +69,9 @@
       "path": "../session-controller/tsconfig.client.json"
     },
     {
+      "path": "../workspace-files/tsconfig.client.json"
+    },
+    {
       "path": "../settings-controller"
     },
     {
@@ -76,6 +82,9 @@
     },
     {
       "path": "../../writing/documents"
+    },
+    {
+      "path": "../../feedback/command-feedback"
     }
   ]
 }

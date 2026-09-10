@@ -71,7 +71,7 @@ export interface SidecarHandle {
 export function parseWebUrlLine(line: string): string | undefined {
   const match = /^dsh web: (http:\/\/127\.0\.0\.1:\d+)(\/\?token=\S+)?(?=$| )/.exec(line)
   if (match === null) return undefined
-  return match[1] + (match[2] ?? '')
+  return (match[1] ?? '') + (match[2] ?? '')
 }
 
 /** Await a condition with a deadline, sleeping between attempts. */

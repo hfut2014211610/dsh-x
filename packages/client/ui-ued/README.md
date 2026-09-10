@@ -1,3 +1,8 @@
+---
+description: "Design-mode browser view: sandboxed prototype preview with in-frame element picking, gated on the ued agent preset."
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-ued
 
 English | [中文](README.zh.md)
@@ -6,6 +11,22 @@ Browser design-mode plugin. It registers the session-owned `ued` `conversation.v
 
 The gate is the preset, not the file type: it decides which sessions activate this view, so nothing renders a model-written page unless the session was started to design one. The registered entry is omitted from the ordinary tab strip and cannot be selected after a session starts.
 
+## Summary
+
+This package is the browser design-mode view for the `ued` agent preset. It renders model-written prototypes in a sandboxed preview frame (`sandbox="allow-scripts"` without `allow-same-origin`, `srcdoc` delivery, injected Content-Security-Policy), lets the user pick an element inside the frame over an origin-authenticated `postMessage` channel, and lands the pick in the composer draft as a reference. It repaints on the trailing edge of `documents/changed` bursts. Nothing runs on the host. Use it when a session designs pages rather than chats.
+
+## Table of Contents
+
+- [The preview frame](#the-preview-frame)
+- [Picking an element](#picking-an-element)
+- [Refresh](#refresh)
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="the-preview-frame"></a>
 ## The preview frame
 
 The frame renders a document the model wrote — executable markup that no person reviewed — inside the same page as the host's RPC channel. `src/client/sandbox.ts` owns that isolation and is deliberately separate from the view so it can be asserted directly. The decisions and the measurements behind them are in the fork's [iframe security review](../../../personal/docs/notes/proposed/2026-08-18-ued-preview-iframe-security.md).
@@ -18,6 +39,7 @@ Three properties carry it:
 
 The frame keeps a visible border and a preview badge. A prototype can draw something that looks like the host's own settings page, and the sandbox does not address that.
 
+<a id="picking-an-element"></a>
 ## Picking an element
 
 Annotating a component means naming one element of a document the host cannot read. `sandbox="allow-scripts"` without `allow-same-origin` makes `contentDocument` null by design, so there is no host-side hit test to run: the pick happens inside the frame, in a script injected beside the policy, and the answer comes back over `postMessage`. `src/client/inspect.ts` owns both halves.
@@ -32,10 +54,12 @@ The picker travels with the document rather than arriving when someone arms it. 
 
 A confirmed pick lands in the session's composer draft through `conversation.input`, not in a sent message. A reference is not a request: the person still has to say what they want changed.
 
+<a id="refresh"></a>
 ## Refresh
 
 A design thread keeps writing after the turn that started it ends, and several threads can write within the same second. The view repaints on the trailing edge of a `documents/changed` burst for the previewed path, so the frame never shows a document caught mid-write. A late read for a prototype the person has already navigated away from is discarded rather than painted.
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this package only renders documents the `documents` seam already owns; it registers no tool, prompt section, or result projection.
@@ -50,3 +74,12 @@ None; this package neither assembles nor sends a provider request.
 - **No in-view editing** — the view reads prototypes; changing one goes through the model, as the design policy requires.
 - **A pick carries markup, not pixels** — the model gets the element’s selector and its own markup. What the element *looks like* is not in the annotation, and the sandbox gives the host no way to capture it; a screenshot would have to be drawn inside the frame.
 - **The outline is an element in the prototype’s tree** — it hangs off `documentElement` rather than `body` to stay clear of the page’s own selectors, and it is removed on disarm, but a rule written against `html > *` would still see it.
+
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+`sandbox="allow-scripts"` must never sit beside `allow-same-origin`, and prototypes must never be served from a host-origin route: either mistake silently un-sandboxes the frame with no visible change. The tests assert the token set both ways. The pick channel authenticates by `event.source` window identity, never by origin, and every payload field is rebuilt on arrival.
+
+</details>

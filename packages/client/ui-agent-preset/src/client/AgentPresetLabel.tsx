@@ -56,7 +56,7 @@ export function AgentPresetLabel({
     | { blank?: boolean; agentPreset?: unknown; projectionValues?: { agentPreset?: unknown } }
     | undefined)
   const projectionValue = summary?.projectionValues?.agentPreset
-  const topLevelValue = (summary as { agentPreset?: unknown } | undefined)?.agentPreset
+  const topLevelValue = summary?.agentPreset
   const preset = typeof projectionValue === 'string'
     ? projectionValue
     : typeof topLevelValue === 'string' ? topLevelValue : undefined
@@ -69,8 +69,7 @@ export function AgentPresetLabel({
   }, [preset, load])
 
   if (preset === undefined) return null
-  if (blank && useAgentPresetSeat !== undefined && loadSeat !== undefined
-    && select !== undefined && introduced !== undefined) {
+  if (blank && loadSeat !== undefined && select !== undefined && introduced !== undefined) {
     return (
       <AgentPresetPicker
         load={loadSeat}
@@ -81,23 +80,17 @@ export function AgentPresetLabel({
       />
     )
   }
-  return <RunningPresetLabel preset={preset} useAgentPresets={useAgentPresets} load={load} t={t} />
+  return <RunningPresetLabel preset={preset} useAgentPresets={useAgentPresets} t={t} />
 }
 
 type RunningPresetLabelProps = Pick<
   AgentPresetLabelProps,
-  'useAgentPresets' | 'load' | 't'
+  'useAgentPresets' | 't'
 > & { preset: string }
 
 /** Read-only preset label for a session whose first turn has started. */
-function RunningPresetLabel({ preset, useAgentPresets, load, t }: RunningPresetLabelProps) {
+function RunningPresetLabel({ preset, useAgentPresets, t }: RunningPresetLabelProps) {
   const options = useAgentPresets(state => state.options)
-
-  useEffect(() => {
-    // Deployments that compose no presets never label anything, so the roster
-    // is only worth a request once a session reports one.
-    void load()
-  }, [preset, load])
 
   const option = options.find(entry => entry.id === preset)
   const text = option === undefined ? undefined : presetDisplayText(option, t)

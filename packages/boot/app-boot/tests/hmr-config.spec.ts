@@ -7,7 +7,10 @@ import { Context } from '@deepseek-ai/cordis'
 import Hmr from '@deepseek-ai/cordis-plugin-hmr'
 import Loader from '@deepseek-ai/cordis-plugin-loader'
 import Timer from '@deepseek-ai/cordis-plugin-timer'
-import { describe, expect, it, vi } from 'vitest'
+import { afterEach, describe, expect, it, vi } from 'vitest'
+
+/** Every per-test tree root, removed once the booted watcher has been disposed. */
+const hmrRoots: string[] = []
 
 /**
  * Boot an HMR context watching `dir`.
@@ -51,6 +54,10 @@ async function eventually(test: () => boolean, message: string): Promise<void> {
 }
 
 describe('HMR exact config paths', () => {
+  afterEach(() => {
+    for (const root of hmrRoots.splice(0)) rmSync(root, { recursive: true, force: true })
+  })
+
   it('observes module changes when its watch base is a filesystem alias', { timeout: 30_000 }, async () => {
     const target = mkdtempSync(join(tmpdir(), 'dsh-hmr-module-canonical-'))
     const alias = `${target}-alias`
@@ -104,6 +111,7 @@ describe('HMR exact config paths', () => {
 
   it('observes add, change, and unlink outside its module roots', { timeout: 20_000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-hmr-config-'))
+    hmrRoots.push(dir)
     const filename = join(dir, 'plugins.yml')
     const ctx = await bootHmr(dir)
     const observed: string[] = []
@@ -130,6 +138,7 @@ describe('HMR exact config paths', () => {
 
   it('observes creation when the config parent did not exist at registration', { timeout: 20_000 }, async () => {
     const root = mkdtempSync(join(tmpdir(), 'dsh-hmr-config-'))
+    hmrRoots.push(root)
     const dir = join(root, 'later')
     const filename = join(dir, 'plugins.yml')
     const ctx = await bootHmr(root)
@@ -148,6 +157,7 @@ describe('HMR exact config paths', () => {
 
   it('serializes refreshes and waits for them during disposal', { timeout: 20_000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-hmr-config-'))
+    hmrRoots.push(dir)
     const filename = join(dir, 'plugins.yml')
     writeFileSync(filename, 'one')
     const ctx = await bootHmr(dir)
@@ -189,6 +199,7 @@ describe('HMR exact config paths', () => {
 
   it('normalizes refresh failures and broadcasts them without escaping the watcher', { timeout: 20_000 }, async () => {
     const dir = mkdtempSync(join(tmpdir(), 'dsh-hmr-config-'))
+    hmrRoots.push(dir)
     const filename = join(dir, 'plugins.yml')
     const ctx = await bootHmr(dir)
     const failure = Promise.withResolvers<{ filename: string; error: Error }>()

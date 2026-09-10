@@ -63,7 +63,6 @@ function logOneRequest(session: Session): void {
   session.append('turn/start', { turn: 1 })
   session.append('request/context', { provider: 'deepseek-official', model: 'flash', contextWindow: 128_000 })
   session.append('step/start', { turn: 1, step: 1 })
-  session.append('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'usage', usage: { inputTokens: 11, outputTokens: 3, cacheReadTokens: 2 } } })
   session.append('assistant/message', {
     turn: 1,
     step: 1,
@@ -72,8 +71,9 @@ function logOneRequest(session: Session): void {
       content: [{ type: 'text', text: 'done' }],
       source: { kind: 'model', provider: 'deepseek-official', model: 'flash' },
     }),
+    stream: [],
     usage: { inputTokens: 11, outputTokens: 3, cacheReadTokens: 2 },
-  }, { surfaceOp: 'append', sourceEventSeqs: [] })
+  }, { surfaceOp: 'append' })
   session.append('step/end', { turn: 1, step: 1 })
   session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
 }

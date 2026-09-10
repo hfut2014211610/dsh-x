@@ -1,3 +1,8 @@
+---
+description: "Plugin mutation half: turn configured Loader entries on or off through one generated Remote, durable across restarts."
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-host-plugin-control
 
 English | [中文](README.zh.md)
@@ -10,6 +15,19 @@ The split from the inventory is deliberate on both counts. Reading the tree and 
 
 The service is Remote-only and declares no same-process Cordis `Context` merge. Client packages consume it through the explicit [`api-remotes`](../../api/remotes/README.md) assembly rather than importing the Host implementation.
 
+## Summary
+
+This package is the write half of the plugin surface: one generated Remote, `pluginControl/setEnabled`, that turns an already-configured Loader entry on or off through a single `ctx.loader.update`, which both flips the running fiber and writes the profile back so the change outlives restarts. Unknown entry ids report `found: false` instead of throwing. The service is Remote-only with no same-process merge. Use it when a client must enable or disable composed entries without touching the tree directly.
+
+## Table of Contents
+
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this Host-only control surface registers no prompt, tool, message, or provider request.
@@ -22,3 +40,12 @@ None; this package never assembles model input.
 
 - **Configured entries only** — the service enables and disables what the profile already declares. It cannot add an entry for a plugin the profile has never mentioned, nor remove one.
 - **No resolution check** — enabling an entry whose module cannot be imported reports success, because the Loader accepts the configuration change and the import failure surfaces afterwards as the entry's own Fiber phase.
+
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+One `ctx.loader.update` is the whole operation: the Loader owns the running tree and the profile it was read from, so keep nothing beside it or it becomes a second truth to synchronize.
+
+</details>

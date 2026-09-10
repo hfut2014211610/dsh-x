@@ -16,7 +16,13 @@ function isBuildFaceClient(value: unknown): boolean {
 export default defineConfig(({ env }) => {
   const client = isBuildFaceClient(env?.DSH_BUILD_FACE)
   return {
-    workspace: ['vendor/*', 'packages/*/*', 'apps/cli'],
+    workspace: client
+      ? ['vendor/*', 'packages/*/*', 'apps/cli']
+      // The fork's Electron sidecar (apps/desktop) builds through its own tsc
+      // project (`npx tsc -b apps/desktop/tsconfig.json`), not the workspace
+      // tsdown pass: it has no index/invariant/startup entry. Upstream's
+      // desktop host (apps/desktop-host) stays in the workspace pass.
+      : ['vendor/*', 'packages/*/*', 'apps/cli', 'apps/desktop-host'],
     entry: client ? '' : ['lib/types/{index,invariant,startup}.js'],
     outDir: 'lib',
     format: ['esm'],

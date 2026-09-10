@@ -1,9 +1,9 @@
 /**
  * The `usageStats` projection unit: mounting the plugin beside the projection
  * registry (and the command runtime its inject waits on) serves one record per
- * model request folded from request routes, step boundaries, usage chunks, and
- * assembled messages; a request that streamed usage and then failed stays
- * billed through its chunk sample; compositions without the plugin are
+ * model request folded from request routes, step boundaries, and assembled
+ * messages; usage travels on the message itself, so a failed attempt that
+ * settled no message leaves no record; compositions without the plugin are
  * unaffected and unmounting removes the key (HMR safety). Upsert and timing
  * math run against the exported definition directly, where event times are
  * controlled.
@@ -11,7 +11,7 @@
 
 import { describe, expect, it } from 'vitest'
 import { Context } from '@deepseek-ai/cordis'
-import { createMessage } from '@deepseek-ai/dsh-llm'
+import { createAssistantMessage } from '@deepseek-ai/dsh-llm'
 import SessionStore, { SessionId } from '@deepseek-ai/dsh-session'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import SessionProjectionRegistry from '@deepseek-ai/dsh-session-projection'
@@ -27,10 +27,9 @@ async function harness(withPlugin: boolean): Promise<{ ctx: Context; session: Se
   return { ctx, session: ctx.sessions.create(SessionId('usage')) }
 }
 
-const message = createMessage({
-  role: 'assistant',
+const message = createAssistantMessage({
   content: [{ type: 'text', text: 'answer' }],
-  source: { kind: 'model', provider: 'mock', model: 'mock' },
+  source: { provider: 'mock', model: 'mock' },
 })
 
 describe('usageStats projection unit (registry drive)', () => {
@@ -42,18 +41,18 @@ describe('usageStats projection unit (registry drive)', () => {
     })
   })
 
-  it('settles one record per request: chunk sample, message final usage, route, and wall time', async () => {
+  it('settles one record per request: message usage, route, and wall time', async () => {
     const { ctx, session } = await harness(true)
     session.append('request/context', { provider: 'deepseek-official', model: 'flash', contextWindow: 128_000 })
     session.append('turn/start', { turn: 1 })
     session.append('step/start', { turn: 1, step: 1 })
-    session.append('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'usage', usage: { inputTokens: 10, outputTokens: 2 } } })
     session.append('assistant/message', {
       turn: 1,
       step: 1,
       message,
+      stream: [],
       usage: { inputTokens: 11, outputTokens: 3, cacheReadTokens: 2 },
-    }, { surfaceOp: 'append', sourceEventSeqs: [] })
+    }, { surfaceOp: 'append' })
     session.append('step/end', { turn: 1, step: 1 })
     session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
     const value = ctx.sessionProjections.snapshot(session).values.usageStats
@@ -68,17 +67,17 @@ describe('usageStats projection unit (registry drive)', () => {
     expect(value?.contextWindow).toBe(128_000)
   })
 
-  it('keeps a failed request billed through its usage chunk with null wall time', async () => {
+  it('leaves no record for a failed attempt that settled no message', async () => {
     const { ctx, session } = await harness(true)
     session.append('request/context', { provider: 'p', model: 'm' })
     session.append('turn/start', { turn: 1 })
     session.append('step/start', { turn: 1, step: 1 })
-    session.append('assistant/chunk', { turn: 1, step: 1, chunk: { type: 'usage', usage: { inputTokens: 10, outputTokens: 2 } } })
+    // Attempts carry the stream but no usage: accounting travels on the
+    // message, so a step with no message has nothing billable.
+    session.append('assistant/attempt', { turn: 1, step: 1, stream: [] })
     session.append('step/end', { turn: 1, step: 1 })
     session.append('turn/end', { turn: 1, reason: { kind: 'aborted', reason: { kind: 'legacy' } } })
-    const record = ctx.sessionProjections.snapshot(session).values.usageStats?.requests[0]
-    expect(record).toMatchObject({ turn: 1, step: 1, provider: 'p', usage: { inputTokens: 10, outputTokens: 2 } })
-    expect(record?.llmMs).toBeNull()
+    expect(ctx.sessionProjections.snapshot(session).values.usageStats?.requests).toEqual([])
   })
 
   it('has no usageStats key without the plugin, and drops it when the plugin unloads (HMR safety)', async () => {
@@ -86,7 +85,7 @@ describe('usageStats projection unit (registry drive)', () => {
     expect('usageStats' in ctx.sessionProjections.snapshot(session).values).toBe(false)
     const fiber = await ctx.plugin(UsageStatsPlugin)
     session.append('step/start', { turn: 1, step: 1 })
-    session.append('assistant/message', { turn: 1, step: 1, message, usage: { inputTokens: 1, outputTokens: 1 } }, { surfaceOp: 'append', sourceEventSeqs: [] })
+    session.append('assistant/message', { turn: 1, step: 1, message, stream: [], usage: { inputTokens: 1, outputTokens: 1 } }, { surfaceOp: 'append' })
     expect(ctx.sessionProjections.snapshot(session).values.usageStats?.requests).toHaveLength(1)
     await fiber.dispose()
     expect('usageStats' in ctx.sessionProjections.snapshot(session).values).toBe(false)
@@ -112,25 +111,23 @@ describe('usageStats fold (controlled timestamps)', () => {
     expect(fold([
       at(1_000, 'request/context', { provider: 'p', model: 'm', contextWindow: 128_000 }),
       at(1_000, 'step/start', { turn: 1, step: 1 }),
-      at(1_800, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'usage', usage: { inputTokens: 5, outputTokens: 1 } } }),
-      at(4_800, 'assistant/message', { turn: 1, step: 1, message, usage: { inputTokens: 5, outputTokens: 1 } }),
+      at(4_800, 'assistant/message', { turn: 1, step: 1, message, stream: [], usage: { inputTokens: 5, outputTokens: 1 } }),
     ])).toEqual({
       requests: [{ turn: 1, step: 1, time: 4_800, provider: 'p', model: 'm', usage: { inputTokens: 5, outputTokens: 1 }, llmMs: 3_800 }],
       contextWindow: 128_000,
     })
   })
 
-  it('keeps a message without usage on the chunk sample and a duplicate message keeps the first wall time', () => {
+  it('keeps a message without usage null and a duplicate message keeps the first wall time', () => {
     const settled = fold([
       at(1_000, 'step/start', { turn: 1, step: 1 }),
-      at(1_500, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'usage', usage: { inputTokens: 5, outputTokens: 1 } } }),
-      at(2_500, 'assistant/message', { turn: 1, step: 1, message }),
+      at(2_500, 'assistant/message', { turn: 1, step: 1, message, stream: [] }),
       // Defensive duplicate: no open boundary anymore, so llmMs stays the
       // first message's and only the stamp moves.
-      at(3_000, 'assistant/message', { turn: 1, step: 1, message }),
+      at(3_000, 'assistant/message', { turn: 1, step: 1, message, stream: [] }),
     ])
     expect(settled.requests).toEqual([
-      { turn: 1, step: 1, time: 3_000, provider: null, model: null, usage: { inputTokens: 5, outputTokens: 1 }, llmMs: 1_500 },
+      { turn: 1, step: 1, time: 3_000, provider: null, model: null, usage: null, llmMs: 1_500 },
     ])
   })
 
@@ -138,12 +135,12 @@ describe('usageStats fold (controlled timestamps)', () => {
     expect(fold([
       at(1_000, 'request/context', { provider: 'p1', model: 'm1' }),
       at(1_000, 'step/start', { turn: 1, step: 1 }),
-      at(2_000, 'assistant/message', { turn: 1, step: 1, message, usage: { inputTokens: 1, outputTokens: 1 } }),
+      at(2_000, 'assistant/message', { turn: 1, step: 1, message, stream: [], usage: { inputTokens: 1, outputTokens: 1 } }),
       at(3_000, 'step/start', { turn: 1, step: 2 }),
       at(3_100, 'request/context', { provider: 'p2', model: 'm2', contextWindow: 64_000 }),
-      at(4_000, 'assistant/message', { turn: 1, step: 2, message, usage: { inputTokens: 2, outputTokens: 2 } }),
+      at(4_000, 'assistant/message', { turn: 1, step: 2, message, stream: [], usage: { inputTokens: 2, outputTokens: 2 } }),
       at(5_000, 'step/start', { turn: 2, step: 1 }),
-      at(6_000, 'assistant/message', { turn: 2, step: 1, message }),
+      at(6_000, 'assistant/message', { turn: 2, step: 1, message, stream: [] }),
     ])).toEqual({
       requests: [
         { turn: 1, step: 1, time: 2_000, provider: 'p1', model: 'm1', usage: { inputTokens: 1, outputTokens: 1 }, llmMs: 1_000 },
@@ -172,11 +169,10 @@ describe('usageStats fold (controlled timestamps)', () => {
     expect(usageStatsProjectionDefinition.wire.view(cleared).contextWindow).toBeNull()
   })
 
-  it('ignores non-usage chunks and clamps negative clock skew to zero', () => {
+  it('clamps negative clock skew to zero', () => {
     expect(fold([
       at(1_000, 'step/start', { turn: 1, step: 1 }),
-      at(1_200, 'assistant/chunk', { turn: 1, step: 1, chunk: { type: 'text-delta', index: 0, text: 'a' } }),
-      at(500, 'assistant/message', { turn: 1, step: 1, message, usage: { inputTokens: 1, outputTokens: 1 } }),
+      at(500, 'assistant/message', { turn: 1, step: 1, message, stream: [], usage: { inputTokens: 1, outputTokens: 1 } }),
     ])).toEqual({
       requests: [{ turn: 1, step: 1, time: 500, provider: null, model: null, usage: { inputTokens: 1, outputTokens: 1 }, llmMs: 0 }],
       contextWindow: null,

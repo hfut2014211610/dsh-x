@@ -34,7 +34,7 @@ function selectReadOnlySubagent(owner: ComposerChainProps): SubagentReadOnlyMatc
   const session = owner.session
   if (session === undefined || !('subagent' in session)) return null
   const subagent = session.subagent
-  if (subagent === undefined || subagent === null) return null
+  if (subagent === null) return null
   if (subagent.address.mode === 'one-shot') return { reason: 'one-shot' }
   // The parent catalog is fetched ahead of the selected Session. Until it
   // resolves, leave the normal disabled composer in place instead of briefly
@@ -43,7 +43,7 @@ function selectReadOnlySubagent(owner: ComposerChainProps): SubagentReadOnlyMatc
   // A RUNNING parent-offline continuable child keeps the default composer:
   // its input is disabled there, but the same primary Stop stays available so
   // the child can be interrupted. Once it stops, this takeover returns.
-  return session.running === true ? null : { reason: 'parent-unavailable' }
+  return session.running ? null : { reason: 'parent-unavailable' }
 }
 
 /**

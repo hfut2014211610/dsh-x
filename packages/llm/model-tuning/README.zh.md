@@ -1,15 +1,40 @@
+---
+description: "每模型采样参数默认值：在官方 llm-pi-ai 之上，按 provider/model 匹配 temperature、maxTokens、stop 与 reasoningEffort。"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-model-tuning
 
 [English](README.md) | 中文
 
 每模型采样参数默认值：补上官方 `llm-pi-ai` 刻意不收的那块配置面（每模型 `temperature` / `maxTokens` / `stop` / `reasoningEffort`）。
 
+## 概述
+
+本包补上官方适配器缺席的每模型采样默认值：`dsh-x-model-tuning` 命名空间按 `provider/model` 把 `temperature`、`maxTokens`、`stop`、`reasoningEffort` 映射到模型，在 `agent/request` waterfall 上匹配替换，保证值进入 request header 日志。`/model-tuning` 斜杠命令经 settings seam 写入，自带校验与热重载。没声明的字段原样透过。适合需要固定采样、不被界面选择覆盖的模型。
+
+## 目录
+
+- [原理](#how-it-works)
+- [加载](#loading)
+- [配置](#configuration)
+- [命令](#commands)
+- [测试](#tests)
+- [边界](#boundaries)
+- [模型体验](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="how-it-works"></a>
 ## 原理
 
 - 注册 `dsh-x-model-tuning` settings 命名空间。cordis patch 的 `config:` 是组合基座，`$DSH_HOME/settings.yaml` 的 `dsh-x-model-tuning:` 段是用户层，两者按 key 合并，改动下一次请求生效。
 - 在 `agent/request` waterfall 上按 `provider/model` 匹配条目并替换生效配置——这是官方认可的请求配置改写点，`packages/core/agent/src/model-selection.ts` 用的是同一套机制。值会进入 request header 日志，这正是「model-visible ⟺ logged」不变量所要求的。
 - 斜杠命令 `/model-tuning` 经 settings seam 写入，校验、持久化、热重载都是白拿的。
 
+<a id="loading"></a>
 ## 加载
 
 Web bundle 默认挂载本包；`profiles` 为空即休眠，不产生任何开销。要挂到别的组合上：
@@ -22,6 +47,7 @@ pnpm dsh web --patch ./packages/llm/model-tuning/cordis.patch.yml
 # ~/.dsh/profiles/<name>/cordis.patch.yml
 ```
 
+<a id="configuration"></a>
 ## 配置
 
 ```yaml
@@ -36,6 +62,7 @@ dsh-x-model-tuning:
 
 条目声明了的字段覆盖到该模型的每个请求；没声明的字段原样透传，所以界面上选的思考等级除非条目自己声明，否则不会被动。键形不合法（没有 `/`、或某一侧为空）在写入时就被拒并点名。模型不支持所配 effort 时，适配器抛 `UNSUPPORTED_REASONING_EFFORT`，请求失败得很响。
 
+<a id="commands"></a>
 ## 命令
 
 ```
@@ -44,17 +71,20 @@ dsh-x-model-tuning:
 /model-tuning unset <provider/model> [field]           drop one field, or the whole entry
 ```
 
+<a id="tests"></a>
 ## 测试
 
 ```sh
 pnpm exec vitest run packages/llm/model-tuning
 ```
 
+<a id="boundaries"></a>
 ## 边界
 
 - 只管 `LlmCallConfig` 那四个字段。协议、endpoint、上下文窗口、思考等级词汇属于官方 `llm-pi-ai` 段。
 - 厂商私有的 body 参数（`top_p`、`enable_search` 之类）不在官方请求词汇表里，本包注入不了。真要用得自己写一个 `LlmAdapter`，那是大得多的工程。
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as it only fills sampling fields on an outgoing request; it registers no tool, prompt section, or result projection.
@@ -63,8 +93,19 @@ None, as it only fills sampling fields on an outgoing request; it registers no t
 
 None; sampling parameters travel beside the prompt rather than in it, so the cached prefix is unchanged.
 
+<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
 - **按模型 id 匹配，不按能力** — 新模型得有人点名才拿得到默认值；改了名的模型会静默退回提供方自己的默认值。
 - **只管瀑布流里声明过的字段** — 请求上别的东西原样透传，这是有意的，但也意味着某个提供方专有的旋钮在这里没有位置。
 - **不能按会话覆盖** — 调优是整个 harness 里按模型生效的；单独一次对话想换采样，只能去改设置。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+匹配走 `agent/request` waterfall，和 `packages/core/agent/src/model-selection.ts` 同一套机制：值必须进入 request header 日志，model-visible ⟺ logged 不变量才成立。只有四个 `LlmCallConfig` 字段；供应商专有 body 参数需要真正的 `LlmAdapter`。
+
+</details>

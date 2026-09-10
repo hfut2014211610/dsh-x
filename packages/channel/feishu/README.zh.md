@@ -1,3 +1,8 @@
+---
+description: "飞书（Lark）通道：常驻桥接加 dsh 插件，把单聊与群 @ 变成卡片可见的 agent 会话。"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-feishu
 
 [English](README.md) | 中文
@@ -6,6 +11,26 @@
 
 设计与取舍见[飞书通道笔记](../../../personal/docs/notes/proposed/2026-08-18-feishu-channel.md)。
 
+## 概述
+
+本包把 dsh 会话接到飞书。常驻桥接进程持有本机唯一的事件订阅并跟飞书说话；dsh 侧插件建会话、提交消息、把事件流渲染到可交互卡片上，并在卡片里直接处理工具审批。两者之间只有一条本地 socket，socket 连着就是活着的信号。适合需要从单聊或群聊指挥 agent 的场景。插件自己不存飞书凭证；桥接读的是插件写下的配置。
+
+## 目录
+
+- [两个部件](#two-parts)
+- [依赖](#dependencies)
+- [配置](#configuration)
+- [跑起来](#running-it)
+- [检查](#checks)
+- [真实凭证验收](#verified-against-real-credentials)
+- [已经量过的数](#numbers-actually-measured)
+- [Model Experience](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="two-parts"></a>
 ## 两个部件
 
 | 部件 | 跑在哪 | 干什么 |
@@ -17,11 +42,13 @@
 
 为什么要拆成两个进程：`lark-cli` 的**一个 event key 只允许一个消费者**。既然只能有一个，就让常驻的桥接从头到尾持有它，dsh 反过来当客户端，交接、互斥这些问题就都不存在了。
 
+<a id="dependencies"></a>
 ## 依赖
 
 - `lark-cli`（本机已装 v1.0.87，应用与凭证配在系统 keychain）。桥接只通过它跟飞书说话，本插件自己不存任何飞书凭证。
 - 插件侧只依赖 dsh 的服务与 `zod`。
 
+<a id="configuration"></a>
 ## 配置
 
 一切都在 dsh 的「设置 → 连接器 → 飞书」，或者等价的 `$DSH_HOME/settings.yaml`。桥接自己没有界面，它那份 `~/.dsh-x-feishu/config.json` 由插件写出，只读、并且盯着文件变——改完不用重起桥接。
@@ -73,6 +100,7 @@ dsh-x-feishu:
 
 出站还是走 lark-cli：`appId` 用来在本机找回对应的 profile，回话、发卡片都以那个应用的身份发。事件从哪个应用进来，回它的就是谁——卡片只能由发它的那个应用改，身份错了连进度都刷不动。
 
+<a id="running-it"></a>
 ## 跑起来
 
 Web bundle 默认挂载本包，所以只剩桥接要自己起——它是常驻进程，持有本机唯一的那份飞书事件订阅：
@@ -85,12 +113,14 @@ node --import tsx/esm packages/channel/feishu/src/bridge/main.ts
 dsh-feishu-bridge
 ```
 
+<a id="checks"></a>
 ## 检查
 
 ```sh
 pnpm exec vitest run packages/channel/feishu
 ```
 
+<a id="verified-against-real-credentials"></a>
 ## 真实凭证验收
 
 已用 `lark-cli` v1.0.87 和真实群聊打通这些 raw escape hatch：
@@ -103,10 +133,12 @@ pnpm exec vitest run packages/channel/feishu
 
 `event consume` 不加 `--quiet`，避免隐藏丢事件告警；真实丢失率仍需靠常驻日志长期观察。
 
+<a id="numbers-actually-measured"></a>
 ## 已经量过的数
 
 `lark-cli` 冷启动五次：339 / 361 / 291 / 343 / 282 ms。**约 300ms 一次**，这就是卡片按阶段更新而不是逐字流式的原因——逐字要 200–500ms 一帧，光进程启动就吃满了。
 
+<a id="model-experience"></a>
 ## Model Experience
 
 Indirectly, through the message text it hands a session: a Lark message arrives with the bot mention stripped and nothing added, and the session's own preset owns every tool and prompt section from there.
@@ -115,8 +147,19 @@ Indirectly, through the message text it hands a session: a Lark message arrives 
 
 None of its own; the prefix a session assembles is the same whether the turn arrived from Lark or from the composer.
 
-## Known Limitations and Deferred Work
+<a id="known-limitations-and-deferred-work"></a>
+## 已知限制与暂缓事项
 
 - **一次只能一种模式** — 身份与事件来源是一起配的，所以没法让身份走 A 模式、事件来源走 B 模式。要拆开就得把 `mode` 变成两个独立维度，配置结构要动。
 - **桥接被杀会留下消费者** — 回收发生在下次启动时，靠它写下的 pid 与 event key 认领，所以一个被杀且再没起来的桥接会一直留着一个 `lark-cli` 消费者。
 - **卡片只能由发它的那个应用改** — 回话必须以收到消息的同一个应用的身份发出，所以一个在对话中途轮换应用的部署会失去改自己卡片的能力。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+桥接独占事件订阅：不要为同一个 key 再起第二个 `lark-cli event consume`。卡片文本只增不改，CardKit 打字机更新才是纯粹的追加；渲染器从不改写已经写出去的内容。
+
+</details>

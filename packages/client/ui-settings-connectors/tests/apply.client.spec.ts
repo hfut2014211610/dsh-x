@@ -41,7 +41,7 @@ async function bench() {
   // The Settings surface constructs its scope service in its own fiber; the
   // same construction here gives the card the `settingsScope` service.
   new SettingsScopeBinder(ctx, {
-    mirror: new SettingsDescribeMirror(ctx as never, 'host'),
+    mirror: new SettingsDescribeMirror(ctx, 'host'),
     schema: new SettingsSchemaService(ctx),
     persistence: 'host',
   })

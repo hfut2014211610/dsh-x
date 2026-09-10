@@ -1,3 +1,8 @@
+---
+description: "Usage settings page: a session-blind global view of model token spend aggregated client-side from usageStats projection values."
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-settings-usage
 
 English | [中文](README.zh.md)
@@ -6,6 +11,19 @@ Model usage settings plugin, browser half. It registers the Usage page in the se
 
 The page only reads: it loads on open, refetches after a connection reset, and refreshes on demand; there is no write surface. Values arrive exactly as the projection seam serves them — attached sessions live, cold sessions as stale as their last persisted projection checkpoint (`asOfSeq` says how stale) — and the intro line says so.
 
+## Summary
+
+This package renders the Usage settings page: a global, session-blind view of model token consumption assembled client-side from every session-list row's `usageStats` projection value. A statistics-window selector bounds every figure; the summary strip, day-bucketed heatmap, and per-model table re-aggregate offline with no wire traffic. The page only reads and never streams live frames. Use it when a deployment must show token spend without a new host endpoint.
+
+## Table of Contents
+
+- [Model Experience](#model-experience)
+- [Known Limitations and Deferred Work](#known-limitations-and-deferred-work)
+- [Dev Note](#dev-note)
+
+-----
+
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as the section renders a browser read-only panel over wire-delivered projection values; nothing here reaches a model request.
@@ -21,3 +39,12 @@ None; the plugin never assembles or sends provider requests.
 - **Cold-session freshness is checkpoint-bound** — detached sessions show their last persisted projection checkpoint; the panel says so once, in the intro line, rather than per row.
 - **The heatmap is day-grained and capped at 28 dots** — intra-day intensity collapses into one dot per day, the 90-day and all-time windows still draw 28 dots (their totals and model rows span the full window), and tooltip day names are relative so no wall-clock date ever renders.
 - **Auxiliary LLM calls are unbilled and unmarked** — title-generation and search-LLM consumption stays outside `usageStats` (their events log no usage), so the panel cannot even flag the gap.
+
+### Dev Note
+
+<details>
+<summary>Working context for maintainers — click to expand</summary>
+
+Missing buckets render as `—`, never 0: an absent count is a reporting gap, not a measured zero. The panel is read-only by design and refetches on open, reset, or demand instead of streaming.
+
+</details>

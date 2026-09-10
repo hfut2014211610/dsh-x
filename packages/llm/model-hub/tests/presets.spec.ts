@@ -51,8 +51,9 @@ describe('listPresets', () => {
     expect(qwen.models.every(model => model.api === 'openai-completions')).toBe(true)
   })
 
-  it('keeps per-model protocols when a vendor spans them (grok)', () => {
+  it('routes grok at the xAI catalog protocol (openai-responses)', () => {
     const grok = byKey.get('grok')!
-    expect(new Set(grok.models.map(model => model.api)).size).toBeGreaterThan(1)
+    expect(grok.models.length).toBeGreaterThan(0)
+    expect(grok.models.every(model => model.api === 'openai-responses')).toBe(true)
   })
 })

@@ -36,22 +36,6 @@ export interface TurnOutcome {
   readonly message?: string
 }
 
-/** 从 `text-delta` 类型的流块里取出文本，其它形状返回 `undefined`。 */
-function textDeltaOf(chunk: unknown): string | undefined {
-  if (typeof chunk !== 'object' || chunk === null) return undefined
-  const record = chunk as Record<string, unknown>
-  if (record.type !== 'text-delta') return undefined
-  return typeof record.text === 'string' ? record.text : undefined
-}
-
-/** 从 `reasoning-delta` 类型的流块里取出文本。 */
-function reasoningDeltaOf(chunk: unknown): string | undefined {
-  if (typeof chunk !== 'object' || chunk === null) return undefined
-  const record = chunk as Record<string, unknown>
-  if (record.type !== 'reasoning-delta') return undefined
-  return typeof record.text === 'string' ? record.text : undefined
-}
-
 /** 把工具参数压成一行摘要。 */
 function summarizeArguments(raw: string, limit: number): string {
   const flat = raw.replace(/\s+/gu, ' ').trim()
@@ -65,8 +49,6 @@ function summarizeArguments(raw: string, limit: number): string {
 export class TurnRenderer {
   private buffer = ''
   private outcome: TurnOutcome | undefined
-  /** 已经收到过流块的 `turn:step`，用来决定要不要拿整条消息补底。 */
-  private readonly streamedSteps = new Set<string>()
   /** 已经写过工具行、还没写结果的 callId。 */
   private readonly openCalls = new Set<string>()
 
@@ -101,8 +83,6 @@ export class TurnRenderer {
     // 它不在 SessionEventType 的静态联合里——按字符串比，不按字面量类型比。
     const type: string = event.type
     switch (type) {
-      case 'assistant/chunk':
-        return this.renderChunk(event as SessionEvent<'assistant/chunk'>)
       case 'assistant/message':
         return this.renderMessage(event as SessionEvent<'assistant/message'>)
       case 'tool/call':
@@ -118,25 +98,12 @@ export class TurnRenderer {
     }
   }
 
-  private renderChunk(event: SessionEvent<'assistant/chunk'>): string {
-    const { turn, step, chunk } = event.data
-    const text = textDeltaOf(chunk)
-    if (text !== undefined) {
-      this.streamedSteps.add(`${turn}:${step}`)
-      return text
-    }
-    if (this.options.density !== 'detailed') return ''
-    const reasoning = reasoningDeltaOf(chunk)
-    return reasoning === undefined ? '' : reasoning
-  }
-
   /**
-   * 整条助手消息只在**这一步一个流块都没来过**时才用来补底。
-   * 适配器不流式输出时（或者流被中断后重放），光靠流块会渲染出空白。
+   * 助手消息整条渲染。流已经内嵌在消息事件里（不再有独立的 chunk 事件），
+   * 所以这里直接取最终文本；适配器不输出时（空内容）返回空串。
    */
   private renderMessage(event: SessionEvent<'assistant/message'>): string {
-    const { turn, step, message } = event.data
-    if (this.streamedSteps.has(`${turn}:${step}`)) return ''
+    const { message } = event.data
     const joined = message.content
       .filter((block): block is { type: 'text'; text: string } => block.type === 'text')
       .map(block => block.text)

@@ -1,3 +1,8 @@
+---
+description: "设计模式浏览器视图：沙箱原型预览与框内元素拾取，仅 ued agent 预设激活。"
+kind: "package-reference"
+---
+
 # @deepseek-ai/dsh-client-ui-ued
 
 [English](README.md) | 中文
@@ -6,6 +11,22 @@
 
 门开在预设上，不是文件类型上：它决定哪些会话激活这个视图，所以不是为了设计而开的会话，不会渲染模型写的页面。已注册条目不会出现在普通 tab 栏中，会话开始后也不能再选择。
 
+## 概述
+
+本包是 `ued` agent 预设的浏览器设计模式视图。它在沙箱预览框里渲染模型写的原型（`sandbox="allow-scripts"` 且不带 `allow-same-origin`、`srcdoc` 投递、注入 Content-Security-Policy），通过按来源窗口认证的 `postMessage` 通道在框内拾取元素，拾取结果以引用的形式落进 composer 草稿。收到 `documents/changed` 突发时在后沿重绘。宿主侧无行为。适合用来设计页面而不是聊天的会话。
+
+## 目录
+
+- [预览框](#the-preview-frame)
+- [拾取元素](#picking-an-element)
+- [刷新](#refresh)
+- [Model Experience](#model-experience)
+- [已知限制与暂缓事项](#known-limitations-and-deferred-work)
+- [开发备注](#dev-note)
+
+-----
+
+<a id="the-preview-frame"></a>
 ## 预览框
 
 框里渲染的是模型写的文档——没有人审阅过的可执行标记——而且和宿主的 RPC 通道在同一个页面里。`src/client/sandbox.ts` 单独持有这层隔离，特意跟视图分开，好让它能被直接断言。决策与实测依据见 fork 的 [iframe 安全评审](../../../personal/docs/notes/proposed/2026-08-18-ued-preview-iframe-security.md)。
@@ -18,6 +39,7 @@
 
 预览框保留可见边框和"预览"角标。原型可以画一个像宿主设置页的界面，沙箱不解决这个问题。
 
+<a id="picking-an-element"></a>
 ## 拾取元素
 
 要标注一个组件，就得指认宿主读不到的那份文档里的某个元素。`sandbox="allow-scripts"` 不与 `allow-same-origin` 并列，`contentDocument` 按设计就是 null，所以宿主这边根本没有命中测试可做：拾取发生在框内，由一段与策略一起注入的脚本完成，答案经 `postMessage` 回来。两半都归 `src/client/inspect.ts` 管。
@@ -32,10 +54,12 @@
 
 确认后的拾取落进这个会话的输入草稿（经 `conversation.input`），不是直接发出去的消息。引用不构成请求：要改什么，还得人自己说。
 
+<a id="refresh"></a>
 ## 刷新
 
 设计线程在启动它的那一轮结束之后还在写，而且多个线程可能在同一秒里写。视图按 `documents/changed` 的尾沿重绘当前预览的路径，所以框里不会出现写到一半的文档。已经切走的原型即使回调迟到也直接丢弃，不会画到当前这份上面。
 
+<a id="model-experience"></a>
 ## Model Experience
 
 None, as this package only renders documents the `documents` seam already owns; it registers no tool, prompt section, or result projection.
@@ -44,9 +68,20 @@ None, as this package only renders documents the `documents` seam already owns; 
 
 None; this package neither assembles nor sends a provider request.
 
+<a id="known-limitations-and-deferred-work"></a>
 ## Known Limitations and Deferred Work
 
 - **替换 `srcdoc` 会重载整个框** — 刷新后原型内部的滚动位置丢失。注入的拾取器给了这件事一条原来没有的路——框内可以自己上报并恢复滚动位置——但还没人这么做。
 - **视图内不能编辑** — 这个视图只读原型；要改就走模型，这也是设计策略的要求。
 - **拾取带回的是标记，不是像素** — 模型拿到的是元素的选择器和它自己的标记。元素长什么样不在标注里，而沙箱也不给宿主任何截取它的办法；截屏只能在框内自己画。
 - **描边框是原型自己那棵树上的元素** — 它挂在 `documentElement` 而不是 `body` 上，避开页面自己的选择器，退出标注时移除；但一条写成 `html > *` 的规则仍然看得见它。
+
+<a id="dev-note"></a>
+### 开发备注
+
+<details>
+<summary>维护者的工作上下文——点击展开</summary>
+
+`sandbox="allow-scripts"` 绝不能和 `allow-same-origin` 并存，原型也绝不能从宿主源的路由 served：任犯一条，沙箱都会在毫无可见变化的情况下失效。测试双向断言 token 集合。拾取通道按 `event.source` 窗口身份认证，不看 origin，所有载荷字段到达即重建。
+
+</details>
