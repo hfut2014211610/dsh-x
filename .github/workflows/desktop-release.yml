@@ -72,7 +72,7 @@ jobs:
         shell: pwsh
         env:
           DSH_DESKTOP_VERSION: ${{ env.FORK_VERSION }}
-        run: pnpm --filter @deepseek-ai/dsh-desktop exec tsx scripts/package-target.ts win-x64
+        run: pnpm --filter @deepseek-ai/dsh-desktop run package:win:x64
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
@@ -124,12 +124,12 @@ jobs:
       - name: Package mac-arm64
         env:
           DSH_DESKTOP_VERSION: ${{ env.FORK_VERSION }}
-        run: pnpm --filter @deepseek-ai/dsh-desktop exec tsx scripts/package-target.ts mac-arm64
+        run: pnpm --filter @deepseek-ai/dsh-desktop run package:mac:arm64
 
       - name: Package mac-x64
         env:
           DSH_DESKTOP_VERSION: ${{ env.FORK_VERSION }}
-        run: pnpm --filter @deepseek-ai/dsh-desktop exec tsx scripts/package-target.ts mac-x64
+        run: pnpm --filter @deepseek-ai/dsh-desktop run package:mac:x64
 
       - uses: actions/upload-artifact@v4
         with:
