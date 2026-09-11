@@ -92,8 +92,12 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           # -Include needs a wildcard in -Path to take effect; top level only
-          # so the win-unpacked helper binaries never reach the release.
-          $files = Get-ChildItem -Path apps/desktop/.desktop-build/targets/win-x64/artifacts/* -Include *.exe, *.yml, *.7z, *.blockmap | ForEach-Object { $_.FullName }
+          # so the win-unpacked helper binaries and builder-debug.yml never
+          # reach the release.
+          $dir = "apps/desktop/.desktop-build/targets/win-x64/artifacts"
+          $channel = Join-Path $dir "latest.yml"
+          if (-not (Test-Path $channel)) { throw "missing required channel file: $channel" }
+          $files = Get-ChildItem -Path "$dir/*" -Include *.exe, latest.yml, *.7z, *.blockmap | ForEach-Object { $_.FullName }
           gh release upload $env:RELEASE_TAG $files --clobber
 
   macos:
@@ -153,8 +157,15 @@ jobs:
           GH_TOKEN: ${{ github.token }}
         run: |
           shopt -s nullglob
+          arm64=apps/desktop/.desktop-build/targets/mac-arm64/artifacts
+          x64=apps/desktop/.desktop-build/targets/mac-x64/artifacts
+          # The channel files are mandatory: without them installed apps never
+          # see the release. builder-debug.yml stays out (rejected asset).
+          for required in "$arm64/latest-mac.yml" "$x64/latest-mac.yml"; do
+            [[ -f $required ]] || { echo "missing required channel file: $required"; exit 1; }
+          done
           files=(
-            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.{dmg,zip,yml,blockmap}
-            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*.{dmg,zip,yml,blockmap}
+            $arm64/*.{dmg,zip} $arm64/latest-mac.yml $arm64/*.blockmap
+            $x64/*.{dmg,zip} $x64/latest-mac.yml $x64/*.blockmap
           )
           gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
