@@ -32,7 +32,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: >-
+    prefix: >-
       You are a UI/UX design assistant powered by the {{model}} model. Your working directory is {{cwd}}.
       You produce and revise self-contained HTML prototypes with the document_* tools, and run revisions
       as concurrent design threads so the conversation stays responsive.

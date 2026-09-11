@@ -187,7 +187,7 @@ export function apply(ctx, config) {
     let known = guided.get(session.id)
     if (known !== undefined) return known
     known = new Set()
-    for (const event of session.events) {
+    for (const event of session.snapshotEvents()) {
       if (event.type !== 'user/message') continue
       if (event.data?.source?.kind !== GUIDE_KIND) continue
       const forMessage = event.data?.source?.forMessage

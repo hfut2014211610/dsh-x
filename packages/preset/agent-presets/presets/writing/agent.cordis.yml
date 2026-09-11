@@ -6,7 +6,7 @@
 - id: persona
   name: '@deepseek-ai/dsh-persona'
   config:
-    text: >-
+    prefix: >-
       You are a writing assistant powered by the {{model}} model. Your working directory is {{cwd}}.
       You help draft, revise, outline, search, and edit documents. Use the document_* tools for all document work.
 

@@ -345,8 +345,10 @@ describe('the shipped Web composition', () => {
       expect(JSON.stringify(assembly.tools.find(tool => tool.name === 'str_replace_editor')?.parameters))
         .toContain('Absolute path')
       expect(ctx.commands.find(handle.agent, 'goal')).toBeUndefined()
-      // serviceFor reports preset-owned providers; unisolated consumers inherit the host fs.
-      expect(ctx.agentPresets.serviceFor(handle.agent, 'fs')).toBeUndefined()
+      // The minimal preset mounts its own fs realm (fs-local plus the editor
+      // under isolate) for the editor to consume through serviceFor, while
+      // the agent's ambient fs stays the host's sandboxed provider.
+      expect(ctx.agentPresets.serviceFor(handle.agent, 'fs')).toBeDefined()
       expect(ctx.get('fs')?.sandboxMode).toBeDefined()
       expect(handle.agent.ctx.get('fs')?.sandboxMode).toBe(ctx.get('fs')?.sandboxMode)
       expect(ctx.agentPresets.serviceFor(handle.agent, 'compaction')).toBeUndefined()
@@ -383,7 +385,7 @@ describe('the shipped Web composition', () => {
       const boot = await ctx.systemPrompt.assemble({ agent: handle.agent, scope: handle.agent })
       expect(boot.tools.map(tool => tool.name)).toEqual(['bash', 'str_replace_editor'])
       expect(boot.tools.find(tool => tool.name === 'bash')?.description).toBe(platformBashDescription())
-      expect(boot.sections).toEqual([{ name: 'deployment:persona', text: MINIMAL_PROMPT }])
+      expect(boot.sections).toEqual([{ name: 'deployment:persona-prefix', text: MINIMAL_PROMPT }])
       expect(boot.contexts).toEqual([])
 
       // The registry still carries the full catalog; only the assembly
@@ -1177,9 +1179,14 @@ describe('a composition that configures its own preset roots', () => {
     // plus a directory that claims a shipped id.
     teamRoot = join(home, 'team-presets')
     const minimalComposition = await readFile(join(SHIPPED_PRESET_ROOT, 'minimal', 'agent.cordis.yml'), 'utf8')
+    // The composition references ./custom-bash.mjs, which only mounts on
+    // win32 — without the sibling file a Windows mount fails while Linux
+    // never notices, so copy it wherever the composition goes.
+    const customBash = await readFile(join(SHIPPED_PRESET_ROOT, 'minimal', 'custom-bash.mjs'), 'utf8')
     for (const id of ['team-spec', 'minimal']) {
       await mkdir(join(teamRoot, id), { recursive: true })
       await writeFile(join(teamRoot, id, 'agent.cordis.yml'), minimalComposition)
+      await writeFile(join(teamRoot, id, 'custom-bash.mjs'), customBash)
     }
     // The user layer of the reported regression: a profile's cordis.patch.yml
     // configuring a shared preset root. The plugin must EXTEND it with its
@@ -1219,7 +1226,9 @@ describe('a composition that configures its own preset roots', () => {
       setup: agentCtx => rootsCtx.agentPresets.mount(agentCtx, 'team-spec').then(() => undefined),
     })
     try {
-      expect(toolNames(rootsCtx, handle.agent)).toEqual(['bash'])
+      // The team root carries the Minimal composition verbatim, editor row
+      // included: same pair as the shipped preset on every platform.
+      expect(toolNames(rootsCtx, handle.agent)).toEqual(MINIMAL_TOOLS)
     } finally {
       await handle.dispose()
     }
