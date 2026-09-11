@@ -211,6 +211,10 @@ describe('desktop project transactions', () => {
     process.env.npm_config_registry = 'https://user-registry.invalid'
     try {
       await expect(manager.applyRelease(seed, '2.0.0', hooks())).rejects.toThrow(/does not match Electron/u)
+      await expect(manager.applyRelease(seed, '2.0.0-x.0.1', hooks())).rejects.toThrow(/does not match Electron/u)
+      // The fork serial suffix rides the packaged app version while the seed
+      // records the bare upstream version; both name the same release line.
+      await expect(manager.applyRelease(seed, '1.0.0-x.0.11', hooks())).resolves.toBe(true)
       await manager.applyRelease(seed, '1.0.0', hooks())
       writeFileSync(
         join(paths.profile, 'node_modules', '@deepseek-ai', 'dsh-desktop-host', 'package.json'),

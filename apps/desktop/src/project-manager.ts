@@ -155,6 +155,22 @@ function assertVersion(version: string): void {
 }
 
 /**
+ * Whether an Electron app version identifies the same release line as a seed
+ * version. Manifests keep the upstream version verbatim while the packaged
+ * app reports `<upstream>-x.<serial>` (the fork serial rides extraMetadata),
+ * so a suffixed Electron version matches its bare seed; anything else must
+ * be exact.
+ * @param electronVersion - version the running Electron package reports.
+ * @param seedVersion - version recorded in the seed release file.
+ * @returns true for an exact match or a fork-suffixed Electron version.
+ */
+export function electronReleaseMatchesSeed(electronVersion: string, seedVersion: string): boolean {
+  if (electronVersion === seedVersion) return true
+  const base = electronVersion.replace(/-x\.\d+(?:\.\d+)*$/u, '')
+  return base !== electronVersion && base === seedVersion
+}
+
+/**
  * Validate one registry package spec and return its requested package name when explicit.
  * @param spec - npm registry name with an optional version or tag.
  * @returns package name, or undefined when the spec's final name is registry-resolved.
@@ -397,7 +413,7 @@ export class DesktopProjectManager {
       verifySeedIntegrity(seedDir)
       const target = releaseFile(seedDir)
       verifyDesktopCorePackageSet(seedDir, target.version)
-      if (target.version !== electronVersion) {
+      if (!electronReleaseMatchesSeed(electronVersion, target.version)) {
         throw new Error(`desktop project: seed ${target.version} does not match Electron ${electronVersion}`)
       }
       if (existsSync(this.paths.profile) && this.releaseVersion() === target.version
