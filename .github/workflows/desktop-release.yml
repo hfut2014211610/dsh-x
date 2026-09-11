@@ -159,13 +159,15 @@ jobs:
           shopt -s nullglob
           arm64=apps/desktop/.desktop-build/targets/mac-arm64/artifacts
           x64=apps/desktop/.desktop-build/targets/mac-x64/artifacts
-          # The channel files are mandatory: without them installed apps never
-          # see the release. builder-debug.yml stays out (rejected asset).
-          for required in "$arm64/latest-mac.yml" "$x64/latest-mac.yml"; do
-            [[ -f $required ]] || { echo "missing required channel file: $required"; exit 1; }
+          # The payloads must all exist; the channel file is single per
+          # release (flat GitHub channel namespace): arm64 wins so Apple
+          # Silicon updates resolve, Intel Macs download the x64 dmg by hand.
+          # builder-debug.yml stays out (rejected asset).
+          for required in "$arm64"/*.dmg "$arm64"/*.zip "$arm64/latest-mac.yml" "$x64"/*.dmg "$x64"/*.zip; do
+            compgen -G "$required" > /dev/null || { echo "missing required artifact: $required"; exit 1; }
           done
           files=(
-            $arm64/*.{dmg,zip} $arm64/latest-mac.yml $arm64/*.blockmap
-            $x64/*.{dmg,zip} $x64/latest-mac.yml $x64/*.blockmap
+            $arm64/*.dmg $arm64/*.zip $arm64/latest-mac.yml $arm64/*.blockmap
+            $x64/*.dmg $x64/*.zip $x64/*.blockmap
           )
           gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
