@@ -52,15 +52,12 @@
   - text: Ran for {{duration}}
 - text: {{clock}}
 - textbox "Message or run a task, / commands, @ files or sessions"
-- button "Commands":
-  - img
-- button "Add attachment":
+- button "Add files or run commands":
   - img
 - 'button "Access mode, current: Workspace Write"': Workspace Write
 - button "Select model, current DeepSeek-V4-Flash":
   - text: DeepSeek-V4-Flash
   - img
-- button "6% of context used"
 - button "Send message" [disabled]
 - button "1 turns 2 steps · {{throughput}} tok/s":
   - img
@@ -68,3 +65,4 @@
 - button "15.8K tok · Cache hit 99%":
   - img
   - text: 15.8K tokCache hit 99%
+- button "6% of context used": 6%

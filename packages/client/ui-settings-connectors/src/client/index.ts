@@ -72,12 +72,14 @@ export function apply(ctx: ClientContext): void {
       return result.value
     },
     setEnabled: async (entryId, enabled) => {
-      const result = await ctx.remote.pluginControl.setEnabled({ entryId, enabled })
-      if (!result.ok) throw new Error(`pluginControl.setEnabled failed: ${result.error.code}: ${result.error.message}`)
-      return {
-        found: result.value.found,
-        ...result.value.failure === undefined ? {} : { failure: result.value.failure },
-      }
+      const result = await ctx.remote.pluginManager.setPluginEnabled(entryId, enabled)
+      if (!result.ok) throw new Error(`pluginManager.setPluginEnabled failed: ${result.error.code}: ${result.error.message}`)
+      // The manager's ChangeResult carries persisted/runtime facts; the card
+      // only needs the plugin's own refusal, if the host reported one.
+      const failure = result.value.application === 'failed' && result.value.error !== undefined
+        ? result.value.error.diagnostic ?? result.value.error.code
+        : undefined
+      return failure === undefined ? { found: true } : { found: true, failure }
     },
   }
   // `feishuAuth/*` 是渠道插件自己挂的 gateway，没有生成出来的 remote 门面，所以

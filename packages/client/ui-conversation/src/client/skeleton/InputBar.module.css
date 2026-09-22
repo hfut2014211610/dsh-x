@@ -7,7 +7,20 @@
      the sides narrow with the shared width axis); the bottom gradient mask
      is owned by the chat scroller. No top pad: the composer stack's gap owns
      the space above; the status strip still carries its own margin. */
-  padding: 0 var(--dsh-composer-side-clearance) 8px;
+  padding: 0 var(--dsh-composer-side-clearance) 4px;
+}
+
+.dock {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 12px;
+  max-width: 100%;
+  padding-top: 4px;
+}
+
+.hero .dock:empty {
+  display: none;
 }
 
 .hero {
@@ -182,6 +195,14 @@
 .input p:last-child::after {
   content: var(--dsh-composer-hint);
   color: var(--dsw-alias-label-caption);
+}
+
+.input[data-composer-composing] p:last-child::after {
+  content: none;
+}
+
+.input[data-composer-composing] + .placeholder {
+  visibility: hidden;
 }
 
 /* figma 34:10434: #ADB2B8 light / #81858C dark — the caption pair exactly.

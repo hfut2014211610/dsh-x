@@ -1,0 +1,66 @@
+import { useSyncExternalStore } from 'react'
+import type { ConversationSlotProps } from '../contract/slots.ts'
+import { conversationPhase } from '../contract/snapshot.ts'
+import { ConversationWidthControls } from './ConversationWidthControls.tsx'
+import css from './ConversationRoot.module.css'
+
+/**
+ * Render the existing main Conversation frame around the extracted content.
+ * @param props - the original `main.conversation` Slot props.
+ * @returns the unchanged root, Header, content, and width-control subtree.
+ */
+export function ConversationMainPanel(props: ConversationSlotProps) {
+  const { sessionId, useSession, useSessions, useConversation, renderSlot, renderFactorySlot, views } = props
+  const session = useSession(s => s)
+  const conversation = useConversation(s => s)
+  const shellPhase = session === undefined || conversation === undefined
+    ? 'blank'
+    : conversationPhase(session, conversation)
+  const openState = session?.openState
+  const summaryBlank = useSessions(s => sessionId === undefined ? undefined : s.byId[sessionId]?.blank)
+
+  // A preset-preferred View (e.g. writing) promotes the session out of the
+  // Hero immediately: the shell is neither settling nor hero while that view
+  // is active. The ledger subscription stays unconditional via stable
+  // fallbacks so callers may omit the registry.
+  useSyncExternalStore(views?.subscribe ?? (() => () => {}), views?.version ?? (() => 0))
+  const preferredViewId = useSessions(() => sessionId === undefined || views === undefined ? null : views.preferred(sessionId))
+  const preferredSessionView = sessionId !== undefined
+    && preferredViewId !== null
+    && (views?.list().some(view => view.id === preferredViewId) ?? false)
+
+  // While a session is still replaying (loading + blank) the hero/docked
+  // choice is unknowable — render the composer hidden instead of flashing
+  // the centered hero and snapping to the docked bar (or vice versa).
+  // Exemption: a session the list summary already proves blank can only
+  // land on the hero, so hiding would blank the column for the whole
+  // history round-trip (the startup auto-selection flash) for nothing.
+  // The exemption is deliberately open-state-wide, not loading-only: a
+  // summary-blank session is the hero before its open starts (`cold`) and
+  // after one fails (`error`) for the same reason — there is no history.
+  // A restored continuable subagent also stays settled until its eagerly
+  // loaded parent catalog establishes availability. This keeps the composer
+  // hidden instead of briefly rendering the parent-offline takeover.
+  const parentAvailabilityPending = session?.subagent?.address.mode === 'continuable'
+    && session.subagent.parentAvailable === undefined
+  const settling = sessionId !== undefined && (
+    (!preferredSessionView && shellPhase === 'blank' && openState === 'loading' && summaryBlank !== true)
+    || parentAvailabilityPending
+  )
+  const hero = sessionId === undefined
+    || (!preferredSessionView && shellPhase === 'blank' && (openState === 'open' || summaryBlank === true))
+  const phase = settling ? 'settling' : hero ? 'hero' : 'active'
+
+  return (
+    <div className={css.root} data-phase={phase} data-conversation-root="">
+      {sessionId === undefined ? null : renderSlot('conversation.session.header', {})}
+      {renderFactorySlot('conversation.content', {
+        variant: 'main',
+        phase,
+        hero,
+      }, {
+        slots: { widthControls: ConversationWidthControls },
+      })}
+    </div>
+  )
+}

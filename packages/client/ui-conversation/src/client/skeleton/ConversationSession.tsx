@@ -96,7 +96,7 @@ function equalBreadcrumbs(left: readonly Breadcrumb[], right: readonly Breadcrum
 /**
  * Renders Session header chrome above the resident conversation scrollport.
  * @param props - Strict Session store, view ledger, navigation, render, and locale shares.
- * @returns the hidden blank-session header or visible title and tabs.
+ * @returns Session navigation controls, with title and tabs after conversation starts.
  */
 export function ConversationSessionHeader({
   sessionId, useSession, useSessions, useConversation, useStore,
@@ -128,13 +128,13 @@ export function ConversationSessionHeader({
   const hideChrome = blank && phase === 'blank' && activePreferredId === null
 
   return (
-    <header
-      className={clsx(css.header, hideChrome && css.headerHidden)}
-      aria-hidden={hideChrome || undefined}
-    >
-      {!hideChrome && (
-        <>
-          <div className={css.titleRow}>
+    <header className={clsx(css.header, hideChrome && css.headerBlank)}>
+      <div className={css.titleRow}>
+        <div className={css.headerLeading} data-conversation-header-leading="">
+          {renderSlot('conversation.session.header.leading', {})}
+        </div>
+        {!hideChrome && (
+          <>
             <div className={css.titleCluster}>
               <nav className={css.crumbs} aria-label={t('session.hierarchy')}>
                 {ancestry.map((summary, index) => {
@@ -192,27 +192,27 @@ export function ConversationSessionHeader({
             <div className={css.headerUtilities}>
               {renderSlot('conversation.session.header.utilities', {})}
             </div>
-            <div className={css.headerCorner} data-conversation-header-corner="">
-              {renderSlot('conversation.session.header.corner', {})}
-            </div>
-          </div>
-          {switchableTabs.length > 1 && activePreferredId === null && !hasCompanion && (
-            <div className={css.tabs} role="tablist">
-              {switchableTabs.map(viewTab => (
-                <button
-                  key={viewTab.id}
-                  type="button"
-                  role="tab"
-                  aria-selected={viewTab.id === active?.id}
-                  className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
-                  onClick={() => { selectView(viewTab.id) }}
-                >
-                  {viewTab.label}
-                </button>
-              ))}
-            </div>
-          )}
-        </>
+          </>
+        )}
+        <div className={css.headerCorner} data-conversation-header-corner="">
+          {renderSlot('conversation.session.header.corner', {})}
+        </div>
+      </div>
+      {!hideChrome && switchableTabs.length > 1 && activePreferredId === null && !hasCompanion && (
+        <div className={css.tabs} role="tablist">
+          {switchableTabs.map(viewTab => (
+            <button
+              key={viewTab.id}
+              type="button"
+              role="tab"
+              aria-selected={viewTab.id === active?.id}
+              className={clsx(css.tab, viewTab.id === active?.id && css.tabActive)}
+              onClick={() => { selectView(viewTab.id) }}
+            >
+              {viewTab.label}
+            </button>
+          ))}
+        </div>
       )}
     </header>
   )
@@ -339,4 +339,5 @@ export function ConversationSession({
       </aside>
     </div>
   )
+
 }

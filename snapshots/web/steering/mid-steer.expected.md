@@ -49,5 +49,5 @@
   - button "Next question" [disabled]:
     - img
   - status
-  - button "Skip this question"
+  - button "Skip"
   - button "Submit" [disabled]

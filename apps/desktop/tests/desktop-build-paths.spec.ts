@@ -15,9 +15,9 @@ describe('desktop build paths', () => {
       'artifacts',
       'runtime',
       'packageSet',
-      'seed',
-      'seedPnpm',
-      'nodeExtract',
+      'dsh',
+      'dshPnpm',
+      'electron',
       'packedDsh',
       'packedVendor',
       'packedLandlock',
@@ -27,7 +27,7 @@ describe('desktop build paths', () => {
       expect(new Set([arm64[key], x64[key], windows[key]]).size).toBe(3)
     }
     expect(arm64.artifacts).toContain(join('targets', 'mac-arm64', 'artifacts'))
-    expect(x64.seed).toContain(join('targets', 'mac-x64', 'seed'))
+    expect(x64.dsh).toContain(join('targets', 'mac-x64', 'dsh'))
     expect(windows.runtime).toContain(join('targets', 'win-x64', 'runtime'))
   })
 

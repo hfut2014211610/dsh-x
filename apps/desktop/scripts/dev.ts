@@ -1,6 +1,6 @@
 /** Build and launch the unpackaged Electron shell against the current workspace. */
 
-import { spawn } from 'node:child_process'
+import { spawn, execFileSync } from 'node:child_process'
 import { existsSync, readFileSync } from 'node:fs'
 import { createRequire } from 'node:module'
 import { join, resolve } from 'node:path'
@@ -8,6 +8,7 @@ import { parseArgs } from 'node:util'
 import { DESKTOP_HOST_PROTOCOL_VERSION } from '../src/host-protocol.ts'
 import type { DesktopRelease } from '../src/release.ts'
 import { prepareDevelopmentProject } from './development-project.ts'
+import { preparePrimaryRuntime } from './prepare-primary-runtime.ts'
 
 const APP_ROOT = resolve(import.meta.dirname, '..')
 const REPOSITORY_ROOT = resolve(APP_ROOT, '..', '..')
@@ -53,7 +54,7 @@ async function runPackageScript(script: string, cwd: string): Promise<void> {
   await run(process.execPath, [packageManager, 'run', script], cwd)
 }
 
-async function launchElectron(projectDir: string): Promise<void> {
+async function launchElectron(): Promise<void> {
   const require = createRequire(import.meta.url)
   const electron: unknown = require('electron')
   if (typeof electron !== 'string') throw new Error('desktop development: electron executable is unavailable')
@@ -65,9 +66,7 @@ async function launchElectron(projectDir: string): Promise<void> {
   const environment: NodeJS.ProcessEnv = {
     ...process.env,
     DSH_HOME: home,
-    DSH_DESKTOP_DEV_PROJECT_DIR: projectDir,
     DSH_DESKTOP_HOST_INSPECT_PORT: String(hostPort),
-    DSH_DESKTOP_NODE_BINARY: process.execPath,
     DSH_DESKTOP_OPEN_DEVTOOLS: process.env.DSH_DESKTOP_OPEN_DEVTOOLS ?? '1',
     ELECTRON_ENABLE_LOGGING: process.env.ELECTRON_ENABLE_LOGGING ?? '1',
   }
@@ -99,20 +98,22 @@ async function main(): Promise<void> {
     schemaVersion: 1,
     version,
     hostProtocolVersion: DESKTOP_HOST_PROTOCOL_VERSION,
-    nodeVersion: process.versions.node,
+    nodeVersion: execFileSync(createRequire(import.meta.url)('electron') as string, ['-p', 'process.versions.node'],
+      { encoding: 'utf8', env: { ...process.env, ELECTRON_RUN_AS_NODE: '1' } }).trim(),
     pnpmVersion,
   }
-  const projectDir = prepareDevelopmentProject({
+  prepareDevelopmentProject({
     projectDir: join(DEVELOPMENT_ROOT, 'project'),
     cliDir: join(REPOSITORY_ROOT, 'apps', 'cli'),
     hostDir: join(REPOSITORY_ROOT, 'apps', 'desktop-host'),
     dependencyDir: join(REPOSITORY_ROOT, 'node_modules', '.pnpm', 'node_modules'),
     release,
   })
-  await launchElectron(projectDir)
+  await preparePrimaryRuntime()
+  await launchElectron()
 }
 
-main().catch((error: unknown) => {
+await main().catch((error: unknown) => {
   console.error(error instanceof Error ? error.message : error)
   process.exitCode = 1
 })

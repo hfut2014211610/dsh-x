@@ -49,7 +49,7 @@ export type AgentPresetLabelProps =
  * @returns the label, or null when the session records no preset.
  */
 export function AgentPresetLabel({
-  sessionId, useSessions, useAgentPresets, useAgentPresetSeat,
+  sessionId, useSessions, useSessionRetainInfo, useAgentPresets, useAgentPresetSeat,
   load, loadSeat, select, introduced, t,
 }: AgentPresetLabelProps) {
   const summary = useSessions(state => state.byId[sessionId] as
@@ -72,6 +72,8 @@ export function AgentPresetLabel({
   if (blank && loadSeat !== undefined && select !== undefined && introduced !== undefined) {
     return (
       <AgentPresetPicker
+        sessionId={sessionId}
+        useSessionRetainInfo={useSessionRetainInfo}
         load={loadSeat}
         select={select}
         introduced={introduced}

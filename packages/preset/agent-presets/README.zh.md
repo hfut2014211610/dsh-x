@@ -50,7 +50,7 @@ kind: "package-reference"
 
 | 字段 | 默认值 | 含义 |
 |---|---|---|
-| `default` | 必填 | 会话未指定时组装的 preset id |
+| `default` | 必填 | 部署 fallback preset id；模式选择关闭或没有用户默认值覆盖时使用 |
 | `roots` | `[]` | 按优先级排列的扫描目录；每项提供 `path`（开头的 `~` 会展开）与 `trust`（默认为 `user`） |
 | `includeShippedRoot` | `true` | 在全部已配置根目录之前，前置本包随附的 preset 作为 `system` 根目录 |
 | `includeUserRoot` | `true` | 在全部已配置根目录之后追加 `<dshHome>/.agent-presets` 作为 `user` 根目录 |
@@ -59,16 +59,17 @@ kind: "package-reference"
 
 随附根目录前置在全部已配置根目录之前，因此即使补丁替换 roster 配置，内置集合仍然可用并赢得重复 id。`includeShippedRoot: false` 会为完全自行提供 preset 的部署移除内置集合。`includeUserRoot: false` 会移除推导出的可写根目录；钉住确切 roster 的测试会同时关闭两个推导根目录。
 
-### 选择默认 preset
+### 显示选择器并选择默认 preset
 
-`default` 配置设定部署级默认值。当组装中存在 settings 提供方时，本插件会注册 `agent-presets` 命名空间，并以 `config.default` 作为其 base，因此用户文档会在部署默认值之上层叠一份按用户设置的默认值：
+必填的 `default` 配置设定部署默认值。当组装中存在 settings 提供方时，本插件会注册 `agent-presets` 命名空间，并以 `{ default: config.default, modeSelectionEnabled: true }` 作为 base，因此既有的新建会话选择器会保持显示，除非用户主动关闭。Host 每次解析默认值都会读取这两个字段：`modeSelectionEnabled` 为 `false` 时，未显式指定 preset 的会话解析为 `config.default`，即使用户文档还保留其他 `default` 也会忽略它；该字段为 `true` 时，用户默认值才可覆盖部署值：
 
 ```yaml
 agent-presets:
+  modeSelectionEnabled: true
   default: minimal
 ```
 
-该值在会话创建时读取，因此更改默认值只影响此后创建的会话；运行中的会话仍停留在它们当初据以组装的 preset 上。清空用户字段即重新继承组装默认值。
+客户端只需写入 `modeSelectionEnabled` 即可显示或隐藏选择，[Web GUI 设置开关](../../client/ui-agent-preset/README.zh.md)正是这样做的。选择器隐藏期间由部署默认值生效；再次开启时恢复已保存的用户 `default`，尚未保存时则继续使用部署默认值。模式选择保持开启时，选择默认模式会写入用户覆盖值，仅供此后创建的会话使用。由于该策略归 Host 所有，它适用于 Web、CLI、SDK 与 headless 调用方此后创建的全部未显式指定 preset 的会话；显式指定的 preset 与任何既有会话均不受影响。
 
 ### 创作 preset
 
@@ -82,7 +83,7 @@ agent-presets:
 
 ### 失败与恢复
 
-组装缺失、无法解析、不是具名插件行列表，或者引用了无法解析的模块的 preset 会被列为 broken，原因会指名出问题的行；组装此类 preset 会被提前拒绝，因此会话绝不会以半组装状态启动。能活到会话创建的，是模块能加载但随后拒绝的行——抛错的插件，或等待组装从未提供的服务的插件——它会让创建失败并回滚，且会指名每一个失败的行，包括组内的行。修复 preset 的文件或删除它，然后重试。
+组装缺失、无法解析、不是具名插件行列表，或者引用了无法解析的模块的 preset 会被列为 broken，原因会指名出问题的行；包查询失败只会把正在检查的 preset 标为 broken，名单中的其他 preset 仍然可用。组装 broken preset 会被提前拒绝，因此会话绝不会以半组装状态启动。能活到会话创建的，是模块能加载但随后拒绝的行——抛错的插件，或等待组装从未提供的服务的插件——它会让创建失败并回滚，且会指名每一个失败的行，包括组内的行。修复 preset 的文件或删除它，然后重试。
 
 -----
 
@@ -126,7 +127,7 @@ agent-presets:
 
 ### 挂载审计
 
-直接挂载的子树不会出现在 `ctx.loader.entries()` 中，因此没有启动审计能覆盖它；`mountPreset` 自行证明结果可用，并拒绝三种形态：无 scope 的目标（preset 的工具会注册成全局的）、仍在等待组装从未提供的服务的行、以及把服务发布进根 realm 的行（进程级全局，第二个发布同名服务的 preset 会相撞）。不变式伴生插件在每次服务通知时复查最后一条规则，因为从定时器或异步续体发布的行会绕过一次性审计。
+直接挂载的子树不会出现在 `ctx.loader.entries()` 中，因此没有启动审计能覆盖它；`mountPreset` 自行证明结果可用，并拒绝导入或激活失败、无 scope 的目标（preset 的工具会注册成全局的）、仍在等待组装从未提供的服务的行、以及把服务发布进根 realm 的行（进程级全局，第二个发布同名服务的 preset 会相撞）。不变式伴生插件在每次服务通知时复查最后一条规则，因为从定时器或异步续体发布的行会绕过一次性审计。
 
 ### 创作机制
 

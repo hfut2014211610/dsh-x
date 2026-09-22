@@ -1,6 +1,7 @@
 // @vitest-environment jsdom
-import { describe, expect, it, vi } from 'vitest'
-import type { ISession } from '@deepseek-ai/dsh-api-session-controller/client'
+import { describe, expect, it, onTestFinished, vi } from 'vitest'
+import type { CommandContribution, CommandUiContract } from '@deepseek-ai/dsh-client-ui-commands/client'
+import type { ISession, SessionReference } from '@deepseek-ai/dsh-api-session-controller/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import type { ObservableSnapshot } from '@deepseek-ai/dsh-client-store'
 import {
@@ -41,7 +42,6 @@ async function bench() {
     },
   }))
   const uploads = new Map<SessionId, (...args: unknown[]) => Promise<unknown>>([[ROOT, rootUpload]])
-  runtime.fileUpload.available = true
   runtime.fileUpload.upload = (sessionId: SessionId, ...args: unknown[]) => {
     const upload = uploads.get(sessionId)
     if (upload === undefined) throw new Error('test file upload has no Session fixture')
@@ -49,20 +49,37 @@ async function bench() {
   }
   runtime.ctx.provide('settingsScope', { bind: () => stubSettingsScope().scope } as never)
   const connectWorkspace = vi.fn(async () => ROOT)
+  const references = new Map<SessionId, SessionReference>()
+  const opened = vi.fn<(id: SessionId) => void>()
+  let mainReference: SessionReference | undefined
+  const replaceMain = (id: SessionId, beforeOpen?: (id: SessionId) => void): void => {
+    const next = runtime.sessions.retain(id, { source: 'mainView' })
+    try {
+      beforeOpen?.(id)
+    } catch (error: unknown) {
+      next.release()
+      throw error
+    }
+    mainReference?.release()
+    mainReference = next
+    opened(id)
+  }
+  const openSession = vi.fn((id: SessionId) => { replaceMain(id) })
   runtime.ctx.provide('uiWorkspace', {
     openWorkspace: async (_workspaceId: WorkspaceId, beforeOpen: (id: SessionId) => void) => {
       const id = await connectWorkspace()
-      beforeOpen(id)
-      runtime.sessions.open(id)
+      replaceMain(id, beforeOpen)
     },
-    openSession: (id: SessionId) => { runtime.sessions.open(id) },
+    openSession,
   } as never)
   const sessionFake = sessionFakeFor()
   await runtime.sessions.add({
     id: ROOT,
     summary: { title: 'R', displayTitle: 'R', cwd: '/proj' },
     session: sessionFake,
-  }, { current: false })
+  })
+  const rootReference = runtime.sessions.retain(ROOT)
+  references.set(ROOT, rootReference)
   const locale = new LocaleRuntime(runtime.ctx)
   runtime.ctx.provide('locale', locale)
   runtime.slots.installLocale(locale)
@@ -76,7 +93,7 @@ async function bench() {
     runtime.slots.entries(key)[0]!
   const conversationApi = (id: SessionId) => {
     const entry = entryOf('conversation.session')
-    const instance = runtime.storeOf('conversation.session', id) as ConversationInstance
+    const instance = runtime.storeOf('conversation.session', references.get(id)) as ConversationInstance
     const injected = (entry.inject as unknown as (
       sessionId: SessionId,
       actions: ConversationActions,
@@ -84,12 +101,14 @@ async function bench() {
     return { instance, injected }
   }
   const residentApi = (id: SessionId | undefined) => {
-    const entry = entryOf('main.conversation')
-    return (entry.inject as unknown as (sessionId: SessionId | undefined) => ConversationInjected)(id)
+    const definition = runtime.factoryOf('conversation.content')
+    return (definition.inject as unknown as (
+      sessionId: SessionId | undefined,
+    ) => ConversationInjected)(id)
   }
   const headerApi = (id: SessionId) => {
     const entry = entryOf('conversation.session.header')
-    const instance = runtime.storeOf('conversation.session.header', id) as ConversationInstance
+    const instance = runtime.storeOf('conversation.session.header', references.get(id)) as ConversationInstance
     const injected = (entry.inject as unknown as (
       sessionId: SessionId,
       actions: ConversationActions,
@@ -105,14 +124,58 @@ async function bench() {
     return { state: input.state, actions: input }
   }
   const viewSource = (id: SessionId): ObservableSnapshot<readonly ViewTab[]> =>
-    conversationApi(id).injected.hooks!.conversationViews
+    conversationApi(id).injected.hooks.conversationViews
   return {
     runtime, feature, slots: runtime.slots, entryOf, conversationApi, headerApi, residentApi, composerApi,
-    inputApi, viewSource, sessionFake, connectWorkspace, rootUpload, uploads,
+    inputApi, viewSource, sessionFake, connectWorkspace, rootUpload, uploads, rootReference, references, opened,
   }
 }
 
 describe('Conversation inject API', () => {
+  it('owns the File action, reads its mounted composer availability, and unregisters on disposal', async () => {
+    const b = await bench()
+    onTestFinished(() => b.runtime.dispose())
+    const contributions = new Map<string, CommandContribution>()
+    const registry = {
+      register: (contribution: CommandContribution) => {
+        contributions.set(contribution.name, contribution)
+        return () => { contributions.delete(contribution.name) }
+      },
+    } satisfies Pick<CommandUiContract, 'register'>
+    b.runtime.ctx.provide('commandUi', registry)
+    await vi.waitFor(() => { expect(contributions.has('file')).toBe(true) })
+    const file = contributions.get('file')!
+    const target = { sessionId: ROOT }
+    expect(file.label!()).toBe('文件')
+    expect(file.available(target)).toBe(false)
+    expect(file.available({ sessionId: 'missing' as SessionId })).toBe(false)
+    if (file.ui.kind !== 'action') throw new Error('File must be an action')
+    file.ui.run({ sessionId: 'missing' as SessionId })
+    const keyboard = b.composerApi(ROOT).keyboard!
+    const open = vi.fn()
+    let available = true
+    const unbind = keyboard.bindFilePicker({ open, available: () => available })
+    expect(file.available(target)).toBe(true)
+    file.ui.run(target)
+    expect(open).toHaveBeenCalledOnce()
+    available = false
+    expect(file.available(target)).toBe(false)
+    file.ui.run(target)
+    expect(open).toHaveBeenCalledOnce()
+    const replacement = vi.fn()
+    const removeReplacement = keyboard.bindFilePicker({ open: replacement, available: () => true })
+    unbind()
+    expect(file.available(target)).toBe(true)
+    file.ui.run(target)
+    expect(replacement).toHaveBeenCalledOnce()
+    removeReplacement()
+    expect(file.available(target)).toBe(false)
+    file.ui.run(target)
+    expect(replacement).toHaveBeenCalledOnce()
+    await b.feature.dispose()
+    expect(contributions.size).toBe(0)
+  })
+
   it('assembles the target-neutral read face without Session side effects', async () => {
     const b = await bench()
     const { injected } = b.conversationApi(ROOT)
@@ -155,7 +218,7 @@ describe('Conversation inject API', () => {
     await b.runtime.dispose()
   })
 
-  it('restores the selected View when a cached Session becomes current', async () => {
+  it('restores the selected View when a cached Session becomes Provider-bound', async () => {
     const b = await bench()
     const binding = b.runtime.ctx.uiConversation.binding(ROOT)
     const activate = vi.spyOn(binding, 'activate')
@@ -170,7 +233,7 @@ describe('Conversation inject API', () => {
         draft: '', view: 'custom', viewRequest: null,
       }))
 
-      b.runtime.ctx.uiSession.adapter.resolve(ROOT)
+      b.runtime.ctx.uiSession.adapter.bindingSource(b.rootReference).getSnapshot()
       expect(activate).toHaveBeenLastCalledWith('chat')
       activate.mockClear()
 
@@ -179,10 +242,13 @@ describe('Conversation inject API', () => {
         (() => null) as never,
       )
       await b.runtime.flush()
-      expect(activate).not.toHaveBeenCalled()
-
-      await b.runtime.sessions.setCurrent(ROOT)
       expect(activate).toHaveBeenLastCalledWith('custom')
+      activate.mockClear()
+
+      using mainReference = b.runtime.sessions.retain(ROOT, { source: 'mainView' })
+      await b.runtime.flush()
+      expect(mainReference.sessionId).toBe(ROOT)
+      expect(activate).not.toHaveBeenCalled()
     } finally {
       removeCustom?.()
       removeChat()
@@ -293,7 +359,7 @@ describe('Conversation inject API', () => {
 
     b.connectWorkspace.mockResolvedValueOnce(ROOT)
     await resident.selectWorkspace('workspace-1' as WorkspaceId)
-    expect(b.runtime.sessions.calls).toContainEqual({ method: 'open', args: [ROOT] })
+    expect(b.opened).toHaveBeenCalledWith(ROOT)
     expect(state.getSnapshot().draft).toBe('carry me')
 
     const other = 'other-1' as SessionId
@@ -305,10 +371,10 @@ describe('Conversation inject API', () => {
       },
     }))
     b.uploads.set(other, targetUpload)
-    await b.runtime.sessions.add({ id: other, session: {} }, { current: false })
+    await b.runtime.sessions.add({ id: other, session: {} })
     b.connectWorkspace.mockResolvedValueOnce(other)
     await resident.selectWorkspace('workspace-2' as WorkspaceId)
-    expect(b.runtime.sessions.calls).toContainEqual({ method: 'open', args: [other] })
+    expect(b.opened).toHaveBeenCalledWith(other)
     expect(state.getSnapshot().draft).toBe('')
     expect(b.inputApi(other).state.getSnapshot().draft).toBe('carry me')
     await vi.waitFor(() => { expect(targetUpload).toHaveBeenCalledOnce() })
@@ -320,13 +386,13 @@ describe('Conversation inject API', () => {
     const b = await bench()
     b.connectWorkspace.mockResolvedValueOnce(ROOT)
     await b.residentApi(undefined).selectWorkspace('workspace-0' as WorkspaceId)
-    expect(b.runtime.sessions.calls).toContainEqual({ method: 'open', args: [ROOT] })
+    expect(b.opened).toHaveBeenCalledWith(ROOT)
 
-    const opens = b.runtime.sessions.calls.filter(call => call.method === 'open').length
+    const opens = b.opened.mock.calls.length
     b.connectWorkspace.mockRejectedValueOnce(new Error('offline'))
     await expect(b.residentApi(ROOT).selectWorkspace('workspace-4' as WorkspaceId))
       .rejects.toThrow('offline')
-    expect(b.runtime.sessions.calls.filter(call => call.method === 'open')).toHaveLength(opens)
+    expect(b.opened).toHaveBeenCalledTimes(opens)
     await b.runtime.dispose()
   })
 

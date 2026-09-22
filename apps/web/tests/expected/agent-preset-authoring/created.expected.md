@@ -7,9 +7,9 @@
     - button "模型":
       - img
       - text: 模型
-    - button "插件":
+    - button "内置插件":
       - img
-      - text: 插件
+      - text: 内置插件
     - button "连接器":
       - img
       - text: 连接器
@@ -22,17 +22,23 @@
     - button "用量":
       - img
       - text: 用量
+    - button "已归档会话":
+      - img
+      - text: 已归档会话
   - button "打开配置文件"
   - button "关闭":
     - img
     - text: 关闭
   - heading "Agent 预设" [level=2]
   - paragraph: 预设即一个会话的 Agent 所运行的插件组装 —— 它的工具、提示词与能力。复制一份既有预设改成自己的，或用「创造模式」让 Agent 帮你创建。
+  - text: 允许切换agent模式 beta
+  - paragraph: 开启后，新任务可选择标准、PTC、创造、极简及自定义模式；关闭后统一使用默认模式（默认为标准模式，可自定义）。仅影响新任务。
+  - switch "允许切换agent模式" [checked]
   - heading "内置" [level=3]
   - list:
     - listitem:
-      - 'button "当前使用: 标准模式" [disabled] [pressed]':
-        - text: 标准模式 内置 当前使用 功能完整的编码 Agent，支持文件编辑、Shell、文件与网页检索、Skills、计划、目标、子代理和工作流。
+      - 'button "新任务默认: 标准模式" [disabled] [pressed]':
+        - text: 标准模式 内置 新任务默认 功能完整的编码 Agent，支持文件编辑、Shell、文件与网页检索、Skills、计划、目标、子代理和工作流。
         - code: standard
       - 'button "查看: 标准模式"':
         - img
@@ -72,7 +78,7 @@
         - text: 复制
     - listitem:
       - 'button "设为默认: 创造模式"':
-        - text: 创造模式 内置 用于创建自定义 Agent preset：具备标准模式的全部能力，并提供运行时检查、插件实验和 preset 创作指导。
+        - text: 创造模式 内置 用于创建自定义 Agent preset：具备标准模式的全部能力，并提供运行时检查、持久化插件管理和 preset 创作指导。
         - code: cordis
       - 'button "查看: 创造模式"':
         - img

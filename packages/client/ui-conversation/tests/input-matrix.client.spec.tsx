@@ -14,7 +14,7 @@ import { createSnapshotStore } from '@deepseek-ai/dsh-client-store'
 import {
   bindSnapshotSelector, conversationSnapshot, sessionSnapshot,
 } from '@deepseek-ai/dsh-client-test-runtime'
-import type { SessionPendingInteractionSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
+import type { SessionStatusSnapshot } from '@deepseek-ai/dsh-client-ui-session/client'
 import type { SessionId } from '@deepseek-ai/dsh-session/types'
 import type { SubmitAttachment, SubmitOutcome } from '../src/client/contract/input.ts'
 import { makeTranslate } from '@deepseek-ai/dsh-client-test-runtime'
@@ -56,9 +56,10 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
       ids: [], byId: {}, current: undefined, phase: 'ready',
       subagentsByParent: {}, jobsBySession: {}, currentAddress: undefined,
     })),
-    useSessionPendingInteraction: bindSnapshotSelector(
-      createSnapshotStore<SessionPendingInteractionSnapshot>(new Map()),
+    useSessionStatus: bindSnapshotSelector(
+      createSnapshotStore<SessionStatusSnapshot>(new Map()),
     ),
+    useSessionRetainInfo: () => undefined,
     useResource,
     useWorkspaces: bindSnapshotSelector(createSnapshotStore({
       items: [], archivedSessionIds: [], state: 'idle', phase: 'ready', error: null,
@@ -86,7 +87,6 @@ function mountBar(shell: SessionInputShell, over?: { running?: boolean; disabled
     useMenuLauncher: bindSnapshotSelector(createSnapshotStore<string | null>(null)),
     renderSlot: (() => null) as InputBarProps['renderSlot'],
     stop: vi.fn(),
-    command: () => Promise.resolve(true),
     t: makeTranslate(zh, commonZh),
     variant: 'composer',
   }
@@ -111,7 +111,7 @@ function bench(over?: {
       shell.setDraft(token)
       shell.beginCommand(
         {
-          token, hint,
+          name: token.slice(1).trim(), token, hint,
           ...(attachments === true ? { attachments: true } : {}),
           submit: over?.submit ?? (() => Promise.resolve({ kind: 'success' as const, source: 'command', name: 'goal' })),
         },
@@ -123,6 +123,25 @@ function bench(over?: {
 }
 
 describe('matrix row: plain', () => {
+  it('unsubscribes from the Inbox projection when disposed', () => {
+    const unsubscribe = vi.fn()
+    const subscribe = vi.fn(() => unsubscribe)
+    const shell = new SessionInputShell({
+      actx: SCTX,
+      defaultSink: () => Promise.resolve({ kind: 'success' }),
+      inbox: { getSnapshot: () => undefined, subscribe },
+      commandAttachments: {
+        serialize: () => Promise.resolve([]),
+        release: () => {},
+        unsupportedNotice: token => `${token.trim()} attachments-unsupported`,
+      },
+    })
+
+    expect(subscribe).toHaveBeenCalledOnce()
+    shell.dispose()
+    expect(unsubscribe).toHaveBeenCalledOnce()
+  })
+
   it('enter falls to the default sink; no claim on the currency; edits free', async () => {
     const { textarea, shell, sink } = bench()
     act(() => { shell.setDraft('普通消息') })
@@ -141,7 +160,7 @@ describe('matrix row: claimed', () => {
     const { view, textarea, shell, claim } = bench()
     claim()
     act(() => { shell.editor.update(() => {}, { discrete: true }) }) // flush the queued decoration refresh
-    expect(shell.snapshot.claim).toEqual({ token: '/goal ', hint: '目标' })
+    expect(shell.snapshot.claim).toEqual({ name: 'goal', token: '/goal ', hint: '目标' })
     expect(view.container.querySelector('[data-lexical-text][style*="warn-label"]')?.textContent).toBe('/goal ')
     // The zh dictionary owns a hint.goal entry, which overrides the raw claim hint (production behavior).
     expect(textarea.style.getPropertyValue('--dsh-composer-hint')).toBe(JSON.stringify('输入目标，智能体将持续执行'))
@@ -201,7 +220,7 @@ describe('matrix row: claimed with attachments', () => {
     const { textarea, shell, claim, serialize, release } = bench({ submit, serialize: () => Promise.resolve([png, file]) })
     claim('/goal ', '目标', true)
     // The claim currency carries the acceptance flag the pre-gate reads.
-    expect(shell.snapshot.claim).toEqual({ token: '/goal ', hint: '目标', attachments: true })
+    expect(shell.snapshot.claim).toEqual({ name: 'goal', token: '/goal ', hint: '目标', attachments: true })
     act(() => { shell.addAttachments([img]) })
     fireEvent.keyDown(textarea, { key: 'Enter' })
     await vi.waitFor(() => { expect(submit).toHaveBeenCalledWith('', SCTX, [png, file]) })
@@ -318,7 +337,7 @@ describe('matrix row: locked (session disabled)', () => {
   it('disables the textarea and chrome; the machine currency is untouched', () => {
     const { view, textarea, shell } = bench({ disabled: true })
     expect(textarea.getAttribute('aria-disabled')).toBe('true')
-    expect((view.getByLabelText('指令') as HTMLButtonElement).disabled).toBe(true)
+    expect((view.getByLabelText('添加文件或调用指令') as HTMLButtonElement).disabled).toBe(true)
     expect(shell.snapshot.phase).toBe('plain')
   })
 

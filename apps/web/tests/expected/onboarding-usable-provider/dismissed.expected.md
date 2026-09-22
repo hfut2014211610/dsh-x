@@ -7,9 +7,9 @@
     - button "模型":
       - img
       - text: 模型
-    - button "插件":
+    - button "内置插件":
       - img
-      - text: 插件
+      - text: 内置插件
     - button "连接器":
       - img
       - text: 连接器
@@ -22,6 +22,9 @@
     - button "用量":
       - img
       - text: 用量
+    - button "已归档会话":
+      - img
+      - text: 已归档会话
   - button "打开配置文件"
   - button "关闭":
     - img

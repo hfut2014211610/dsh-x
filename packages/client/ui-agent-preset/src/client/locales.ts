@@ -14,13 +14,15 @@ export type AgentPresetSettingsKey =
   | 'presetUedName' | 'presetUedDescription'
   | 'duplicate' | 'duplicateUnavailable' | 'delete' | 'presetId' | 'presetIdPlaceholder' | 'copyOf'
   | 'displayName' | 'displayNamePlaceholder'
-  | 'inUse' | 'noDescription' | 'builtInGroup' | 'customGroup'
+  | 'inUse' | 'selectionOffDefault' | 'noDescription' | 'builtInGroup' | 'customGroup'
   | 'brokenBadge' | 'brokenNoCopy' | 'switchRefused'
   | 'composition' | 'cancel' | 'close' | 'retry'
   | 'copyTitle' | 'copyIntro' | 'create' | 'creating' | 'creatorDraft'
   | 'openLocation' | 'showLocation' | 'revealedPathLabel'
   | 'idRequired' | 'idInvalid' | 'idTaken'
   | 'deleteTitle' | 'deleteDescription' | 'deleteConfirm' | 'deleting'
+  | 'showPicker' | 'showPickerBeta' | 'showPickerDescription'
+  | 'enablePickerToSetDefault' | 'enablePickerToCreate'
 
 /** English copy. */
 export const en: Record<AgentPresetSettingsKey, string> = {
@@ -52,7 +54,7 @@ export const en: Record<AgentPresetSettingsKey, string> = {
     'Single-tool coding agent with a persistent shell.',
   presetCordisName: 'Creator mode',
   presetCordisDescription:
-    'Built for creating custom agent presets, with all Standard mode capabilities plus runtime inspection, plugin experiments, and preset-authoring guidance.',
+    'Built for creating custom agent presets, with all Standard mode capabilities plus runtime inspection, persistent plugin management, and preset-authoring guidance.',
   presetWritingName: 'Writing mode',
   presetWritingDescription:
     'Document drafting and revision agent, offering the document_* tools only.',
@@ -66,7 +68,8 @@ export const en: Record<AgentPresetSettingsKey, string> = {
   presetIdPlaceholder: 'my-agent',
   displayName: 'Name',
   displayNamePlaceholder: 'Shown in the picker; defaults to the identifier',
-  inUse: 'In use',
+  inUse: 'New task default',
+  selectionOffDefault: 'Default',
   builtInGroup: 'Built-in',
   customGroup: 'Custom',
   noDescription: 'No description.',
@@ -96,6 +99,12 @@ export const en: Record<AgentPresetSettingsKey, string> = {
     'The preset directory is deleted. Sessions already running on it keep working; new sessions cannot select it.',
   deleteConfirm: 'Delete',
   deleting: 'Deleting…',
+  showPicker: 'Allow switching Agent modes',
+  showPickerBeta: 'Beta',
+  showPickerDescription:
+    'When enabled, new tasks can choose Standard, PTC, Creator, Minimal, and custom modes. When disabled, all new tasks use the default mode (Standard by default; configurable). Only affects new tasks.',
+  enablePickerToSetDefault: 'Turn on Agent mode selection to choose a default',
+  enablePickerToCreate: 'Turn on Agent mode selection to start Creator mode',
 }
 
 /** Simplified Chinese copy. */
@@ -120,7 +129,7 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   presetMinimalName: '极简模式',
   presetMinimalDescription: '仅提供持久 shell 的单工具编码 Agent。',
   presetCordisName: '创造模式',
-  presetCordisDescription: '用于创建自定义 Agent preset：具备标准模式的全部能力，并提供运行时检查、插件实验和 preset 创作指导。',
+  presetCordisDescription: '用于创建自定义 Agent preset：具备标准模式的全部能力，并提供运行时检查、持久化插件管理和 preset 创作指导。',
   presetWritingName: '写作模式',
   presetWritingDescription: '面向文档编写与修订的写作 Agent，只提供 document_* 文档工具。',
   presetUedName: 'UED 模式',
@@ -132,7 +141,8 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   presetIdPlaceholder: 'my-agent',
   displayName: '名称',
   displayNamePlaceholder: '选择器中显示的名字，缺省用标识符',
-  inUse: '当前使用',
+  inUse: '新任务默认',
+  selectionOffDefault: '默认',
   builtInGroup: '内置',
   customGroup: '自定义',
   noDescription: '暂无描述。',
@@ -159,6 +169,11 @@ export const zh: Record<AgentPresetSettingsKey, string> = {
   deleteDescription: '预设目录将被删除。已在其上运行的会话不受影响；新会话将无法再选择它。',
   deleteConfirm: '删除',
   deleting: '正在删除…',
+  showPicker: '允许切换agent模式',
+  showPickerBeta: 'beta',
+  showPickerDescription: '开启后，新任务可选择标准、PTC、创造、极简及自定义模式；关闭后统一使用默认模式（默认为标准模式，可自定义）。仅影响新任务。',
+  enablePickerToSetDefault: '请先开启 Agent 模式选择，再设置默认模式',
+  enablePickerToCreate: '请先开启 Agent 模式选择，再启动创造模式',
 }
 
 /** Preset roster fields needed to resolve Web display copy. */

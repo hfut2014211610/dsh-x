@@ -6,10 +6,8 @@
 export type {
   DshBundleManifest,
   DshClientManifest,
-  DshConfigTreeDeclaration,
+  DshEnginesManifest,
   DshManifest,
-  DshModuleFallbackManifest,
+  DshPackageManifest,
   DshProfileManifest,
-  DshSessionFormatMigrationManifest,
-  ProfilePatchReload,
 } from './types.ts'

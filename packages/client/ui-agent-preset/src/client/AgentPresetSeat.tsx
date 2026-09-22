@@ -80,7 +80,13 @@ export type AgentPresetSeatProps =
 /** Shared picker props used by the Hero seat and a still-blank session header. */
 export type AgentPresetPickerProps = Pick<
   AgentPresetSeatProps,
-  'load' | 'select' | 'introduced' | 'useAgentPresetSeat' | 't'
+  | 'sessionId'
+  | 'useSessionRetainInfo'
+  | 'load'
+  | 'select'
+  | 'introduced'
+  | 'useAgentPresetSeat'
+  | 't'
 >
 
 /**
@@ -89,18 +95,31 @@ export type AgentPresetPickerProps = Pick<
  * @returns the chip, or null when the deployment composes no presets.
  */
 export function AgentPresetPicker({
-  load, select, introduced, useAgentPresetSeat, t,
+  sessionId, useSessionRetainInfo, load, select, introduced, useAgentPresetSeat, t,
 }: AgentPresetPickerProps) {
   const state = useAgentPresetSeat(snapshot => snapshot)
+  const main = useSessionRetainInfo(info => sessionId === undefined
+    || (info?.retainedBy.mainView ?? 0) > 0)
   const [open, setOpen] = useState(false)
   // The seq keys the banner, so picking the same broken preset twice replays
   // it rather than leaving the first one silently in place.
   const toastSeq = useRef(0)
   const [toast, setToast] = useState<{ seq: number; text: string } | null>(null)
+  const pickerVisible = useRef(state.showPicker)
+  pickerVisible.current = state.showPicker
 
   useEffect(() => {
     void load()
   }, [load])
+
+  // The component stays registered while hidden, so clear local disclosure
+  // state explicitly; otherwise an external off/on edit can revive an old
+  // menu or refusal banner.
+  useEffect(() => {
+    if (state.showPicker) return
+    setOpen(false)
+    setToast(null)
+  }, [state.showPicker])
 
   const chosen = state.options.find(option => option.id === state.current)
   const chosenText = chosen === undefined ? undefined : presetDisplayText(chosen, t)
@@ -129,7 +148,7 @@ export function AgentPresetPicker({
 
   // Nothing to choose between: the deployment composes no presets and every
   // session shares the host composition.
-  if (!ready) return null
+  if (!main || !state.showPicker || !ready) return null
 
   // One wrapper span: the chip is a flex row with a gap, so loose character
   // spans would each pick up the gap between them.
@@ -182,7 +201,7 @@ export function AgentPresetPicker({
             // Announced only for a pick a person just made: `apply()` also runs
             // when a session becomes current, and a banner over that would
             // report a refusal nobody asked for.
-            if (refusal === undefined) return
+            if (refusal === undefined || !pickerVisible.current) return
             toastSeq.current += 1
             setToast({ seq: toastSeq.current, text: t('switchRefused', { name, reason: refusal }) })
           })

@@ -207,6 +207,7 @@ export class SessionController extends TypertRemoteService {
       return Promise.resolve({
         meta: attached.header,
         inheritedEventCount: attached.inheritedEventCount,
+        // oxlint-disable-next-line typescript/no-deprecated -- Existing Session history read; migration deferred.
         events: attached.snapshotEvents(),
       })
     }
@@ -359,12 +360,12 @@ export class SessionController extends TypertRemoteService {
   }
 
   /**
-   * Mutate one still-pending queue occurrence on a live Agent.
+   * Mutate one still-pending queue occurrence, resuming a cold Agent first.
    * @param request - Session, queue item, and requested mutation.
    * @returns acknowledgement that the queue mutation was applied.
    */
   @Remote('updateQueue')
-  updateQueue(request: SessionUpdateQueueRequest): SessionUpdateQueueValue {
+  updateQueue(request: SessionUpdateQueueRequest): Promise<SessionUpdateQueueValue> {
     return this.commands.updateQueue(request)
   }
 
