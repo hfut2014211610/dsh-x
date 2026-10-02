@@ -19,6 +19,26 @@ describe('installer preparation preserves application dependencies', () => {
       DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://harness-test.deepseek.com',
     }, platform, 'x64')).toThrow('DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN')
   })
+  it('stamps the fork serial into the packaged application while the manifest version stays the default', async () => {
+    const { createElectronBuilderConfig } = await import('../scripts/electron-builder-config.mjs')
+    const manifestVersion = (JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8')) as {
+      version: string
+    }).version
+    const env = {
+      DSH_DESKTOP_APP_ID: 'com.example.installer',
+      DSH_DESKTOP_MANDATORY_UPDATE_TEST_ORIGIN: 'https://policy.example.com',
+      DSH_DESKTOP_TARGET_PLATFORM: 'win32',
+      DSH_DESKTOP_TARGET_ARCH: 'x64',
+      DSH_DESKTOP_UNSIGNED: '1',
+      DOWNLOAD_TEST_ORIGIN: 'https://desktop-updates.example.com',
+    }
+    expect(createElectronBuilderConfig(env, 'win32', 'x64').extraMetadata.version).toBe(manifestVersion)
+    expect(createElectronBuilderConfig({ ...env, DSH_DESKTOP_VERSION: `${manifestVersion}-x.0.14` }, 'win32', 'x64')
+      .extraMetadata.version).toBe(`${manifestVersion}-x.0.14`)
+    expect(createElectronBuilderConfig({ ...env, DSH_DESKTOP_VERSION: '  ' }, 'win32', 'x64')
+      .extraMetadata.version).toBe(manifestVersion)
+  })
+
   it.each(['win32', 'darwin'] as const)('keeps electron-builder responsible for node_modules on %s', async (platform) => {
     execute.mockClear()
     const env = {

@@ -1,3 +1,4 @@
+import { readFileSync } from 'node:fs'
 import { join } from 'node:path'
 import { fileURLToPath } from 'node:url'
 import { execFile } from 'node:child_process'
@@ -25,6 +26,42 @@ import {
   verifyMacOSAppUpdateConfig,
   writeMacOSAppUpdateConfig,
 } from './macos-app-update-config.mjs'
+
+/**
+ * Version electron-builder stamps into the application, installers, and update metadata.
+ *
+ * Release manifests keep the upstream version verbatim so upstream merges stay linear, and a
+ * fork release passes its serial in `DSH_DESKTOP_VERSION` instead. Without that setting the
+ * manifest version is used, which is the plain upstream behavior.
+ * @param env - Packaging environment.
+ * @returns Version stamped into packaged artifacts.
+ */
+function resolveForkAppVersion(env = process.env) {
+  const override = env.DSH_DESKTOP_VERSION?.trim()
+  if (override !== undefined && override !== '') return override
+  const manifest = JSON.parse(readFileSync(new URL('../package.json', import.meta.url), 'utf8'))
+  if (typeof manifest.version !== 'string' || manifest.version === '') {
+    throw new Error('desktop config: apps/desktop/package.json has no version')
+  }
+  return manifest.version
+}
+
+/**
+ * Verify a materialized runtime against the application version being packaged.
+ * @param root - Prepared runtime directory holding `desktop-runtime.json`.
+ * @param appVersion - Version electron-builder reports for this build.
+ * @param target - Platform and architecture selected by the build.
+ * @returns The verified runtime descriptor.
+ */
+async function verifyPreparedRuntime(root, appVersion, target) {
+  const { readDesktopRuntime, verifyDesktopRuntime } = await import('../lib/types/runtime-tree.js')
+  const { forkSerialMatchesRelease } = await import('../lib/types/release.js')
+  const descriptor = readDesktopRuntime(root)
+  if (!forkSerialMatchesRelease(appVersion, descriptor.release.version)) {
+    throw new Error(`desktop runtime: ${descriptor.release.version} does not match Electron ${appVersion}`)
+  }
+  return verifyDesktopRuntime(root, descriptor.release.version, target)
+}
 
 /**
  * Create electron-builder configuration from one release environment.
@@ -77,7 +114,7 @@ export function createElectronBuilderConfig(
   if (preparedRuntime !== undefined) buildPaths.dsh = preparedRuntime
   return {
     appId,
-    extraMetadata: { dshDesktopAppId: appId, dshMandatoryUpdatePolicy: policy },
+    extraMetadata: { dshDesktopAppId: appId, dshMandatoryUpdatePolicy: policy, version: resolveForkAppVersion(env) },
     productName: 'DeepSeek Harness',
     artifactName: 'deepseek-harness-${version}-${os}-${arch}.${ext}',
     directories: { output: unsigned ? join(buildPaths.root, 'unsigned-artifacts') : buildPaths.artifacts },
@@ -140,21 +177,20 @@ export function createElectronBuilderConfig(
       resolveDesktopPolicyConfig(policy)
     },
     afterPack: async context => {
-      const { verifyDesktopRuntime, writeDesktopRuntime } = await import('../lib/types/runtime-tree.js')
       const resourcesDir = context.packager.getResourcesDir(context.appOutDir)
       if (resolvedPlatform === 'darwin' && update !== undefined) {
         await writeMacOSAppUpdateConfig(resourcesDir, resolveMacOSAppUpdateFeed(context.packager.config.publish),
           context.packager.appInfo.updaterCacheDirName)
       }
+      const runtimeTarget = { platform: resolvedPlatform, arch: resolvedArch }
       if (resolvedPlatform === 'win32' && !unsigned) {
+        const { writeDesktopRuntime } = await import('../lib/types/runtime-tree.js')
         // Windows signs copied executable resources before afterPack runs.
-        const prepared = await verifyDesktopRuntime(buildPaths.dsh,
-          context.packager.appInfo.version, { platform: resolvedPlatform, arch: resolvedArch })
+        const prepared = await verifyPreparedRuntime(buildPaths.dsh, context.packager.appInfo.version, runtimeTarget)
         writeDesktopRuntime(buildPaths.dsh, prepared.release, prepared.sharedPackages.map(entry => entry.name),
-          { platform: resolvedPlatform, arch: resolvedArch })
+          runtimeTarget)
       }
-      await verifyDesktopRuntime(buildPaths.dsh,
-        context.packager.appInfo.version, { platform: resolvedPlatform, arch: resolvedArch })
+      await verifyPreparedRuntime(buildPaths.dsh, context.packager.appInfo.version, runtimeTarget)
     },
     afterSign: async context => {
       if (context.electronPlatformName !== 'darwin') return

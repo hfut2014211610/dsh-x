@@ -17,6 +17,23 @@ function isRecord(value: unknown): value is Record<string, unknown> {
   return typeof value === 'object' && value !== null
 }
 
+/** Trailing fork serial stamped into a packaged application version. */
+const FORK_SERIAL_SUFFIX = /-x\.\d+(?:\.\d+)*$/u
+
+/**
+ * Whether a packaged application version names the same release line as a bundled runtime version.
+ *
+ * A fork release stamps its serial into the application version (`<upstream>-x.<serial>`) while
+ * the materialized runtime keeps the upstream manifest version, so that trailing serial is
+ * tolerated; every other version pair must match exactly.
+ * @param appVersion - Version the installed application reports.
+ * @param runtimeVersion - Version recorded in the bundled runtime descriptor.
+ * @returns true when both versions name the same release line.
+ */
+export function forkSerialMatchesRelease(appVersion: string, runtimeVersion: string): boolean {
+  return appVersion === runtimeVersion || appVersion.replace(FORK_SERIAL_SUFFIX, '') === runtimeVersion
+}
+
 /** Validate release data read from an installed or packaged filesystem resource. */
 export function parseDesktopRelease(value: unknown): DesktopRelease {
   if (!isRecord(value) || value.schemaVersion !== 1 || typeof value.version !== 'string'
