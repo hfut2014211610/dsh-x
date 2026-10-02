@@ -19,7 +19,7 @@
  *        walking up from the session cwd to the project root (a directory
  *        containing `.git`, or the cwd itself).
  *  - The hint is ONCE PER SESSION, DERIVED FROM DURABLE EVENTS: the guard
- *    scans the session log for an existing `instruction-hint` message (then
+ *    scans the session log for an existing instruction-hint source (then
  *    O(1)), so a process restart — whose in-memory state starts empty —
  *    cannot inject a second copy. A duplicate would collide with the first
  *    message's deterministic id (`instruction-hint-<sessionId>`) and break
@@ -39,15 +39,37 @@
  * ROW ORDER: this plugin registers its `agent/pre-step` handler with
  * `prepend: true` and after `context-gate`/`tool-bootstrap`, so it runs
  * inside the gate's outermost strip — but it emits AFTER promotion, when the
- * strip is inactive. The hint source kind is `instruction-hint`, which is
- * not in the gate's claimed-baseline allowlist, so the gate can strip it
- * only while the session is unpromoted (never the intended path).
+ * strip is inactive. The hint uses the released `plugin` source kind with the
+ * `instructions` context form; the pre-fix fork-only `instruction-hint` kind
+ * is still recognized when scanning older logs, because released-format
+ * migration refuses that kind and an unreadable log is worse than a
+ * presentation label. `plugin` is not in the gate's claimed-baseline
+ * allowlist either, so the gate can strip it only while the session is
+ * unpromoted (never the intended path).
  */
 
 import { createEpochPromotion } from './compaction-epoch.mjs'
 
 /** Cordis plugin name used by loader diagnostics. */
 export const name = 'instruction-hint'
+
+/**
+ * Plugin name carried by the hint's durable source. The released `plugin`
+ * source admits `{ plugin, form: 'instructions' }`; the fork-specific
+ * `instruction-hint` kind is not in the released migration vocabulary and
+ * makes the whole Session unreadable once a newer format migrates it.
+ */
+const HINT_PLUGIN = 'instruction-hint'
+
+/**
+ * Whether one durable message source is this plugin's hint.
+ * @param source - Logged `user/message` source.
+ * @returns true for both the current `plugin` source and the pre-fix kind.
+ */
+function isInstructionHintSource(source) {
+  return source?.kind === HINT_PLUGIN
+    || (source?.kind === 'plugin' && source.plugin === HINT_PLUGIN)
+}
 
 /** Durable session event types that count as a promotion signal per mode. */
 const PROMOTE_EVENTS = {
@@ -154,13 +176,13 @@ export function apply(ctx, config) {
     const known = hinted.get(session.id)
     if (known !== undefined) return known
     const found = (typeof session.snapshotEvents === 'function' ? session.snapshotEvents() : []).some((event) =>
-      event.type === 'user/message' && event.data?.source?.kind === 'instruction-hint',
+      event.type === 'user/message' && isInstructionHintSource(event.data?.source),
     )
     hinted.set(session.id, found)
     return found
   }
   ctx.on('session/event', (session, event) => {
-    if (event.type === 'user/message' && event.data?.source?.kind === 'instruction-hint') {
+    if (event.type === 'user/message' && isInstructionHintSource(event.data?.source)) {
       hinted.set(session.id, true)
     }
   })
@@ -222,7 +244,7 @@ export function apply(ctx, config) {
           id: `instruction-hint-${session.id}`,
           role: 'user',
           content: [{ type: 'text', text }],
-          source: { kind: 'instruction-hint', form: 'hint' },
+          source: { kind: 'plugin', plugin: HINT_PLUGIN, form: 'instructions' },
         }],
       }
     } catch (error) {
