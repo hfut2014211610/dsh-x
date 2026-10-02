@@ -67,6 +67,34 @@ describe('usageStats projection unit (registry drive)', () => {
     expect(value?.contextWindow).toBe(128_000)
   })
 
+  it('accepts the provider-reported totalTokens bucket on logged usage', async () => {
+    const { ctx, session } = await harness(true)
+    session.append('request/context', { provider: 'x-models', model: 'deepseek-v4.1-flash' })
+    session.append('turn/start', { turn: 1 })
+    session.append('step/start', { turn: 1, step: 1 })
+    session.append('assistant/message', {
+      turn: 1,
+      step: 1,
+      message,
+      stream: [],
+      usage: {
+        inputTokens: 10,
+        outputTokens: 5,
+        totalTokens: 15,
+        cacheReadTokens: 3,
+      },
+    }, { surfaceOp: 'append' })
+    session.append('step/end', { turn: 1, step: 1 })
+    session.append('turn/end', { turn: 1, reason: { kind: 'completed' } })
+    const value = ctx.sessionProjections.snapshot(session).values.usageStats
+    expect(value?.requests[0]?.usage).toEqual({
+      inputTokens: 10,
+      outputTokens: 5,
+      totalTokens: 15,
+      cacheReadTokens: 3,
+    })
+  })
+
   it('leaves no record for a failed attempt that settled no message', async () => {
     const { ctx, session } = await harness(true)
     session.append('request/context', { provider: 'p', model: 'm' })

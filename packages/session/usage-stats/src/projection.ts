@@ -55,6 +55,7 @@ declare module '@deepseek-ai/dsh-session-projection/types' {
 const tokenUsageSchema = z.object({
   inputTokens: z.number().int().nonnegative(),
   outputTokens: z.number().int().nonnegative(),
+  totalTokens: z.number().int().nonnegative().optional(),
   cacheReadTokens: z.number().int().nonnegative().optional(),
   cacheWriteTokens: z.number().int().nonnegative().optional(),
   reasoningTokens: z.number().int().nonnegative().optional(),
