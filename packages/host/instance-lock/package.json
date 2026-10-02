@@ -1,7 +1,7 @@
 {
   "name": "@deepseek-ai/dsh-host-instance-lock",
   "description": "Refuse to start a second dsh runtime against a harness home that already has one",
-  "version": "0.1.5-rc.1",
+  "version": "0.1.6-alpha.2",
   "publishConfig": {
     "access": "public"
   },
