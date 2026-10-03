@@ -1,26 +1,32 @@
 name: Desktop release
 
-# Package the upstream Electron shell (apps/desktop) per target from THIS
+# Package the upstream Electron shell (apps/desktop) for Windows x64 from THIS
 # commit's packed dsh family closure, so fork packages ride the runtime, then
-# upload the installers to a GitHub Release.
+# upload the installer to a GitHub Release.
 #
-# Differences from the upstream scripts this flow drives: the update channel
-# is this repository's GitHub Releases instead of the Tencent COS deployment
-# (the fork holds no COS credentials; see electron-builder.config.mjs), the
-# packaged app version carries the fork serial through DSH_DESKTOP_VERSION,
-# and code signing is an unsigned-but-valid fallback when the secrets below
-# are absent. macOS notarization and Windows token signing engage only when
-# their environments are configured.
+# The fork holds no code-signing certificate and no Apple Developer identity,
+# and upstream 0.1.6 made both platforms refuse to package without one:
+# `validateDesktopPackageEnvironment` requires a real `CSC_LINK` p12 plus a
+# notarization strategy before any macOS build starts, and Windows signing needs
+# an EV token in a SafeNet key container. Only `--unsigned` skips that
+# preflight, and it accepts win-x64 alone, so this flow ships Windows only.
+#
+# `--unsigned` also drops the update channel: the builder emits no
+# `app-update.yml` and no `latest.yml`, which leaves the packaged app's update
+# coordinator disabled (`existsSync(app-update.yml)`) rather than pointing it at
+# the upstream Tencent COS deployment. Installs are therefore manual — download
+# the `.exe` from the Release. Restoring auto-update needs a signed Windows
+# build, or a fork-owned overlay that publishes a `github` provider.
 
 on:
   workflow_dispatch:
     inputs:
       version:
-        description: 'Fork version stamped into the installers (e.g. 0.1.5-rc.1-x.0.11); empty uses the dsh manifest version'
+        description: 'Fork version stamped into the installer (e.g. 0.1.6-alpha.2-x.0.14); empty uses the dsh manifest version'
         required: false
         default: ''
       release-tag:
-        description: 'Existing release tag to upload the installers to (e.g. dsh-v0.1.5-rc.1-x.0.11); empty skips the upload'
+        description: 'Existing release tag to upload the installer to (e.g. dsh-v0.1.6-alpha.2-x.0.14); empty skips the upload'
         required: false
         default: ''
 
@@ -29,10 +35,6 @@ permissions:
 
 env:
   DSH_TELEMETRY_DISABLED: '1'
-  DSH_DESKTOP_APP_ID: com.deepseek.harness
-  # writeReleaseRecord resolves the COS update config for its bookkeeping
-  # file; the fork never uploads to COS, so a bare origin suffices.
-  DOWNLOAD_TEST_ORIGIN: https://github.com
   FORK_VERSION: ${{ github.event.inputs.version }}
   RELEASE_TAG: ${{ github.event.inputs.release-tag }}
 
@@ -54,6 +56,27 @@ jobs:
         with:
           node-version: '24'
 
+      - name: Write the release settings
+        shell: pwsh
+        # Upstream reads every release setting from a gitignored per-platform
+        # dotenv and refuses to fall back to the ambient environment, so the
+        # fork's values have to be materialized as a file. `production` selects
+        # anonymous mandatory-update checks; the `test` deployment would demand a
+        # Feishu sign-in before the app may query for updates, and no fork
+        # deployment serves that endpoint. A transport failure against the
+        # placeholder origin is fail-open, so an unreachable policy origin never
+        # blocks startup.
+        run: |
+          $settings = @'
+          DSH_DESKTOP_APP_ID=com.deepseek.harness
+          DSH_DESKTOP_AUTO_UPDATE_ENV=production
+          DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=https://github.com
+          '@
+          [System.IO.File]::WriteAllText(
+            (Join-Path $PWD 'apps/desktop/.env.windows'),
+            $settings,
+            [System.Text.UTF8Encoding]::new($false))
+
       - name: Install (immutable)
         shell: pwsh
         run: pnpm install --frozen-lockfile
@@ -72,17 +95,17 @@ jobs:
         shell: pwsh
         env:
           DSH_DESKTOP_VERSION: ${{ env.FORK_VERSION }}
-        run: pnpm --filter @deepseek-ai/dsh-desktop run package:win:x64
+        # The unsigned target writes to unsigned-artifacts/ instead of
+        # artifacts/ and skips the release record, because neither belongs to a
+        # build with no signature and no channel.
+        run: pnpm --filter @deepseek-ai/dsh-desktop run package:win:x64:unsigned
 
       - name: Upload artifacts
         uses: actions/upload-artifact@v4
         with:
           name: desktop-windows-x64
           path: |
-            apps/desktop/.desktop-build/targets/win-x64/artifacts/*.exe
-            apps/desktop/.desktop-build/targets/win-x64/artifacts/*.yml
-            apps/desktop/.desktop-build/targets/win-x64/artifacts/*.7z
-            apps/desktop/.desktop-build/targets/win-x64/artifacts/*.blockmap
+            apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts/*.exe
           if-no-files-found: error
 
       - name: Attach installers to the release
@@ -91,83 +114,11 @@ jobs:
         env:
           GH_TOKEN: ${{ github.token }}
         run: |
-          # -Include needs a wildcard in -Path to take effect; top level only
-          # so the win-unpacked helper binaries and builder-debug.yml never
-          # reach the release.
-          $dir = "apps/desktop/.desktop-build/targets/win-x64/artifacts"
-          $channel = Join-Path $dir "latest.yml"
-          if (-not (Test-Path $channel)) { throw "missing required channel file: $channel" }
-          $files = Get-ChildItem -Path "$dir/*" -Include *.exe, latest.yml, *.7z, *.blockmap | ForEach-Object { $_.FullName }
-          gh release upload $env:RELEASE_TAG $files --clobber
-
-  macos:
-    runs-on: macos-latest
-    name: macos arm64 + x64 / dmg
-    timeout-minutes: 60
-    steps:
-      - uses: actions/checkout@v6
-        with:
-          persist-credentials: false
-
-      - uses: pnpm/action-setup@v4
-        with:
-          dest: ${{ runner.temp }}/setup-pnpm
-
-      - uses: actions/setup-node@v6
-        with:
-          node-version: '24'
-
-      - name: Install (immutable)
-        run: pnpm install --frozen-lockfile
-
-      - name: Download the Electron binary
-        # Same opt-in install as the Windows lane.
-        run: node apps/desktop/node_modules/electron/install.js
-
-      - name: Build the desktop shell
-        run: pnpm --filter @deepseek-ai/dsh-desktop run build
-
-      - name: Package mac-arm64
-        env:
-          DSH_DESKTOP_VERSION: ${{ env.FORK_VERSION }}
-        run: pnpm --filter @deepseek-ai/dsh-desktop run package:mac:arm64
-
-      - name: Package mac-x64
-        env:
-          DSH_DESKTOP_VERSION: ${{ env.FORK_VERSION }}
-        run: pnpm --filter @deepseek-ai/dsh-desktop run package:mac:x64
-
-      - uses: actions/upload-artifact@v4
-        with:
-          name: desktop-macos
-          path: |
-            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.dmg
-            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.zip
-            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.yml
-            apps/desktop/.desktop-build/targets/mac-arm64/artifacts/*.blockmap
-            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*.dmg
-            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*.zip
-            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*.yml
-            apps/desktop/.desktop-build/targets/mac-x64/artifacts/*.blockmap
-          if-no-files-found: error
-
-      - name: Attach installers to the release
-        if: ${{ env.RELEASE_TAG != '' }}
-        env:
-          GH_TOKEN: ${{ github.token }}
-        run: |
-          shopt -s nullglob
-          arm64=apps/desktop/.desktop-build/targets/mac-arm64/artifacts
-          x64=apps/desktop/.desktop-build/targets/mac-x64/artifacts
-          # The payloads must all exist; the channel file is single per
-          # release (flat GitHub channel namespace): arm64 wins so Apple
-          # Silicon updates resolve, Intel Macs download the x64 dmg by hand.
-          # builder-debug.yml stays out (rejected asset).
-          for required in "$arm64"/*.dmg "$arm64"/*.zip "$arm64/latest-mac.yml" "$x64"/*.dmg "$x64"/*.zip; do
-            compgen -G "$required" > /dev/null || { echo "missing required artifact: $required"; exit 1; }
-          done
-          files=(
-            $arm64/*.dmg $arm64/*.zip $arm64/latest-mac.yml $arm64/*.blockmap
-            $x64/*.dmg $x64/*.zip $x64/*.blockmap
-          )
-          gh release upload "$RELEASE_TAG" "${files[@]}" --clobber
+          # -Include needs a wildcard in -Path to take effect; top level only so
+          # the win-unpacked helper binaries and builder-debug.yml never reach
+          # the release. No channel file and no differential package: an
+          # unsigned build has no update feed to compute a differential against.
+          $dir = "apps/desktop/.desktop-build/targets/win-x64/unsigned-artifacts"
+          $installer = Get-ChildItem -Path "$dir/*" -Include *.exe | ForEach-Object { $_.FullName }
+          if (-not $installer) { throw "missing installer: $dir/*.exe" }
+          gh release upload $env:RELEASE_TAG $installer --clobber
