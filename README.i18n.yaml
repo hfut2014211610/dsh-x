@@ -1,6 +1,31 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write README.md
-README.md: 6d07b78389bdd41f8bd5a9eac7422e568cf527a3
-README.zh.md: 1f46ec8fb2e94b287da3159c11d595e440921920
+/dsh-x:
+  en: d409538cf09ad969
+  zh: 625b32bde3112a4f
+/dsh-x/what-dsh-x-adds:
+  en: 881d0345e0e50aa9
+  zh: de541fb1bab5dcef
+/dsh-x/install:
+  en: 68a23bbdbe1d5dad
+  zh: f4bb88543836b1ef
+/dsh-x/run-from-source:
+  en: 5b979441a071e3ba
+  zh: d61b61752069cc84
+/dsh-x/community-and-support:
+  en: 20acf6451fdc869b
+  zh: d06246dd019ecef7
+/dsh-x/contributing:
+  en: cabc2d3e9f8898bd
+  zh: 83b6d238bae29ce3
+/dsh-x/development:
+  en: 2b89ba0c8dbd108f
+  zh: 6ccd15623ac2d68c
+/dsh-x/citation:
+  en: 6704e9e5a8d49a91
+  zh: 85c9cdd8d56f8e9d
+/dsh-x/license:
+  en: 926995344fc1c72b
+  zh: 45d9d500636c35ae

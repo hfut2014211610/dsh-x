@@ -4,19 +4,19 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react'
 import type { FormEvent, MouseEvent, ReactNode } from 'react'
 import type { ConvViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
-  IconBrowseOutline16,
-  IconCheckOutline16,
+  IconBrowseOutlineRegular,
+  IconCheckOutlineRegular,
   IconChevronRightOutline14,
-  IconCloseOutline16,
-  IconCodeOutline16,
+  IconCloseOutlineRegular,
+  IconCodeOutlineRegular,
   IconFolderClose16,
   IconFolderOpen16,
-  IconFolderOpenOutline16,
-  IconListPenOutline16,
-  IconLoadingOutline16,
-  IconRefreshOutline16,
-  IconSearchOutline16,
-  IconWarningOutline16,
+  IconFolderOpenOutlineRegular,
+  IconListPenOutlineRegular,
+  IconLoadingOutlineRegular,
+  IconRefreshOutlineRegular,
+  IconSearchOutlineRegular,
+  IconWarningOutlineRegular,
   CodeBlock,
   MarkdownText,
   ResizeHandle,
@@ -228,7 +228,7 @@ function DirectoryBranch({
                 : <span className={css.treeChevronSeat} />}
               {directory
                 ? open ? <IconFolderOpen16 className={css.treeFolder} /> : <IconFolderClose16 className={css.treeFolder} />
-                : <IconCodeOutline16 className={css.treeFile} />}
+                : <IconCodeOutlineRegular className={css.treeFile} />}
               <span className={css.treeName}>{entry.name}</span>
             </button>
             {directory && open && (
@@ -249,7 +249,7 @@ function DirectoryBranch({
       })}
       {(state === undefined || state.status === 'loading') && (
         <li className={css.treeMessage} role="none">
-          <IconLoadingOutline16 className={css.treeSpinner} />
+          <IconLoadingOutlineRegular className={css.treeSpinner} />
           <span>{t('tree.loading')}</span>
         </li>
       )}
@@ -812,13 +812,13 @@ export function WritingView({
     <div className={css.root} data-writing-view={sessionId}>
       <nav className={css.toolRail} aria-label={t('tools.label')}>
         <RailButton active={panel === 'document'} label={t('tools.document')} onClick={() => { togglePanel('document') }}>
-          <IconFolderOpenOutline16 />
+          <IconFolderOpenOutlineRegular />
         </RailButton>
         <RailButton active={panel === 'outline'} label={t('tools.outline')} onClick={() => { togglePanel('outline') }}>
-          <IconListPenOutline16 />
+          <IconListPenOutlineRegular />
         </RailButton>
         <RailButton active={panel === 'search'} label={t('tools.search')} onClick={() => { togglePanel('search') }}>
-          <IconSearchOutline16 />
+          <IconSearchOutlineRegular />
         </RailButton>
       </nav>
 
@@ -827,7 +827,7 @@ export function WritingView({
           <header className={css.panelHeader}>
             <strong>{t(`panel.${panel}`)}</strong>
             <button type="button" className={css.iconButton} aria-label={t('action.close')} onClick={() => { setPanel(null) }}>
-              <IconCloseOutline16 />
+              <IconCloseOutlineRegular />
             </button>
           </header>
 
@@ -847,7 +847,7 @@ export function WritingView({
                 }}
               >
                 <div className={css.searchInput}>
-                  <IconSearchOutline16 />
+                  <IconSearchOutlineRegular />
                   <input
                     id={`writing-path-${sessionId}`}
                     aria-label={t('filter.label')}
@@ -870,7 +870,7 @@ export function WritingView({
                       aria-label={t('filter.clear')}
                       onClick={() => { setPathInput('') }}
                     >
-                      <IconCloseOutline16 />
+                      <IconCloseOutlineRegular />
                     </button>
                   )}
                 </div>
@@ -880,7 +880,7 @@ export function WritingView({
                   <strong id={`writing-tree-${sessionId}`}>{t('tree.heading')}</strong>
                   <Tooltip label={t('tree.refresh')} side="bottom">
                     <button type="button" className={css.iconButton} aria-label={t('tree.refresh')} onClick={refreshDirectories}>
-                      <IconRefreshOutline16 />
+                      <IconRefreshOutlineRegular />
                     </button>
                   </Tooltip>
                 </div>
@@ -917,7 +917,7 @@ export function WritingView({
             <>
               <form className={css.searchForm} onSubmit={(event) => { void handleSearch(event) }}>
                 <div className={css.searchInput}>
-                  <IconSearchOutline16 />
+                  <IconSearchOutlineRegular />
                   <input
                     aria-label={t('search.input')}
                     value={query}
@@ -960,8 +960,8 @@ export function WritingView({
           <div className={css.editorActions}>
             <span className={css.status} data-status={status} title={version || undefined}>
               {status === 'conflict' || status === 'error'
-                ? <IconWarningOutline16 />
-                : <IconCheckOutline16 />}
+                ? <IconWarningOutlineRegular />
+                : <IconCheckOutlineRegular />}
               {statusLabel}
             </span>
             <Tooltip label={t('action.reload')} side="bottom">
@@ -972,7 +972,7 @@ export function WritingView({
                 disabled={currentPath === '' || status === 'loading'}
                 onClick={() => { void loadDocument(currentPath, 'reload') }}
               >
-                <IconRefreshOutline16 />
+                <IconRefreshOutlineRegular />
               </button>
             </Tooltip>
             <Tooltip label={t('action.newWindow')} side="bottom">
@@ -983,7 +983,7 @@ export function WritingView({
                 disabled={currentPath === ''}
                 onClick={openInNewWindow}
               >
-                <IconBrowseOutline16 />
+                <IconBrowseOutlineRegular />
               </button>
             </Tooltip>
             <button
@@ -1027,7 +1027,7 @@ export function WritingView({
                     aria-label={`${t('action.close')} ${name}`}
                     onClick={() => { closeDocument(path) }}
                   >
-                    <IconCloseOutline16 />
+                    <IconCloseOutlineRegular />
                   </button>
                 </span>
               )
@@ -1038,7 +1038,7 @@ export function WritingView({
         {error !== null && <div className={css.error} role="alert">{error}</div>}
         {status === 'conflict' && (
           <div className={css.conflict} role="status">
-            <IconWarningOutline16 />
+            <IconWarningOutlineRegular />
             <span>{t('conflict.message')}</span>
             <button type="button" onClick={() => { void loadDocument(currentPath, 'reload') }}>{t('action.reload')}</button>
           </div>

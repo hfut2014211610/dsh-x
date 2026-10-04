@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-29-remove-werewolf-experiment.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/simplification/2026-08-29-remove-werewolf-experiment.md
-2026-08-29-remove-werewolf-experiment.md: 32e7028e9ce71a73d77cedad62b9caa87bd7407b
-2026-08-29-remove-werewolf-experiment.zh.md: 439885cf054f38a028f780c484d6ab97e89d0254
+/agent-note-remove-the-werewolf-experiment-from-dsh:
+  en: cd6f85afa264909e
+  zh: 0d66d8226691df0d
+/agent-note-remove-the-werewolf-experiment-from-dsh/problem:
+  en: 1a62398ec0bcee4e
+  zh: 85d6f14cd2723376
+/agent-note-remove-the-werewolf-experiment-from-dsh/decision:
+  en: c16ebc4cb9032677
+  zh: b3d63f5e19ae4429
+/agent-note-remove-the-werewolf-experiment-from-dsh/alternatives-considered:
+  en: d96f61b33e3fc10f
+  zh: 1dfc72ddd0e9a974
+/agent-note-remove-the-werewolf-experiment-from-dsh/consequences:
+  en: 00bd79ca459801f4
+  zh: 1e20ef278880c4f8

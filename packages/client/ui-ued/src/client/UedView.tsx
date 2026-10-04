@@ -4,14 +4,14 @@ import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ConvViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
   IconChevronRightOutline14,
-  IconCloseOutline16,
-  IconCodeOutline16,
+  IconCloseOutlineRegular,
+  IconCodeOutlineRegular,
   IconFolderClose16,
-  IconListPenOutline16,
-  IconLoadingOutline16,
-  IconPlusOutline16,
-  IconRefreshOutline16,
-  IconWarningOutline16,
+  IconListPenOutlineRegular,
+  IconLoadingOutlineRegular,
+  IconPlusOutlineRegular,
+  IconRefreshOutlineRegular,
+  IconWarningOutlineRegular,
   ResizeHandle,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 import type {
@@ -287,7 +287,7 @@ export function UedView({
               aria-label={label('files.refresh')}
               onClick={() => { void refreshListing(directory) }}
             >
-              <IconRefreshOutline16 />
+              <IconRefreshOutlineRegular />
             </button>
           </header>
           <div className={css.crumb}>{directory === '' ? '/' : `/${directory}`}</div>
@@ -303,7 +303,7 @@ export function UedView({
           )}
           {listing.status === 'loading' && <p className={css.hint}>{label('files.loading')}</p>}
           {listing.status === 'error' && (
-            <p className={css.error}><IconWarningOutline16 /> {listing.error ?? label('files.error')}</p>
+            <p className={css.error}><IconWarningOutlineRegular /> {listing.error ?? label('files.error')}</p>
           )}
           {listing.status === 'ready' && directories.map(entry => (
             <button
@@ -324,7 +324,7 @@ export function UedView({
               aria-pressed={entry.path === selected}
               onClick={() => { open(entry.path) }}
             >
-              <IconCodeOutline16 className={css.rowFile} />
+              <IconCodeOutlineRegular className={css.rowFile} />
               <span>{entry.name}</span>
             </button>
           ))}
@@ -373,7 +373,7 @@ export function UedView({
               aria-pressed={armed}
               onClick={toggleArmed}
             >
-              <IconListPenOutline16 />
+              <IconListPenOutlineRegular />
             </button>
           )}
           {selected !== undefined && (
@@ -383,17 +383,17 @@ export function UedView({
               aria-label={label('preview.reload')}
               onClick={() => { void loadPreview(selected) }}
             >
-              <IconRefreshOutline16 />
+              <IconRefreshOutlineRegular />
             </button>
           )}
         </header>
         <div className={css.frameWrap}>
           {preview.status === 'idle' && (
-            <p className={css.hint}><IconCodeOutline16 /> {label('preview.none')}</p>
+            <p className={css.hint}><IconCodeOutlineRegular /> {label('preview.none')}</p>
           )}
-          {preview.status === 'loading' && <p className={css.hint}><IconLoadingOutline16 /> {label('preview.loading')}</p>}
+          {preview.status === 'loading' && <p className={css.hint}><IconLoadingOutlineRegular /> {label('preview.loading')}</p>}
           {preview.status === 'error' && (
-            <p className={css.error}><IconWarningOutline16 /> {preview.error ?? label('preview.error')}</p>
+            <p className={css.error}><IconWarningOutlineRegular /> {preview.error ?? label('preview.error')}</p>
           )}
           {preview.status === 'ready' && (
             // `sandbox` is a constant, never composed at the call site: an
@@ -430,7 +430,7 @@ export function UedView({
                   aria-label={label('inspect.close')}
                   onClick={() => { setPicked(null); highlight(-1) }}
                 >
-                  <IconCloseOutline16 />
+                  <IconCloseOutlineRegular />
                 </button>
               </header>
               {picked.map(candidate => (
@@ -450,7 +450,7 @@ export function UedView({
                     aria-label={label('inspect.add')}
                     onClick={() => { addToConversation(candidate) }}
                   >
-                    <IconPlusOutline16 />
+                    <IconPlusOutlineRegular />
                   </button>
                 </div>
               ))}

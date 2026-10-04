@@ -10,7 +10,7 @@
  */
 
 import { useEffect, useState } from 'react'
-import { Button, IconPlusOutline16, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconPlusOutlineRegular, Pill } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import type { en } from './locales.ts'
 import { routeNameFor } from './store.ts'
@@ -116,7 +116,7 @@ export function ModelHubSection(props: ModelHubSectionProps) {
             {importBusy ? t('importBusy') : t('importButton')}
           </Button>
           <Button
-            icon={<IconPlusOutline16 />}
+            icon={<IconPlusOutlineRegular />}
             onClick={() => { setEditor({ kind: 'provider', key: null }) }}
           >{t('addProvider')}</Button>
         </div>
@@ -173,7 +173,7 @@ export function ModelHubSection(props: ModelHubSectionProps) {
       <div className={styles.sectionHead}>
         <h3 className={styles.sectionTitle}>{t('models')}</h3>
         <Button
-          icon={<IconPlusOutline16 />}
+          icon={<IconPlusOutlineRegular />}
           onClick={() => { setEditor({ kind: 'model', id: null }) }}
         >{t('addModel')}</Button>
       </div>

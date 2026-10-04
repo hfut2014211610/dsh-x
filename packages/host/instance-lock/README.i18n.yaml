@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/host/instance-lock/README.md
-README.md: c9e95047db9474ab54cc912f4d615649995703fc
-README.zh.md: 9498cef936ec109ea26d8346e0e0bd7dc65318cd
+/:
+  en: c0d2578bf5efc41d
+  zh: d0821458053bae40
+/deepseek-ai-dsh-host-instance-lock:
+  en: a7811bbd28efc754
+  zh: ad472e7eec1fa3ef
+/deepseek-ai-dsh-host-instance-lock/summary:
+  en: ba7990854ac5f229
+  zh: ed329a49139b3bee
+/deepseek-ai-dsh-host-instance-lock/table-of-contents:
+  en: b99bd4c523df5fd1
+  zh: fd21357873d0d7dc
+/deepseek-ai-dsh-host-instance-lock/the-guard-is-deliberately-the-blunt-one:
+  en: fcf0d03d53267cf4
+  zh: 82fa78c7fcf2f4f5
+/deepseek-ai-dsh-host-instance-lock/refusing-means-ctx-appexit:
+  en: c4ad6d07271d3f6e
+  zh: 5c3e64d21f627bcf
+/deepseek-ai-dsh-host-instance-lock/the-claim-is-a-file-honoured-only-while-its-pid-is-alive:
+  en: b4a5b15ba57d5472
+  zh: c73044f851d710e0
+/deepseek-ai-dsh-host-instance-lock/configuration:
+  en: e6d17143940d496c
+  zh: 26969f7566bce6f4
+/deepseek-ai-dsh-host-instance-lock/model-experience:
+  en: e75282aa60df9028
+  zh: e75282aa60df9028
+/deepseek-ai-dsh-host-instance-lock/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: 62a2d806b05ac679
+/deepseek-ai-dsh-host-instance-lock/known-limitations-and-deferred-work:
+  en: b6a7fa59212bfd45
+  zh: 4b98a2beef234db1
+/deepseek-ai-dsh-host-instance-lock/known-limitations-and-deferred-work/dev-note:
+  en: 9f4137dac333c92c
+  zh: 341dbdef9f5e9c59

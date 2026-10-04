@@ -1,6 +1,40 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write packages/client/ui-settings-connectors/README.md
-README.md: cecd44f7b99f0c28f5bc740ee0a1348ee9cf2dbe
-README.zh.md: 686484ed681d04ecf91d6e5b5f821e432afae606
+/:
+  en: 0418730c8adabc27
+  zh: dea13c9ea3ffef60
+/deepseek-ai-dsh-client-ui-settings-connectors:
+  en: f7748520d4cc808f
+  zh: dae4b17a16ca8edc
+/deepseek-ai-dsh-client-ui-settings-connectors/summary:
+  en: 3bdcea209e00fba2
+  zh: 282e7158e0588254
+/deepseek-ai-dsh-client-ui-settings-connectors/table-of-contents:
+  en: 07a0918a05d274ec
+  zh: 48f50447277a3a46
+/deepseek-ai-dsh-client-ui-settings-connectors/why-this-is-not-a-tab-under-plugins:
+  en: fe858fe101c3fa3a
+  zh: 299af2546ceea483
+/deepseek-ai-dsh-client-ui-settings-connectors/adding-a-channel:
+  en: 84a6cb18736bade8
+  zh: 0f97621feb0dda73
+/deepseek-ai-dsh-client-ui-settings-connectors/the-staged-form:
+  en: 216644a4823feb07
+  zh: b22185847e5e00d6
+/deepseek-ai-dsh-client-ui-settings-connectors/the-feishu-card:
+  en: d7d4e00f19560f15
+  zh: e834826d60eb2422
+/deepseek-ai-dsh-client-ui-settings-connectors/model-experience:
+  en: 5ed7c34b5a95825e
+  zh: ea71cc74efb30d91
+/deepseek-ai-dsh-client-ui-settings-connectors/model-experience/kv-cache-effect:
+  en: ca75c51c89c2c9b0
+  zh: a046659276bc2299
+/deepseek-ai-dsh-client-ui-settings-connectors/known-limitations-and-deferred-work:
+  en: 7e0525f6ba1c6998
+  zh: 4d7c59b4b916506f
+/deepseek-ai-dsh-client-ui-settings-connectors/known-limitations-and-deferred-work/dev-note:
+  en: 5627c9284e396543
+  zh: 3472ce1094ce5600

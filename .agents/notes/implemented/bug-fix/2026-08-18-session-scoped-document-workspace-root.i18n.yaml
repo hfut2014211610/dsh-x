@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-session-scoped-document-workspace-root.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-18-session-scoped-document-workspace-root.md
-2026-08-18-session-scoped-document-workspace-root.md: 5fe3ed21e038d6f565701fc32d29e1ecf7a83a55
-2026-08-18-session-scoped-document-workspace-root.zh.md: e895497a94a01e100c90db05515c479eb5235c84
+/agent-note-session-scoped-document-workspace-roots:
+  en: 2262d76c69b8208c
+  zh: 97622a3526eae733
+/agent-note-session-scoped-document-workspace-roots/problem:
+  en: f6f0c9138c18fbde
+  zh: 9c92cf331f7c56c8
+/agent-note-session-scoped-document-workspace-roots/decision:
+  en: bd33abbb11825447
+  zh: a5055b4f6675cebf
+/agent-note-session-scoped-document-workspace-roots/verification:
+  en: f30739c765336540
+  zh: 9f5e0d6baaa1bc1d
+/agent-note-session-scoped-document-workspace-roots/alternatives-considered:
+  en: dd021b95814bc384
+  zh: 5e539955642b6df7
+/agent-note-session-scoped-document-workspace-roots/consequences:
+  en: 2a0822a84a50e370
+  zh: 14ec6b53c18c18d3

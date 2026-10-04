@@ -11,7 +11,7 @@
 import { useEffect } from 'react'
 import type { ReactNode } from 'react'
 import clsx from 'clsx'
-import { Button, IconRefreshOutline16, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
+import { Button, IconRefreshOutlineRegular, Tooltip } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { InjectFace } from '@deepseek-ai/dsh-client-ui-slots'
 import type { UsageSettingsStore } from './store.ts'
 import type { DayUsage, ModelUsageRow, UsageRange } from './view-model.ts'
@@ -131,7 +131,7 @@ function UsageLoaded({ injected }: { injected: UsageSectionFace }): ReactNode {
           <p className={styles.intro}>{t('intro')}</p>
         </div>
         <Button variant="ghost" size="sm" onClick={() => { void controller.load() }}>
-          <IconRefreshOutline16 size={16} />
+          <IconRefreshOutlineRegular size={16} />
           {t('refresh')}
         </Button>
       </header>

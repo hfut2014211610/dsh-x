@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-writing-editor-companion-layout.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-writing-editor-companion-layout.md
-2026-08-18-writing-editor-companion-layout.md: 46eece71e7347e37390a4307347bf06381b8c96a
-2026-08-18-writing-editor-companion-layout.zh.md: b00a574a47fbd14907e10064c975b9713a1c8c32
+/agent-note-writing-editor-with-a-companion-conversation:
+  en: 81ba098ca5d98624
+  zh: 8bc9af74ba55d79e
+/agent-note-writing-editor-with-a-companion-conversation/problem:
+  en: 619e0d66db9b8b85
+  zh: 452d9d0929f90794
+/agent-note-writing-editor-with-a-companion-conversation/decision:
+  en: 75a9491c88fe3372
+  zh: acdd3ba46754bdf4
+/agent-note-writing-editor-with-a-companion-conversation/alternatives-considered:
+  en: 45e9a7e90ab6ea40
+  zh: 8c92602299f19065
+/agent-note-writing-editor-with-a-companion-conversation/consequences:
+  en: 16914e0da93d925b
+  zh: a74e5b9e349de6b7

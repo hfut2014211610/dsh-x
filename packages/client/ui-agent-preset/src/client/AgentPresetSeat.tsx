@@ -13,10 +13,10 @@
  */
 
 import { useEffect, useRef, useState } from 'react'
-import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
+import type { ObservableSnapshot, SnapshotStore } from '@deepseek-ai/dsh-client-store'
 import type { InjectFace, PropsLocale, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
 import {
-  IconAgentPresetOutline16, IconChevronDownOutline14, IconWarningOutline16, Menu, Toast,
+  IconAgentPresetOutlineRegular, IconChevronDownOutlineRegular, IconWarningOutlineRegular, Menu, Toast,
 } from '@deepseek-ai/dsh-client-ui-primitives'
 // Type-only: pulls the ui-conversation SlotMap merge (the hero seat).
 import type {} from '@deepseek-ai/dsh-client-ui-conversation/client'
@@ -27,6 +27,8 @@ import css from './AgentPresetSeat.module.css'
 /** Registration-side business face for the hero chip. */
 export interface AgentPresetSeatInjected {
   hooks: {
+    /** Shared Developer tools preference; off hides the chip. */
+    developerTools: ObservableSnapshot<boolean>
     /** Seat snapshot bound by the renderer as useAgentPresetSeat. */
     agentPresetSeat: SnapshotStore<AgentPresetSeatState>
   }
@@ -49,16 +51,7 @@ const INTRO_CHAR_STAGGER_MS = 40
 const INTRO_TEXT_REVEAL_MS = 200
 const INTRO_CHAR_FADE_MS = 400
 
-/**
- * How long a refused switch holds before fading.
- *
- * Longer than the primitive's default because this banner is the only place
- * the refusal appears. The chip's label has already snapped back to the
- * preset the session still runs, and a preset the host refuses to MOUNT is
- * one discovery reported healthy — its row on the settings page carries no
- * reason to go back and read, because there was nothing to see until the
- * rows actually ran.
- */
+/** Duration of a selection-refusal banner, including a revision becoming unavailable during a pick. */
 const REFUSAL_HOLD_MS = 8000
 
 /**
@@ -92,7 +85,8 @@ export type AgentPresetPickerProps = Pick<
 /**
  * Render the shared blank-session agent-preset picker.
  * @param props - composed slot props.
- * @returns the chip, or null when the deployment composes no presets.
+ * @returns the chip, or null outside the main view or before the roster
+ *   provides a preset choice.
  */
 export function AgentPresetPicker({
   sessionId, useSessionRetainInfo, load, select, introduced, useAgentPresetSeat, t,
@@ -105,21 +99,10 @@ export function AgentPresetPicker({
   // it rather than leaving the first one silently in place.
   const toastSeq = useRef(0)
   const [toast, setToast] = useState<{ seq: number; text: string } | null>(null)
-  const pickerVisible = useRef(state.showPicker)
-  pickerVisible.current = state.showPicker
 
   useEffect(() => {
     void load()
   }, [load])
-
-  // The component stays registered while hidden, so clear local disclosure
-  // state explicitly; otherwise an external off/on edit can revive an old
-  // menu or refusal banner.
-  useEffect(() => {
-    if (state.showPicker) return
-    setOpen(false)
-    setToast(null)
-  }, [state.showPicker])
 
   const chosen = state.options.find(option => option.id === state.current)
   const chosenText = chosen === undefined ? undefined : presetDisplayText(chosen, t)
@@ -148,7 +131,7 @@ export function AgentPresetPicker({
 
   // Nothing to choose between: the deployment composes no presets and every
   // session shares the host composition.
-  if (!main || !state.showPicker || !ready) return null
+  if (!main || !ready) return null
 
   // One wrapper span: the chip is a flex row with a gap, so loose character
   // spans would each pick up the gap between them.
@@ -201,7 +184,7 @@ export function AgentPresetPicker({
             // Announced only for a pick a person just made: `apply()` also runs
             // when a session becomes current, and a banner over that would
             // report a refusal nobody asked for.
-            if (refusal === undefined || !pickerVisible.current) return
+            if (refusal === undefined) return
             toastSeq.current += 1
             setToast({ seq: toastSeq.current, text: t('switchRefused', { name, reason: refusal }) })
           })
@@ -219,9 +202,9 @@ export function AgentPresetPicker({
             disabled={state.busy}
             onClick={() => { setOpen(value => !value) }}
           >
-            <IconAgentPresetOutline16 className={introducing ? `${css.seatIcon} ${css.introIcon}` : css.seatIcon} />
+            <IconAgentPresetOutlineRegular className={introducing ? `${css.seatIcon} ${css.introIcon}` : css.seatIcon} />
             <span className={css.seatLabel}>{shownLabel}</span>
-            <IconChevronDownOutline14 className={css.chevron} />
+            <IconChevronDownOutlineRegular className={css.chevron} />
           </button>
         )}
       />
@@ -229,7 +212,7 @@ export function AgentPresetPicker({
         <Toast
           key={toast.seq}
           text={toast.text}
-          icon={<IconWarningOutline16 />}
+          icon={<IconWarningOutlineRegular />}
           holdMs={REFUSAL_HOLD_MS}
           // The composer card, which is the content column this chip sits
           // above rather than inside — hence a page query, not `closest`.
@@ -246,8 +229,13 @@ export function AgentPresetPicker({
 /**
  * Render the root-scoped new-session preset seat.
  * @param props - composed slot props.
- * @returns the shared preset picker.
+ * @returns the shared preset picker, or null with Developer tools off. The gate
+ *   sits here rather than inside the picker so the picker unmounts with it: its
+ *   disclosure state is discarded instead of revived by a later toggle, and the
+ *   blank-session header keeps the same picker while tools are off.
  */
 export function AgentPresetSeat(props: AgentPresetSeatProps) {
+  const developerTools = props.useDeveloperTools(value => value)
+  if (!developerTools) return null
   return <AgentPresetPicker {...props} />
 }

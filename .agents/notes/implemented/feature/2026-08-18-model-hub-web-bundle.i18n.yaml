@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-18-model-hub-web-bundle.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/feature/2026-08-18-model-hub-web-bundle.md
-2026-08-18-model-hub-web-bundle.md: 92c6664c3645fba46c5edc1e073a294096c08211
-2026-08-18-model-hub-web-bundle.zh.md: bd7b77ce06761372590405c73ba28847fb5b340a
+/agent-note-model-hub-ships-in-the-web-bundle:
+  en: 927052557ec4d217
+  zh: 3d6207e5b25866fb
+/agent-note-model-hub-ships-in-the-web-bundle/problem:
+  en: b1ae61497496c1b2
+  zh: bb8cf3216922d63e
+/agent-note-model-hub-ships-in-the-web-bundle/decision:
+  en: 1135bb3797db2790
+  zh: 740dc94332abbd50
+/agent-note-model-hub-ships-in-the-web-bundle/verification:
+  en: c62b9e38e75a9c11
+  zh: 32a36779324938ff
+/agent-note-model-hub-ships-in-the-web-bundle/alternatives-considered:
+  en: 80e986a63ccc0939
+  zh: 5d7730ecc1f6b952
+/agent-note-model-hub-ships-in-the-web-bundle/consequences:
+  en: dcad79dd97586dcf
+  zh: 32cf7c968655aaac

@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-preset-git-bash-preflight.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-preset-git-bash-preflight.md
-2026-08-25-preset-git-bash-preflight.md: ebb3e5f7f76726b26013eb64979d2142e652cb28
-2026-08-25-preset-git-bash-preflight.zh.md: 522891fa19420eac8ba0b8d75cdc2ce0e0bda278
+/agent-note-windows-preset-git-bash-preflight:
+  en: 8f4b51a144c17aac
+  zh: 3a0646d97e07b705
+/agent-note-windows-preset-git-bash-preflight/problem:
+  en: 2afd31d8e98a8134
+  zh: 562018cee8c3e4ba
+/agent-note-windows-preset-git-bash-preflight/decision:
+  en: 2cc4caaf705cbacc
+  zh: ba2bcd0f75f55788
+/agent-note-windows-preset-git-bash-preflight/verification:
+  en: bbec62e1e8755a47
+  zh: be049b83fbf96e02
+/agent-note-windows-preset-git-bash-preflight/alternatives-considered:
+  en: 7998847da7eb66a5
+  zh: eebb16f9c0f78b3b
+/agent-note-windows-preset-git-bash-preflight/consequences:
+  en: a1110a6274a94424
+  zh: f411326851779db3

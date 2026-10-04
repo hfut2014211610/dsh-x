@@ -1,6 +1,19 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-08-25-clean-desktop-incremental-state.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/bug-fix/2026-08-25-clean-desktop-incremental-state.md
-2026-08-25-clean-desktop-incremental-state.md: 17143c99b368ae4ea1730258a1594e45d4116eab
-2026-08-25-clean-desktop-incremental-state.zh.md: 6dc2551c7024a0466ab5c4de5512e900c9da5892
+/agent-note-clean-desktop-incremental-compiler-state-with-its-output:
+  en: 1dcbc8b1795f40f3
+  zh: e30751a988a1e06f
+/agent-note-clean-desktop-incremental-compiler-state-with-its-output/problem:
+  en: 0811c36bd416cb56
+  zh: aff1c5084c38d40d
+/agent-note-clean-desktop-incremental-compiler-state-with-its-output/decision:
+  en: 93b23a0ea5a96839
+  zh: 0668a2f02dd3da53
+/agent-note-clean-desktop-incremental-compiler-state-with-its-output/alternatives-considered:
+  en: 5488a10c21fafe86
+  zh: 35a2ceba47ee8753
+/agent-note-clean-desktop-incremental-compiler-state-with-its-output/consequences:
+  en: b265077f1a3282f7
+  zh: fe5618ec2bbc2525

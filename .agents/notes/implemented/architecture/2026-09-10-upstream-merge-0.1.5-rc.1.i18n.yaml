@@ -1,6 +1,22 @@
-# Bilingual-pair consistency record (docs/i18n/README.md): the git blob hash of each
-# side as of the last confirmed-consistent state. Both languages carry equal authority;
-# after editing either side, bring the other along and re-record with:
+# Bilingual-pair consistency record for 2026-09-10-upstream-merge-0.1.5-rc.1.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
 #   pnpm run verify-translation-pairing --write .agents/notes/implemented/architecture/2026-09-10-upstream-merge-0.1.5-rc.1.md
-2026-09-10-upstream-merge-0.1.5-rc.1.md: 5b29255c5713a0ab8e7005c556511d732bc42d49
-2026-09-10-upstream-merge-0.1.5-rc.1.zh.md: 627394dc84b228ecc9ff10944ab9259b2dd81d60
+/agent-note-upstream-merge-to-0-1-5-rc-1:
+  en: 0fc7f92de56aa0ce
+  zh: 7a314b9cad087706
+/agent-note-upstream-merge-to-0-1-5-rc-1/problem:
+  en: 7d43fe1ee0009f33
+  zh: 69fb5151bf0d1061
+/agent-note-upstream-merge-to-0-1-5-rc-1/decision:
+  en: 1e3564bd97d7eee4
+  zh: d1871fe6e6b3a600
+/agent-note-upstream-merge-to-0-1-5-rc-1/alternatives-considered:
+  en: de43c896caf69de7
+  zh: 169bdfe79e072faf
+/agent-note-upstream-merge-to-0-1-5-rc-1/verification:
+  en: c199b6b29c477303
+  zh: c618fb3df398c24a
+/agent-note-upstream-merge-to-0-1-5-rc-1/consequences:
+  en: b3709a4c5a1e58ec
+  zh: e27bcb282d7a4a33
