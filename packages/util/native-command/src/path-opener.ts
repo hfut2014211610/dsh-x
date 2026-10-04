@@ -186,7 +186,7 @@ async function openWindowsTarget(
     signal.throwIfAborted()
     if (intent !== 'text-editor') throw error
   }
-  await run('notepad.exe', [path], signal)
+  await run('notepad.exe', [path], signal, 'visible')
 }
 
 /** Translate a WSL path before handing it to the Windows desktop. */
