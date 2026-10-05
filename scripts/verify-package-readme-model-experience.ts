@@ -144,7 +144,6 @@ const SENTENCE_MODEL_EXPERIENCE: Readonly<Record<string, SentenceContract>> = {
   'packages/client/ui-writing': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/client/ui-ued': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },
   'packages/channel/feishu': { kind: 'indirect', reason: 'The channel carries a Lark message into an ordinary session; the session preset owns every tool and prompt section.' },
-  'packages/llm/model-tuning': { kind: 'none', reason: 'Per-model sampling defaults ride beside the prompt; the package registers no model surface.' },
   'packages/host/instance-lock': { kind: 'none', reason: 'Host-side startup guard; registers nothing model-facing.' },
   'packages/client/ui-settings-connectors': { kind: 'none', reason: 'Browser-side settings surface; registers no model surface.' },
   'packages/client/ui-workspace': { kind: 'none', reason: 'Browser-side UI plugin layer; registers nothing model-facing.' },

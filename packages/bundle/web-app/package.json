@@ -206,7 +206,6 @@
     "@deepseek-ai/dsh-host-plugin-control": "workspace:*",
     "@deepseek-ai/dsh-host-instance-lock": "workspace:*",
     "@deepseek-ai/dsh-model-hub": "workspace:*",
-    "@deepseek-ai/dsh-model-tuning": "workspace:*",
     "@deepseek-ai/dsh-feishu": "workspace:*",
     "@deepseek-ai/dsh-session-projection-cache": "workspace:*",
     "@deepseek-ai/dsh-usage-stats": "workspace:*",

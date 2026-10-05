@@ -18,6 +18,14 @@ overrides:
   'extract-zip>yauzl': '3.4.0'
   '@deepseek-ai/cosmokit': 'link:vendor/cosmokit'
   '@deepseek-ai/schemastery': 'link:vendor/schemastery'
+  # The fork adds workspace packages, so the lockfile is regenerated rather than
+  # inherited, and `micromark-util-types` then resolves twice: `^2.0.2` reaches
+  # 2.0.3 for most of the tree while `micromark-extension-gfm-table@2.1.1` pins
+  # 2.0.2. Two copies of one package make `mdast-util-from-markdown`'s
+  # `Extension` structurally incompatible with ui-primitives', so pin the version
+  # every dependent already agrees on. Drop this once an upstream lockfile
+  # carries the fork's packages.
+  'micromark-util-types': '2.0.2'
 
 peerDependencyRules:
   allowedVersions:

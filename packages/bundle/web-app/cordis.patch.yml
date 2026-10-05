@@ -120,12 +120,6 @@
     - id: model-hub
       name: '@deepseek-ai/dsh-model-hub'
 
-    # Per-model sampling defaults, the surface llm-pi-ai deliberately leaves
-    # out. An empty profiles map is dormant: the waterfall listener matches
-    # nothing and every request passes through untouched.
-    - id: model-tuning
-      name: '@deepseek-ai/dsh-model-tuning'
-
     # The Feishu channel. Dormant until its settings name a way in, which
     # the Connectors page is for; an unconfigured install mounts the row and
     # opens no socket.

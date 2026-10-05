@@ -36,6 +36,7 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import z from '@deepseek-ai/schemastery'
+import type { SettingsNamespace } from '@deepseek-ai/dsh-settings'
 import type {} from '@deepseek-ai/dsh-settings'
 import type { Session, SessionEvent } from '@deepseek-ai/dsh-session'
 import type {} from '@deepseek-ai/dsh-agent'
@@ -125,6 +126,10 @@ export interface Config {
   staleMs: number
   /** 桥接探这个地址判断 dsh 在不在；留空用本进程正在听的地址。 */
   probeOrigin: string
+}
+
+function isRecord(value: unknown): value is Config {
+  return typeof value === 'object' && value !== null && !Array.isArray(value)
 }
 
 export const Config = z.object({
@@ -248,13 +253,24 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, NS, Config, config, {
-      setSource: (current: () => Config) => { source = current },
+    // 连接器页就是这一节的页面，所以设置服务不要再自动生成一份。
+    settingsCtx.effect(() => settingsCtx.settings.configure({ auto: false }, ctx.fiber))
+    // 服务没有按 namespace 取值的读取口：宿主插件要么从自己那份注入的 Config
+    // 读，要么从共享的 describe 镜像读。这里的字段都是标量，保留 plain schema
+    // 比逐个标 volatile 更省事，代价是每次变更扫一遍镜像——而变更只在人改设置时
+    // 发生，通道自己不会写。
+    const refresh = (): void => {
+      const value = settingsCtx.settings.describe({ redactSecrets: true })
+        .find(descriptor => descriptor.ns === NS)?.value
+      if (isRecord(value)) source = () => value as Config
+    }
+    refresh()
+    settingsCtx.on('settings/document-updated', (updated: SettingsNamespace) => {
+      if (updated !== NS) return
+      refresh()
       // 端点是唯一一个"拨号那一刻定死"的值，所以只有它需要被通知。
-      onChange: () => {
-        if (client?.redialIfMoved() === true) logger.info('桥接端点改了，正在改连 %s', endpoint())
-        publish()
-      },
+      if (client?.redialIfMoved() === true) logger.info('桥接端点改了，正在改连 %s', endpoint())
+      publish()
     })
   })
 

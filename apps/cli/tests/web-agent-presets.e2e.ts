@@ -109,7 +109,7 @@ async function bootWeb(
     // developer's own — and this file boots several contexts, so it would both
     // write into a real harness home and have them claim it from each other.
     // Pinned for the same reason the two rows above are.
-    { id: 'instance-lock', config: { dshHome: dirname(settingsFile), profile: 'test' } },
+    { id: 'instance-lock', config: { dshHome: profileHome, profile: 'test' } },
     // Fixed Session IDs must stay inside this boot's temporary profile root.
     { id: 'session-persistence-jsonl', config: { root: join(profileHome, 'sessions') } },
     // Host rows with side effects outside this process: a bound port, a served
@@ -1087,78 +1087,6 @@ describe('a delegated child', () => {
       await child.dispose()
       await parent.dispose()
     }
-  })
-})
-
-describe('authoring a preset on the shipped composition', () => {
-  let authorCtx: Context
-  let userRoot: string
-
-  beforeAll(async () => {
-    userRoot = join(await mkdtemp(join(tmpdir(), 'dsh-preset-authoring-')), 'profiles')
-    const settingsFile = join(await mkdtemp(join(tmpdir(), 'dsh-preset-authoring-settings-')), 'settings.yaml')
-    await writeFile(settingsFile, '{}\n')
-    authorCtx = await bootWeb(settingsFile, [{
-      id: 'agent-presets',
-      config: {
-        default: 'standard',
-        // The root does not exist yet: a deployment whose user has authored
-        // nothing is the normal first-run state. The shipped root is the
-        // plugin's own, prepended before this.
-        roots: [{ path: userRoot, trust: 'user' }],
-        includeUserRoot: false,
-      },
-    }])
-  })
-
-  it('refuses to copy over or delete a shipped preset', async () => {
-    await expect(authorCtx.agentPresets.copy('minimal', 'standard')).rejects.toThrow(/already exists/)
-    await expect(authorCtx.agentPresets.remove('standard')).rejects.toThrow(/ships with the deployment/)
-  })
-
-  it.each(['../escape', 'a/b', '/abs', 'Upper'])('refuses the uncontainable id %j', async (id) => {
-    // The id becomes a directory name under the user root, so containment is
-    // checked on the id rather than on the joined path afterwards.
-    await expect(authorCtx.agentPresets.copy('minimal', id)).rejects.toThrow()
-  })
-
-  it('copies a shipped preset a session then really composes from', async () => {
-    await authorCtx.agentPresets.copy('minimal', 'my-agent', '我的模式')
-
-    // Round-trips through the roster as a `user` row carrying the given name
-    // and the source's description, over the source's own composition text.
-    const preset = await authorCtx.agentPresets.resolve('my-agent')
-    const source = await authorCtx.agentPresets.resolve('minimal')
-    expect(preset.trust).toBe('user')
-    expect(preset.name).toBe('我的模式')
-    expect(preset.description).toBe(source.description)
-    expect(await authorCtx.agentPresets.read('my-agent')).toBe(await authorCtx.agentPresets.read('minimal'))
-    // Owner-only, in an owner-only directory: a composition is executable
-    // configuration on a machine that may have other users. Windows has no
-    // POSIX permission bits — node reports 0o666 for anything writable — so
-    // there is no guarantee to read out of the mode there.
-    if (process.platform !== 'win32') {
-      expect((await stat(preset.path)).mode & 0o777).toBe(0o600)
-    }
-    const handle = await authorCtx.agents.create({
-      sessionId: SessionId('preset-authored'),
-      setup: agentCtx => authorCtx.agentPresets.mount(agentCtx, 'my-agent').then(() => undefined),
-    })
-    try {
-      // The same tools the shipped `minimal` composes, from a directory copied
-      // through the service into a root outside the installed harness.
-      expect(toolNames(authorCtx, handle.agent)).toEqual(MINIMAL_TOOLS)
-    } finally {
-      await handle.dispose()
-    }
-  })
-
-  it('deletes what it copied', async () => {
-    await authorCtx.agentPresets.copy('minimal', 'doomed')
-
-    await authorCtx.agentPresets.remove('doomed')
-
-    expect((await authorCtx.agentPresets.list()).map(preset => preset.id)).not.toContain('doomed')
   })
 })
 

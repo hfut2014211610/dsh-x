@@ -42,10 +42,11 @@
 
 import type { Context } from '@deepseek-ai/cordis'
 import type { Agent } from '@deepseek-ai/dsh-agent'
+// Type-only: resolves the model-selection source the route probe stamps on its ping.
 import { credentialRef } from '@deepseek-ai/dsh-credentials'
 import { createUserMessage } from '@deepseek-ai/dsh-llm'
 import type { GenerateOptions, LlmFailure, StreamChunk } from '@deepseek-ai/dsh-llm'
-import type { SettingsPathOp, SettingsProvider } from '@deepseek-ai/dsh-settings'
+import type { SettingsForms, SettingsNamespace, SettingsPathOp } from '@deepseek-ai/dsh-settings'
 import type { PiAiProviderProfile } from '@deepseek-ai/dsh-llm-pi-ai'
 import { Remote, TypertRemoteService } from '@deepseek-ai/dsh-typert-protocol'
 import { assertUsable, compileChains, compileRoutes, Config } from './compile.ts'
@@ -105,7 +106,7 @@ export function diffRouteOps(
  * @throws whatever the settings seam rejects (invalid generated profile, missing namespace).
  */
 export async function reconcileRoutes(
-  settings: Pick<SettingsProvider, 'mutate'>,
+  settings: Pick<SettingsForms, 'mutate'>,
   config: Config,
 ): Promise<{ changed: boolean }> {
   const desired = compileRoutes(config)
@@ -195,7 +196,9 @@ export async function probeRoutes(
         maxTokens: 1,
         messages: [createUserMessage({
           content: [{ type: 'text', text: 'ping' }],
-          source: { kind: 'plugin', plugin: 'dsh-x-model-hub' },
+          // A route probe is model selection talking to itself: no orm, so the
+          // message carries no context contribution into the request.
+          source: { kind: 'model-selection' },
         })],
         signal: AbortSignal.timeout(timeoutMs),
       }
@@ -357,7 +360,7 @@ export class ModelHubGateway extends TypertRemoteService {
       }
       credentials[key] = { configured: info.configured, valid: true }
     }))
-    const defaultModel = this.ctx.settings.get(AGENT_DEFAULT_NS) as HubDocView['defaultModel']
+    const defaultModel = namespaceValue(this.ctx.settings, AGENT_DEFAULT_NS) as HubDocView['defaultModel']
     return {
       providers: doc.providers ?? {},
       models: doc.models ?? {},
@@ -410,7 +413,7 @@ export class ModelHubGateway extends TypertRemoteService {
    */
   @Remote('probeModel')
   async probeModel(id: string, timeoutMs?: number): Promise<{ results: ProbeResult[] }> {
-    const doc = (this.ctx.settings.get(NS) ?? {}) as Config
+    const doc = (namespaceValue(this.ctx.settings, NS) ?? {}) as Config
     const live = this.ctx.llm.listProviders().map(provider => provider.id)
     const plan = resolveProbeRoutes(doc, id, live, lastReconcileFailure)
     const timeout = typeof timeoutMs === 'number' && Number.isFinite(timeoutMs) && timeoutMs > 0 ? timeoutMs : PROBE_TIMEOUT_MS
@@ -504,7 +507,7 @@ export class ModelHubGateway extends TypertRemoteService {
       const merged = mergeRouteLayers(base[route], user[route])
       if (merged !== undefined) routes[route] = merged
     }
-    const doc = (this.ctx.settings.get(NS) ?? {}) as Config
+    const doc = (namespaceValue(this.ctx.settings, NS) ?? {}) as Config
     const plan = planImport(routes, {
       managedRoutes: doc._routes ?? [],
       existingProviders: doc.providers ?? {},
@@ -527,10 +530,37 @@ export class ModelHubGateway extends TypertRemoteService {
  * @param ctx - plugin context.
  * @param config - validated entry configuration from the cordis patch.
  */
+/**
+ * Read one settings namespace's current document on the Host side.
+ *
+ * The service publishes no per-namespace getter and no section installer: a Host
+ * plugin reads the shared describe mirror instead, and the authoring page it
+ * registers elsewhere suppresses the generated one.
+ * @param settings - the settings service.
+ * @param ns - namespace to read.
+ * @returns the namespace value, or undefined when nothing declares it.
+ */
+function namespaceValue(settings: SettingsForms, ns: string): unknown {
+  return settings.describe({ redactSecrets: true }).find(descriptor => descriptor.ns === ns)?.value
+}
+
+/**
+ * @param ctx - plugin context.
+ * @param config - validated entry configuration from the cordis patch.
+ */
 export function apply(ctx: Context, config: Config): void {
   let current: () => Config = () => config
-  let settings: SettingsProvider | undefined
+  let settings: SettingsForms | undefined
   lastReconcileFailure = null
+
+  /** Reject a configuration the compiler cannot turn into routes, before any write. */
+  try {
+    assertUsable(current())
+  } catch (error) {
+    lastReconcileFailure = error instanceof Error ? error.message : String(error)
+    ctx.logger.error('dsh-x-model-hub: the declared configuration does not compile; no routes are generated')
+    ctx.logger.error(error)
+  }
 
   /**
    * One contained reconcile pass: failures keep the last good generated
@@ -549,16 +579,22 @@ export function apply(ctx: Context, config: Config): void {
   }
 
   ctx.inject(['settings'], (settingsCtx) => {
-    settingsCtx.settings.installSection(ctx, NS, Config, config, {
-      validate: assertUsable,
-      setSource: (source: () => Config) => {
-        current = source
-      },
-      onChange: () => {
-        if (settings === undefined) return
-        void reconcile('keeping the previously generated routes after a refused update')
-      },
+    settings = settingsCtx.settings
+    // The authoring page is `ui-model-hub`, so the service must not also
+    // generate one for this namespace.
+    settingsCtx.effect(() => settingsCtx.settings.configure({ auto: false }, ctx.fiber))
+    /** Point the compiler at the document as it stands now, not at the entry's boot-time copy. */
+    const refresh = (): void => {
+      const value = namespaceValue(settingsCtx.settings, NS)
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) current = () => value as Config
+    }
+    refresh()
+    settingsCtx.on('settings/document-updated', (updated: SettingsNamespace) => {
+      if (updated !== NS) return
+      refresh()
+      void reconcile('keeping the previously generated routes after a refused update')
     })
+    void reconcile('generating routes for the authored providers and models')
   })
 
   ctx.plugin(ModelHubGateway)

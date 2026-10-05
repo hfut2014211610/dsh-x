@@ -20,9 +20,9 @@
 
 import { mkdirSync, mkdtempSync, readFileSync, rmSync } from 'node:fs'
 import { tmpdir } from 'node:os'
-import { join } from 'node:path'
+import { basename, dirname, join } from 'node:path'
 import { parseArgs } from 'node:util'
-import { capture, isEntry, TAR } from './process.ts'
+import { capture, isEntry } from './process.ts'
 
 /** Side effects the universalization performs; tests replace every member. */
 export interface UniversalOps {
@@ -44,7 +44,9 @@ const hostOps: UniversalOps = {
   },
   extract(tarball, target) {
     mkdirSync(target, { recursive: true })
-    capture(TAR, ['-xzf', tarball, '-C', target, '--strip-components=1'])
+    // GNU tar reads the colon in a Windows drive path as a remote-host separator,
+    // so tar runs beside the tarball with its bare name as the argument.
+    capture('tar', ['-xzf', basename(tarball), '-C', target, '--strip-components=1'], { cwd: dirname(tarball) })
   },
   removeTree(path) { rmSync(path, { recursive: true, force: true }) },
 }

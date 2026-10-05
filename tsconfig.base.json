@@ -338,6 +338,15 @@
       "@deepseek-ai/dsh-compaction-image-offload/projection": ["./packages/compaction/compaction-image-offload/src/projection.ts"],
       "@deepseek-ai/dsh-session-format-catalog/message-projections": ["./packages/session/session-format-catalog/src/message-projections.ts"],
       "@deepseek-ai/dsh-native-command/types": ["./packages/util/native-command/src/types.ts"],
+      // Fork packages whose npm name does not follow their directory, so the
+      // generated aliases below cannot map them.
+      "@deepseek-ai/dsh-client-ui-model-hub": ["./packages/client/ui-model-hub/src"],
+      "@deepseek-ai/dsh-client-ui-settings-connectors": ["./packages/client/ui-settings-connectors/src"],
+      "@deepseek-ai/dsh-client-ui-settings-usage": ["./packages/client/ui-settings-usage/src"],
+      "@deepseek-ai/dsh-client-ui-ued": ["./packages/client/ui-ued/src"],
+      "@deepseek-ai/dsh-client-ui-writing": ["./packages/client/ui-writing/src"],
+      "@deepseek-ai/dsh-host-instance-lock": ["./packages/host/instance-lock/src"],
+      "@deepseek-ai/dsh-host-plugin-control": ["./packages/host/plugin-control/src"],
       // BEGIN generated package aliases — pnpm run gen-tsconfig-paths
       "@deepseek-ai/dsh-acp": ["./packages/acp/acp/src"],
       "@deepseek-ai/dsh-acp-app": ["./packages/bundle/acp-app/src"],
@@ -379,6 +388,12 @@
       "@deepseek-ai/dsh-credentials-local": ["./packages/credentials/credentials-local/src"],
       "@deepseek-ai/dsh-deepseek-llm-api-extensions": ["./packages/llm/deepseek-llm-api-extensions/src"],
       "@deepseek-ai/dsh-deque": ["./packages/util/deque/src"],
+      "@deepseek-ai/dsh-documents": ["./packages/writing/documents/src"],
+      "@deepseek-ai/dsh-documents/invariant": ["./packages/writing/documents/src/invariant.ts"],
+      "@deepseek-ai/dsh-documents-local": ["./packages/writing/documents-local/src"],
+      "@deepseek-ai/dsh-documents-local/invariant": ["./packages/writing/documents-local/src/invariant.ts"],
+      "@deepseek-ai/dsh-feishu": ["./packages/channel/feishu/src"],
+      "@deepseek-ai/dsh-feishu/invariant": ["./packages/channel/feishu/src/invariant.ts"],
       "@deepseek-ai/dsh-file-reference": ["./packages/context/file-reference/src"],
       "@deepseek-ai/dsh-file-reference-local": ["./packages/context/file-reference-local/src"],
       "@deepseek-ai/dsh-fs": ["./packages/fs/fs/src"],
@@ -419,6 +434,8 @@
       "@deepseek-ai/dsh-mcp-client": ["./packages/mcp/mcp-client/src"],
       "@deepseek-ai/dsh-mcp-resources": ["./packages/mcp/mcp-resources/src"],
       "@deepseek-ai/dsh-message-feedback": ["./packages/feedback/message-feedback/src"],
+      "@deepseek-ai/dsh-model-hub": ["./packages/llm/model-hub/src"],
+      "@deepseek-ai/dsh-model-hub/invariant": ["./packages/llm/model-hub/src/invariant.ts"],
       "@deepseek-ai/dsh-native-command": ["./packages/util/native-command/src"],
       "@deepseek-ai/dsh-office-to-pdf": ["./packages/document/office-to-pdf/src"],
       "@deepseek-ai/dsh-output-retention": ["./packages/util/output-retention/src"],
@@ -513,6 +530,8 @@
       "@deepseek-ai/dsh-tool-bash": ["./packages/shell/tool-bash/src"],
       "@deepseek-ai/dsh-tool-bash-persistent": ["./packages/shell/tool-bash-persistent/src"],
       "@deepseek-ai/dsh-tool-cordis": ["./packages/extensions/tool-cordis/src"],
+      "@deepseek-ai/dsh-tool-documents": ["./packages/writing/tool-documents/src"],
+      "@deepseek-ai/dsh-tool-documents/invariant": ["./packages/writing/tool-documents/src/invariant.ts"],
       "@deepseek-ai/dsh-tool-fs": ["./packages/fs/tool-fs/src"],
       "@deepseek-ai/dsh-tool-fs-search": ["./packages/fs/tool-fs-search/src"],
       "@deepseek-ai/dsh-tool-goal": ["./packages/goal/tool-goal/src"],
@@ -536,6 +555,8 @@
       "@deepseek-ai/dsh-tool-workspace-dependencies": ["./packages/skill/tool-workspace-dependencies/src"],
       "@deepseek-ai/dsh-tools": ["./packages/core/tools/src"],
       "@deepseek-ai/dsh-tools/invariant": ["./packages/core/tools/src/invariant.ts"],
+      "@deepseek-ai/dsh-usage-stats": ["./packages/session/usage-stats/src"],
+      "@deepseek-ai/dsh-usage-stats/invariant": ["./packages/session/usage-stats/src/invariant.ts"],
       "@deepseek-ai/dsh-user-approval": ["./packages/interaction/user-approval/src"],
       "@deepseek-ai/dsh-user-approval/invariant": ["./packages/interaction/user-approval/src/invariant.ts"],
       "@deepseek-ai/dsh-user-questions": ["./packages/interaction/user-questions/src"],
@@ -554,7 +575,9 @@
       "@deepseek-ai/dsh-workflow-ptc": ["./packages/workflow/workflow-ptc/src"],
       "@deepseek-ai/dsh-workspace": ["./packages/workspace/workspace/src"],
       "@deepseek-ai/dsh-workspace/invariant": ["./packages/workspace/workspace/src/invariant.ts"],
-      "@deepseek-ai/dsh-workspace-changes": ["./packages/deliverables/workspace-changes/src"]
+      "@deepseek-ai/dsh-workspace-changes": ["./packages/deliverables/workspace-changes/src"],
+      "@deepseek-ai/dsh-writing-mode": ["./packages/writing/writing-mode/src"],
+      "@deepseek-ai/dsh-writing-mode/invariant": ["./packages/writing/writing-mode/src/invariant.ts"]
       // END generated package aliases
     }
   }
