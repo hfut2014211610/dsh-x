@@ -1,0 +1,64 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/context/agent-instruction-hint/README.md
+/deepseek-ai-dsh-agent-instruction-hint:
+  en: f1a16a2b02d66f6a
+  zh: 979b84921133eec7
+/deepseek-ai-dsh-agent-instruction-hint/summary:
+  en: 664d103c766f5ae0
+  zh: 6fa2c658cf8369f1
+/deepseek-ai-dsh-agent-instruction-hint/table-of-contents:
+  en: c42aa705d87da4f2
+  zh: c42aa705d87da4f2
+/deepseek-ai-dsh-agent-instruction-hint/use-this-package:
+  en: bbff250eba0f1b89
+  zh: bbff250eba0f1b89
+/deepseek-ai-dsh-agent-instruction-hint/use-this-package/row-order:
+  en: 89347426863b86c4
+  zh: 1c12dab568c6a993
+/deepseek-ai-dsh-agent-instruction-hint/use-this-package/configuration:
+  en: 64441f3580a86612
+  zh: 34a86549ed92e03a
+/deepseek-ai-dsh-agent-instruction-hint/use-this-package/subagents:
+  en: f49f6c1db9310e94
+  zh: 89f2c6b3b3e66aee
+/deepseek-ai-dsh-agent-instruction-hint/understand-the-implementation:
+  en: ee4615a04fa6503d
+  zh: ee4615a04fa6503d
+/deepseek-ai-dsh-agent-instruction-hint/understand-the-implementation/which-files-it-names:
+  en: 585dd93c819fdbae
+  zh: a934992525c89a22
+/deepseek-ai-dsh-agent-instruction-hint/understand-the-implementation/once-per-session:
+  en: adabb9fcca05f1d8
+  zh: 71124619f875b4e4
+/deepseek-ai-dsh-agent-instruction-hint/understand-the-implementation/failure-behavior:
+  en: bbe5b79e0d911316
+  zh: b7f2f3d7da8c734d
+/deepseek-ai-dsh-agent-instruction-hint/further-exploration:
+  en: 82f0f65473d84053
+  zh: 201a924d465ce98c
+/deepseek-ai-dsh-agent-instruction-hint/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-agent-instruction-hint/model-experience/the-hint:
+  en: 4d6c3c22f82fd80d
+  zh: 3f9d90ed10a06e49
+/deepseek-ai-dsh-agent-instruction-hint/model-experience/token-effect:
+  en: a285bc10e8613791
+  zh: ffb84111bc49799a
+/deepseek-ai-dsh-agent-instruction-hint/model-experience/kv-cache-effect:
+  en: 23f75780be8bc577
+  zh: ffc8fecde995896c
+/deepseek-ai-dsh-agent-instruction-hint/known-limitations-and-deferred-work:
+  en: 255a42f7124eba76
+  zh: 255a42f7124eba76
+/deepseek-ai-dsh-agent-instruction-hint/known-limitations-and-deferred-work/the-project-root-is-not-the-working-directory:
+  en: e9c4bd2a9a44c41d
+  zh: 5c0d824a9e29a8f6
+/deepseek-ai-dsh-agent-instruction-hint/known-limitations-and-deferred-work/a-failed-probe-costs-the-hint:
+  en: ad58827616743412
+  zh: 6dd02dad5240b519
+/deepseek-ai-dsh-agent-instruction-hint/known-limitations-and-deferred-work/no-published-invariant:
+  en: 5ae281ca954e18a4
+  zh: 0443bbd97979436b
