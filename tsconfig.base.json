@@ -384,6 +384,7 @@
       "@deepseek-ai/dsh-compaction-image-offload": ["./packages/compaction/compaction-image-offload/src"],
       "@deepseek-ai/dsh-compaction-tool-result-pruner": ["./packages/compaction/compaction-tool-result-pruner/src"],
       "@deepseek-ai/dsh-config-editor": ["./packages/boot/config-editor/src"],
+      "@deepseek-ai/dsh-context-gate": ["./packages/guard/context-gate/src"],
       "@deepseek-ai/dsh-credentials": ["./packages/credentials/credentials/src"],
       "@deepseek-ai/dsh-credentials/invariant": ["./packages/credentials/credentials/src/invariant.ts"],
       "@deepseek-ai/dsh-credentials-local": ["./packages/credentials/credentials-local/src"],

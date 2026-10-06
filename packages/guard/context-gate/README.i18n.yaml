@@ -1,0 +1,58 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/guard/context-gate/README.md
+/deepseek-ai-dsh-context-gate:
+  en: 16b657185754835d
+  zh: d2e16c231abdeded
+/deepseek-ai-dsh-context-gate/summary:
+  en: 3b3d3ba51b0d6a9e
+  zh: a5849efb543c5730
+/deepseek-ai-dsh-context-gate/table-of-contents:
+  en: 15cc9159b25b6568
+  zh: 15cc9159b25b6568
+/deepseek-ai-dsh-context-gate/use-this-package:
+  en: bbff250eba0f1b89
+  zh: bbff250eba0f1b89
+/deepseek-ai-dsh-context-gate/use-this-package/row-order:
+  en: a4458c635882e8ff
+  zh: ce37445a49b333f8
+/deepseek-ai-dsh-context-gate/use-this-package/configuration:
+  en: 49477abddd71f62d
+  zh: 5fc7e232bdb2951f
+/deepseek-ai-dsh-context-gate/use-this-package/subagents:
+  en: 8e019aceca332bc7
+  zh: f522212cb3c14741
+/deepseek-ai-dsh-context-gate/understand-the-implementation:
+  en: ee4615a04fa6503d
+  zh: ee4615a04fa6503d
+/deepseek-ai-dsh-context-gate/understand-the-implementation/two-interception-paths:
+  en: 18958653e5081d5d
+  zh: 2057553c8a77c203
+/deepseek-ai-dsh-context-gate/understand-the-implementation/failure-behavior:
+  en: 2df4762a79c17d7c
+  zh: d8cd43c874552a0b
+/deepseek-ai-dsh-context-gate/further-exploration:
+  en: fd2f8716c76b2a07
+  zh: ca34a26e3cd730df
+/deepseek-ai-dsh-context-gate/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-context-gate/model-experience/first-request-of-an-epoch:
+  en: 0024a756535f2600
+  zh: 2e713b2aee41c50a
+/deepseek-ai-dsh-context-gate/model-experience/token-effect:
+  en: 7d5a7a84f10c1855
+  zh: 019edf2f316d75a7
+/deepseek-ai-dsh-context-gate/model-experience/kv-cache-effect:
+  en: cd9b8d8aa8add5f9
+  zh: e9903d361ee604a3
+/deepseek-ai-dsh-context-gate/known-limitations-and-deferred-work:
+  en: 255a42f7124eba76
+  zh: 255a42f7124eba76
+/deepseek-ai-dsh-context-gate/known-limitations-and-deferred-work/skill-invocations-survive-by-default:
+  en: 9a1a20149256c763
+  zh: 4d4176cfa3530e61
+/deepseek-ai-dsh-context-gate/known-limitations-and-deferred-work/no-published-invariant:
+  en: 69c2cbb351ddc852
+  zh: 71f6bcbcf894c33f
