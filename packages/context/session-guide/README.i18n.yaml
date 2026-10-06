@@ -1,0 +1,70 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/context/session-guide/README.md
+/deepseek-ai-dsh-session-guide:
+  en: 0ee0aaa7e1a1e8df
+  zh: e3162df489a97926
+/deepseek-ai-dsh-session-guide/summary:
+  en: ad9a3fc991d57745
+  zh: 56b986c456177c4e
+/deepseek-ai-dsh-session-guide/table-of-contents:
+  en: 39af59ff0e46fa55
+  zh: 39af59ff0e46fa55
+/deepseek-ai-dsh-session-guide/use-this-package:
+  en: bbff250eba0f1b89
+  zh: bbff250eba0f1b89
+/deepseek-ai-dsh-session-guide/use-this-package/row-order:
+  en: 221294afc9122347
+  zh: c9d90835b6a39e3a
+/deepseek-ai-dsh-session-guide/use-this-package/configuration:
+  en: e2d93ea4ff37b618
+  zh: 14aad4e57c6dd7fe
+/deepseek-ai-dsh-session-guide/use-this-package/subagents:
+  en: 396eaf6eb48d97a9
+  zh: bc6edae027635bef
+/deepseek-ai-dsh-session-guide/why-it-is-off:
+  en: 8c13350a8f257a92
+  zh: 48961ff0d56de573
+/deepseek-ai-dsh-session-guide/understand-the-implementation:
+  en: ee4615a04fa6503d
+  zh: ee4615a04fa6503d
+/deepseek-ai-dsh-session-guide/understand-the-implementation/placement:
+  en: e78fa1a4c170f75c
+  zh: 5d58d372d0bfe316
+/deepseek-ai-dsh-session-guide/understand-the-implementation/one-guidance-per-user-turn:
+  en: 0a42dbf1317c76ff
+  zh: 3ffb48c247148821
+/deepseek-ai-dsh-session-guide/understand-the-implementation/the-complex-message-dispatch:
+  en: 5e3a385105c009d7
+  zh: a12357753ee02a38
+/deepseek-ai-dsh-session-guide/understand-the-implementation/failure-behavior:
+  en: 5daabb14f20d810f
+  zh: 6df8d2f12489b895
+/deepseek-ai-dsh-session-guide/further-exploration:
+  en: 88a9c8fe54ed7026
+  zh: 0d576d4a534d0fab
+/deepseek-ai-dsh-session-guide/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-session-guide/model-experience/the-guidance-line:
+  en: f71aa2a3d7e60dad
+  zh: cbcb1e4943204b21
+/deepseek-ai-dsh-session-guide/model-experience/token-effect:
+  en: cc524e3d9db53379
+  zh: 1643e7a44fe2e363
+/deepseek-ai-dsh-session-guide/model-experience/kv-cache-effect:
+  en: 9d0b03b944b15fee
+  zh: 8cc8f01c527c697c
+/deepseek-ai-dsh-session-guide/known-limitations-and-deferred-work:
+  en: 255a42f7124eba76
+  zh: 255a42f7124eba76
+/deepseek-ai-dsh-session-guide/known-limitations-and-deferred-work/the-text-is-a-starting-point:
+  en: c95a5d231a265cec
+  zh: 68f9176029cb93b1
+/deepseek-ai-dsh-session-guide/known-limitations-and-deferred-work/the-complex-heuristic-is-crude:
+  en: adb00c99b11d898c
+  zh: 3d716f4b7e16df87
+/deepseek-ai-dsh-session-guide/known-limitations-and-deferred-work/no-published-invariant:
+  en: b2002c34afd6b474
+  zh: 964927a85776683d

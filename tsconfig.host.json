@@ -408,6 +408,7 @@
     { "path": "./packages/guard/context-gate" },
     { "path": "./packages/tool/tool-bootstrap" },
     { "path": "./packages/context/agent-instruction-hint" },
+    { "path": "./packages/context/session-guide" },
     { "path": "./packages/compaction/command-compact" },
     { "path": "./packages/compaction/compaction-tool-result-pruner" },
     { "path": "./packages/compaction/compaction-image-offload" },
