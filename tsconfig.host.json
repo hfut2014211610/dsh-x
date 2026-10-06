@@ -406,6 +406,7 @@
     { "path": "./packages/compaction/compaction-basic" },
     { "path": "./packages/compaction/compaction-epoch" },
     { "path": "./packages/guard/context-gate" },
+    { "path": "./packages/tool/tool-bootstrap" },
     { "path": "./packages/compaction/command-compact" },
     { "path": "./packages/compaction/compaction-tool-result-pruner" },
     { "path": "./packages/compaction/compaction-image-offload" },

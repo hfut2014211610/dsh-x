@@ -1,0 +1,67 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/tool/tool-bootstrap/README.md
+/deepseek-ai-dsh-tool-bootstrap:
+  en: 4a9b400e1beeebd1
+  zh: cc2cc32431bf08ba
+/deepseek-ai-dsh-tool-bootstrap/summary:
+  en: 185c8d718df1a036
+  zh: 1707d79401e10a79
+/deepseek-ai-dsh-tool-bootstrap/table-of-contents:
+  en: facfc8683c15af43
+  zh: facfc8683c15af43
+/deepseek-ai-dsh-tool-bootstrap/use-this-package:
+  en: bbff250eba0f1b89
+  zh: bbff250eba0f1b89
+/deepseek-ai-dsh-tool-bootstrap/use-this-package/row-order:
+  en: cb4cca85900e82d4
+  zh: 8f2fbf0fe8e63656
+/deepseek-ai-dsh-tool-bootstrap/use-this-package/configuration:
+  en: 3d02f6ecb9ec3912
+  zh: 8a317d68f887a836
+/deepseek-ai-dsh-tool-bootstrap/use-this-package/subagents:
+  en: 6fb4bbb38375f759
+  zh: aeb379f56177010f
+/deepseek-ai-dsh-tool-bootstrap/understand-the-implementation:
+  en: ee4615a04fa6503d
+  zh: ee4615a04fa6503d
+/deepseek-ai-dsh-tool-bootstrap/understand-the-implementation/the-three-phases:
+  en: 2b525f4e52fd4f2d
+  zh: f7b35a85179edfed
+/deepseek-ai-dsh-tool-bootstrap/understand-the-implementation/the-resident-set:
+  en: d394e42caffdf446
+  zh: cce673b8eddcd4c8
+/deepseek-ai-dsh-tool-bootstrap/understand-the-implementation/the-optional-output-cap:
+  en: 23ed915de0dec20d
+  zh: 23534b42cf2232f0
+/deepseek-ai-dsh-tool-bootstrap/understand-the-implementation/failure-behavior:
+  en: 8ce00da91f3d87ef
+  zh: 4aafb13a16cccb41
+/deepseek-ai-dsh-tool-bootstrap/further-exploration:
+  en: 57c6f378ead0004d
+  zh: 760bd577663675c9
+/deepseek-ai-dsh-tool-bootstrap/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-tool-bootstrap/model-experience/tool-catalog-across-a-session:
+  en: 9f8361ba9add9952
+  zh: 94e70579f8204b0e
+/deepseek-ai-dsh-tool-bootstrap/model-experience/token-effect:
+  en: 9ab27755fccc76d2
+  zh: 61d2fd7ff5620708
+/deepseek-ai-dsh-tool-bootstrap/model-experience/kv-cache-effect:
+  en: c74dd9fc9bcadb8d
+  zh: 0f421264efbe3e68
+/deepseek-ai-dsh-tool-bootstrap/known-limitations-and-deferred-work:
+  en: 255a42f7124eba76
+  zh: 255a42f7124eba76
+/deepseek-ai-dsh-tool-bootstrap/known-limitations-and-deferred-work/file-tools-are-not-resident:
+  en: f9269910597503b2
+  zh: d9ac890a30a38b8b
+/deepseek-ai-dsh-tool-bootstrap/known-limitations-and-deferred-work/the-unlock-set-is-per-session:
+  en: 7253cd7062b34b38
+  zh: bd7b4c0cb07fa60c
+/deepseek-ai-dsh-tool-bootstrap/known-limitations-and-deferred-work/no-published-invariant:
+  en: 0197fa7520cdd8d1
+  zh: 0f3b2723f3fa7889

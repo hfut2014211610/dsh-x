@@ -531,6 +531,7 @@
       "@deepseek-ai/dsh-tool-ask-user": ["./packages/interaction/tool-ask-user/src"],
       "@deepseek-ai/dsh-tool-bash": ["./packages/shell/tool-bash/src"],
       "@deepseek-ai/dsh-tool-bash-persistent": ["./packages/shell/tool-bash-persistent/src"],
+      "@deepseek-ai/dsh-tool-bootstrap": ["./packages/tool/tool-bootstrap/src"],
       "@deepseek-ai/dsh-tool-cordis": ["./packages/extensions/tool-cordis/src"],
       "@deepseek-ai/dsh-tool-documents": ["./packages/writing/tool-documents/src"],
       "@deepseek-ai/dsh-tool-documents/invariant": ["./packages/writing/tool-documents/src/invariant.ts"],
