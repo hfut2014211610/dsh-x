@@ -6764,6 +6764,31 @@ importers:
         specifier: workspace:*
         version: link:../../core/tools
 
+  packages/compaction/compaction-epoch:
+    dependencies:
+      zod:
+        specifier: ^4.4.3
+        version: 4.4.3
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-compaction':
+        specifier: workspace:*
+        version: link:../compaction
+      '@deepseek-ai/dsh-session':
+        specifier: workspace:*
+        version: link:../../core/session
+      '@deepseek-ai/dsh-session-persistence-jsonl':
+        specifier: workspace:*
+        version: link:../../session/session-persistence-jsonl
+      '@deepseek-ai/dsh-session-projection':
+        specifier: workspace:*
+        version: link:../../session/session-projection
+
   packages/compaction/compaction-image-offload:
     dependencies:
       '@deepseek-ai/dsh-util-values':

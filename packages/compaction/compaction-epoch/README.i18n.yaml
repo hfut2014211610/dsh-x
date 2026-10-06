@@ -1,0 +1,55 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/compaction/compaction-epoch/README.md
+/deepseek-ai-dsh-compaction-epoch:
+  en: b23b97c4f1932b99
+  zh: 0b25b5740b97babd
+/deepseek-ai-dsh-compaction-epoch/summary:
+  en: 875eb4c413cb6465
+  zh: 006a7e745eac3c0a
+/deepseek-ai-dsh-compaction-epoch/table-of-contents:
+  en: 584107faa6b9868b
+  zh: 584107faa6b9868b
+/deepseek-ai-dsh-compaction-epoch/use-this-package:
+  en: bbff250eba0f1b89
+  zh: bbff250eba0f1b89
+/deepseek-ai-dsh-compaction-epoch/use-this-package/registering-the-unit:
+  en: 59d578ffbd0c7dd7
+  zh: 600bc1cb6a686395
+/deepseek-ai-dsh-compaction-epoch/use-this-package/reading-the-phase:
+  en: 2dda81b143c51ddf
+  zh: 958a168d6f11c1e0
+/deepseek-ai-dsh-compaction-epoch/understand-the-implementation:
+  en: ee4615a04fa6503d
+  zh: ee4615a04fa6503d
+/deepseek-ai-dsh-compaction-epoch/understand-the-implementation/why-a-projection:
+  en: 82d7f3d1ae3f18af
+  zh: 9bceba4acba35420
+/deepseek-ai-dsh-compaction-epoch/understand-the-implementation/why-one-unit-serves-four-plugins:
+  en: ca8d9a073eb2c98b
+  zh: c89cc7b261433155
+/deepseek-ai-dsh-compaction-epoch/further-exploration:
+  en: 02299c95e17fcb3f
+  zh: 7439dfc020afc766
+/deepseek-ai-dsh-compaction-epoch/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-compaction-epoch/model-experience/indirect-effect-on-the-first-request:
+  en: 314ee1574db3daff
+  zh: 92d9b593775ca132
+/deepseek-ai-dsh-compaction-epoch/model-experience/token-effect:
+  en: 7e59633cad5284b6
+  zh: c8aaf11e201f83fb
+/deepseek-ai-dsh-compaction-epoch/model-experience/kv-cache-effect:
+  en: a34e2d3d703b60ea
+  zh: 8e408c899709f75a
+/deepseek-ai-dsh-compaction-epoch/known-limitations-and-deferred-work:
+  en: 255a42f7124eba76
+  zh: 255a42f7124eba76
+/deepseek-ai-dsh-compaction-epoch/known-limitations-and-deferred-work/promotion-signals-are-fixed-to-two-event-types:
+  en: 8e0afd138b66afc8
+  zh: da782622091a185b
+/deepseek-ai-dsh-compaction-epoch/known-limitations-and-deferred-work/no-published-invariant:
+  en: b6450d178a95c199
+  zh: 9363743c198f137a

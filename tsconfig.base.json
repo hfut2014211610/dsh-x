@@ -380,6 +380,7 @@
       "@deepseek-ai/dsh-compaction": ["./packages/compaction/compaction/src"],
       "@deepseek-ai/dsh-compaction/invariant": ["./packages/compaction/compaction/src/invariant.ts"],
       "@deepseek-ai/dsh-compaction-basic": ["./packages/compaction/compaction-basic/src"],
+      "@deepseek-ai/dsh-compaction-epoch": ["./packages/compaction/compaction-epoch/src"],
       "@deepseek-ai/dsh-compaction-image-offload": ["./packages/compaction/compaction-image-offload/src"],
       "@deepseek-ai/dsh-compaction-tool-result-pruner": ["./packages/compaction/compaction-tool-result-pruner/src"],
       "@deepseek-ai/dsh-config-editor": ["./packages/boot/config-editor/src"],

@@ -404,6 +404,7 @@
     { "path": "./packages/writing/writing-mode" },
     { "path": "./packages/compaction/compaction" },
     { "path": "./packages/compaction/compaction-basic" },
+    { "path": "./packages/compaction/compaction-epoch" },
     { "path": "./packages/compaction/command-compact" },
     { "path": "./packages/compaction/compaction-tool-result-pruner" },
     { "path": "./packages/compaction/compaction-image-offload" },
