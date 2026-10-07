@@ -1,0 +1,61 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/skill/tool-skill-search/README.md
+/deepseek-ai-dsh-tool-skill-search:
+  en: 0a167495619e8445
+  zh: 91285a30432a92fb
+/deepseek-ai-dsh-tool-skill-search/summary:
+  en: 8c70dff3da374adb
+  zh: 8132d40f9cb43360
+/deepseek-ai-dsh-tool-skill-search/table-of-contents:
+  en: 17a49a498646c74d
+  zh: 17a49a498646c74d
+/deepseek-ai-dsh-tool-skill-search/use-this-package:
+  en: bbff250eba0f1b89
+  zh: bbff250eba0f1b89
+/deepseek-ai-dsh-tool-skill-search/use-this-package/row-order:
+  en: 428a83ec5ecb487d
+  zh: 1717b165b0f587e3
+/deepseek-ai-dsh-tool-skill-search/use-this-package/arguments:
+  en: 7c6fd89ac85f87d2
+  zh: f33186daefdd879b
+/deepseek-ai-dsh-tool-skill-search/use-this-package/visibility:
+  en: e260dbc1f6baee2f
+  zh: dcfec70b25e33592
+/deepseek-ai-dsh-tool-skill-search/understand-the-implementation:
+  en: ee4615a04fa6503d
+  zh: ee4615a04fa6503d
+/deepseek-ai-dsh-tool-skill-search/understand-the-implementation/search:
+  en: c67ab9cf11664eb2
+  zh: dc6dcaf2a2a9d88a
+/deepseek-ai-dsh-tool-skill-search/understand-the-implementation/load:
+  en: 1116f96e4878d8f3
+  zh: 04735b6e0c3f64df
+/deepseek-ai-dsh-tool-skill-search/further-exploration:
+  en: 214b19c73055f00f
+  zh: dd068ae2ebd52b5c
+/deepseek-ai-dsh-tool-skill-search/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-tool-skill-search/model-experience/discovery-instead-of-a-catalog:
+  en: 9ad4a6fae6ca96c0
+  zh: 8e98cf84cad0eef4
+/deepseek-ai-dsh-tool-skill-search/model-experience/token-effect:
+  en: f69119b2f2927512
+  zh: a9a8cc74b18bc50e
+/deepseek-ai-dsh-tool-skill-search/model-experience/kv-cache-effect:
+  en: bd9f7887b079df8e
+  zh: 55583e687e12c848
+/deepseek-ai-dsh-tool-skill-search/known-limitations-and-deferred-work:
+  en: 255a42f7124eba76
+  zh: 255a42f7124eba76
+/deepseek-ai-dsh-tool-skill-search/known-limitations-and-deferred-work/this-row-replaces-the-tool-skill-row:
+  en: 56188508f918fd28
+  zh: 25ba82337e57fc06
+/deepseek-ai-dsh-tool-skill-search/known-limitations-and-deferred-work/search-is-substring-matching:
+  en: 27e08f115b3437bf
+  zh: 73f30f90a61cc74c
+/deepseek-ai-dsh-tool-skill-search/known-limitations-and-deferred-work/no-published-invariant:
+  en: 49cc691bd822b899
+  zh: f17bc58d9c38cbd9

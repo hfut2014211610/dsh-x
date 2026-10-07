@@ -548,6 +548,7 @@
       "@deepseek-ai/dsh-tool-ralph": ["./packages/workflow/tool-ralph/src"],
       "@deepseek-ai/dsh-tool-session-query": ["./packages/session-query/tool-session-query/src"],
       "@deepseek-ai/dsh-tool-skill": ["./packages/skill/tool-skill/src"],
+      "@deepseek-ai/dsh-tool-skill-search": ["./packages/skill/tool-skill-search/src"],
       "@deepseek-ai/dsh-tool-str-replace-editor": ["./packages/fs/tool-str-replace-editor/src"],
       "@deepseek-ai/dsh-tool-subagent": ["./packages/subagent/tool-subagent/src"],
       "@deepseek-ai/dsh-tool-subagent/invariant": ["./packages/subagent/tool-subagent/src/invariant.ts"],
