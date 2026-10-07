@@ -535,6 +535,7 @@
       "@deepseek-ai/dsh-tool-bash-persistent": ["./packages/shell/tool-bash-persistent/src"],
       "@deepseek-ai/dsh-tool-bootstrap": ["./packages/tool/tool-bootstrap/src"],
       "@deepseek-ai/dsh-tool-cordis": ["./packages/extensions/tool-cordis/src"],
+      "@deepseek-ai/dsh-tool-dev-search": ["./packages/tool/tool-dev-search/src"],
       "@deepseek-ai/dsh-tool-documents": ["./packages/writing/tool-documents/src"],
       "@deepseek-ai/dsh-tool-documents/invariant": ["./packages/writing/tool-documents/src/invariant.ts"],
       "@deepseek-ai/dsh-tool-fs": ["./packages/fs/tool-fs/src"],

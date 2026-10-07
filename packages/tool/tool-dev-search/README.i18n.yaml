@@ -1,0 +1,61 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/tool/tool-dev-search/README.md
+/deepseek-ai-dsh-tool-dev-search:
+  en: 7a92112a9fa4f2ab
+  zh: cb02b5516f8c0e1b
+/deepseek-ai-dsh-tool-dev-search/summary:
+  en: 23f4a62a9ade53a3
+  zh: b48ecc636c6b3ad8
+/deepseek-ai-dsh-tool-dev-search/table-of-contents:
+  en: 89197243ecf2f127
+  zh: 89197243ecf2f127
+/deepseek-ai-dsh-tool-dev-search/use-this-package:
+  en: bbff250eba0f1b89
+  zh: bbff250eba0f1b89
+/deepseek-ai-dsh-tool-dev-search/use-this-package/row-order:
+  en: 15d3a69b6b0cb0f3
+  zh: 26f175067facfd16
+/deepseek-ai-dsh-tool-dev-search/use-this-package/arguments:
+  en: b12cc88e3d00cff4
+  zh: 748f4ae7a0859346
+/deepseek-ai-dsh-tool-dev-search/understand-the-implementation:
+  en: ee4615a04fa6503d
+  zh: ee4615a04fa6503d
+/deepseek-ai-dsh-tool-dev-search/understand-the-implementation/what-the-model-sees-first:
+  en: bc049f40e24dbc39
+  zh: f6f26f832ce981f7
+/deepseek-ai-dsh-tool-dev-search/understand-the-implementation/search:
+  en: 90597e989d62c1c5
+  zh: 3a247246324638f4
+/deepseek-ai-dsh-tool-dev-search/understand-the-implementation/unlock:
+  en: bedba4656c5f72f6
+  zh: 8b07760a77182495
+/deepseek-ai-dsh-tool-dev-search/further-exploration:
+  en: 0c34840fc0963f4c
+  zh: 770ad84bd5310e95
+/deepseek-ai-dsh-tool-dev-search/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-tool-dev-search/model-experience/the-discovery-round-trip:
+  en: fccb8d3879493df6
+  zh: e4b91f12e1a4105c
+/deepseek-ai-dsh-tool-dev-search/model-experience/token-effect:
+  en: b9045c50c8434831
+  zh: 894efcd7e032f1fd
+/deepseek-ai-dsh-tool-dev-search/model-experience/kv-cache-effect:
+  en: e49c4c1e3879054b
+  zh: ee6176cb09bcbc60
+/deepseek-ai-dsh-tool-dev-search/known-limitations-and-deferred-work:
+  en: 255a42f7124eba76
+  zh: 255a42f7124eba76
+/deepseek-ai-dsh-tool-dev-search/known-limitations-and-deferred-work/unlock-takes-effect-on-the-next-request:
+  en: 7fb0fada8f5a865d
+  zh: 1e9991aae9f4aae2
+/deepseek-ai-dsh-tool-dev-search/known-limitations-and-deferred-work/search-sees-one-scope:
+  en: b1a29de19a820e5f
+  zh: c9a43dc6317c73cd
+/deepseek-ai-dsh-tool-dev-search/known-limitations-and-deferred-work/no-published-invariant:
+  en: b81eb70509c1d853
+  zh: 8aad7fa5ec86b762

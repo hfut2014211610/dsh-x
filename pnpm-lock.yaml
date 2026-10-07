@@ -14013,6 +14013,21 @@ importers:
         specifier: workspace:*
         version: link:../../core/system-prompt
 
+  packages/tool/tool-dev-search:
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-agent':
+        specifier: workspace:*
+        version: link:../../core/agent
+      '@deepseek-ai/dsh-llm':
+        specifier: workspace:*
+        version: link:../../llm/llm
+      '@deepseek-ai/dsh-tools':
+        specifier: workspace:*
+        version: link:../../core/tools
+
   packages/typert/generator:
     dependencies:
       '@jridgewell/gen-mapping':
