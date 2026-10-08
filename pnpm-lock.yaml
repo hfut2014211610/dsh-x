@@ -10793,6 +10793,19 @@ importers:
         specifier: workspace:*
         version: link:../../core/system-prompt
 
+  packages/preset/ued-mode:
+    dependencies:
+      '@deepseek-ai/schemastery':
+        specifier: link:../../../vendor/schemastery
+        version: link:../../../vendor/schemastery
+    devDependencies:
+      '@deepseek-ai/cordis':
+        specifier: workspace:~
+        version: link:../../../vendor/cordis
+      '@deepseek-ai/dsh-system-prompt':
+        specifier: workspace:*
+        version: link:../../core/system-prompt
+
   packages/ptc-runtime/ptc-runtime:
     devDependencies:
       '@deepseek-ai/cordis':

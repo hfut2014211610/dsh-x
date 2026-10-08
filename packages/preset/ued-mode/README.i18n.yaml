@@ -1,0 +1,58 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/preset/ued-mode/README.md
+/deepseek-ai-dsh-ued-mode:
+  en: f410ab3ef40f9081
+  zh: 134713ba6e847a1a
+/deepseek-ai-dsh-ued-mode/summary:
+  en: b0d8cceeeababb3c
+  zh: be363b033e4e0ae8
+/deepseek-ai-dsh-ued-mode/table-of-contents:
+  en: 4110e5e666d988f3
+  zh: 4110e5e666d988f3
+/deepseek-ai-dsh-ued-mode/use-this-package:
+  en: bbff250eba0f1b89
+  zh: bbff250eba0f1b89
+/deepseek-ai-dsh-ued-mode/use-this-package/row-order:
+  en: c0579998542248f5
+  zh: 6acb4eedac82ee83
+/deepseek-ai-dsh-ued-mode/use-this-package/configuration:
+  en: 7497bf645c6cbe99
+  zh: 0de28bc00e04876b
+/deepseek-ai-dsh-ued-mode/understand-the-implementation:
+  en: ee4615a04fa6503d
+  zh: ee4615a04fa6503d
+/deepseek-ai-dsh-ued-mode/understand-the-implementation/the-two-hazards:
+  en: 6edefd85e9e149ac
+  zh: e827f0da0b0fc4f0
+/deepseek-ai-dsh-ued-mode/understand-the-implementation/why-this-is-policy:
+  en: 47c58436afd150ed
+  zh: 541672e7507782cc
+/deepseek-ai-dsh-ued-mode/further-exploration:
+  en: bbaaa96dc375694c
+  zh: aa12a5f29d9c22e6
+/deepseek-ai-dsh-ued-mode/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-ued-mode/model-experience/the-policy-section:
+  en: 884dfbb0cbb06348
+  zh: fbf5254672521762
+/deepseek-ai-dsh-ued-mode/model-experience/token-effect:
+  en: bfa31ff89deaea3b
+  zh: 286f0f2d9bdab914
+/deepseek-ai-dsh-ued-mode/model-experience/kv-cache-effect:
+  en: bb0bb1084c85cd0e
+  zh: 69bf5ccd1c6432d5
+/deepseek-ai-dsh-ued-mode/known-limitations-and-deferred-work:
+  en: 255a42f7124eba76
+  zh: 255a42f7124eba76
+/deepseek-ai-dsh-ued-mode/known-limitations-and-deferred-work/the-policy-is-advisory:
+  en: 83f51e7cd1952420
+  zh: 5355f896126e5393
+/deepseek-ai-dsh-ued-mode/known-limitations-and-deferred-work/the-tool-names-must-match-the-composition:
+  en: a9f9074f39be3bbc
+  zh: 44ef166889f8633a
+/deepseek-ai-dsh-ued-mode/known-limitations-and-deferred-work/no-published-invariant:
+  en: 8d5293f5efe69388
+  zh: 1cf9c7a846c6c143

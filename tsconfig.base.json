@@ -563,6 +563,7 @@
       "@deepseek-ai/dsh-tool-workspace-dependencies": ["./packages/skill/tool-workspace-dependencies/src"],
       "@deepseek-ai/dsh-tools": ["./packages/core/tools/src"],
       "@deepseek-ai/dsh-tools/invariant": ["./packages/core/tools/src/invariant.ts"],
+      "@deepseek-ai/dsh-ued-mode": ["./packages/preset/ued-mode/src"],
       "@deepseek-ai/dsh-usage-stats": ["./packages/session/usage-stats/src"],
       "@deepseek-ai/dsh-usage-stats/invariant": ["./packages/session/usage-stats/src/invariant.ts"],
       "@deepseek-ai/dsh-user-approval": ["./packages/interaction/user-approval/src"],
