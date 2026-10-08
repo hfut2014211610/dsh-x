@@ -409,6 +409,7 @@
     { "path": "./packages/tool/tool-bootstrap" },
     { "path": "./packages/tool/tool-dev-search" },
     { "path": "./packages/skill/tool-skill-search" },
+    { "path": "./packages/shell/tool-bash-windows" },
     { "path": "./packages/context/agent-instruction-hint" },
     { "path": "./packages/context/session-guide" },
     { "path": "./packages/compaction/command-compact" },

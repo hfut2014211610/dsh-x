@@ -1,0 +1,64 @@
+# Bilingual-pair consistency record for README.md (docs/i18n/README.md): per heading
+# section, a hash of its English and Chinese blocks outside code blocks and generated regions.
+# After editing either side, bring the other along and re-record with:
+#   pnpm run verify-translation-pairing --write packages/shell/tool-bash-windows/README.md
+/deepseek-ai-dsh-tool-bash-windows:
+  en: 996f25d3e06d5a37
+  zh: 574635aef8686494
+/deepseek-ai-dsh-tool-bash-windows/summary:
+  en: 6f56ffee53bb1d56
+  zh: f66ff8849772fbed
+/deepseek-ai-dsh-tool-bash-windows/table-of-contents:
+  en: b10e8cb4caacecd2
+  zh: b10e8cb4caacecd2
+/deepseek-ai-dsh-tool-bash-windows/use-this-package:
+  en: bbff250eba0f1b89
+  zh: bbff250eba0f1b89
+/deepseek-ai-dsh-tool-bash-windows/use-this-package/row-order:
+  en: 5434982b0a660df8
+  zh: 9a2ca7ac5c8b77ec
+/deepseek-ai-dsh-tool-bash-windows/use-this-package/configuration:
+  en: 30894ff3cb3fbbe9
+  zh: 72a96001a1cfbb90
+/deepseek-ai-dsh-tool-bash-windows/use-this-package/mount-time-preflight:
+  en: 88697b40a8da5076
+  zh: 71e0a577469bb275
+/deepseek-ai-dsh-tool-bash-windows/understand-the-implementation:
+  en: ee4615a04fa6503d
+  zh: ee4615a04fa6503d
+/deepseek-ai-dsh-tool-bash-windows/understand-the-implementation/executable-discovery:
+  en: b6720d8119a033d2
+  zh: a04b219eb153cbf0
+/deepseek-ai-dsh-tool-bash-windows/understand-the-implementation/one-command-per-call:
+  en: 7de75d39b7cf2d08
+  zh: 7017eb7e1637b934
+/deepseek-ai-dsh-tool-bash-windows/understand-the-implementation/exit-codes:
+  en: d37f78a1ceb1c9bb
+  zh: 1a5fdec10348c553
+/deepseek-ai-dsh-tool-bash-windows/further-exploration:
+  en: be6d890bb9f0da17
+  zh: 53864f4959faa4cb
+/deepseek-ai-dsh-tool-bash-windows/model-experience:
+  en: 215e7ba838619b7b
+  zh: 215e7ba838619b7b
+/deepseek-ai-dsh-tool-bash-windows/model-experience/the-bash-tool:
+  en: 60c64bea3bc69902
+  zh: 12879b091e06cf03
+/deepseek-ai-dsh-tool-bash-windows/model-experience/token-effect:
+  en: 80898c123d931e3f
+  zh: 79832b7d27516080
+/deepseek-ai-dsh-tool-bash-windows/model-experience/kv-cache-effect:
+  en: 9bc52f88dfde3848
+  zh: acc944e09635868e
+/deepseek-ai-dsh-tool-bash-windows/known-limitations-and-deferred-work:
+  en: 255a42f7124eba76
+  zh: 255a42f7124eba76
+/deepseek-ai-dsh-tool-bash-windows/known-limitations-and-deferred-work/no-windows-sandbox-confinement:
+  en: 1f60d5d63c071de5
+  zh: aad4ff985a5c19e4
+/deepseek-ai-dsh-tool-bash-windows/known-limitations-and-deferred-work/state-does-not-persist:
+  en: d56455a8dfd05ed7
+  zh: fb5fd1f6b2086522
+/deepseek-ai-dsh-tool-bash-windows/known-limitations-and-deferred-work/no-published-invariant:
+  en: 5f18a1df48ac6425
+  zh: 466d975863fc8991
