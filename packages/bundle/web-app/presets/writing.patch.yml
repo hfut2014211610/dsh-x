@@ -1,0 +1,25 @@
+# Agent preset writing: one `@deepseek-ai/dsh-agent-preset` declaration
+# inserted after the web patch. Edits saved from the Web editor override this
+# row's `config.plugins` by id from the profile patch.
+#
+# The documents service and the UI writing plugin are host-plane rows in the
+# web bundle; what this preset chooses is whether its agent can reach them.
+- insert:
+    - id: preset-writing
+      name: '@deepseek-ai/dsh-agent-preset'
+      config:
+        id: writing
+        name: 写作模式
+        description: 面向文档编写与修订的写作 Agent，只提供 document_* 文档工具。
+        order: 5
+        plugins:
+          - id: persona
+            name: '@deepseek-ai/dsh-persona'
+            config:
+              prefix: >-
+                You are a writing assistant powered by the {{model}} model. Your working directory is {{cwd}}.
+                You help draft, revise, outline, search, and edit documents. Use the document_* tools for all document work.
+          - id: writing-mode
+            name: '@deepseek-ai/dsh-writing-mode'
+          - id: tool-documents
+            name: '@deepseek-ai/dsh-tool-documents'
