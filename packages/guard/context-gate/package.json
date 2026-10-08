@@ -43,7 +43,10 @@
                             "@deepseek-ai/dsh-session":  "workspace:*",
                             "@deepseek-ai/dsh-session-projection":  "workspace:*",
                             "@deepseek-ai/dsh-system-prompt":  "workspace:*",
-                            "@deepseek-ai/dsh-scope":  "workspace:*"
+                            "@deepseek-ai/dsh-scope":  "workspace:*",
+                            "@deepseek-ai/dsh-app-boot":  "workspace:*",
+                            "@deepseek-ai/dsh-agent-loop-testkit":  "workspace:*",
+                            "@deepseek-ai/dsh-loader-smoke":  "workspace:*"
                         },
     "dependencies":  {
                          "@deepseek-ai/schemastery":  "workspace:~"

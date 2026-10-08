@@ -1,0 +1,39 @@
+# Real-composition fixture for the context gate: the rows one anchored-standard
+# composition mounts to observe injection suppression. Booted as a subprocess
+# through the same app/boot path a deployment uses, driven by
+# `../../loader.spec.ts`.
+#
+# `time-context` stands in for whatever a deployment injects: it contributes one
+# runtime context per assembly and one message per step, which is exactly what the
+# gate is supposed to suppress before promotion and preserve after it.
+- id: system-prompt
+  name: '@deepseek-ai/dsh-system-prompt'
+
+- id: session-persistence
+  name: '@deepseek-ai/dsh-session-persistence'
+
+- id: session-projections
+  name: '@deepseek-ai/dsh-session-projection'
+
+# Supplies the `compaction/end` event the gate's epoch state folds.
+- id: compaction
+  name: '@deepseek-ai/dsh-compaction'
+
+- id: agents
+  name: '@deepseek-ai/dsh-agent'
+
+# Contributes the `sandbox:policy` runtime context, the same family of
+# deployment policy snapshots the gate's header names. Its text is non-empty for
+# any assembly carrying an agent's session.
+- id: sandbox-policy
+  name: '@deepseek-ai/dsh-sandbox-policy'
+
+# `time-context` contributes one message per step, which is the second
+# interception path the gate owns.
+- id: time-context
+  name: '@deepseek-ai/dsh-time-context'
+
+- id: context-gate
+  name: '@deepseek-ai/dsh-context-gate'
+  config:
+    promoteOn: either
