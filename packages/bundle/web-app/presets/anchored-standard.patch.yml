@@ -14,8 +14,6 @@
       name: '@deepseek-ai/dsh-agent-preset'
       config:
         id: anchored-standard
-        name: 锚定标准模式
-        description: 首轮以 Minimal 双工具与零注入上下文锚定轨迹，首个持久回复后晋升为按需解锁的 Standard 工具集。
         order: 1.5
         plugins:
           - id: context-gate
@@ -320,9 +318,12 @@
           # registered once. This preset contributes the delegation TOOLS, which resolve
           # that host registry.
           #
-          # `workflows` is different — nothing outside an agent reads it — so every row
-          # that reaches it shares one entry-local realm here, and a consumer left
-          # outside would resolve a host registry this preset does not populate.
+          # `workflowEngine` itself is entry-local here, so every row that reaches
+          # it shares one realm: the workflow runtime provider below and the two
+          # consumer tools. Upstream retired `@deepseek-ai/dsh-workflow-worker-thread`
+          # in favour of running orchestration in the PTC sandbox, so this preset
+          # mounts `@deepseek-ai/dsh-workflow-ptc` — the same row the shipped
+          # `standard` preset uses — as the engine this realm provides.
           #
           # `tool-subagent-report` is host-plane for the same reason as the registry,
           # not because a preset may not want it: it registers a CONTINUABLE SETUP on
@@ -376,8 +377,8 @@
                   enableRunInBackground: false
                   maxDepth: provider-managed
 
-              - id: workflow-worker-thread
-                name: '@deepseek-ai/dsh-workflow-worker-thread'
+              - id: workflow-ptc
+                name: '@deepseek-ai/dsh-workflow-ptc'
                 config:
                   provider: spawn
 

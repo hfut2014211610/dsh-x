@@ -21,6 +21,12 @@ const guides = new Map<string, PresetGuide>([
   ['ptc', { name: 'presetPtcName', intro: 'guidePtcIntro', explanation: 'guidePtcExplanation', usage: 'guidePtcUsage' }],
   ['minimal', { name: 'presetMinimalName', intro: 'guideMinimalIntro', explanation: 'guideMinimalExplanation', usage: 'guideMinimalUsage' }],
   ['cordis', { name: 'presetCordisName', intro: 'guideCordisIntro', explanation: 'guideCordisExplanation', usage: 'guideCordisUsage' }],
+  // The three presets this fork ships from the same bundle. They publish no
+  // `name` either, so they are shipped copy too, and upstream's map is
+  // upstream-tracked — extend it here rather than there.
+  ['anchored-standard', { name: 'presetAnchoredName', intro: 'guideAnchoredIntro', explanation: 'guideAnchoredExplanation', usage: 'guideAnchoredUsage' }],
+  ['writing', { name: 'presetWritingName', intro: 'guideWritingIntro', explanation: 'guideWritingExplanation', usage: 'guideWritingUsage' }],
+  ['ued', { name: 'presetUedName', intro: 'guideUedIntro', explanation: 'guideUedExplanation', usage: 'guideUedUsage' }],
 ])
 
 /**

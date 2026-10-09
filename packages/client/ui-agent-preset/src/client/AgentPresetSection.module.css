@@ -201,6 +201,10 @@
 }
 
 .cardName {
+  /* `flex: 1` so the name takes the row the identifier leaves behind instead of
+     its own content width; without it the name truncates as soon as the
+     identifier widens. */
+  flex: 1;
   min-width: 0;
   font-size: 15px;
   font-weight: 600;
@@ -231,7 +235,11 @@
 }
 
 .cardId {
-  flex-shrink: 0;
+  /* The preset name is what the reader acts on, so it keeps its width when a
+     long identifier competes for the same row. The identifier carries a `title`
+     and is an exact copyable value in the composition viewer, so it is the right
+     side to truncate. */
+  flex-shrink: 1;
   max-width: 35%;
   font-family: var(--dsw-font-mono, ui-monospace, SFMono-Regular, Menlo, monospace);
   font-size: 11px;
