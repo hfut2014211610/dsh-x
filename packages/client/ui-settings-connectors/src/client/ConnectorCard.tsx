@@ -12,7 +12,7 @@
  */
 
 import { useEffect, useId, useState, type ReactNode } from 'react'
-import { IconChevronDownOutline14 } from '@deepseek-ai/dsh-client-ui-primitives'
+import { IconChevronDownOutlineMedium } from '@deepseek-ai/dsh-client-ui-primitives'
 import type { ConnectorFieldState, ConnectorFormState } from './connector-form.ts'
 import type { ConnectorPresenceState } from './connector-presence.ts'
 import type { ConnectorsKey } from './locales.ts'
@@ -122,7 +122,7 @@ export function ConnectorCard(props: ConnectorCardProps) {
             : <span className={css.summary}>{t(props.summaryKey)}</span>}
         </span>
         {state.dirty ? <span className={css.pending}>{t('unsaved')}</span> : null}
-        <IconChevronDownOutline14 className={open ? `${css.chevron} ${css.chevronOpen}` : css.chevron} />
+        <IconChevronDownOutlineMedium className={open ? `${css.chevron} ${css.chevronOpen}` : css.chevron} />
       </button>
       {open
         ? (

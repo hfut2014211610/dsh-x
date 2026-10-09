@@ -14,7 +14,7 @@
 
 import type { Context as ClientContext } from '@deepseek-ai/cordis'
 // Type-only: the settings shell's SlotMap merge (the 'settings.section' entry)
-// and the ctx.settingsScope Context merge. Cross-plugin collaboration goes
+// and the ctx.configForms Context merge. Cross-plugin collaboration goes
 // through the service, never a value import (client bundle purity gate).
 import type {} from '@deepseek-ai/dsh-client-ui-settings/client'
 // Type-only: pulls the locale plugin's Context merge (ctx.locale).
@@ -26,7 +26,7 @@ import type {} from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { ConnectorsSection } from './ConnectorsSection.tsx'
 import type { ConnectorsSectionInjected } from './ConnectorsSection.tsx'
 import { FeishuCard } from './FeishuCard.tsx'
-import { FEISHU_NS, FeishuCardController } from './feishu-card-controller.ts'
+import { FEISHU_NS, FeishuCardController, type FeishuSettings } from './feishu-card-controller.ts'
 import type { ConnectorPluginFace } from './connector-presence.ts'
 import type { AuthRpc } from './feishu-auth-controller.ts'
 import { en, zh, NS } from './locales.ts'
@@ -52,7 +52,7 @@ export type { ConnectorsKey } from './locales.ts'
 
 /** Required services (cordis fiber inject); the slot registration waits on the declaration via `slots.inject()`. */
 export const inject = [
-  'slots', 'locale', 'connection', 'remote', 'settingsScope',
+  'slots', 'locale', 'connection', 'remote', 'configForms',
   'remote.pluginInventory', 'remote.pluginControl',
 ]
 
@@ -85,7 +85,7 @@ export function apply(ctx: ClientContext): void {
   // `feishuAuth/*` 是渠道插件自己挂的 gateway，没有生成出来的 remote 门面，所以
   // 走连接上的裸 RPC 通道——跟模型中心那一页拿 `modelHub/*` 是同一条路。
   const rpc = (ctx.get('connection') as unknown as { rpc: AuthRpc }).rpc
-  const feishu = new FeishuCardController(ctx.settingsScope.bind({ namespace: FEISHU_NS }), plugins, rpc)
+  const feishu = new FeishuCardController(ctx.configForms.get<FeishuSettings>(FEISHU_NS), plugins, rpc)
 
   // Between Plugins (15) and Model Hub (20): a connector is configuration of
   // the deployment, so it belongs with the plugin pages rather than beside

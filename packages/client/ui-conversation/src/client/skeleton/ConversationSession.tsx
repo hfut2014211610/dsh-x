@@ -232,7 +232,7 @@ export function ConversationSessionHeader({
  */
 export function ConversationSession({
   sessionId, useSession, useSessions, useConversation,
-  useInput, inputActions, useStore, actions,
+  useInput, inputActions, useStore, actions, useInspectCall,
   renderSlot, views, bindDraftMirror, releaseSessionImages, openView, t,
 }: ConversationSessionProps) {
   // Same roster source as the header above; see its comment.
@@ -259,8 +259,8 @@ export function ConversationSession({
   const phase = conversationPhase(session, conversation)
   const inputState = useInput(s => s)
   const storedDraft = useStore(s => s.draft)
-  // `?? null`: persisted snapshots from before the inspect/viewRequest fields rehydrate without it.
-  const inspect = useStore(s => (s as { inspect?: { callId: string } | null }).inspect ?? null)
+  const inspectCall = useInspectCall(value => value)
+  // `?? null`: persisted snapshots from before the viewRequest field rehydrate without it.
   const viewRequest = useStore(s => (s as { viewRequest?: { view: string; focus: string } | null }).viewRequest ?? null)
   // null until the panel has been laid out once: the CSS default is a viewport
   // expression, so the first drag has to start from what it actually resolved
@@ -304,8 +304,7 @@ export function ConversationSession({
 
   if (blank && phase === 'blank' && activePreferredId === null) return null
   const owner = {
-    inspect,
-    onInspectDone: () => { (actions as unknown as { setInspect?: (value: null) => void }).setInspect?.(null) },
+    inspectCall,
     viewRequest,
     openView,
     completeViewRequest: () => {

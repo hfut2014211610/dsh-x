@@ -3,10 +3,10 @@
 import { useCallback, useEffect, useRef, useState } from 'react'
 import type { ConvViewProps } from '@deepseek-ai/dsh-client-ui-conversation/client'
 import {
-  IconChevronRightOutline14,
+  IconChevronRightOutlineMedium,
   IconCloseOutlineRegular,
   IconCodeOutlineRegular,
-  IconFolderClose16,
+  IconFolderCloseMedium,
   IconListPenOutlineRegular,
   IconLoadingOutlineRegular,
   IconPlusOutlineRegular,
@@ -297,7 +297,7 @@ export function UedView({
               className={css.row}
               onClick={() => { setDirectory(parentOf(directory)) }}
             >
-              <IconChevronRightOutline14 className={css.up} />
+              <IconChevronRightOutlineMedium className={css.up} />
               <span>{label('files.up')}</span>
             </button>
           )}
@@ -312,7 +312,7 @@ export function UedView({
               className={css.row}
               onClick={() => { setDirectory(entry.path) }}
             >
-              <IconFolderClose16 className={css.rowFolder} />
+              <IconFolderCloseMedium className={css.rowFolder} />
               <span>{entry.name}</span>
             </button>
           ))}

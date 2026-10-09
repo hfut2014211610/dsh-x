@@ -8,7 +8,7 @@
  */
 
 import type { SnapshotStore } from '@deepseek-ai/dsh-client-store'
-import type { SettingsScope } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   ConnectorForm, choiceField, durationField, listField, textField, toggleField,
   type ConnectorActions, type ConnectorFieldState, type ConnectorFormState,
@@ -205,7 +205,7 @@ export interface FeishuCardFace extends ConnectorActions {
   reset: () => void
 }
 
-/** Bridges the `dsh-x-feishu` scope onto the Feishu card's staged form. */
+/** Bridges the `dsh-x-feishu` namespace form onto the Feishu card's staged form. */
 export class FeishuCardController {
   private readonly form: ConnectorForm<FeishuSettings>
   private readonly presence: ConnectorPresenceController
@@ -218,16 +218,16 @@ export class FeishuCardController {
   private confirmingReset = false
 
   /**
-   * @param scope - the bound settings scope for the `dsh-x-feishu` namespace.
+   * @param settings - the shared namespace form for `dsh-x-feishu`.
    * @param plugins - the plugin-tree calls the card's switch runs on.
    * @param rpc - the connection's raw RPC channel, where `feishuAuth/*` lives.
    */
   constructor(
-    scope: SettingsScope<FeishuSettings>,
+    settings: ConfigForm<FeishuSettings>,
     plugins: ConnectorPluginFace,
     private readonly rpc: AuthRpc,
   ) {
-    this.form = new ConnectorForm(scope, [
+    this.form = new ConnectorForm(settings, [
       choiceField('mode', FEISHU_MODES),
       textField('profileId'),
       textField('appId'),

@@ -1,39 +1,39 @@
 /** The staged form behind a connector card: what it shows, and what a save writes. */
 
 import { describe, expect, it, vi } from 'vitest'
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import {
   ConnectorForm, choiceField, durationField, listField, textField, toggleField,
 } from '../src/client/connector-form.ts'
 
 type Section = Record<string, unknown>
 
-/** A settings scope standing in for the host document, with the writes it took. */
-interface FakeScope extends SettingsScope<Section> {
+/** A settings form standing in for the host document, with the writes it took. */
+interface FakeForm extends ConfigForm<Section> {
   /** Replace the served snapshot and notify subscribers. */
-  publish: (patch: Partial<SettingsScopeSnapshot<Section>>) => void
-  /** Every set/unset that crossed this scope, in order. */
+  publish: (patch: Partial<ConfigFormSnapshot<Section>>) => void
+  /** Every set/unset that crossed this form, in order. */
   writes: Array<{ op: 'set' | 'unset'; field: string; value?: unknown }>
 }
 
 /**
- * Build a scope whose writes land in the user layer and show through in the
+ * Build a form whose writes land in the user layer and show through in the
  * effective value, which is what the host does when it takes a mutation.
  * @param options.base - composition layer a cleared field falls back to.
  * @param options.user - user layer the section starts with.
  * @param options.refuse - fields the host silently declines to write.
- * @returns the fake scope.
+ * @returns the fake form.
  */
-function fakeScope(options: {
+function fakeForm(options: {
   base?: Section
   user?: Section
   refuse?: readonly string[]
-} = {}): FakeScope {
+} = {}): FakeForm {
   const base = options.base ?? {}
   const refuse = new Set(options.refuse ?? [])
   const listeners = new Set<() => void>()
-  const writes: FakeScope['writes'] = []
-  let snapshot: SettingsScopeSnapshot<Section> = {
+  const writes: FakeForm['writes'] = []
+  let snapshot: ConfigFormSnapshot<Section> = {
     status: 'ready',
     value: { ...base, ...options.user ?? {} },
     base,
@@ -57,7 +57,7 @@ function fakeScope(options: {
         snapshot = { ...snapshot, user, value: { ...base, ...user } }
         notify()
       }
-      return Promise.resolve()
+      return Promise.resolve(true)
     },
     unset: (field) => {
       writes.push({ op: 'unset', field })
@@ -68,11 +68,11 @@ function fakeScope(options: {
         snapshot = { ...snapshot, user, value: { ...base, ...user } }
         notify()
       }
-      return Promise.resolve()
+      return Promise.resolve(true)
     },
     // The form under test only calls set/unset; mutate stays a stub to
-    // satisfy the scope face.
-    mutate: () => Promise.resolve(),
+    // satisfy the form face.
+    mutate: () => Promise.resolve(true),
     publish: (patch) => {
       snapshot = { ...snapshot, ...patch }
       notify()
@@ -142,19 +142,19 @@ describe('saving a list', () => {
   // by reference would report every list save as refused while it in fact
   // landed — and the card would keep drafts nobody needs to fix.
   it('counts as landed even though the host hands back another array', async () => {
-    const scope = fakeScope()
-    const form = new ConnectorForm(scope, [listField('groupAllowlist')])
+    const settings = fakeForm()
+    const form = new ConnectorForm(settings, [listField('groupAllowlist')])
 
     form.actions().edit('groupAllowlist', 'oc_a\noc_b')
     await form.save()
 
-    expect(scope.writes).toEqual([{ op: 'set', field: 'groupAllowlist', value: ['oc_a', 'oc_b'] }])
+    expect(settings.writes).toEqual([{ op: 'set', field: 'groupAllowlist', value: ['oc_a', 'oc_b'] }])
     expect(form.state()).toMatchObject({ dirty: false, failed: false })
   })
 
   it('still reports a list the host would not take', async () => {
-    const scope = fakeScope({ refuse: ['groupAllowlist'] })
-    const form = new ConnectorForm(scope, [listField('groupAllowlist')])
+    const settings = fakeForm({ refuse: ['groupAllowlist'] })
+    const form = new ConnectorForm(settings, [listField('groupAllowlist')])
 
     form.actions().edit('groupAllowlist', 'oc_a')
     await form.save()
@@ -165,7 +165,7 @@ describe('saving a list', () => {
 
 describe('ConnectorForm', () => {
   it('shows the effective value and marks a field the user layer carries', () => {
-    const form = new ConnectorForm(fakeScope({ base: { flushMs: 2500 }, user: { presetId: 'writing' } }), SPECS)
+    const form = new ConnectorForm(fakeForm({ base: { flushMs: 2500 }, user: { presetId: 'writing' } }), SPECS)
 
     expect(form.field('presetId')).toEqual({ text: 'writing', overridden: true, invalid: false })
     // Inherited from the composition layer: shown, but not an override.
@@ -174,34 +174,34 @@ describe('ConnectorForm', () => {
   })
 
   it('reports the namespace as absent when this deployment serves no section', () => {
-    const scope = fakeScope()
-    const form = new ConnectorForm(scope, SPECS)
-    scope.publish({ status: 'unavailable', writable: false })
+    const settings = fakeForm()
+    const form = new ConnectorForm(settings, SPECS)
+    settings.publish({ status: 'unavailable', writable: false })
 
     expect(form.state()).toMatchObject({ status: 'absent', writable: false })
   })
 
   it('carries the loading status through untouched', () => {
-    const scope = fakeScope()
-    const form = new ConnectorForm(scope, SPECS)
-    scope.publish({ status: 'loading' })
+    const settings = fakeForm()
+    const form = new ConnectorForm(settings, SPECS)
+    settings.publish({ status: 'loading' })
 
     expect(form.state().status).toBe('loading')
   })
 
   it('stages an edit without writing, then writes every staged field on save', async () => {
-    const scope = fakeScope({ base: { flushMs: 2500 } })
-    const form = new ConnectorForm(scope, SPECS)
+    const settings = fakeForm({ base: { flushMs: 2500 } })
+    const form = new ConnectorForm(settings, SPECS)
     const { edit } = form.actions()
 
     edit('presetId', 'writing')
     edit('flushMs', '4000')
-    expect(scope.writes).toEqual([])
+    expect(settings.writes).toEqual([])
     expect(form.state()).toMatchObject({ dirty: true, invalid: false })
 
     await form.save()
 
-    expect(scope.writes).toEqual([
+    expect(settings.writes).toEqual([
       { op: 'set', field: 'presetId', value: 'writing' },
       { op: 'set', field: 'flushMs', value: 4000 },
     ])
@@ -209,7 +209,7 @@ describe('ConnectorForm', () => {
   })
 
   it('drops a staged edit that restates what the section already carries', () => {
-    const form = new ConnectorForm(fakeScope({ user: { presetId: 'writing' } }), SPECS)
+    const form = new ConnectorForm(fakeForm({ user: { presetId: 'writing' } }), SPECS)
 
     form.actions().edit('presetId', 'writing')
 
@@ -217,53 +217,53 @@ describe('ConnectorForm', () => {
   })
 
   it('blocks the save while a draft is not a value its field takes', async () => {
-    const scope = fakeScope()
-    const form = new ConnectorForm(scope, SPECS)
+    const settings = fakeForm()
+    const form = new ConnectorForm(settings, SPECS)
 
     form.actions().edit('flushMs', 'soon')
 
     expect(form.field('flushMs')).toEqual({ text: 'soon', overridden: false, invalid: true })
     expect(form.state()).toMatchObject({ dirty: true, invalid: true })
     await form.save()
-    expect(scope.writes).toEqual([])
+    expect(settings.writes).toEqual([])
   })
 
   it('clears an override on reset and shows what the field falls back to', async () => {
-    const scope = fakeScope({ base: { flushMs: 2500 }, user: { flushMs: 4000 } })
-    const form = new ConnectorForm(scope, SPECS)
+    const settings = fakeForm({ base: { flushMs: 2500 }, user: { flushMs: 4000 } })
+    const form = new ConnectorForm(settings, SPECS)
 
     form.actions().resetField('flushMs')
 
     expect(form.field('flushMs')).toEqual({ text: '2500', overridden: false, invalid: false })
     await form.save()
-    expect(scope.writes).toEqual([{ op: 'unset', field: 'flushMs' }])
+    expect(settings.writes).toEqual([{ op: 'unset', field: 'flushMs' }])
     expect(form.field('flushMs').overridden).toBe(false)
   })
 
   it('writes nothing when a field with no override is reset', async () => {
-    const scope = fakeScope({ base: { flushMs: 2500 } })
-    const form = new ConnectorForm(scope, SPECS)
+    const settings = fakeForm({ base: { flushMs: 2500 } })
+    const form = new ConnectorForm(settings, SPECS)
 
     form.actions().resetField('flushMs')
 
     expect(form.state().dirty).toBe(false)
     await form.save()
-    expect(scope.writes).toEqual([])
+    expect(settings.writes).toEqual([])
   })
 
   it('clears the field when the draft is emptied', async () => {
-    const scope = fakeScope({ base: { presetId: 'standard' }, user: { presetId: 'writing' } })
-    const form = new ConnectorForm(scope, SPECS)
+    const settings = fakeForm({ base: { presetId: 'standard' }, user: { presetId: 'writing' } })
+    const form = new ConnectorForm(settings, SPECS)
 
     form.actions().edit('presetId', '')
     await form.save()
 
-    expect(scope.writes).toEqual([{ op: 'unset', field: 'presetId' }])
+    expect(settings.writes).toEqual([{ op: 'unset', field: 'presetId' }])
   })
 
   it('keeps the drafts and says so when the host did not take a write', async () => {
-    const scope = fakeScope({ refuse: ['presetId'] })
-    const form = new ConnectorForm(scope, SPECS)
+    const settings = fakeForm({ refuse: ['presetId'] })
+    const form = new ConnectorForm(settings, SPECS)
 
     form.actions().edit('presetId', 'writing')
     await form.save()
@@ -273,8 +273,8 @@ describe('ConnectorForm', () => {
   })
 
   it('clears the failure on the next edit', async () => {
-    const scope = fakeScope({ refuse: ['presetId'] })
-    const form = new ConnectorForm(scope, SPECS)
+    const settings = fakeForm({ refuse: ['presetId'] })
+    const form = new ConnectorForm(settings, SPECS)
     form.actions().edit('presetId', 'writing')
     await form.save()
 
@@ -284,31 +284,31 @@ describe('ConnectorForm', () => {
   })
 
   it('writes through the action a card binds to its save button', async () => {
-    const scope = fakeScope()
-    const form = new ConnectorForm(scope, SPECS)
+    const settings = fakeForm()
+    const form = new ConnectorForm(settings, SPECS)
     const actions = form.actions()
     actions.edit('presetId', 'writing')
 
     actions.save()
-    await vi.waitFor(() => { expect(scope.writes).toHaveLength(1) })
+    await vi.waitFor(() => { expect(settings.writes).toHaveLength(1) })
 
     expect(form.state().dirty).toBe(false)
   })
 
   it('refuses a second save while one is crossing the wire', async () => {
-    const scope = fakeScope()
-    const form = new ConnectorForm(scope, SPECS)
+    const settings = fakeForm()
+    const form = new ConnectorForm(settings, SPECS)
     form.actions().edit('presetId', 'writing')
 
     const first = form.save()
     await form.save()
     await first
 
-    expect(scope.writes).toHaveLength(1)
+    expect(settings.writes).toHaveLength(1)
   })
 
   it('drops every staged edit on discard, and does nothing when there is none', () => {
-    const form = new ConnectorForm(fakeScope(), SPECS)
+    const form = new ConnectorForm(fakeForm(), SPECS)
     const listener = vi.fn()
     const store = form.bind(() => form.state().dirty)
     store.subscribe(listener)
@@ -324,18 +324,18 @@ describe('ConnectorForm', () => {
     expect(form.field('presetId').text).toBe('')
   })
 
-  it('republishes when the scope moves underneath', () => {
-    const scope = fakeScope()
-    const form = new ConnectorForm(scope, SPECS)
+  it('republishes when the form moves underneath', () => {
+    const settings = fakeForm()
+    const form = new ConnectorForm(settings, SPECS)
     const store = form.bind(() => form.field('presetId').text)
 
-    scope.publish({ value: { presetId: 'ued' } })
+    settings.publish({ value: { presetId: 'ued' } })
 
     expect(store.getSnapshot()).toBe('ued')
   })
 
   it('refuses to read a field the card never declared', () => {
-    const form = new ConnectorForm(fakeScope(), SPECS)
+    const form = new ConnectorForm(fakeForm(), SPECS)
 
     expect(() => form.field('nope')).toThrow('connector card has no field nope')
   })

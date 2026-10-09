@@ -7,7 +7,7 @@ import { SlotRegistry } from '@deepseek-ai/dsh-client-ui-renderer/client'
 import { LocaleRuntime } from '@deepseek-ai/dsh-client-locale/client'
 import { TestRemote } from '@deepseek-ai/dsh-client-test-runtime'
 import { SettingsSchemaService } from '@deepseek-ai/dsh-client-ui-settings/src/client/schema.ts'
-import { SettingsScopeBinder } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-scope.ts'
+import { ConfigForms } from '@deepseek-ai/dsh-client-ui-settings/src/client/config-form.ts'
 import { SettingsDescribeMirror } from '@deepseek-ai/dsh-client-ui-settings/src/client/settings-mirror.ts'
 import { apply, inject } from '../src/client/index.ts'
 import type { ConnectorsSectionInjected } from '../src/client/ConnectorsSection.tsx'
@@ -28,8 +28,8 @@ async function bench() {
     ok: false as const,
     error: { code: 'settings/rejected', message: 'denied' },
   }))
-  // The card binds its scope through the Settings surface's service, and
-  // forwarded host events reach it through the test double's explicit emit
+  // The card binds its namespace form through the Settings surface's service,
+  // and forwarded host events reach it through the test double's explicit emit
   // driver.
   const remote = new TestRemote(ctx, { settings: { describe: describeSettings } })
   remote.$host = { home: undefined, isLoopback: true }
@@ -38,9 +38,9 @@ async function bench() {
   ctx.provide('connection', {
     rpc: { call: rpcCall },
   } as never)
-  // The Settings surface constructs its scope service in its own fiber; the
-  // same construction here gives the card the `settingsScope` service.
-  new SettingsScopeBinder(ctx, {
+  // The Settings surface constructs its forms service in its own fiber; the
+  // same construction here gives the card the `configForms` service.
+  new ConfigForms(ctx, {
     mirror: new SettingsDescribeMirror(ctx, 'host'),
     schema: new SettingsSchemaService(ctx),
     persistence: 'host',
@@ -64,7 +64,7 @@ function declareRoot(slots: SlotRegistry): () => void {
 describe('ui-settings-connectors apply', () => {
   it('declares the services it uses', () => {
     expect(inject).toEqual([
-      'slots', 'locale', 'connection', 'remote', 'settingsScope',
+      'slots', 'locale', 'connection', 'remote', 'configForms',
       'remote.pluginInventory', 'remote.pluginControl',
     ])
   })

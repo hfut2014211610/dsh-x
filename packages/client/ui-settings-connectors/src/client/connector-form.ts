@@ -18,7 +18,7 @@
  * here.
  */
 
-import type { SettingsScope, SettingsScopeSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
+import type { ConfigForm, ConfigFormSnapshot } from '@deepseek-ai/dsh-client-ui-settings/client'
 import { createSnapshotStore, type SnapshotStore } from '@deepseek-ai/dsh-client-store'
 
 /** The write one field's staged text performs when the card is saved. */
@@ -222,7 +222,7 @@ export function choiceField(field: string, choices: readonly string[]): Connecto
  * Stages one connector's edits over one settings namespace and writes them on save.
  *
  * The form publishes through a snapshot store because slot components read
- * through a snapshot selector, while both the scope and the local drafts move
+ * through a snapshot selector, while both the namespace form and the local drafts move
  * underneath; every projection is rebuilt from the two together.
  */
 export class ConnectorForm<T> {
@@ -233,16 +233,16 @@ export class ConnectorForm<T> {
   private failed = false
 
   /**
-   * @param scope - the bound settings scope for this connector's namespace.
+   * @param form - the shared namespace form backing this connector's fields.
    * @param specs - the section fields this card edits.
    */
-  constructor(private readonly scope: SettingsScope<T>, specs: readonly ConnectorFieldSpec[]) {
+  constructor(private readonly form: ConfigForm<T>, specs: readonly ConnectorFieldSpec[]) {
     this.specs = new Map(specs.map(spec => [spec.field, spec]))
-    scope.subscribe(() => { this.publish() })
+    form.subscribe(() => { this.publish() })
   }
 
   /**
-   * Publish a projection of this form, rebuilt whenever the scope or a draft changes.
+   * Publish a projection of this form, rebuilt whenever the namespace form or a draft changes.
    * @param project - build the card's state from the form's current reads.
    * @returns the store the card's component reads through its bound selector.
    */
@@ -253,7 +253,7 @@ export class ConnectorForm<T> {
   }
 
   /**
-   * Run something whenever the scope or a draft changes.
+   * Run something whenever the namespace form or a draft changes.
    *
    * For the follow-on work a change implies but a projection must not do: a
    * projection can be rebuilt at any time and has to stay free of effects.
@@ -268,7 +268,7 @@ export class ConnectorForm<T> {
    * @returns the form state the card renders from.
    */
   state(): ConnectorFormState {
-    const snapshot = this.scope.getSnapshot()
+    const snapshot = this.form.getSnapshot()
     const plan = this.plan()
     return {
       status: snapshot.status === 'unavailable' ? 'absent' : snapshot.status,
@@ -365,12 +365,12 @@ export class ConnectorForm<T> {
   }
 
   private async clear(field: string): Promise<boolean> {
-    await this.scope.unset(field)
+    await this.form.unset(field)
     return !this.stored(field)
   }
 
   private async store(field: string, value: unknown): Promise<boolean> {
-    await this.scope.set(field, value)
+    await this.form.set(field, value)
     return sameValue(this.userLayer()?.[field], value)
   }
 
@@ -388,8 +388,8 @@ export class ConnectorForm<T> {
     return spec
   }
 
-  private snapshotOf(): SettingsScopeSnapshot<T> {
-    return this.scope.getSnapshot()
+  private snapshotOf(): ConfigFormSnapshot<T> {
+    return this.form.getSnapshot()
   }
 
   private sectionValue(field: string): unknown {

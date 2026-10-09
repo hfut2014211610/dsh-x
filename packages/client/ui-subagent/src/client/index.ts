@@ -35,8 +35,12 @@ export const inject = ['sessions', 'uiWorkspace', 'slots', 'locale', 'sidebarRig
 
 /** Claim the composer for one-shot history or an unavailable continuation owner. */
 function selectReadOnlySubagent(owner: ComposerChainProps): SubagentReadOnlyMatch | null {
-  const subagent = owner.session?.subagent
-  if (subagent === undefined || subagent === null) return null
+  // The chain currency is a Session or a Conversation, and only a Session
+  // carries subagent facts, so a Conversation never claims the composer.
+  const session = owner.session
+  if (session === undefined || !('subagent' in session)) return null
+  const subagent = session.subagent
+  if (subagent === null) return null
   if (subagent.address.mode === 'unknown') return { reason: 'unknown' }
   if (subagent.address.mode === 'one-shot') return { reason: 'one-shot' }
   // Until a Host summary establishes parent availability, keep the normal

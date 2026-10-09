@@ -6,11 +6,11 @@ import type { ConvViewProps } from '@deepseek-ai/dsh-client-ui-conversation/clie
 import {
   IconBrowseOutlineRegular,
   IconCheckOutlineRegular,
-  IconChevronRightOutline14,
+  IconChevronRightOutlineMedium,
   IconCloseOutlineRegular,
   IconCodeOutlineRegular,
-  IconFolderClose16,
-  IconFolderOpen16,
+  IconFolderCloseMedium,
+  IconFolderOpenMedium,
   IconFolderOpenOutlineRegular,
   IconListPenOutlineRegular,
   IconLoadingOutlineRegular,
@@ -224,10 +224,10 @@ function DirectoryBranch({
               }}
             >
               {directory
-                ? <IconChevronRightOutline14 className={`${css.treeChevron}${open ? ` ${css.treeChevronOpen}` : ''}`} />
+                ? <IconChevronRightOutlineMedium className={`${css.treeChevron}${open ? ` ${css.treeChevronOpen}` : ''}`} />
                 : <span className={css.treeChevronSeat} />}
               {directory
-                ? open ? <IconFolderOpen16 className={css.treeFolder} /> : <IconFolderClose16 className={css.treeFolder} />
+                ? open ? <IconFolderOpenMedium className={css.treeFolder} /> : <IconFolderCloseMedium className={css.treeFolder} />
                 : <IconCodeOutlineRegular className={css.treeFile} />}
               <span className={css.treeName}>{entry.name}</span>
             </button>

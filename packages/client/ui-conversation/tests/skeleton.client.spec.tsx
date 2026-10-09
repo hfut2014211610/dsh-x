@@ -1,5 +1,5 @@
 // @vitest-environment jsdom
-import type { GlobalStandardProps, PropsRuntime } from '@deepseek-ai/dsh-client-ui-slots'
+import type { GlobalStandardProps } from '@deepseek-ai/dsh-client-ui-slots'
 import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest'
 import { createContext, useContext, type ReactNode } from 'react'
 import { act, cleanup, fireEvent, render } from '@testing-library/react'
@@ -284,7 +284,6 @@ function mount(
           useStore={bindSnapshotSelector(store)}
           actions={store.actions}
           renderSlot={renderSlot}
-          useConversationViews={useConversationViews}
           bindDraftMirror={write => wiring.bindMirror(write)}
           views={views}
           openView={(view, focus) => { store.actions.openView(view, focus) }}
@@ -386,7 +385,9 @@ function mount(
       </FactoryViewsTestContext.Provider>
     )
   }) as ConversationSlotProps['renderFactorySlot']
-  const runtimeProps: PropsRuntime<'main.conversation'> & Pick<ConversationSlotProps, 'SessionProvider'> = {
+  // __renders is the renderer's own call-tracking seam, keyed per slot union;
+  // the sub-components this fixture spreads into each declare a narrower union.
+  const runtimeProps: Omit<ConversationSlotProps, 'renderSlot' | 'renderFactorySlot' | '__renders'> = {
     usePanelInfo: selector => selector({ activePanelId: null }),
     sessionId,
     SessionProvider,

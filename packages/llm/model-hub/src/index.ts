@@ -586,7 +586,7 @@ export function apply(ctx: Context, config: Config): void {
     /** Point the compiler at the document as it stands now, not at the entry's boot-time copy. */
     const refresh = (): void => {
       const value = namespaceValue(settingsCtx.settings, NS)
-      if (typeof value === 'object' && value !== null && !Array.isArray(value)) current = () => value as Config
+      if (typeof value === 'object' && value !== null && !Array.isArray(value)) current = () => value
     }
     refresh()
     settingsCtx.on('settings/document-updated', (updated: SettingsNamespace) => {

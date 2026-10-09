@@ -30,7 +30,12 @@ async function bench() {
   await reference.ready
   const hub = new InputHub(runtime.ctx, makeTranslate(zh, {}))
   const fiber = runtime.ctx.plugin(ConversationController, {
-    input: hub, blocks: new ComposerBlockRegistry(), maxConcurrentFileUploads: 2,
+    input: hub,
+    blocks: new ComposerBlockRegistry(),
+    // The stop shortcut reads no preferred or companion View.
+    preferredViews: { declare: () => () => {} },
+    companionViews: { declare: () => () => {} },
+    maxConcurrentFileUploads: 2,
   })
   await fiber.await()
   const conversation = new UiConversation(runtime.ctx, runtime.sessions)

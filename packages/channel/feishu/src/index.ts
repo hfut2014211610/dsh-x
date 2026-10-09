@@ -262,7 +262,7 @@ export function apply(ctx: Context, config: Config): void {
     const refresh = (): void => {
       const value = settingsCtx.settings.describe({ redactSecrets: true })
         .find(descriptor => descriptor.ns === NS)?.value
-      if (isRecord(value)) source = () => value as Config
+      if (isRecord(value)) source = () => value
     }
     refresh()
     settingsCtx.on('settings/document-updated', (updated: SettingsNamespace) => {

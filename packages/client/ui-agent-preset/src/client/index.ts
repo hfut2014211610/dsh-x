@@ -164,7 +164,7 @@ export function apply(ctx: ClientContext): void {
 
     const labelInjected = (sessionId: SessionId): AgentPresetLabelInjected => {
       const binding = scope.sessions.binding(sessionId)
-      const seat = binding === undefined ? unboundSeat : seatFor(scope, binding)
+      const seat = binding === undefined ? unboundSeat : seatFor(binding)
       return {
         hooks: { agentPresets: controller.store, agentPresetSeat: seat.store },
         load: () => controller.load(),
