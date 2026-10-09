@@ -311,6 +311,9 @@ export function ConversationSession({
       (actions as unknown as { completeViewRequest?: () => void }).completeViewRequest?.()
     },
   }
+  // `companion` above is already the validated declaration: it is null unless
+  // it names a different View that actually registered. Rendering the split for
+  // an unvalidated one would size the composer to a panel that is not there.
   if (companion === null) {
     return (
       <div className={css.viewArea}>

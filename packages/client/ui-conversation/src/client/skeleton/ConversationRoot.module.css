@@ -272,6 +272,59 @@ button.crumb:hover {
   min-height: 0;
 }
 
+/* Preferred/companion View layout: the primary View keeps the full height on
+   the left, the companion rides beside it in a resizable column. Every child
+   needs an explicit stretch — `<main>` is `display: block` by default, so
+   without `min-height: 0` here it would size to its content instead of the
+   row, and a View that fills its box (Writing, UED) would collapse to a strip. */
+.companionViewArea {
+  flex-direction: row;
+  align-items: stretch;
+  gap: 0;
+}
+
+.primaryView {
+  display: flex;
+  flex: 1 1 auto;
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.companionPanel {
+  display: flex;
+  /* Sized from the shared property rather than its own box: a drag writes that
+     property, and the resident composer reads it too. A width set here would
+     leave the column dragging while the composer resized on its own. */
+  flex: 0 0 var(--dsh-companion-width, 320px);
+  width: var(--dsh-companion-width, 320px);
+  flex-direction: column;
+  min-width: 0;
+  min-height: 0;
+  overflow: hidden;
+}
+
+.companionHeader {
+  display: flex;
+  flex: none;
+  align-items: center;
+  min-height: 40px;
+  padding: 0 12px;
+  font-size: 13px;
+  font-weight: 600;
+  color: var(--dsw-alias-label-primary);
+  border-bottom: 0.5px solid var(--dsw-alias-border-subtle);
+}
+
+.companionBody {
+  display: flex;
+  flex: 1;
+  flex-direction: column;
+  min-height: 0;
+  overflow: hidden;
+}
+
 /* Width handles: 40px col-resize strips beside the transcript, absolute in
    .body (NOT the scrollport: an absolute strip there would extend the
    scrollable range; NOT .root: a strip from the column top would paint its
