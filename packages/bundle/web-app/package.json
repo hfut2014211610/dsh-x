@@ -191,7 +191,18 @@
                          "@deepseek-ai/dsh-tool-dev-search":  "workspace:*",
                          "@deepseek-ai/dsh-tool-skill-search":  "workspace:*",
                          "@deepseek-ai/dsh-tool-bash-windows":  "workspace:*",
-                         "@deepseek-ai/dsh-ued-mode":  "workspace:*"
+                         "@deepseek-ai/dsh-ued-mode":  "workspace:*",
+                         "@deepseek-ai/dsh-documents-local":  "workspace:*",
+                         "@deepseek-ai/dsh-usage-stats":  "workspace:*",
+                         "@deepseek-ai/dsh-model-hub":  "workspace:*",
+                         "@deepseek-ai/dsh-feishu":  "workspace:*",
+                         "@deepseek-ai/dsh-host-plugin-control":  "workspace:*",
+                         "@deepseek-ai/dsh-host-instance-lock":  "workspace:*",
+                         "@deepseek-ai/dsh-client-ui-model-hub":  "workspace:*",
+                         "@deepseek-ai/dsh-client-ui-settings-usage":  "workspace:*",
+                         "@deepseek-ai/dsh-client-ui-settings-connectors":  "workspace:*",
+                         "@deepseek-ai/dsh-client-ui-writing":  "workspace:*",
+                         "@deepseek-ai/dsh-client-ui-ued":  "workspace:*"
                      },
     "peerDependencies":  {
                              "@deepseek-ai/cordis":  "workspace:~",
@@ -212,22 +223,11 @@
                             "@deepseek-ai/dsh-system-prompt":  "workspace:*",
                             "@deepseek-ai/dsh-typert-registry":  "workspace:*",
                             "@deepseek-ai/libreoffice-kit":  "^0.1.1",
-                            "@deepseek-ai/dsh-otel":  "workspace:*",
-                            "@deepseek-ai/dsh-client-ui-model-hub":  "workspace:*",
-                            "@deepseek-ai/dsh-client-ui-settings-usage":  "workspace:*",
-                            "@deepseek-ai/dsh-client-ui-settings-connectors":  "workspace:*",
-                            "@deepseek-ai/dsh-client-ui-writing":  "workspace:*",
-                            "@deepseek-ai/dsh-client-ui-ued":  "workspace:*",
-                            "@deepseek-ai/dsh-host-plugin-control":  "workspace:*",
-                            "@deepseek-ai/dsh-host-instance-lock":  "workspace:*",
-                            "@deepseek-ai/dsh-model-hub":  "workspace:*",
-                            "@deepseek-ai/dsh-feishu":  "workspace:*",
-                            "@deepseek-ai/dsh-session-projection-cache":  "workspace:*",
-                            "@deepseek-ai/dsh-usage-stats":  "workspace:*",
-                            "@deepseek-ai/dsh-storage":  "workspace:*",
-                            "@deepseek-ai/dsh-storage-domain":  "workspace:*",
-                            "@deepseek-ai/dsh-storage-json":  "workspace:*",
-                            "@deepseek-ai/dsh-documents":  "workspace:*",
-                            "@deepseek-ai/dsh-documents-local":  "workspace:*"
-                        }
+                             "@deepseek-ai/dsh-otel":  "workspace:*",
+                             "@deepseek-ai/dsh-session-projection-cache":  "workspace:*",
+                             "@deepseek-ai/dsh-storage":  "workspace:*",
+                             "@deepseek-ai/dsh-storage-domain":  "workspace:*",
+                             "@deepseek-ai/dsh-storage-json":  "workspace:*",
+                             "@deepseek-ai/dsh-documents":  "workspace:*"
+                         }
 }
