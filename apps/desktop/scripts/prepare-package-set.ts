@@ -114,14 +114,20 @@ export function selectDesktopPackageClosure(
       if (available.has(dependency)) visit(dependency)
     }
   }
-  for (const name of [...ROOT_PACKAGES, ...[...patchRoots].sort()]) {
+  for (const name of ROOT_PACKAGES) {
     if (!available.has(name)) {
       if (workspaceNames.has(name)) {
-        throw new Error(`desktop package set: packed inputs omit unpacked package ${name}`)
+        throw new Error(`desktop package set: packed inputs omit ${name}`)
       }
       continue
     }
     visit(name)
+  }
+  // A bundle patch names plugins its own profile enables; a target that packs none of them still
+  // ships a working runtime, so an absent one joins the set when the inputs provide it and is
+  // otherwise left to npm resolution.
+  for (const name of [...patchRoots].sort()) {
+    if (available.has(name)) visit(name)
   }
   return [...selected.entries()].sort(([left], [right]) => left.localeCompare(right)).map(([, packed]) => packed)
 }
