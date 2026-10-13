@@ -1,22 +1,28 @@
 name: Desktop release
 
-# Package the upstream Electron shell (apps/desktop) for Windows x64 from THIS
-# commit's packed dsh family closure, so fork packages ride the runtime, then
-# upload the installer to a GitHub Release.
+# Package the upstream Electron shell (apps/desktop) for Windows x64 and
+# macOS arm64 from THIS commit's packed dsh family closure, so fork packages
+# ride the runtime, then upload the installers to a GitHub Release.
 #
 # The fork holds no code-signing certificate and no Apple Developer identity,
 # and upstream 0.1.6 made both platforms refuse to package without one:
 # `validateDesktopPackageEnvironment` requires a real `CSC_LINK` p12 plus a
 # notarization strategy before any macOS build starts, and Windows signing needs
-# an EV token in a SafeNet key container. Only `--unsigned` skips that
-# preflight, and it accepts win-x64 alone, so this flow ships Windows only.
+# an EV token in a SafeNet key container. This fork relaxes `--unsigned` to
+# accept macOS targets so both platforms can ship from one unsigned flow; the
+# built artifacts keep the `-unsigned` suffix and land in `unsigned-artifacts`,
+# so nothing claims a signature or a notarization that did not happen.
 #
 # `--unsigned` also drops the update channel: the builder emits no
 # `app-update.yml` and no `latest.yml`, which leaves the packaged app's update
 # coordinator disabled (`existsSync(app-update.yml)`) rather than pointing it at
 # the upstream Tencent COS deployment. Installs are therefore manual — download
-# the `.exe` from the Release. Restoring auto-update needs a signed Windows
-# build, or a fork-owned overlay that publishes a `github` provider.
+# the installer from the Release. Restoring auto-update needs signed builds on
+# both platforms, or a fork-owned overlay that publishes a `github` provider.
+#
+# The macOS app is unsigned, so Gatekeeper blocks first launch: users remove the
+# quarantine attribute (`xattr -dr com.apple.quarantine`) or open it from
+# Finder's right-click Open.
 
 on:
   workflow_dispatch:
@@ -122,3 +128,72 @@ jobs:
           $installer = Get-ChildItem -Path "$dir/*" -Include *.exe | ForEach-Object { $_.FullName }
           if (-not $installer) { throw "missing installer: $dir/*.exe" }
           gh release upload $env:RELEASE_TAG $installer --clobber
+
+  macos:
+    runs-on: macos-14
+    name: macOS arm64 / dmg
+    timeout-minutes: 90
+    steps:
+      - uses: actions/checkout@v6
+        with:
+          persist-credentials: false
+
+      - uses: pnpm/action-setup@v4
+        with:
+          dest: ${{ runner.temp }}/setup-pnpm
+
+      - uses: actions/setup-node@v6
+        with:
+          node-version: '24'
+
+      - name: Write the release settings
+        # macOS reads the same three values from a per-platform dotenv; the
+        # mandatory-update origin is the placeholder the Windows job uses, and
+        # a transport failure against it stays fail-open.
+        run: |
+          cat > apps/desktop/.env.macos <<'EOF'
+          DSH_DESKTOP_APP_ID=com.deepseek.harness
+          DSH_DESKTOP_AUTO_UPDATE_ENV=production
+          DSH_DESKTOP_MANDATORY_UPDATE_PROD_ORIGIN=https://github.com
+          EOF
+
+      - name: Install (immutable)
+        run: pnpm install --frozen-lockfile
+
+      - name: Download the Electron binary
+        # The workspace denies install scripts; the binary the packager needs
+        # comes from the Electron package's own installer on demand.
+        run: node apps/desktop/node_modules/electron/install.js
+
+      - name: Build the desktop shell
+        run: pnpm --filter @deepseek-ai/dsh-desktop run build
+
+      - name: Package mac-arm64
+        env:
+          DSH_DESKTOP_VERSION: ${{ env.FORK_VERSION }}
+        # No CSC_LINK and no Apple identity: this is the unsigned path the fork
+        # added, so the dmg lands in unsigned-artifacts/ without a signature.
+        run: pnpm --filter @deepseek-ai/dsh-desktop run package:mac:arm64:unsigned
+
+      - name: Upload artifacts
+        uses: actions/upload-artifact@v4
+        with:
+          name: desktop-macos-arm64
+          path: |
+            apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/*.dmg
+          if-no-files-found: error
+
+      - name: Attach the installer to the release
+        if: ${{ env.RELEASE_TAG != '' }}
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          # Top level only, so the mac-unpacked helper binaries and
+          # builder-debug.yml never reach the release.
+          shopt -s nullglob
+          installers=(apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/*.dmg)
+          if [ ${#installers[@]} -eq 0 ]; then
+            echo "missing installer: apps/desktop/.desktop-build/targets/mac-arm64/unsigned-artifacts/*.dmg" >&2
+            exit 1
+          fi
+          gh release upload "$RELEASE_TAG" "${installers[@]}" --clobber
