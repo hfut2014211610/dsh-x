@@ -48,7 +48,7 @@ jobs:
   windows:
     runs-on: windows-latest
     name: windows x64 / nsis
-    timeout-minutes: 60
+    timeout-minutes: 120
     steps:
       - name: Allow plain files in place of repository symlinks
         # snapshots/session/office-skills holds two committed symlinks. A Windows
@@ -103,7 +103,11 @@ jobs:
 
       - name: Build the desktop shell
         shell: pwsh
-        run: pnpm --filter @deepseek-ai/dsh-desktop run build
+        # The repository build, not the desktop package's own `tsc -b`: a client
+        # package resolves a sibling's typert declarations from lib/, which
+        # tsdown emits and tsc does not, so a bare desktop build has no types to
+        # read on a clean checkout.
+        run: pnpm run build
 
       - name: Package win-x64
         shell: pwsh
@@ -181,7 +185,11 @@ jobs:
         run: node apps/desktop/node_modules/electron/install.js
 
       - name: Build the desktop shell
-        run: pnpm --filter @deepseek-ai/dsh-desktop run build
+        # The repository build, not the desktop package's own `tsc -b`: a client
+        # package resolves a sibling's typert declarations from lib/, which
+        # tsdown emits and tsc does not, so a bare desktop build has no types to
+        # read on a clean checkout.
+        run: pnpm run build
 
       - name: Package mac-arm64
         env:
