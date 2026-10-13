@@ -50,6 +50,14 @@ jobs:
     name: windows x64 / nsis
     timeout-minutes: 60
     steps:
+      - name: Allow plain files in place of repository symlinks
+        # snapshots/session/office-skills holds two committed symlinks. A Windows
+        # runner's git has no symlink privilege, so checkout aborts before any
+        # packaging step runs unless the entries land as plain files. macOS
+        # keeps real symlinks and needs nothing here.
+        shell: pwsh
+        run: git config --global core.symlinks false
+
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
@@ -134,6 +142,13 @@ jobs:
     name: macOS arm64 / dmg
     timeout-minutes: 90
     steps:
+      - name: Allow plain files in place of repository symlinks
+        # snapshots/session/office-skills holds two committed symlinks, and the
+        # Homebrew git this runner prefers refuses to write them, so checkout
+        # aborts before any packaging step runs. Only the packing runtime needs
+        # the tree, and it reads these as plain files.
+        run: git config --global core.symlinks false
+
       - uses: actions/checkout@v6
         with:
           persist-credentials: false
