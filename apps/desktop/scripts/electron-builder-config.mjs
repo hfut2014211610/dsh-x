@@ -239,14 +239,16 @@ const resourcesDir = context.packager.getResourcesDir(context.appOutDir)
         await verifyMacOSAppUpdateConfig(appPath, resolveMacOSAppUpdateFeed(context.packager.config.publish),
           context.packager.appInfo.updaterCacheDirName)
       }
-      verifyMacOSSignatureAfterSign(context, macOSSigning ?? resolveMacOSSigningEnvironment(env))
+      // An unsigned build resolved no identity, so there is no signature to verify.
+      if (macOSSigning !== undefined) verifyMacOSSignatureAfterSign(context, macOSSigning)
     },
     artifactBuildCompleted: artifact => {
       if (!artifact.file.endsWith('.dmg')) return
+      if (macOSSigning === undefined) return
       return notarizeMacOSDiskImageArtifact(
         artifact,
         env,
-        macOSSigning ?? resolveMacOSSigningEnvironment(env),
+        macOSSigning,
       )
     },
     win: {
